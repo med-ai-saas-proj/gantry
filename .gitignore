@@ -1,0 +1,11 @@
+# Byte-compiled / optimized / DLL files
+*__pycache__*
+.idea
+.vscode
+!.vscode/launch.json
+
+# Environments
+.env
+*.yml
+
+venv/
