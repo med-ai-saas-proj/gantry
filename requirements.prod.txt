@@ -6,3 +6,5 @@ pandas==2.2.2
 numpy==2.0.1
 fastapi==0.111.1
 requests==2.27.1
+orjson==3.11.3
+structlog==25.4.0
