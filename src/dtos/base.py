@@ -14,6 +14,8 @@ class GenerateTypeAdapter(Generic[T]):
         return dto
 
 
-@with_config(config=ConfigDict(use_enum_values=True, plugin_settings={"observe": "all"}))
+@with_config(
+    ConfigDict(use_enum_values=True, plugin_settings={"observe": "all"})
+)
 class BaseDTO(TypedDict):
     pass
