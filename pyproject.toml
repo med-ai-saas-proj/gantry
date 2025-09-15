@@ -1,10 +1,11 @@
 [project]
-name = "hist-api-integration"
+name = "app"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "alembic>=1.16.5",
     "fastapi[standard]>=0.116.1",
     "numpy>=2.3.3",
     "orjson>=3.11.3",
@@ -48,8 +49,4 @@ reportTypedDictNotRequiredAccess = false
 exclude = ["*.pyi?$", "*__pycache__*", "venv"]
 
 [dependency-groups]
-dev = [
-    "black>=25.1.0",
-    "flake8>=7.3.0",
-    "ipython>=9.5.0",
-]
+dev = ["black>=25.1.0", "flake8>=7.3.0", "ipython>=9.5.0"]
