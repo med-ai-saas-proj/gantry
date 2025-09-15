@@ -2,7 +2,9 @@ import os
 
 
 class CommonConsts:
-    ROOT_FOLDER = os.path.abspath(os.path.join(os.path.abspath(__file__), 3 * "../"))
+    ROOT_FOLDER = os.path.abspath(
+        os.path.join(os.path.abspath(__file__), 3 * "../")
+    )
     TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 

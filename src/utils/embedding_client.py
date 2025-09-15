@@ -1,15 +1,19 @@
 import numpy as np
 from typing import List, Optional
-from sentence_transformers import SentenceTransformer
+
+# from sentence_transformers import SentenceTransformer
 
 from src.utils.logger import LOGGER
 
 
 class EmbeddingClient:
-    def __init__(self, model_name: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"):
+    def __init__(
+        self,
+        model_name: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+    ):
         self.model_name = model_name
         self.model = None
-        self._load_model()
+        # self._load_model()
 
     def _load_model(self):
         """Load the sentence transformer model"""
@@ -62,13 +66,17 @@ class EmbeddingClient:
                 return []
 
             # Clean texts
-            cleaned_texts = [text.strip() for text in texts if text and text.strip()]
+            cleaned_texts = [
+                text.strip() for text in texts if text and text.strip()
+            ]
 
             if not cleaned_texts:
                 return []
 
             # Generate embeddings in batch
-            embeddings = self.model.encode(cleaned_texts, convert_to_tensor=False)
+            embeddings = self.model.encode(
+                cleaned_texts, convert_to_tensor=False
+            )
 
             # Convert to list of lists
             return [embedding.tolist() for embedding in embeddings]
@@ -77,7 +85,9 @@ class EmbeddingClient:
             LOGGER.error(f"Failed to generate batch embeddings: {str(e)}")
             raise Exception(f"Batch embedding generation failed: {str(e)}")
 
-    def calculate_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
+    def calculate_similarity(
+        self, embedding1: List[float], embedding2: List[float]
+    ) -> float:
         """
         Calculate cosine similarity between two embeddings
 
@@ -110,7 +120,10 @@ class EmbeddingClient:
             return 0.0
 
     def find_most_similar(
-        self, query_embedding: List[float], candidate_embeddings: List[List[float]], threshold: float = 0.5
+        self,
+        query_embedding: List[float],
+        candidate_embeddings: List[List[float]],
+        threshold: float = 0.5,
     ) -> Optional[int]:
         """
         Find the most similar embedding from candidates
@@ -131,7 +144,9 @@ class EmbeddingClient:
             best_index = None
 
             for i, candidate in enumerate(candidate_embeddings):
-                similarity = self.calculate_similarity(query_embedding, candidate)
+                similarity = self.calculate_similarity(
+                    query_embedding, candidate
+                )
 
                 if similarity > best_similarity and similarity >= threshold:
                     best_similarity = similarity
