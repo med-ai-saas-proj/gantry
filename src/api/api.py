@@ -1,16 +1,13 @@
-from typing import List
-
 from fastapi import APIRouter
-from fastapi.responses import FileResponse
-from starlette.responses import JSONResponse
-import os
+from fastapi.responses import JSONResponse
 
-from src.consts.common import MessageConsts
+# from src.custom_types.responses import C
+from .v1 import v1_router
 from src.dtos import BaseDTO
 
 
 class ErrorDetailModel(BaseDTO):
-    field: List[str]
+    field: list[str]
 
 
 class ErrorResponseModel(BaseDTO):
@@ -20,6 +17,7 @@ class ErrorResponseModel(BaseDTO):
 
 
 api_router = APIRouter(
+    prefix="/api",
     default_response_class=JSONResponse,
     responses={
         400: {"model": ErrorResponseModel},
@@ -29,9 +27,4 @@ api_router = APIRouter(
     },
 )
 
-
-@api_router.get("/healthcheck", include_in_schema=False)
-def healthcheck():
-    return JSONResponse(
-        status_code=200, content={"message": MessageConsts.SUCCESS}
-    )
+api_router.include_router(v1_router)

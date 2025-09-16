@@ -1,3 +1,1 @@
 from .base import BaseDTO, GenerateTypeAdapter
-from .add_regulations import IAddRegulationForm, AddRegulationForm
-from .add_predefined_questions import IAddPredefinedQuestionPayload, AddPredefinedQuestionPayload
