@@ -1,18 +1,23 @@
 import json
+import time
 from typing import Any
+import uuid
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
+from starlette.datastructures import MutableHeaders
 from starlette.responses import JSONResponse
 
 from src.api import api_router
-from src.consts.common import MessageConsts
+from src.consts.common import CommonConsts, MessageConsts
 from src.consts.env import EnvConsts
 from src.custom_types.responses.error import CErrorResponse
 from src.dtos.base import PYDANTIC_DISCRIMINATOR_KEY
+from src.initialize.request_id import REQUEST_ID_CONTEXTVAR, REQUEST_ID_VARS
 from src.utils.logger import LOGGER
+from src.utils.request_id import RequestIdUtils
 
 
 app = FastAPI(
@@ -23,11 +28,19 @@ app = FastAPI(
     # openapi_url="/docs/openapi.json",
     redoc_url="/docs" if EnvConsts.DEBUG else None,
 )
-cors = CORSMiddleware(app, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+cors = CORSMiddleware(
+    app,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(RequestValidationError)
-async def fastapi_exception_handler(request: Request, exception: RequestValidationError):
+async def fastapi_exception_handler(
+    request: Request, exception: RequestValidationError
+):
     errors = exception.errors()
     parsed_errors = {}
     for error in errors:
@@ -43,7 +56,10 @@ async def fastapi_exception_handler(request: Request, exception: RequestValidati
             ref_parsed_errors = ref_parsed_errors[loc]
         mssg_list.append(error["msg"])
     exception_response = CErrorResponse(
-        http_code=400, status_code=400, message=MessageConsts.BAD_REQUEST, errors=parsed_errors
+        http_code=400,
+        status_code=400,
+        message=MessageConsts.BAD_REQUEST,
+        errors=parsed_errors,
     )
     return JSONResponse(
         status_code=exception_response.http_code,
@@ -52,7 +68,9 @@ async def fastapi_exception_handler(request: Request, exception: RequestValidati
 
 
 @app.exception_handler(ValidationError)
-async def pydantic_exception_handler(request: Request, exception: ValidationError):
+async def pydantic_exception_handler(
+    request: Request, exception: ValidationError
+):
     errors = exception.errors()
     parsed_errors = {}
     for error in errors:
@@ -71,7 +89,10 @@ async def pydantic_exception_handler(request: Request, exception: ValidationErro
             ref_parsed_errors = ref_parsed_errors[loc]
         mssg_list.append(error["msg"])
     exception_response = CErrorResponse(
-        http_code=400, status_code=400, message=MessageConsts.BAD_REQUEST, errors=parsed_errors
+        http_code=400,
+        status_code=400,
+        message=MessageConsts.BAD_REQUEST,
+        errors=parsed_errors,
     )
     return JSONResponse(
         status_code=exception_response.http_code,
@@ -97,6 +118,33 @@ async def internal_exception_handler(request: Request, exception):
         status_code=exception.http_code,
         content=error_response,
     )
+
+
+@app.middleware("http")
+async def global_middleware(request: Request, call_next):
+    start_time = time.time_ns() // 1_000_000
+    request_id = request.headers.get(CommonConsts.REQUEST_ID_HEADER, None)
+    if request_id is None:
+        request_id = str(uuid.uuid4())
+        new_header = request.headers.mutablecopy()
+        new_header[CommonConsts.REQUEST_ID_HEADER] = request_id
+        request._headers = new_header
+        request.scope["headers"] = new_header.raw
+    RequestIdUtils.set(request_id)
+    try:
+        res: JSONResponse = await call_next(request)
+        res.headers[CommonConsts.REQUEST_ID_HEADER] = request_id
+        process_time = time.time_ns() // 1_000_000 - start_time
+        LOGGER.info(
+            "Request",
+            requestId=request_id,
+            latencyMs=process_time,
+            method=request.method,
+            url=request.url,
+            status=res.status_code,
+        )
+    finally:
+        RequestIdUtils.reset()
 
 
 app.include_router(router=api_router)

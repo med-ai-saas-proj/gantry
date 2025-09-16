@@ -6,6 +6,7 @@ class CommonConsts:
         os.path.join(os.path.abspath(__file__), 3 * "../")
     )
     TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
+    REQUEST_ID_HEADER = "x-request-id"
 
 
 class MessageConsts:

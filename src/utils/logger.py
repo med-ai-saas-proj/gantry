@@ -3,6 +3,7 @@ import time
 import orjson
 import structlog
 
+from src.utils.request_id import RequestIdUtils
 from src.consts.env import EnvConsts
 
 
@@ -11,16 +12,24 @@ def orjson_renderer(_, __, event_dict):
 
 
 def ms_timestamper(_, __, event_dict):
-    event_dict["latencyMs"] = time.time_ns() // 1_000_000
+    event_dict["timestamp"] = time.time_ns() // 1_000_000
     return event_dict
 
 
-def configure_default_logging(env, logger: logging.Logger) -> structlog.stdlib.BoundLogger:
+def request_ider(_, __, event_dict):
+    event_dict["requestId"] = RequestIdUtils.get()
+    return event_dict
+
+
+def configure_default_logging(
+    env, logger: logging.Logger
+) -> structlog.stdlib.BoundLogger:
     pre_chain = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
         structlog.processors.StackInfoRenderer(),
         ms_timestamper,
+        request_ider,
     ]
     processors = pre_chain
     logger.addHandler(logging.StreamHandler())
