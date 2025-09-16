@@ -1,8 +1,17 @@
 from pydantic_ai import Agent
+from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.providers.anthropic import AnthropicProvider
 from .shared_instruction import add_current_date
 
+from src.consts.env import EnvConsts
+
+
 EHR_SUMMARY_AGENT = Agent(
-    model="anthropic:claude-4-opus-20250514",
+    model=AnthropicModel(
+        "claude-4-opus-20250514",
+        provider=AnthropicProvider(api_key=EnvConsts.ANTHROPIC_API_KEY),
+        settings={"max_tokens": 32000},
+    ),
     name="ehr_summary_agent",
     instructions=[
         """You are a highly skilled clinical summarization assistant. Your user is a busy physician (MD/DO) who needs a rapid, accurate, and clinically relevant overview of a patient's Electronic Health Record (EHR).
@@ -85,5 +94,4 @@ Một câu duy nhất tóm tắt danh tính bệnh nhân và lý do chính nhậ
 * [ví dụ: "Dự kiến xuất viện vào ngày mai nếu ổn định."]""",
         add_current_date,
     ],
-    model_settings={"max_tokens": 32000},
 )
