@@ -3,7 +3,7 @@ services:
     image: pgvector/pgvector:pg16
     container_name: postgres-pgvector
     env_file:
-      - .env.db
+      - .env.postgres
     ports:
       - "5432:5432"
     volumes:
@@ -13,6 +13,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
     restart: unless-stopped
 
 volumes:
