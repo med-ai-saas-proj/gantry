@@ -32,8 +32,10 @@ def configure_default_logging(
         request_ider,
     ]
     processors = pre_chain
+    is_dev = bool(env.lower() == "dev")
+    min_level = logging.DEBUG if is_dev else logging.INFO
     logger.addHandler(logging.StreamHandler())
-    logger.setLevel(logging.INFO)
+    logger.setLevel(min_level)
 
     if env.lower() in ["prod", "dev"]:
         processors += [orjson_renderer]
@@ -43,7 +45,7 @@ def configure_default_logging(
     return structlog.wrap_logger(
         logger,
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
+        wrapper_class=structlog.make_filtering_bound_logger(min_level),
         context_class=dict,
         # logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=True,
