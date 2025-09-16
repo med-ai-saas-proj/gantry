@@ -8,7 +8,7 @@ import json
 from src.dependencies.auth import get_current_user
 from src.entities.user import User
 from src.utils.logger import LOGGER
-from src.utils.dict_utils import xml_to_dict
+from src.utils.dict_utils import DictUtils
 from src.initialize.services import EHR_SUMMARY_SERVICE
 from src.custom_types.responses import CErrorResponse
 
@@ -20,7 +20,7 @@ async def extract_ehr(request: Request):
         body = (await request.body()).decode()
         # LOGGER.debug("XML", body)
         parsed_xml = ElementTree.fromstring(body)
-        body_dict = xml_to_dict(parsed_xml)
+        body_dict = DictUtils.xml_to_dict(parsed_xml)
         if not body_dict:
             raise
         # LOGGER.debug("Converted XML", body_dict)

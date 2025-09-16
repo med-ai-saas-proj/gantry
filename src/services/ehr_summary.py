@@ -3,7 +3,7 @@ from contextlib import _GeneratorContextManager
 from structlog.stdlib import BoundLogger
 from pydantic_ai import Agent
 from src.services.postgres import PostgresService
-from src.utils.dict_utils import remove_empty_and_none_recursive
+from src.utils.dict_utils import DictUtils
 import yaml
 
 
@@ -23,7 +23,7 @@ class EHRSummaryService:
 
     def _process_ehr(self, ehr: dict):
         processed_ehr = yaml.safe_dump(
-            remove_empty_and_none_recursive(ehr),
+            DictUtils.remove_empty_and_none_recursive(ehr),
             indent=2,
             allow_unicode=True,
         )
