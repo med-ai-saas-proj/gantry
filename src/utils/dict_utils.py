@@ -1,11 +1,11 @@
 def remove_empty_and_none_recursive(dict):
     """
-    Recursively removes keys from a dictionary whose values are None, empty strings, empty lists, 
+    Recursively removes keys from a dictionary whose values are None, empty strings, empty lists,
     or empty dictionaries.
     Args:
         dict (dict): The input dictionary to clean.
     Returns:
-        dict: A new dictionary with all keys removed where the value is None, an empty string, 
+        dict: A new dictionary with all keys removed where the value is None, an empty string,
         an empty list, or an empty dictionary. Nested dictionaries are processed recursively.
     Example:
         >>> remove_empty_and_none_recursive({
@@ -19,7 +19,6 @@ def remove_empty_and_none_recursive(dict):
         {'e': {'g': 1}, 'h': 2}
     """
 
-    """
     if not isinstance(dict, dict):
         return dict
     return {
