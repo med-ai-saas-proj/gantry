@@ -1,9 +1,5 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from src.api.auth import auth_router
-from src.api.api_key import api_key_router
-
-# from src.custom_types.responses import C
 from .v1 import v1_router
 from src.dtos import BaseDTO
 
