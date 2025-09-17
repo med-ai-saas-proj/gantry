@@ -26,5 +26,3 @@ api_router = APIRouter(
 )
 
 api_router.include_router(v1_router)
-api_router.include_router(auth_router)
-api_router.include_router(api_key_router)

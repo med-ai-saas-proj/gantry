@@ -1,15 +1,17 @@
+from typing import Optional, Callable
+from contextlib import _GeneratorContextManager
+
 from src.services.postgres import PostgresService
 from src.utils.password import PasswordUtils
 from src.repositories.users import UserRepo
 from src.custom_types.responses import CErrorResponse
 from src.consts.common import MessageConsts
 from src.entities.user import User
-from typing import Optional
 
 
 class UserService:
-    def __init__(self, postgres_service: PostgresService):
-        self.postgres_service = postgres_service
+    def __init__(self, session_scope: Callable[..., _GeneratorContextManager]):
+        self.postgres_service = PostgresService(session_scope)
 
     async def register_user(self, email: str, password: str):
         existing_user = await self.get_user_by_email(email)
