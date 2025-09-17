@@ -7,8 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
-from starlette.datastructures import MutableHeaders
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from src.api import api_router
 from src.consts.common import CommonConsts, MessageConsts
@@ -21,7 +20,7 @@ from src.utils.request_id import RequestIdUtils
 
 
 app = FastAPI(
-    title="backend",
+    title="Venera API",
     description="Welcome to API documentation",
     # root_path="/api/v1",
     docs_url="/docs" if EnvConsts.DEBUG else None,
@@ -132,7 +131,7 @@ async def global_middleware(request: Request, call_next):
         request.scope["headers"] = new_header.raw
     RequestIdUtils.set(request_id)
     try:
-        res: JSONResponse = await call_next(request)
+        res: Response = await call_next(request)
         res.headers[CommonConsts.REQUEST_ID_HEADER] = request_id
         process_time = time.time_ns() // 1_000_000 - start_time
         LOGGER.info(

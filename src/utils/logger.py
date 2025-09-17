@@ -32,7 +32,7 @@ def configure_default_logging(
         request_ider,
     ]
     processors = pre_chain
-    is_dev = bool(env.lower() == "dev")
+    is_dev = env.lower() in ["dev", "local"]
     min_level = logging.DEBUG if is_dev else logging.INFO
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(min_level)

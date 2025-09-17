@@ -1,10 +1,12 @@
-from typing import Callable
-from contextlib import _GeneratorContextManager
-from structlog.stdlib import BoundLogger
-from pydantic_ai import Agent
 from src.services.postgres import PostgresService
 from src.utils.dict_utils import DictUtils
+
 import yaml
+from typing import Callable
+from contextlib import _GeneratorContextManager
+
+from structlog.stdlib import BoundLogger
+from pydantic_ai import Agent
 
 
 class EHRSummaryService:
