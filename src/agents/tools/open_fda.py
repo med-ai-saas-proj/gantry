@@ -1,16 +1,14 @@
 import re
 import requests
 from pydantic_ai import RunContext
+from pydantic_ai.toolsets import FunctionToolset
 from typing import Literal, Optional, TypedDict, NotRequired, Any
-from pydantic import BaseModel, Field
+
+from src.utils.logger import LOGGER
 
 OPEN_FDA_ENDPOINT = "https://api.fda.gov/drug/label.json"
 
-__all__ = [
-    "get_population_specific_drug_info",
-    "get_population_specific_drug_info",
-    "get_drug_safety_and_interaction_info",
-]
+__all__ = ["OPEN_FDA_TOOLSET"]
 
 
 class ToolOutput(TypedDict):
@@ -42,21 +40,30 @@ get_drug_safety_and_interaction_info_return_fields = [
 ]
 
 
-def make_fda_tool(return_fields: list[str], doc_string: str):
+def make_fda_tool(return_fields: list[str], name: str, doc_string: str):
     def get_drug_info(
         ctx: RunContext, drug_name: str, limit: int = 5
     ) -> ToolOutput:
-        return search_openfda(
-            map_properties_to_openfda_fields(
-                {"drug_name": drug_name, "limit": limit},
-                search_fields={
-                    "drug_name": ["openfda.generic_name", "openfda.brand_name"]
-                },
-            ),
-            endpoint_url=OPEN_FDA_ENDPOINT,
-            return_fields=return_fields,
-        )
+        try:
+            LOGGER.debug("Calling tool", name=name, drug_name=drug_name)
+            return search_openfda(
+                map_properties_to_openfda_fields(
+                    {"drug_name": drug_name, "limit": limit},
+                    search_fields={
+                        "drug_name": [
+                            "openfda.generic_name",
+                            "openfda.brand_name",
+                        ]
+                    },
+                ),
+                endpoint_url=OPEN_FDA_ENDPOINT,
+                return_fields=return_fields,
+            )
+        except Exception as e:
+            LOGGER.error("Fail to search openfda", error=str(e))
+            return {"error": "Server error"}
 
+    get_drug_info.__name__ = name
     get_drug_info.__doc__ = (
         doc_string
         + f"""
@@ -71,20 +78,27 @@ Args:
     return get_drug_info
 
 
-get_drug_prescription_info = make_fda_tool(
-    get_drug_prescription_info_return_fields,
-    """Retrieves essential prescription information for a given drug.
+OPEN_FDA_TOOLSET = FunctionToolset(
+    tools=[
+        make_fda_tool(
+            get_drug_prescription_info_return_fields,
+            "get_drug_prescription_info",
+            """Retrieves essential prescription information for a given drug.
 Given a drug name, this function returns drug's description, patient information, boxed warnings, approved uses, and dosage guidelines.)""",
-)
-get_population_specific_drug_info = make_fda_tool(
-    get_population_specific_drug_info_return_fields,
-    """Retrieves drug safety and usage information for specific populations.
+        ),
+        make_fda_tool(
+            get_population_specific_drug_info_return_fields,
+            "get_population_specific_drug_info",
+            """Retrieves drug safety and usage information for specific populations.
 Given a drug name, this function returns detailed guidance on its use during pregnancy, while nursing, and for pediatric and geriatric populations.""",
-)
-get_drug_safety_and_interaction_info = make_fda_tool(
-    get_drug_safety_and_interaction_info_return_fields,
-    """Retrieves safety-related information and drug interactions for a specified drug.
+        ),
+        make_fda_tool(
+            get_drug_safety_and_interaction_info_return_fields,
+            "get_drug_safety_and_interaction_info",
+            """Retrieves safety-related information and drug interactions for a specified drug.
 Given a drug name, this function returns details about overdose risks, contraindications, warnings, potential adverse reactions, and known drug interactions.""",
+        ),
+    ]
 )
 
 

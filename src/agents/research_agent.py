@@ -18,7 +18,7 @@ worker_model = AnthropicModel(
 )
 
 report_model = AnthropicModel(
-    "claude-4-opus-20250514",
+    "claude-4-sonnet-20250514",
     provider=AnthropicProvider(api_key=EnvConsts.ANTHROPIC_API_KEY),
     settings={"max_tokens": 64000},
 )

@@ -32,9 +32,9 @@ class EHRSummaryService:
         result = {"result": ""}
         try:
             async with self.agent.run_stream(self._process_ehr(ehr)) as run:
-                async for output in run.stream_output():
-                    yield output[len(result["result"]) :]
-                    result["result"] = output
+                async for output in run.stream_text(delta=True):
+                    result["result"] += output
+                    yield output
         except Exception as e:
             result["error"] = str(e)
             raise e
@@ -49,8 +49,8 @@ class EHRSummaryService:
         result = {"result": ""}
         try:
             async with self.agent.run_stream(self._process_ehr(ehr)) as run:
-                async for output in run.stream_output():
-                    result["result"] = output
+                async for output in run.stream_text(delta=True):
+                    result["result"] += output
 
             return result["result"]
         except Exception as e:

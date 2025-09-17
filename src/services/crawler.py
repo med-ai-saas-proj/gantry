@@ -7,21 +7,19 @@ from typing import (
     TypedDict,
     Literal,
     Optional,
-    NotRequired,
     AsyncGenerator,
     Iterable,
 )
 from contextlib import _GeneratorContextManager
 
 from structlog.stdlib import BoundLogger
-from pydantic_ai import Agent
 from pydantic import BaseModel
 from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
 from crawl4ai.content_filter_strategy import (
     PruningContentFilter,
     BM25ContentFilter,
 )
-from crawl4ai.deep_crawling import DeepCrawlStrategy
+from crawl4ai.deep_crawling import DeepCrawlStrategy, BFSDeepCrawlStrategy
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
 
 
@@ -74,8 +72,16 @@ class CrawlerService:
         self,
         query: str,
         limit: int = 5,
-        time_range: Optional[SearchTimeRange] = None,
+        time_restrict: Optional[SearchTimeRange] = None,
     ):
+        if limit > 10 or limit < 1:
+            self.logger.error(
+                "Search limit out of range", query=query, limit=limit
+            )
+            raise RuntimeError(
+                f"Failed to search for {query}, limit should be < 10 and > 0"
+            )
+
         params = {
             "key": self.google_search_api_key,
             "cx": self.google_search_cx,
@@ -83,18 +89,24 @@ class CrawlerService:
             "num": limit,
         }
 
-        if time_range:
+        if time_restrict:
             # Google Custom Search supports dateRestrict in the format: d[number], w[number], m[number], y[number]
             unit_map = {"day": "d", "week": "w", "month": "m", "year": "y"}
             params["dateRestrict"] = (
-                f"{unit_map[time_range.unit]}{time_range.num}"
+                f"{unit_map[time_restrict.unit]}{time_restrict.num}"
             )
 
         await self._throttle_search_api()
         response = requests.get(
             "https://www.googleapis.com/customsearch/v1", params=params
         )
-        response.raise_for_status()
+        if not response.ok:
+            self.logger.error(
+                "Failed to search",
+                query=query,
+            )
+            raise RuntimeError(f"Failed to search for {query}")
+
         items = response.json().get("items", [])
 
         results: list[SearchResult] = []
@@ -154,10 +166,13 @@ class CrawlerService:
             deep_crawl_strategy=deep_crawl_strategy,
         )
 
-        if crawler is None:
-            async with AsyncWebCrawler() as crawler:
-                return await self._run_with_crawler(url, config, crawler)
-        return await self._run_with_crawler(url, config, crawler)
+        try:
+            if crawler is None:
+                async with AsyncWebCrawler() as crawler:
+                    return await self._run_with_crawler(url, config, crawler)
+            return await self._run_with_crawler(url, config, crawler)
+        except Exception as e:
+            self.logger.error("Crawl error", url=url, error=str(e))
 
     async def crawl_many(
         self,
@@ -225,7 +240,7 @@ class CrawlerService:
             count: Max number of results to return.
         """
         search_results = await self.search_google(
-            query=query, limit=limit, time_range=time_range
+            query=query, limit=limit, time_restrict=time_range
         )
         # Crawl URLs and merge content into results by URL
         crawled = await self.crawl_many(
@@ -234,6 +249,7 @@ class CrawlerService:
             ignore_links=ignore_links,
             ignore_images=ignore_images,
             escape_html=escape_html,
+            deep_crawl_strategy=BFSDeepCrawlStrategy(max_depth=1, max_pages=20),
         )
         data_by_url = {item.get("url"): item for item in crawled}
         results: list[DiscoverResult] = []

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Venera API Demo</title>
+    <style>
+        :root {
+            --background-color: #1a1a1a;
+            --text-color: #e0e0e0;
+            --primary-color: #007bff;
+            --primary-hover-color: #0056b3;
+            --secondary-color: #2a2a2a;
+            --border-color: #444;
+            --error-color: #dc3545;
+            --success-color: #28a745;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        h1, h2 {
+            color: var(--text-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.5rem;
+        }
+
+        .container {
+            background-color: var(--secondary-color);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: bold;
+        }
+
+        input[type="email"],
+        input[type="password"],
+        input[type="text"],
+        textarea {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+            font-family: "Courier New", Courier, monospace;
+        }
+
+        button {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover-color);
+        }
+        
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+
+        .auth-toggle {
+            color: var(--primary-color);
+            cursor: pointer;
+            text-decoration: underline;
+        }
+
+        .notification {
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            display: none; /* Hidden by default */
+        }
+        
+        .notification.error {
+            background-color: var(--error-color);
+            color: white;
+        }
+        
+        .notification.success {
+            background-color: var(--success-color);
+            color: white;
+        }
+
+        .api-key-display {
+            background-color: var(--background-color);
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: "Courier New", Courier, monospace;
+            word-wrap: break-word;
+            margin-top: 1rem;
+            border: 1px dashed var(--border-color);
+        }
+        
+        .output-panel {
+            background-color: #111;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+            min-height: 50px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: "Courier New", Courier, monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app">
+        <h1>Venera API Demo Client</h1>
+
+        <div id="notification" class="notification"></div>
+
+        <div id="auth-container">
+            <div id="login-view" class="container">
+                <h2>Login</h2>
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required minlength="8">
+                    </div>
+                    <button type="submit">Login</button>
+                </form>
+                <p>Don't have an account? <span class="auth-toggle" onclick="toggleAuthForms()">Register here.</span></p>
+            </div>
+
+            <div id="register-view" class="container hidden">
+                <h2>Register</h2>
+                <form id="register-form">
+                    <div class="form-group">
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" required minlength="8">
+                    </div>
+                    <button type="submit">Register</button>
+                </form>
+                <p>Already have an account? <span class="auth-toggle" onclick="toggleAuthForms()">Login here.</span></p>
+            </div>
+        </div>
+
+        <div id="app-container" class="hidden">
+            <p>Welcome! <button id="logout-btn" style="float: right;">Logout</button></p>
+            
+            <div class="container">
+                <h2>API Key Management</h2>
+                <form id="api-key-form">
+                    <div class="form-group">
+                        <label for="api-key-name">New API Key Name</label>
+                        <input type="text" id="api-key-name" placeholder="e.g., My Test Key" required>
+                    </div>
+                    <button type="submit">Create API Key</button>
+                </form>
+                <div id="api-key-result" class="api-key-display hidden"></div>
+            </div>
+
+            <div class="container">
+                <h2>EHR Summarize Demo</h2>
+                <form id="summarize-form">
+                    <div class="form-group">
+                        <label for="summarize-input">EHR JSON Input</label>
+                        <textarea id="summarize-input" required></textarea>
+                    </div>
+                    <button type="submit">Summarize</button>
+                    <h3>Streaming Output:</h3>
+                    <div id="summarize-output" class="output-panel"></div>
+                </form>
+            </div>
+
+            <div class="container">
+                <h2>Rx Advisor Demo</h2>
+                <form id="rx-advisor-form">
+                    <div class="form-group">
+                        <label for="rx-advisor-input">EHR & Prescription JSON Input</label>
+                        <textarea id="rx-advisor-input" required></textarea>
+                    </div>
+                    <button type="submit">Get Advice</button>
+                     <h3>Streaming Output:</h3>
+                    <div id="rx-advisor-output" class="output-panel"></div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        // -----------------------------------------------------------------
+        // !!! IMPORTANT: CHANGE THIS TO YOUR SERVER'S URL !!!
+        // -----------------------------------------------------------------
+        const API_BASE_URL = window.location.origin; 
+        
+        // --- PRE-FILLED DEMO DATA ---
+        const defaultSummarizeInput = JSON.stringify({
+            "ehr": {
+                "patient_info": "John Doe, a 45-year-old male.",
+                "history": "He has a 10-year history of hypertension, managed with Lisinopril 10mg daily, and type 2 diabetes, controlled with Metformin 500mg twice daily.",
+                "visit_notes": "Patient presents with a persistent dry cough for 3 weeks. Denies fever, chills, or shortness of breath. Physical exam is unremarkable."
+            },
+            "stream": true
+        }, null, 2);
+
+        const defaultRxAdvisorInput = JSON.stringify({
+            "ehr": {
+                "patient_info": "Jane Smith, a 62-year-old female.",
+                "allergies": ["penicillin"],
+                "conditions": ["osteoarthritis", "GERD", "chronic kidney disease stage 3"],
+                "current_medications": ["Omeprazole 20mg daily"]
+            },
+            "prescription": {
+                "medications": ["Naproxen 500mg twice daily for joint pain"]
+            },
+            "stream": true
+        }, null, 2);
+
+
+        // --- DOM ELEMENTS ---
+        const notificationEl = document.getElementById('notification');
+        const authContainer = document.getElementById('auth-container');
+        const appContainer = document.getElementById('app-container');
+        
+        // Auth forms
+        const loginView = document.getElementById('login-view');
+        const registerView = document.getElementById('register-view');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        // API Key section
+        const apiKeyForm = document.getElementById('api-key-form');
+        const apiKeyResultEl = document.getElementById('api-key-result');
+        
+        // Demo sections
+        const summarizeForm = document.getElementById('summarize-form');
+        const summarizeInput = document.getElementById('summarize-input');
+        const summarizeOutput = document.getElementById('summarize-output');
+        const rxAdvisorForm = document.getElementById('rx-advisor-form');
+        const rxAdvisorInput = document.getElementById('rx-advisor-input');
+        const rxAdvisorOutput = document.getElementById('rx-advisor-output');
+        
+        // --- STATE ---
+        let accessToken = localStorage.getItem('venera_access_token');
+
+        // --- UI HELPER FUNCTIONS ---
+
+        function showNotification(message, isError = false) {
+            notificationEl.textContent = message;
+            notificationEl.className = `notification ${isError ? 'error' : 'success'}`;
+            notificationEl.style.display = 'block';
+            setTimeout(() => {
+                notificationEl.style.display = 'none';
+            }, 5000);
+        }
+
+        function toggleAuthForms() {
+            loginView.classList.toggle('hidden');
+            registerView.classList.toggle('hidden');
+        }
+
+        function updateUI() {
+            accessToken = localStorage.getItem('venera_access_token');
+            if (accessToken) {
+                authContainer.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+            } else {
+                authContainer.classList.remove('hidden');
+                appContainer.classList.add('hidden');
+            }
+        }
+        
+        function setFormDisabled(form, disabled) {
+            const button = form.querySelector('button[type="submit"]');
+            if (button) {
+                button.disabled = disabled;
+                button.textContent = disabled ? 'Processing...' : button.dataset.originalText || button.textContent;
+            }
+        }
+        
+        // --- API & STREAMING LOGIC ---
+
+        /**
+         * Generic fetch wrapper for API calls
+         */
+        async function apiFetch(endpoint, options = {}) {
+            accessToken = localStorage.getItem('venera_access_token');
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers,
+            };
+            if (accessToken) {
+                headers['Authorization'] = `Bearer ${accessToken}`;
+            }
+
+            const url = new URL(endpoint, API_BASE_URL)
+            const response = await fetch(url.toString(), { ...options, headers });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ message: "An unknown error occurred." }));
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+            // For streaming responses, we don't parse JSON here
+            if (options.stream) {
+                return response;
+            }
+            // For regular responses, handle no-content or parse JSON
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                return response.json();
+            }
+            return; // No content
+        }
+        
+        /**
+         * Handles Server-Sent Events (SSE) from a fetch response stream
+         */
+        async function handleStreamingRequest(endpoint, body, outputElement) {
+            outputElement.textContent = ''; // Clear previous output
+            let apiKey = ''; // Use the token for these demos, as API key might not have access
+
+            try {
+                const response = await apiFetch(endpoint, {
+                    method: 'POST',
+                    body: JSON.stringify(body),
+                    stream: true
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // Process complete messages in the buffer. A message ends with "\n\n".
+                    let boundary = buffer.indexOf('\n\n');
+                    while (boundary !== -1) {
+                        const message = buffer.substring(0, boundary);
+                        buffer = buffer.substring(boundary + 2);
+
+                        let isDeltaEvent = false;
+                        const lines = message.split('\n');
+                        
+                        for (const line of lines) {
+                            if (line.startsWith('event:')) {
+                                if (line.substring(6).trim() === 'delta') {
+                                    isDeltaEvent = true;
+                                }
+                            } else if (line.startsWith('data:') && isDeltaEvent) {
+                                const dataJson = line.substring(5).trim();
+                                try {
+                                    const data = JSON.parse(dataJson);
+                                    if (data && typeof data.d === 'string') {
+                                        outputElement.textContent += data.d;
+                                    }
+                                } catch (e) {
+                                    console.error("Failed to parse SSE data JSON:", dataJson, e);
+                                }
+                                // Reset for the next data line within the same message block if any
+                                isDeltaEvent = false; 
+                            }
+                        }
+                        boundary = buffer.indexOf('\n\n');
+                    }
+                }
+            } catch (error) {
+                outputElement.textContent = `Error: ${error.message}`;
+                showNotification(error.message, true);
+            }
+        }
+        
+        // --- EVENT HANDLERS ---
+        
+        async function handleRegister(e) {
+            e.preventDefault();
+            const form = e.target;
+            setFormDisabled(form, true);
+            const email = form.querySelector('#register-email').value;
+            const password = form.querySelector('#register-password').value;
+
+            try {
+                await apiFetch('/api/v1/auth/register', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password }),
+                });
+                showNotification("Registration successful! Please log in.", false);
+                toggleAuthForms();
+                form.reset();
+            } catch (error) {
+                showNotification(`Registration failed: ${error.message}`, true);
+            } finally {
+                setFormDisabled(form, false);
+            }
+        }
+        
+        async function handleLogin(e) {
+            e.preventDefault();
+            const form = e.target;
+            setFormDisabled(form, true);
+            const email = form.querySelector('#login-email').value;
+            const password = form.querySelector('#login-password').value;
+
+            try {
+                const data = await apiFetch('/api/v1/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password }),
+                });
+                accessToken = data.data.token;
+                localStorage.setItem('venera_access_token', accessToken);
+                updateUI();
+                form.reset();
+            } catch (error) {
+                showNotification(`Login failed: ${error.message}`, true);
+            } finally {
+                setFormDisabled(form, false);
+            }
+        }
+        
+        function handleLogout() {
+            accessToken = null;
+            localStorage.removeItem('venera_access_token');
+            updateUI();
+        }
+        
+        async function handleCreateApiKey(e) {
+            e.preventDefault();
+            const form = e.target;
+            setFormDisabled(form, true);
+            const name = form.querySelector('#api-key-name').value;
+            apiKeyResultEl.classList.add('hidden');
+            
+            try {
+                const data = await apiFetch('/api/v1/api-key/create', {
+                    method: 'POST',
+                    body: JSON.stringify({ name }),
+                });
+                apiKeyResultEl.textContent = `Your new API Key: ${data.data.api_key}`;
+                apiKeyResultEl.classList.remove('hidden');
+                showNotification("API Key created successfully!", false);
+                form.reset();
+            } catch (error) {
+                showNotification(`Failed to create API key: ${error.message}`, true);
+            } finally {
+                setFormDisabled(form, false);
+            }
+        }
+        
+        async function handleSummarize(e) {
+            e.preventDefault();
+            const form = e.target;
+            setFormDisabled(form, true);
+            try {
+                const body = JSON.parse(summarizeInput.value);
+                await handleStreamingRequest('/api/v1/ehr_summarize', body, summarizeOutput);
+            } catch (error) {
+                showNotification("Invalid JSON in input field.", true);
+            } finally {
+                 setFormDisabled(form, false);
+            }
+        }
+        
+        async function handleRxAdvisor(e) {
+            e.preventDefault();
+            const form = e.target;
+            setFormDisabled(form, true);
+            try {
+                const body = JSON.parse(rxAdvisorInput.value);
+                await handleStreamingRequest('/api/v1/rx_advisor', body, rxAdvisorOutput);
+            } catch (error) {
+                showNotification("Invalid JSON in input field.", true);
+            } finally {
+                setFormDisabled(form, false);
+            }
+        }
+
+        // --- INITIALIZATION ---
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Save original button text for reset
+            document.querySelectorAll('button[type="submit"]').forEach(button => {
+                button.dataset.originalText = button.textContent;
+            });
+            
+            // Set default text in textareas
+            summarizeInput.value = defaultSummarizeInput;
+            rxAdvisorInput.value = defaultRxAdvisorInput;
+
+            // Bind event listeners
+            registerForm.addEventListener('submit', handleRegister);
+            loginForm.addEventListener('submit', handleLogin);
+            logoutBtn.addEventListener('click', handleLogout);
+            apiKeyForm.addEventListener('submit', handleCreateApiKey);
+            summarizeForm.addEventListener('submit', handleSummarize);
+            rxAdvisorForm.addEventListener('submit', handleRxAdvisor);
+            
+            // Initial UI state
+            updateUI();
+        });
+    </script>
+
+</body>
+</html>
