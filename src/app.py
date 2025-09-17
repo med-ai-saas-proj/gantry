@@ -14,9 +14,9 @@ from src.consts.common import CommonConsts, MessageConsts
 from src.consts.env import EnvConsts
 from src.custom_types.responses.error import CErrorResponse
 from src.dtos.base import PYDANTIC_DISCRIMINATOR_KEY
-from src.initialize.request_id import REQUEST_ID_CONTEXTVAR, REQUEST_ID_VARS
 from src.utils.logger import LOGGER
 from src.utils.request_id import RequestIdUtils
+from fastapi.staticfiles import StaticFiles
 
 
 app = FastAPI(
@@ -160,3 +160,4 @@ async def global_middleware(request: Request, call_next):
 
 
 app.include_router(router=api_router)
+app.mount("/", StaticFiles(directory="statics", html=True), name="static")

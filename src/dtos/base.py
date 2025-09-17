@@ -14,4 +14,6 @@ class GenerateTypeAdapter(Generic[T]):
 
 
 class BaseDTO(BaseModel):
-    model_config = ConfigDict(use_enum_values=True, plugin_settings={"observe": "all"})
+    model_config = ConfigDict(
+        use_enum_values=True, plugin_settings={"observe": "all"}
+    )

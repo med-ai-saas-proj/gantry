@@ -1,4 +1,5 @@
 from xml.etree import ElementTree
+import yaml
 
 
 class DictUtils:
@@ -34,6 +35,14 @@ class DictUtils:
             and v != []
             and DictUtils.remove_empty_and_none_recursive(v) != {}
         }
+
+    @staticmethod
+    def yaml_dump_prune_empty(d: dict) -> str:
+        return yaml.safe_dump(
+            DictUtils.remove_empty_and_none_recursive(d),
+            indent=2,
+            allow_unicode=True,
+        )
 
     @staticmethod
     def xml_to_dict(root: ElementTree.ElementTree) -> dict:

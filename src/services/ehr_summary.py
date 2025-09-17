@@ -24,11 +24,7 @@ class EHRSummaryService:
         pass
 
     def _process_ehr(self, ehr: dict):
-        processed_ehr = yaml.safe_dump(
-            DictUtils.remove_empty_and_none_recursive(ehr),
-            indent=2,
-            allow_unicode=True,
-        )
+        processed_ehr = DictUtils.yaml_dump_prune_empty(ehr)
         self.logger.debug("Processed EHR", processed_ehr=processed_ehr)
         return processed_ehr
 
@@ -36,9 +32,9 @@ class EHRSummaryService:
         result = {"result": ""}
         try:
             async with self.agent.run_stream(self._process_ehr(ehr)) as run:
-                async for output in run.stream_text(delta=True):
-                    result["result"] += output
-                    yield output
+                async for output in run.stream_output():
+                    yield output[len(result["result"]) :]
+                    result["result"] = output
         except Exception as e:
             result["error"] = str(e)
             raise e
@@ -53,8 +49,8 @@ class EHRSummaryService:
         result = {"result": ""}
         try:
             async with self.agent.run_stream(self._process_ehr(ehr)) as run:
-                async for output in run.stream_text(delta=True):
-                    result["result"] += output
+                async for output in run.stream_output():
+                    result["result"] = output
 
             return result["result"]
         except Exception as e:
