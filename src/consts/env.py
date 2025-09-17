@@ -15,3 +15,5 @@ class EnvConsts:
     GOOGLE_PROGRAMMATIC_SEARCH_CX = os.environ["GOOGLE_PROGRAMMABLE_SEARCH_CX"]
 
     CRAWLER_MAX_CONCURRENT = int(os.environ.get("CRAWLER_MAX_CONCURRENT", "8"))
+
+    JWT_SECRET = os.environ.get("JWT_SECRET", "venera")

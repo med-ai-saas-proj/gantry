@@ -17,7 +17,7 @@ class SharedInput(TypedDict):
     stream: NotRequired[bool]
 
 
-async def stream_summary(generator: AsyncGenerator[str]):
+async def stream_summary(generator: AsyncGenerator[str, None]):
     async for delta in generator:
         data = {"d": delta}
         yield ResponseUtils.format_sse("delta", data)

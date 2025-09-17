@@ -21,21 +21,36 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.execute(
-        """
-CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid() UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password CHAR(80) NOT NULL,
-    created_at TIMESTAMP DEFAULT now() NOT NULL,
-    updated_at TIMESTAMP DEFAULT now() NOT NULL
-);
-""".strip()
-    )
-    op.execute("""CREATE INDEX ix_users_email ON users (email);""")
-    op.execute(
-        """ALTER TABLE users
-    ADD CONSTRAINT ck_user_email CHECK (char_length(email) > 5);"""
+    op.create_table(
+        "users",
+        sa.Column(
+            "id",
+            sa.types.UUID(),
+            primary_key=True,
+            server_default=sa.text("gen_random_uuid()"),
+            unique=True,
+            nullable=False,
+        ),
+        sa.Column(
+            "email",
+            sa.types.String(255),
+            index=True,
+            unique=True,
+            nullable=False,
+        ),
+        sa.Column("password", sa.types.String(255), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.types.TIMESTAMP(),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.types.TIMESTAMP(),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
     pass
 

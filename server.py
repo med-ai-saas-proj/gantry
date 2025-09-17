@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv(".env")
+
 import argparse
 import uvicorn
 from uvicorn.config import LOGGING_CONFIG

@@ -16,8 +16,10 @@ dependencies = [
     "pyjwt>=2.10.1",
     "python-dotenv>=1.1.1",
     "requests>=2.32.5",
-    "sqlalchemy>=2.0.43",
+    "sqlalchemy[postgresql]>=2.0.43",
     "structlog>=25.4.0",
+    "bcrypt>=4.0.0",
+    "email-validator>=2.0.0",
 ]
 
 [tool.black]
@@ -39,8 +41,8 @@ exclude = '''
 )/
 '''
 
-[project.entry-points.pydantic]
-observe = "plugins:plugins:plugin"
+# [project.entry-points.pydantic]
+# observe = "plugins:plugins:plugin"
 
 [tool.pyright]
 reportOptionalSubscript = false

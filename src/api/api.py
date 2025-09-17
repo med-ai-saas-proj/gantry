@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from src.api.auth import auth_router
+from src.api.api_key import api_key_router
 
 # from src.custom_types.responses import C
 from .v1 import v1_router
@@ -28,3 +30,5 @@ api_router = APIRouter(
 )
 
 api_router.include_router(v1_router)
+api_router.include_router(auth_router)
+api_router.include_router(api_key_router)
