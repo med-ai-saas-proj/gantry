@@ -1,6 +1,5 @@
 from typing import Generic, TypeVar
-from typing_extensions import TypedDict
-from pydantic import ConfigDict, TypeAdapter, with_config
+from pydantic import BaseModel, ConfigDict, TypeAdapter
 
 
 PYDANTIC_DISCRIMINATOR_KEY = "[__BACKEND_PYDANTIC_DICRIMINATOR__]."
@@ -14,8 +13,5 @@ class GenerateTypeAdapter(Generic[T]):
         return dto
 
 
-@with_config(
-    ConfigDict(use_enum_values=True, plugin_settings={"observe": "all"})
-)
-class BaseDTO(TypedDict):
-    pass
+class BaseDTO(BaseModel):
+    model_config = ConfigDict(use_enum_values=True, plugin_settings={"observe": "all"})

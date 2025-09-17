@@ -44,7 +44,7 @@ async def summarize_ehr(
     return JSONResponse({"summary": summary})
 
 
-async def stream_summary(generator: AsyncGenerator[str]):
+async def stream_summary(generator: AsyncGenerator[str, None]):
     async for delta in generator:
         data = {"d": delta}
         yield f"event: delta\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"

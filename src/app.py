@@ -133,16 +133,29 @@ async def global_middleware(request: Request, call_next):
     RequestIdUtils.set(request_id)
     try:
         res: JSONResponse = await call_next(request)
-        res.headers[CommonConsts.REQUEST_ID_HEADER] = request_id
+        if res is not None:
+            res.headers[CommonConsts.REQUEST_ID_HEADER] = request_id
+            process_time = time.time_ns() // 1_000_000 - start_time
+            LOGGER.info(
+                "Request",
+                requestId=request_id,
+                latencyMs=process_time,
+                method=request.method,
+                url=request.url,
+                status=res.status_code,
+            )
+        return res
+    except Exception as e:
         process_time = time.time_ns() // 1_000_000 - start_time
-        LOGGER.info(
-            "Request",
+        LOGGER.error(
+            "Request failed",
             requestId=request_id,
             latencyMs=process_time,
             method=request.method,
             url=request.url,
-            status=res.status_code,
+            error=str(e),
         )
+        raise
     finally:
         RequestIdUtils.reset()
 

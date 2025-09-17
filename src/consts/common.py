@@ -20,3 +20,4 @@ class MessageConsts:
     CONFLICT = "Conflict"
     INVALID_OBJECT_ID = "Invalid object id"
     INTERNAL_SERVER_ERROR = "Unknown internal server error"
+    USER_ALREADY_EXISTS = "User with this email already exists"
