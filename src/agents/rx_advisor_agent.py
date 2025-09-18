@@ -16,7 +16,7 @@ RX_ADVISOR_AGENT = Agent(
         settings={"max_tokens": 32000},
     ),
     name="rx_advisor_agent",
-    toolsets=[OPEN_FDA_TOOLSET, WEB_TOOLSET],
+    # toolsets=[OPEN_FDA_TOOLSET, WEB_TOOLSET],
     instructions=[
         add_current_date,
         """You are **Rx-Advisor**, an AI clinical support agent designed to assist qualified medical professionals. Your sole function is to analyze a patient's Electronic Health Record (EHR) and a proposed new prescription to identify and flag potential risks. You must operate with the highest degree of precision and caution.
