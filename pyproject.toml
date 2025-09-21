@@ -52,5 +52,13 @@ reportTypedDictNotRequiredAccess = false
 # reportGeneralTypeIssues = false
 exclude = ["*.pyi?$", "*__pycache__*", "venv"]
 
+[tool.uv.sources]
+patient-record-processing = { git = "ssh://git@github.com/Venera-AI/patient-record-processing" }
+
 [dependency-groups]
-dev = ["black>=25.1.0", "flake8>=7.3.0", "ipython>=9.5.0"]
+dev = [
+    "black>=25.1.0",
+    "flake8>=7.3.0",
+    "ipython>=9.5.0",
+    "openapi-generator-cli[jdk4py]>=7.15.0",
+]
