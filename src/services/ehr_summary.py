@@ -1,7 +1,8 @@
 from src.services.postgres import PostgresService
 from src.utils.dict_utils import DictUtils
+from src.utils.ehr import EHRUtils
+from src.custom_types.ehr import InputEHR, EHRDict
 
-import yaml
 from typing import Callable
 from contextlib import _GeneratorContextManager
 
@@ -20,18 +21,23 @@ class EHRSummaryService:
         self.agent = agent
         self.logger = logger
 
-    def _store_ehr_and_result(self, user_id: str, ehr: dict, result: dict):
+    def _store_ehr_and_result(
+        self, user_id: str, ehr_dict: EHRDict, result: dict
+    ):
         pass
 
-    def _process_ehr(self, ehr: dict):
-        processed_ehr = DictUtils.yaml_dump_prune_empty(ehr)
-        self.logger.debug("Processed EHR", processed_ehr=processed_ehr)
-        return processed_ehr
+    def _ehr_to_prompt(self, ehr: EHRDict):
+        processed_ehr = EHRUtils.prune_and_preprocess_input_ehr(ehr)
+        ehr_str = DictUtils.yaml_dump(processed_ehr.content)
+        self.logger.debug("Processed EHR", type=ehr.type, ehr_str=ehr_str)
+        return ehr_str
 
-    async def summarize_ehr_stream(self, user_id: str, ehr: dict):
+    async def summarize_ehr_stream(self, user_id: str, ehr: InputEHR):
+        ehr_dict = EHRDict.from_input_ehr(ehr)
         result = {"result": ""}
         try:
-            async with self.agent.run_stream(self._process_ehr(ehr)) as run:
+            prompt = self._ehr_to_prompt(ehr_dict)
+            async with self.agent.run_stream(prompt) as run:
                 async for output in run.stream_text(delta=True):
                     result["result"] += output
                     yield output
@@ -40,22 +46,13 @@ class EHRSummaryService:
             raise e
         finally:
             self.logger.debug("Result", result=result)
-            self._store_ehr_and_result(user_id, ehr, result)
+            self._store_ehr_and_result(user_id, ehr_dict, result)
 
-    async def summarize_ehr(self, user_id: str, ehr: dict) -> str:
+    async def summarize_ehr(self, user_id: str, ehr: InputEHR) -> str:
         # Why does this instead of run_sync?
         # Anthropic said: non-streaming Messages API requests are not expected to exceed a 10 minute timeout
         # https://docs.anthropic.com/en/api/errors#long-requests
-        result = {"result": ""}
-        try:
-            async with self.agent.run_stream(self._process_ehr(ehr)) as run:
-                async for output in run.stream_text(delta=True):
-                    result["result"] += output
-
-            return result["result"]
-        except Exception as e:
-            result["error"] = str(e)
-            raise e
-        finally:
-            self.logger.debug("Result", result=result)
-            self._store_ehr_and_result(user_id, ehr, result)
+        final_result = ""
+        async for text_chunk in self.summarize_ehr_stream(user_id, ehr):
+            final_result += text_chunk
+        return final_result

@@ -20,6 +20,7 @@ dependencies = [
     "structlog>=25.4.0",
     "bcrypt>=4.0.0",
     "email-validator>=2.0.0",
+    "patient-record-processing",
 ]
 
 [tool.black]
@@ -53,7 +54,7 @@ reportTypedDictNotRequiredAccess = false
 exclude = ["*.pyi?$", "*__pycache__*", "venv"]
 
 [tool.uv.sources]
-patient-record-processing = { git = "ssh://git@github.com/Venera-AI/patient-record-processing" }
+patient-record-processing = { git = "https://github.com/Venera-AI/patient-record-processing.git" }
 
 [dependency-groups]
 dev = [

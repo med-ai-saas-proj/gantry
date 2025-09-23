@@ -177,6 +177,7 @@ dependencies = [
     { name = "numpy" },
     { name = "orjson" },
     { name = "pandas" },
+    { name = "patient-record-processing" },
     { name = "psycopg2-binary" },
     { name = "pydantic-ai" },
     { name = "pyjwt" },
@@ -204,6 +205,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.3.3" },
     { name = "orjson", specifier = ">=3.11.3" },
     { name = "pandas", specifier = ">=2.3.2" },
+    { name = "patient-record-processing", git = "https://github.com/Venera-AI/patient-record-processing.git" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "pydantic-ai", specifier = ">=1.0.6" },
     { name = "pyjwt", specifier = ">=2.10.1" },
@@ -810,6 +812,30 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/bc/53/25e811d92fd60f5c65e098c3b68bd8f1a35e4abb6b77a153025115b680de/fastuuid-0.12.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b9b31dd488d0778c36f8279b306dc92a42f16904cba54acca71e107d65b60b0c", size = 258257, upload-time = "2025-01-27T18:03:56.408Z" },
     { url = "https://files.pythonhosted.org/packages/10/23/73618e7793ea0b619caae2accd9e93e60da38dd78dd425002d319152ef2f/fastuuid-0.12.0-cp313-cp313-manylinux_2_34_x86_64.whl", hash = "sha256:b19361ee649365eefc717ec08005972d3d1eb9ee39908022d98e3bfa9da59e37", size = 278559, upload-time = "2025-01-27T18:03:58.661Z" },
     { url = "https://files.pythonhosted.org/packages/e4/41/6317ecfc4757d5f2a604e5d3993f353ba7aee85fa75ad8b86fce6fc2fa40/fastuuid-0.12.0-cp313-cp313-win_amd64.whl", hash = "sha256:8fc66b11423e6f3e1937385f655bedd67aebe56a3dcec0cb835351cfe7d358c9", size = 157276, upload-time = "2025-01-27T18:06:39.245Z" },
+]
+
+[[package]]
+name = "fhir-core"
+version = "1.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a4/98/210f317815f6eafa8cb21fbf203e6ac75bd53f2b25c1376bc1a647b3b4d7/fhir_core-1.1.4.tar.gz", hash = "sha256:d6549665c32f6b710da19d1309851d5d5f8902af899925623d6f4441eb1f2176", size = 33870, upload-time = "2025-07-11T18:10:59.565Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2b/16/0fb20a14046b6b8a447019e939e58ee8dbe54a6bd06472f93d9ec6801ed8/fhir_core-1.1.4-py2.py3-none-any.whl", hash = "sha256:66d81639f9a45e646cf21cae492d68d89550a22409bf68a9b292b789e0d0061d", size = 29183, upload-time = "2025-07-11T18:10:58.167Z" },
+]
+
+[[package]]
+name = "fhir-resources"
+version = "8.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fhir-core" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d4/7f/882dde9ce229fccfa81257c6989edb4b0d67f7e8ae94170e74be024fdfa9/fhir_resources-8.1.0.tar.gz", hash = "sha256:8d64a717f37ea50bde97c1b8ff3fd969a6074df99c167183a273abe4da8bbfa5", size = 1599741, upload-time = "2025-07-10T12:36:01.137Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cc/a9/18672a8a1c570cb7b4eeafe1decd267f291997d20f240fffb17145a525f9/fhir_resources-8.1.0-py2.py3-none-any.whl", hash = "sha256:4370a5b6b35f278705328368bf79b3a17db91025fd4ec896fb963edd44ecc5de", size = 2267435, upload-time = "2025-07-10T12:35:59.096Z" },
 ]
 
 [[package]]
@@ -1943,6 +1969,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ca/bc/f35b8446f4531a7cb215605d100cd88b7ac6f44ab3fc94870c120ab3adbf/pathspec-0.12.1.tar.gz", hash = "sha256:a482d51503a1ab33b1c67a6c3813a26953dbdc71c31dacaef9a838c4e29f5712", size = 51043, upload-time = "2023-12-10T22:30:45Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/cc/20/ff623b09d963f88bfde16306a54e12ee5ea43e9b597108672ff3a408aad6/pathspec-0.12.1-py3-none-any.whl", hash = "sha256:a0d503e138a4c123b27490a4f7beda6a01c6f288df0e4a8b79c7eb0dc7b4cc08", size = 31191, upload-time = "2023-12-10T22:30:43.14Z" },
+]
+
+[[package]]
+name = "patient-record-processing"
+version = "0.1.1"
+source = { git = "https://github.com/Venera-AI/patient-record-processing.git#6921872c5b14e0346152834615cb02b3af1229ea" }
+dependencies = [
+    { name = "fhir-resources" },
+    { name = "pydantic" },
 ]
 
 [[package]]

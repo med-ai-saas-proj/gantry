@@ -1,5 +1,5 @@
 from typing import Annotated, Any, AsyncGenerator, TypedDict, NotRequired
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body
 from fastapi.responses import StreamingResponse, JSONResponse
 
 from src.dependencies.auth import get_current_user
@@ -7,15 +7,10 @@ from src.entities.user import User
 from src.utils.logger import LOGGER
 from src.utils.response import ResponseUtils
 from src.initialize.services import RX_ADVISOR_SERVICE
+from src.dtos.ehr import InputEHR, InputPrescription
 
 
 router = APIRouter(tags=["Doctor Help"])
-
-
-class SharedInput(TypedDict):
-    ehr: dict[str, Any]
-    prescription: dict[str, Any]
-    stream: NotRequired[bool]
 
 
 async def stream_summary(generator: AsyncGenerator[str, None]):
@@ -26,14 +21,17 @@ async def stream_summary(generator: AsyncGenerator[str, None]):
 
 @router.post("/rx_advisor")
 async def rx_advisor(
-    user: Annotated[User, Depends(get_current_user)], body: SharedInput
+    user: Annotated[User, Depends(get_current_user)],
+    ehr: InputEHR,
+    prescription: InputPrescription,
+    stream: bool = Body(False, embed=True),
 ):
     LOGGER.debug("user", user_id=user["id"])
-    if body.get("stream", False):
+    if stream:
         return StreamingResponse(
             stream_summary(
                 RX_ADVISOR_SERVICE.generate_advice_stream(
-                    user["id"], body["ehr"], body["prescription"]
+                    user["id"], ehr, prescription
                 )
             ),
             media_type="text/event-stream",
@@ -44,6 +42,6 @@ async def rx_advisor(
         )
     else:
         analysis = await RX_ADVISOR_SERVICE.generate_advice(
-            user["id"], body["ehr"], body["prescription"]
+            user["id"], ehr, prescription
         )
         return JSONResponse({"analysis": analysis})
