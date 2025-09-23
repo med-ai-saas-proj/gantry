@@ -1,12 +1,13 @@
 from src.services.postgres import PostgresService
 from src.utils.dict_utils import DictUtils
+from src.agents.shared_types import AnswerStruct
 
-import yaml
 from typing import Callable
 from contextlib import _GeneratorContextManager
 
 from structlog.stdlib import BoundLogger
 from pydantic_ai import Agent
+from pydantic import ValidationError
 
 
 class RxAdvisorService:
@@ -14,7 +15,7 @@ class RxAdvisorService:
         self,
         session_scope: Callable[..., _GeneratorContextManager],
         logger: BoundLogger,
-        agent: Agent,
+        agent: Agent[None, AnswerStruct],
     ):
         self.postgres_service = PostgresService(session_scope=session_scope)
         self.agent = agent
@@ -47,16 +48,18 @@ New Prescription:
             async with self.agent.run_stream(
                 self._process_ehr_and_prescription(ehr, prescription)
             ) as run:
-                async for output in run.stream_text(delta=True):
-                    # for part in output.parts:
-                    #     if part.part_kind == "text":
-                    #         yield part.content[len(result["result"]) :]
-                    #         result["result"] = part.content
-                    #     elif part.part_kind == "tool-call":
-                    #         if end:
-                    #             yield f"\nUsing tool: {part.tool_name}, with {part.args_as_json_str()}\n"
-                    yield output
-                    result["result"] += output
+                async for output, end in run.stream_responses():
+                    try:
+                        validated_output = await run.validate_response_output(
+                            output,
+                            allow_partial=not end,
+                        )
+                    except ValidationError:
+                        continue
+                    answer = validated_output["answer"]
+                    new_response = answer[len(agent_result) :]
+                    yield new_response
+                    agent_result = answer
         except Exception as e:
             result["error"] = str(e)
             raise e
@@ -70,18 +73,9 @@ New Prescription:
         # Why does this instead of run_sync?
         # Anthropic said: non-streaming Messages API requests are not expected to exceed a 10 minute timeout
         # https://docs.anthropic.com/en/api/errors#long-requests
-        result = {"result": ""}
-        try:
-            async with self.agent.run_stream(
-                self._process_ehr_and_prescription(ehr, prescription)
-            ) as run:
-                async for output in run.stream_text(delta=True):
-                    result["result"] += output
-
-            return result["result"]
-        except Exception as e:
-            result["error"] = str(e)
-            raise e
-        finally:
-            self.logger.debug("Result", result=result)
-            self._store_ehr_and_result(user_id, ehr, prescription, result)
+        res = ""
+        async for output in self.generate_advice_stream(
+            user_id, ehr, prescription=prescription
+        ):
+            res += output
+        return res

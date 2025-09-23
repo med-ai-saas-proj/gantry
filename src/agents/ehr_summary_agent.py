@@ -12,6 +12,7 @@ EHR_SUMMARY_AGENT = Agent(
         provider=AnthropicProvider(api_key=EnvConsts.ANTHROPIC_API_KEY),
         settings={"max_tokens": 32000},
     ),
+    end_strategy="exhaustive",
     name="ehr_summary_agent",
     instructions=[
         add_current_date,

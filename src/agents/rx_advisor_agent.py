@@ -3,11 +3,11 @@ from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 
 from .shared_instruction import add_current_date
+from .shared_types import AnswerStruct
 from .tools.open_fda import OPEN_FDA_TOOLSET
 from .tools.web import WEB_TOOLSET
 
 from src.consts.env import EnvConsts
-
 
 RX_ADVISOR_AGENT = Agent(
     model=AnthropicModel(
@@ -15,8 +15,10 @@ RX_ADVISOR_AGENT = Agent(
         provider=AnthropicProvider(api_key=EnvConsts.ANTHROPIC_API_KEY),
         settings={"max_tokens": 32000},
     ),
+    output_type=AnswerStruct,
     name="rx_advisor_agent",
-    # toolsets=[OPEN_FDA_TOOLSET, WEB_TOOLSET],
+    end_strategy="exhaustive",
+    toolsets=[OPEN_FDA_TOOLSET, WEB_TOOLSET],
     instructions=[
         add_current_date,
         """You are **Rx-Advisor**, an AI clinical support agent designed to assist qualified medical professionals. Your sole function is to analyze a patient's Electronic Health Record (EHR) and a proposed new prescription to identify and flag potential risks. You must operate with the highest degree of precision and caution.

@@ -1,10 +1,13 @@
+from typing import TypeVar, Any
 from xml.etree import ElementTree
 import yaml
+
+T = TypeVar("T", list, dict, float, int, str)
 
 
 class DictUtils:
     @staticmethod
-    def remove_empty_and_none_recursive(d):
+    def remove_empty_and_none_recursive(d: T) -> T:
         """
         Recursively removes keys from a dictionary whose values are None, empty strings, empty lists,
         or empty dictionaries.
@@ -25,23 +28,39 @@ class DictUtils:
             {'e': {'g': 1}, 'h': 2}
         """
 
-        if not isinstance(d, dict):
+        if isinstance(d, dict):
+            res = {}
+            for k, v in d.items():
+                if not v:
+                    continue
+                pruned = DictUtils.remove_empty_and_none_recursive(v)
+                if pruned:
+                    res[k] = pruned
+            return res
+        elif isinstance(d, list):
+            res = []
+            for it in d:
+                if not it:
+                    continue
+                pruned = DictUtils.remove_empty_and_none_recursive(it)
+                if pruned:
+                    res.append(pruned)
+            return res
+        else:
             return d
-        return {
-            k: DictUtils.remove_empty_and_none_recursive(v)
-            for k, v in d.items()
-            if v is not None
-            and v != ""
-            and v != []
-            and DictUtils.remove_empty_and_none_recursive(v) != {}
-        }
 
     @staticmethod
-    def yaml_dump_prune_empty(d: dict) -> str:
+    def yaml_dump(d: Any) -> str:
         return yaml.safe_dump(
-            DictUtils.remove_empty_and_none_recursive(d),
+            d,
             indent=2,
             allow_unicode=True,
+        )
+
+    @staticmethod
+    def yaml_dump_prune_empty(d: Any) -> str:
+        return DictUtils.yaml_dump(
+            DictUtils.remove_empty_and_none_recursive(d),
         )
 
     @staticmethod
