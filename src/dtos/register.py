@@ -1,4 +1,4 @@
-from src.dtos.base import BaseDTO
+from .base import BaseDTO
 from pydantic import Field, EmailStr, field_validator
 
 
