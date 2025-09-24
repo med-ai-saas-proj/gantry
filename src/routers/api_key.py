@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from src.dependencies.auth import get_current_user
 from src.entities.user import User
 from src.consts.common import MessageConsts
-from src.custom_types.responses import CResponse
+from src.custom_types.responses import MessagedResponse
 from src.initialize.services import API_KEY_SERVICE
 
 api_key_router = APIRouter(prefix="/api-key", tags=["API Key"])
@@ -41,7 +41,7 @@ async def create_api_key(
         created_at=api_key_data["created_at"].isoformat(),
     )
 
-    return CResponse(
+    return MessagedResponse(
         http_code=201,
         status_code=201,
         message=MessageConsts.CREATED,
@@ -82,7 +82,7 @@ async def list_api_keys(
         api_keys=api_keys, total_count=len(api_keys)
     )
 
-    return CResponse(
+    return MessagedResponse(
         http_code=200,
         status_code=200,
         message=MessageConsts.SUCCESS,

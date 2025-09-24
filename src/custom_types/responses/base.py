@@ -1,22 +1,13 @@
-from typing import List, Dict, Union, Any
+from typing import Dict, Any
+from dataclasses import dataclass
 
-from src.custom_types.common import BaseDict
 
-
-class CResponse:
-    def __init__(
-        self,
-        http_code: int,
-        status_code: int,
-        message: str,
-        data: Union[List, BaseDict, Any] = None,
-        errors: BaseDict | None = None,
-    ):
-        self.http_code = http_code
-        self.status_code = status_code
-        self.message = message
-        self.data = data
-        self.errors = errors
+@dataclass
+class MessagedResponse:
+    status_code: int
+    message: str
+    data: Any = None
+    errors: Any = None
 
     def to_dict(self) -> Dict:
         result = {"statusCode": self.status_code, "message": self.message}

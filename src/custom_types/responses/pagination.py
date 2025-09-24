@@ -1,12 +1,20 @@
 from typing import Any, Dict, List, Union
 
 from src.custom_types.common import BaseDict
-from src.custom_types.responses import CResponse
+from src.custom_types.responses import MessagedResponse
 
 
-class CPaginationResponse(CResponse):
-    def __init__(self, http_code, status_code, message, data: Union[List, BaseDict, Any], page, page_size, total):
-        super().__init__(http_code=http_code, status_code=status_code, message=message, data=data)
+class CPaginationResponse(MessagedResponse):
+    def __init__(
+        self,
+        status_code,
+        message,
+        data: Union[List, BaseDict, Any],
+        page,
+        page_size,
+        total,
+    ):
+        super().__init__(status_code=status_code, message=message, data=data)
         self.page = page
         self.page_size = page_size
         self.total = total
