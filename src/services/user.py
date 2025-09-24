@@ -42,7 +42,10 @@ class UserService:
             repo=UserRepo, conditions=conditions
         )
 
-        return users[0] if users else None
+        if users:
+            users[0]["id"] = str(users[0]["id"])
+            return users[0]
+        return None
 
     async def change_password(
         self, user_id: str, current_password: str, new_password: str

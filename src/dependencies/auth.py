@@ -1,30 +1,12 @@
-from datetime import datetime
 from fastapi import Request, HTTPException, Depends
+from fastapi.security import OAuth2AuthorizationCodeBearer, OAuth2PasswordBearer
 
-from src.entities import User
 from src.utils.jwt import JWTUtils
 from src.initialize.services import USER_SERVICE
-from src.services.user import UserService
 
 
-def get_current_user_form_apikey(api_key: str):
-    now = datetime.now()
-    return User(
-        id="a960652d-1acc-41f2-94c9-0a92299eef9b",
-        email="example@example.com",
-        createdAt=now,
-        updated_at=now,
-    )
-
-
-def get_current_user_form_session(session: str):
-    now = datetime.now()
-    return User(
-        id="a960652d-1acc-41f2-94c9-0a92299eef9b",
-        email="test@example.com",
-        createdAt=now,
-        updated_at=now,
-    )
+# oauth2_auth_code = OAuth2AuthorizationCodeBearer("/login", "/login")
+# oauth2_password = OAuth2PasswordBearer("/login")
 
 
 async def get_current_user(request: Request):

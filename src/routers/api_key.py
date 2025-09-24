@@ -42,11 +42,10 @@ async def create_api_key(
     )
 
     return MessagedResponse(
-        http_code=201,
         status_code=201,
         message=MessageConsts.CREATED,
         data=response.dict(),
-    ).to_dict()
+    )
 
 
 @api_key_router.get("/list", response_model=dict)
@@ -83,8 +82,7 @@ async def list_api_keys(
     )
 
     return MessagedResponse(
-        http_code=200,
         status_code=200,
         message=MessageConsts.SUCCESS,
         data=response.dict(),
-    ).to_dict()
+    )
