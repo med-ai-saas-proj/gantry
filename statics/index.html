@@ -519,7 +519,7 @@
             method: "POST",
             body: JSON.stringify({ email, password }),
           });
-          accessToken = data.data.token;
+          accessToken = data.token;
           localStorage.setItem("venera_access_token", accessToken);
           updateUI();
           form.reset();
