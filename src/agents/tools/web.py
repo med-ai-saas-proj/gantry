@@ -40,8 +40,6 @@ async def web_search(
         date_restrict (:obj:`TimeRange`, optional): Restrict the results to the last few days, week, month or year. Must contain the following key:
             - unit (str): one of day, week, month, year
             - num (int): the number of unit to restrict
-
-
     """
     try:
         results = await CRAWLER_SERVICE.discover(query, 5, date_restrict)

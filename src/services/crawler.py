@@ -14,7 +14,7 @@ from contextlib import _GeneratorContextManager
 
 from structlog.stdlib import BoundLogger
 from pydantic import BaseModel
-from crawl4ai import AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, BrowserConfig
 from crawl4ai.content_filter_strategy import (
     PruningContentFilter,
     BM25ContentFilter,
@@ -67,6 +67,24 @@ class CrawlerService:
         self.google_search_cx = google_search_cx
         self.max_conncurrent_crawler = max_concurrent_crawler
         self._crawler_semaphore = asyncio.Semaphore(max_concurrent_crawler)
+        self.excluded_selector = ",".join(
+            [
+                "footer",
+                '[role="banner"]',
+                '[role="navigation"]',
+                '[role="complementary"]',
+                ".nav",
+                ".navbar",
+                ".navigation",
+                ".sidebar",
+                ".footer",
+                ".header",
+                ".advertisement",
+                ".ads",
+                ".social-share",
+                ".cookie-notice",
+            ]
+        )
 
     async def search_google(
         self,
@@ -136,7 +154,7 @@ class CrawlerService:
             if query:
                 prune_filter = BM25ContentFilter(
                     user_query=query,
-                    bm25_threshold=1.2,
+                    bm25_threshold=1.4,
                     language="english",  # use for stemming
                     use_stemming=True,
                 )
@@ -148,7 +166,7 @@ class CrawlerService:
                 )
         else:
             prune_filter = None
-        self.logger.debug("Filter", prune_filter)
+        self.logger.debug("Filter", filter=prune_filter)
 
         md_generator = DefaultMarkdownGenerator(
             options={
@@ -163,12 +181,19 @@ class CrawlerService:
             exclude_external_links=True,
             exclude_internal_links=True,
             exclude_social_media_links=True,
+            excluded_selector=self.excluded_selector,
+            remove_forms=True,
             deep_crawl_strategy=deep_crawl_strategy,
         )
 
         try:
             if crawler is None:
-                async with AsyncWebCrawler() as crawler:
+                async with AsyncWebCrawler(
+                    config=BrowserConfig(
+                        enable_stealth=True,  # Simple flag to enable
+                        headless=False,  # Better for avoiding detection
+                    )
+                ) as crawler:
                     return await self._run_with_crawler(url, config, crawler)
             return await self._run_with_crawler(url, config, crawler)
         except Exception as e:
@@ -219,7 +244,7 @@ class CrawlerService:
             per_url_lists = await asyncio.gather(*tasks)
             # Flatten list[list[CrawlResult]] -> list[CrawlResult]
             flattened: list[CrawlResult] = [
-                item for sublist in per_url_lists for item in sublist
+                item for sublist in per_url_lists for item in (sublist or [])
             ]
             return flattened
 
