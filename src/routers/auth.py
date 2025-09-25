@@ -24,28 +24,15 @@ auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @auth_router.post(
     "/register",
-    response_model=MessagedResponse,
     status_code=http.HTTPStatus.CREATED,
 )
 async def register(
     request: RegisterRequestDTO,
 ):
     user = await USER_SERVICE.register_user(request.email, request.password)
-    response = {
-        "id": user["id"],
-        "email": user["email"],
-        "createdAt": (
-            user["created_at"].isoformat() if user.get("created_at") else None
-        ),
-    }
-
-    return MessagedResponse(
-        status_code=http.HTTPStatus.CREATED,
-        message=MessageConsts.CREATED,
-    )
 
 
-@auth_router.post("/change-password", response_model=MessagedResponse)
+@auth_router.post("/change-password", status_code=http.HTTPStatus.OK)
 async def change_password(
     request: ChangePasswordRequestDTO,
     current_user: User = Depends(get_current_user),
@@ -54,11 +41,6 @@ async def change_password(
         user_id=current_user["id"],
         current_password=request.current_password,
         new_password=request.new_password,
-    )
-
-    return MessagedResponse(
-        status_code=http.HTTPStatus.OK,
-        message=MessageConsts.SUCCESS,
     )
 
 

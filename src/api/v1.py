@@ -1,9 +1,8 @@
-from typing import List
-
 from fastapi import APIRouter
 from starlette.responses import JSONResponse
 
 from src.consts.common import MessageConsts
+from src.custom_types.responses import MessagedResponse
 from src.routers import (
     summary_router,
     api_key_router,
@@ -21,8 +20,6 @@ v1_router.include_router(api_key_router)
 v1_router.include_router(auth_router)
 
 
-@v1_router.get("/healthcheck")
+@v1_router.get("/healthcheck", response_model=MessagedResponse)
 def healthcheck():
-    return JSONResponse(
-        status_code=200, content={"message": MessageConsts.SUCCESS}
-    )
+    return MessagedResponse(status_code=200, message=MessageConsts.SUCCESS)
