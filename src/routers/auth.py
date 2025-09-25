@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse, Response
-from starlette.responses import http
+import http
 
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])

@@ -1,20 +1,25 @@
-from src.services.api_key import ApiKeyServices
+from src.dependencies.auth import get_current_user
+from src.entities.user import User
+from src.initialize.services import API_KEY_SERVICE
 from src.dtos.api_key import (
     CreateApiKeyRequestDTO,
     CreateApiKeyResponseDTO,
     ApiKeyListResponseDTO,
+    DeleteApiKeyRequestDTO,
 )
-from fastapi import APIRouter, Depends
-from src.dependencies.auth import get_current_user
-from src.entities.user import User
-from src.consts.common import MessageConsts
-from src.custom_types.responses import MessagedResponse
-from src.initialize.services import API_KEY_SERVICE
+from src.custom_types.responses import CErrorResponse
+
+from fastapi import APIRouter, Depends, Response
+from http import HTTPStatus
 
 api_key_router = APIRouter(prefix="/api-key", tags=["API Key"])
 
 
-@api_key_router.post("/create", response_model=dict)
+@api_key_router.post(
+    "/create",
+    response_model=CreateApiKeyResponseDTO,
+    status_code=HTTPStatus.CREATED,
+)
 async def create_api_key(
     request: CreateApiKeyRequestDTO,
     current_user: User = Depends(get_current_user),
@@ -28,7 +33,7 @@ async def create_api_key(
         expires_in_days=request.expires_in_days,
     )
 
-    response = CreateApiKeyResponseDTO(
+    return CreateApiKeyResponseDTO(
         id=api_key_data["id"],
         name=api_key_data["name"],
         api_key=api_key_data["api_key"],
@@ -41,14 +46,8 @@ async def create_api_key(
         created_at=api_key_data["created_at"].isoformat(),
     )
 
-    return MessagedResponse(
-        status_code=201,
-        message=MessageConsts.CREATED,
-        data=response.dict(),
-    )
 
-
-@api_key_router.get("/list", response_model=dict)
+@api_key_router.get("/list", response_model=ApiKeyListResponseDTO)
 async def list_api_keys(
     current_user: User = Depends(get_current_user),
 ):
@@ -77,12 +76,4 @@ async def list_api_keys(
         for key in api_keys_data
     ]
 
-    response = ApiKeyListResponseDTO(
-        api_keys=api_keys, total_count=len(api_keys)
-    )
-
-    return MessagedResponse(
-        status_code=200,
-        message=MessageConsts.SUCCESS,
-        data=response.dict(),
-    )
+    return ApiKeyListResponseDTO(api_keys=api_keys, total_count=len(api_keys))
