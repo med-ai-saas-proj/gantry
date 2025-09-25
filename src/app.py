@@ -55,13 +55,12 @@ async def fastapi_exception_handler(
             ref_parsed_errors = ref_parsed_errors[loc]
         mssg_list.append(error["msg"])
     exception_response = CErrorResponse(
-        http_code=400,
         status_code=400,
         message=MessageConsts.BAD_REQUEST,
         errors=parsed_errors,
     )
     return JSONResponse(
-        status_code=exception_response.http_code,
+        status_code=exception_response.status_code,
         content=exception_response.to_dict(),
     )
 
@@ -88,13 +87,12 @@ async def pydantic_exception_handler(
             ref_parsed_errors = ref_parsed_errors[loc]
         mssg_list.append(error["msg"])
     exception_response = CErrorResponse(
-        http_code=400,
         status_code=400,
         message=MessageConsts.BAD_REQUEST,
         errors=parsed_errors,
     )
     return JSONResponse(
-        status_code=exception_response.http_code,
+        status_code=exception_response.status_code,
         content=exception_response.to_dict(),
     )
 
@@ -104,9 +102,8 @@ async def internal_exception_handler(request: Request, exception):
     if isinstance(exception, CErrorResponse):
         error_response = exception.to_dict()
     else:
-        errors = None if not EnvConsts.DEBUG else {"key": [str(exception)]}
+        errors = None if not EnvConsts.DEBUG else {"key": str(exception)}
         exception = CErrorResponse(
-            http_code=500,
             status_code=500,
             message=MessageConsts.INTERNAL_SERVER_ERROR,
             errors=errors,
@@ -114,7 +111,7 @@ async def internal_exception_handler(request: Request, exception):
         error_response = exception.to_dict()
     LOGGER.error(json.dumps(error_response))
     return JSONResponse(
-        status_code=exception.http_code,
+        status_code=exception.status_code,
         content=error_response,
     )
 

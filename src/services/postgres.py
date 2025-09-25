@@ -78,7 +78,7 @@ class PostgresService:
         record = await self.get_by_id(repo, _id)
         if record is None:
             raise CErrorResponse(
-                http_code=404, status_code=404, message=MessageConsts.NOT_FOUND
+                status_code=404, message=MessageConsts.NOT_FOUND
             )
         return record
 

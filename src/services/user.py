@@ -17,10 +17,9 @@ class UserService:
         existing_user = await self.get_user_by_email(email)
         if existing_user:
             raise CErrorResponse(
-                http_code=409,
                 status_code=409,
                 message=MessageConsts.USER_ALREADY_EXISTS,
-                errors={"email": ["User with this email already exists"]},
+                errors={"email": {"msg": MessageConsts.USER_ALREADY_EXISTS}},
             )
         hashed_password = PasswordUtils.hash_password(password)
 
@@ -54,7 +53,6 @@ class UserService:
         user = await self.get_user_by_id(user_id)
         if not user:
             raise CErrorResponse(
-                http_code=404,
                 status_code=404,
                 message=MessageConsts.NOT_FOUND,
                 errors={"user": ["User not found"]},
@@ -69,10 +67,9 @@ class UserService:
 
         if not PasswordUtils.verify_password(current_password, stored_password):
             raise CErrorResponse(
-                http_code=400,
                 status_code=400,
-                message="Invalid current password",
-                errors={"current_password": ["Current password is incorrect"]},
+                message=MessageConsts.INVALID_CREDENTIALS,
+                errors={"msg": MessageConsts.INVALID_CREDENTIALS},
             )
 
         # Hash new password

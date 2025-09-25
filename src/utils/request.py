@@ -28,7 +28,6 @@ class RequestUtils:
             if key not in arrayFields:
                 if len(result[key]) > 1:
                     raise CErrorResponse(
-                        http_code=400,
                         status_code=400,
                         message=MessageConsts.BAD_REQUEST,
                         errors={key: "Multiple values found for field"},
