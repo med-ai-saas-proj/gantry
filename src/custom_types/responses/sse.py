@@ -1,25 +1,30 @@
 import json
-from typing import (
-    TypedDict,
-    Optional,
-    AsyncIterable,
-    Iterable,
-    Union,
-    TypeAlias,
-    TypeVar,
-)
+from typing import AsyncIterable, Iterable, Union, TypeAlias, TypeVar, TypedDict
 from enum import Enum
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
+EventType = TypeVar("EventType", Enum, str, None)
+T = TypeVar("T", dict, str, bytes)
+
 
 class SSEResponse(StreamingResponse):
-    EventType = TypeVar("EventType", Enum, str)
-    T = TypeVar("T", dict, str, bytes)
-
     class Content[EventType, T](TypedDict):
-        event: Optional[EventType]
+        event: EventType
         data: T
+        # def __init__(self) -> None:
+        #     need_prop = ["event", "data"]
+        #     for prop in need_prop:
+        #         if not hasattr(self, prop):
+        #             raise NotImplementedError(
+        #                 f"Subclass '{self.__class__.__name__}' must define a '{prop}' attribute."
+        #             )
+
+        # def get_event(self) -> EventType:
+        #     return self.event
+
+        # def get_data(self) -> T:
+        #     return self.data
 
     Stream: TypeAlias = Union[AsyncIterable[Content], Iterable[Content]]
 
@@ -61,13 +66,15 @@ class SSEResponse(StreamingResponse):
 
     @staticmethod
     def format_sse(content: Content) -> bytes:
-        if isinstance(content["data"], bytes):
-            result = b"data: " + content["data"] + b"\n\n"
-        elif isinstance(content["data"], str):
-            result = f"data: {content['data']}\n\n".encode()
+        data = content["data"]
+        event = content["event"]
+        if isinstance(data, bytes):
+            result = b"data: " + data + b"\n\n"
+        elif isinstance(data, str):
+            result = f"data: {data}\n\n".encode()
         else:
-            result = f"data: {json.dumps(content['data'])}\n\n".encode()
+            result = f"data: {json.dumps(data)}\n\n".encode()
 
-        if content["event"]:
-            result = f"event: {content["event"]}\n".encode("utf-8") + result
+        if event is not None:
+            result = f"event: {event}\n".encode("utf-8") + result
         return result
