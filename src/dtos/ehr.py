@@ -1,24 +1,38 @@
 from .base import BaseDTO, Field
-from typing import Any, Literal, Union, Annotated, TypeAlias
+
+from typing import (
+    Any,
+    Literal,
+    LiteralString,
+    Union,
+    Annotated,
+    TypeAlias,
+)
+
+from enum import Enum
 from fhir.resources.bundle import Bundle
 from fhir.resources.medication import Medication
 from patient_record_processing.schemas.vn_moh import flat
 
-SupportedEHRFormat = Literal["custom_json", "fhir", "vn_moh"]
+
+class EHRFormat(str, Enum):
+    custom_json = "custom_json"
+    fhir = "fhir"
+    vn_moh = "vn_moh"
 
 
 class InputEHR_CustomJSON(BaseDTO):
-    type: Literal["custom_json"]
+    type: Literal[EHRFormat.custom_json]
     custom_json: dict[str, Any]
 
 
 class InputEHR_FHIR(BaseDTO):
-    type: Literal["fhir"]
+    type: Literal[EHRFormat.fhir]
     fhir: Bundle
 
 
 class InputEHR_VN_MOH(BaseDTO):
-    type: Literal["vn_moh"]
+    type: Literal[EHRFormat.vn_moh]
     vn_moh: flat.VN_MOH
 
 
@@ -29,17 +43,17 @@ InputEHR: TypeAlias = Annotated[
 
 
 class InputPrescription_CustomJSON(BaseDTO):
-    type: Literal["custom_json"]
+    type: Literal[EHRFormat.custom_json]
     custom_json: list[dict[str, Any]]
 
 
 class InputPrescription_FHIR(BaseDTO):
-    type: Literal["fhir"]
+    type: Literal[EHRFormat.fhir]
     fhir: list[Medication]
 
 
 class InputPrescription_VN_MOH(BaseDTO):
-    type: Literal["vn_moh"]
+    type: Literal[EHRFormat.vn_moh]
     vn_moh: list[flat.ChiTietThuoc]
 
 
