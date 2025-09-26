@@ -291,6 +291,42 @@ class PostgresService:
             return updated_records
         return None
 
+    @overload
+    async def delete_by_condition(
+        self,
+        repo: Type[PostgresRepo[T]],
+        conditions: SqlConditionInterface,
+        returning: Literal[True],
+    ) -> List[T]: ...
+
+    @overload
+    async def delete_by_condition(
+        self,
+        repo: Type[PostgresRepo[T]],
+        conditions: SqlConditionInterface,
+        returning: Literal[False],
+    ) -> None: ...
+
+    @overload
+    async def delete_by_condition(
+        self,
+        repo: Type[PostgresRepo[T]],
+        conditions: SqlConditionInterface,
+        returning: bool = False,
+    ) -> List[T] | None: ...
+
+
+    async def delete_by_condition(
+        self, repo: Type[PostgresRepo[T]], conditions: SqlConditionInterface, returning: bool = False
+    ) -> List[T] | None:
+        query = repo.delete_by_condition(conditions=conditions, returning=returning)
+        cursor = await self.execute_raw_query(
+            sql=query.sql, params=query.params
+        )
+        if returning:
+            return repo.row_factory(cursor)
+        return None
+
     async def fast_insert_into_temp(
         self,
         target_query_builder: BaseQueryBuilder,

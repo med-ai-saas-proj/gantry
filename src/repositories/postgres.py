@@ -158,6 +158,18 @@ class PostgresRepo(Generic[T]):
         return SqlQuery(sql=sql, params=query_condition.params)
 
     @classmethod
+    def delete_by_condition(cls, conditions: SqlConditionInterface, returning: bool):
+        query_condition = cls.query_builder.where(conditions=conditions)
+        sql_returning = "\nRETURNING *" if returning else ""
+        sql = (
+            "DELETE"
+            f"\nFROM {cls.query_builder.full_table_name}"
+            f"\n{query_condition.add_where_operator()}"
+            f"{sql_returning}"
+        )
+        return SqlQuery(sql=sql, params=query_condition.params)
+
+    @classmethod
     def lock_table(cls, mode):
         sql = f"""
             LOCK TABLE {cls.query_builder.full_table_name} IN {mode} MODE;

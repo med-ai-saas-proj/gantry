@@ -87,3 +87,16 @@ class ApiKeyServices:
             }
             for key in api_keys
         ]
+
+    async def delete_by_id(self, _id: str):
+        # example service delete
+        return await self.postgres_service.delete_by_condition(ApiKeyRepo, {
+            "logical": "and",
+            "conditions": [
+                {
+                    "field": "id",
+                    "operator": "=",
+                    "value": _id,
+                }
+            ],
+        })
