@@ -54,7 +54,7 @@ reportTypedDictNotRequiredAccess = false
 exclude = ["*.pyi?$", "*__pycache__*", "venv"]
 
 [tool.uv.sources]
-patient-record-processing = { git = "https://github.com/Venera-AI/patient-record-processing.git" }
+patient-record-processing = { git = "ssh://git@github.com/Venera-AI/patient-record-processing.git" }
 
 [dependency-groups]
 dev = [

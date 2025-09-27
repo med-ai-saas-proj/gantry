@@ -1,6 +1,6 @@
 services:
   db:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg18
     container_name: postgres-pgvector
     env_file:
       - .env.postgres
@@ -12,11 +12,15 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - db_network
 
   redis:
     image: redis:8-alpine
     container_name: redis
     restart: unless-stopped
+    networks:
+      - redis_network
   
   main:
     depends_on:
@@ -25,8 +29,17 @@ services:
     restart: unless-stopped
     build:
       context: .
+      image: ${IMAGE_NAME}:latest
     ports:
-      - "3000:3000"
+      - "8000:8000"
+    pull_policy: always # Ensures compose always tries to pull a new image
+    networks:
+      - db_network
+      - redis_network
+
+network:
+  db_network:
+  redis_network
 
 volumes:
   postgres_data:

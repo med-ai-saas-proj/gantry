@@ -7,7 +7,7 @@ ENV PATH="/root/.local/bin/:$PATH"
 
 WORKDIR /app
 COPY pyproject.toml uv.lock /app/
-RUN --mount=type=ssh,id=github_ssh_key uv sync --frozen
+RUN --mount=type=ssh,id=schema_repo_read_ssh_key uv sync --frozen
 
 COPY . .
 

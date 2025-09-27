@@ -205,7 +205,7 @@ requires-dist = [
     { name = "numpy", specifier = ">=2.3.3" },
     { name = "orjson", specifier = ">=3.11.3" },
     { name = "pandas", specifier = ">=2.3.2" },
-    { name = "patient-record-processing", git = "https://github.com/Venera-AI/patient-record-processing.git" },
+    { name = "patient-record-processing", git = "ssh://git@github.com/Venera-AI/patient-record-processing.git" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "pydantic-ai", specifier = ">=1.0.6" },
     { name = "pyjwt", specifier = ">=2.10.1" },
@@ -1974,7 +1974,7 @@ wheels = [
 [[package]]
 name = "patient-record-processing"
 version = "0.1.1"
-source = { git = "https://github.com/Venera-AI/patient-record-processing.git#6921872c5b14e0346152834615cb02b3af1229ea" }
+source = { git = "ssh://git@github.com/Venera-AI/patient-record-processing.git#6921872c5b14e0346152834615cb02b3af1229ea" }
 dependencies = [
     { name = "fhir-resources" },
     { name = "pydantic" },
