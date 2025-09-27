@@ -77,3 +77,24 @@ async def list_api_keys(
     ]
 
     return ApiKeyListResponseDTO(api_keys=api_keys, total_count=len(api_keys))
+
+
+@api_key_router.delete("/delete", responses={400: {"model": CErrorResponse}})
+async def delete_api_key(
+    request: DeleteApiKeyRequestDTO,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Delete an API key for the authenticated user.
+    """
+    deleted = await API_KEY_SERVICE.delete_by_id(
+        current_user["id"],
+        request.api_key_id,
+    )
+    if deleted:
+        return Response(status_code=HTTPStatus.OK)
+    else:
+        return CErrorResponse(
+            status_code=HTTPStatus.NOT_FOUND,
+            message="API key not found",
+        )

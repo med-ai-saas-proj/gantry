@@ -50,3 +50,13 @@ class ApiKeyListResponseDTO(BaseDTO):
         ..., description="List of user's API keys"
     )
     total_count: int = Field(..., description="Total number of API keys")
+
+
+class DeleteApiKeyRequestDTO(BaseDTO):
+    api_key_id: str = Field(..., description="The ID of the API key to delete")
+
+    @field_validator("api_key_id")
+    def validate_api_key_id(cls, v):
+        if not v.strip():
+            raise ValueError("API key ID cannot be empty")
+        return v.strip()
