@@ -44,7 +44,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE_NAME }}:latest # Tags the image as 'latest'
           tags: ${{ env.IMAGE_NAME }}:latest,${{ env.IMAGE_NAME }}:$(git rev-parse --short HEAD)
           cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=inline,ref=${{ env.IMAGE_NAME }}:buildcache
