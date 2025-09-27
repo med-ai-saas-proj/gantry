@@ -28,6 +28,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      
+            - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Create an SSH key file from the GitHub secret
+      - name: Create SSH key for pip
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SCHEMA_REPO_READ_SSH_KEY }}" > ~/.ssh/schema_repo_read_ssh_key
+          chmod 600 ~/.ssh/schema_repo_read_ssh_key
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -49,7 +59,7 @@ jobs:
           cache-to: type=inline,ref=${{ env.IMAGE_NAME }}:buildcache
           # This is the magic part for the private pip install
           ssh: |
-            schema_repo_read_ssh_key=${{ secrets.SCHEMA_REPO_READ_SSH_KEY }}
+            schema_repo_read_ssh_key=~/.ssh/schema_repo_read_ssh_key
 
   deploy:
     name: Deploy to VM
