@@ -8,4 +8,4 @@
 *.env*
 *.yml
 
-venv/
+.venv/
