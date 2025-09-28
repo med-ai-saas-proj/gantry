@@ -45,9 +45,9 @@ jobs:
       # Create an SSH key file from the GitHub secret
       - name: Create SSH key for pip
         run: |
-          echo "${{ secrets.SCHEMA_REPO_READ_SSH_KEY }}" > $HOME/schema_repo_read_ssh_key
-          chmod 600 $HOME/schema_repo_read_ssh_key
-          stat $HOME/schema_repo_read_ssh_key
+          echo "${{ secrets.SCHEMA_REPO_READ_SSH_KEY }}" > /home/runner/schema_repo_read_ssh_key
+          chmod 600 /home/runner/schema_repo_read_ssh_key
+          stat /home/runner/schema_repo_read_ssh_key
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -59,7 +59,7 @@ jobs:
           cache-to: type=inline,ref=${{ env.IMAGE_NAME }}:buildcache
           # This is the magic part for the private pip install
           ssh: |
-            schema_repo_read_ssh_key=$HOME/schema_repo_read_ssh_key
+            schema_repo_read_ssh_key=/home/runner/schema_repo_read_ssh_key
 
   deploy:
     name: Deploy to VM
