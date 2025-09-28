@@ -55,9 +55,8 @@ jobs:
           context: .
           push: true
           tags: ${{ env.IMAGE_NAME }}:latest,${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
-          cache-to: type=inline,ref=${{ env.IMAGE_NAME }}:buildcache
-          # This is the magic part for the private pip install
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           ssh: |
             schema_repo_read_ssh_key=/home/runner/schema_repo_read_ssh_key
 
