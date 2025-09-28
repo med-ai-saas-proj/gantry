@@ -41,7 +41,7 @@ services:
 
 network:
   db_network:
-  redis_network
+  redis_network:
 
 volumes:
   postgres_data:
