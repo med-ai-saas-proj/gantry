@@ -13,12 +13,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Construct environment variables
-        run: |
-          chmod 600 /home/runner/schema_repo_read_ssh_key
-        env:
-          REPO: ${{ github.repository }}
-
       - name: Deploy to VM via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
