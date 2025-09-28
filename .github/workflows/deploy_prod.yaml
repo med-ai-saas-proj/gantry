@@ -22,18 +22,15 @@ jobs:
       packages: write # Required to push to GHCR
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Construct environment variables
         run: |
           echo "IMAGE_NAME=ghcr.io/${REPO,,}" >> ${GITHUB_ENV}
           echo "IMAGE_TAG=$(git rev-parse --short HEAD)" >> ${GITHUB_ENV}
         env:
           REPO: ${{ github.repository }}
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
