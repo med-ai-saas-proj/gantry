@@ -38,7 +38,7 @@ services:
       - db_network
       - redis_network
 
-network:
+networks:
   db_network:
   redis_network:
 
