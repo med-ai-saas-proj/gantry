@@ -28,7 +28,7 @@ jobs:
             echo "${{ secrets.API_HUB_DEPLOY_KEY }}" > $HOME/.ssh/deployment_key
             sudo chmod 600 $HOME/.ssh/deployment_key
 
-            ssh-agent bash -c "ssh-add $HOME/.ssh/deployment_key; if [ -d repo ]; then (cd repo && git pull); else git clone git@github.com:${{ env.GITHUB_REPOSITORY }}.git repo;fi"
+            ssh-agent bash -c "ssh-add $HOME/.ssh/deployment_key; if [ -d repo ]; then (cd repo && git pull); else git clone git@github.com:${{ github.repository }}.git repo;fi"
 
             cd repo
 
@@ -37,8 +37,9 @@ jobs:
             echo "${{ secrets.POSTGRES_ENV_FILE }}" > .env.postgres
 
             # Stop the current container and start the new one
-            sudo docker compose -f compose.yaml up -d --build --force-recreate \
+            sudo docker compose -f compose.yaml build \
               --ssh schema_repo_read_ssh_key=$HOME/.ssh/schema_repo_read_ssh_key
+            sudo docker compose -f compose.yaml up -d
 
             # Clean up old, unused Docker images to save space
             sudo docker image prune -af
