@@ -1,5 +1,5 @@
 #! /bin/sh
-export UV_ENV_FILE=.env
+# export UV_ENV_FILE=.env
 uv run --no-sync crawl4ai-setup
 uv run --no-sync alembic upgrade head
 uv run --no-sync uvicorn server:app --host 0.0.0.0 --port 8000 \
