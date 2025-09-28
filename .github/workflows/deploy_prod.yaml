@@ -75,7 +75,10 @@ jobs:
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
             # Navigate to your app directory
+            mkdir -p /home/${{ secrets.VM_USERNAME }}/my-app
             cd /home/${{ secrets.VM_USERNAME }}/my-app
+
+            echo $(cat compose.yaml) > compose.yaml
 
             # Set environment variables for docker-compose
             export IMAGE_NAME=${{ env.IMAGE_NAME }}
@@ -88,10 +91,10 @@ jobs:
             echo "${{ secrets.POSTGRES_ENV_FILE }}" > .env.postgres
 
             # Pull the latest image
-            docker-compose pull
+            docker-compose -f compose.yaml pull
 
             # Stop the current container and start the new one
-            docker-compose up -d --force-recreate
+            docker-compose -f compose.yaml up -d --force-recreate
 
             # Clean up old, unused Docker images to save space
             docker image prune -af
