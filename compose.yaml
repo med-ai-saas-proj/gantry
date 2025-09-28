@@ -31,7 +31,6 @@ services:
     restart: unless-stopped
     build:
       context: .
-      image: ${IMAGE_NAME}:latest
     ports:
       - "8000:8000"
     pull_policy: always # Ensures compose always tries to pull a new image
