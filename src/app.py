@@ -148,7 +148,7 @@ async def global_middleware(request: Request, call_next):
             requestId=request_id,
             latencyMs=process_time,
             method=request.method,
-            url=request.url,
+            url=str(request.url),
             error=str(e),
         )
         raise
