@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main # Or your deployment branch
+      - master # Or your deployment branch
   workflow_dispatch:
     inputs:
       branch-name:
@@ -11,11 +12,6 @@ on:
         required: true
         default: "main"
         type: string
-
-# The image name in GitHub Container Registry (ghcr.io)
-# Format: ghcr.io/GITHUB_USERNAME/REPO_NAME
-env:
-  IMAGE_NAME: ghcr.io/${{ github.repository }}
 
 jobs:
   build_and_push:
@@ -26,6 +22,12 @@ jobs:
       packages: write # Required to push to GHCR
 
     steps:
+      - name: Construct IMAGE_NAME
+        run: |
+          echo "IMAGE_NAME=ghcr.io/${REPO,,}" >> ${GITHUB_ENV}
+        env:
+          REPO: ${{ github.repository }}
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
