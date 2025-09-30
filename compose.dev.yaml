@@ -1,6 +1,6 @@
 services:
   db:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector:pg18
     container_name: postgres-pgvector
     env_file:
       - .env.postgres

@@ -1,10 +1,14 @@
+# This file is the entrypoint for debugging
 from dotenv import load_dotenv
+
 load_dotenv(".env")
 
+from src.main.app import cors as app  # type: ignore # noqa: F401
+
 import argparse
+
 import uvicorn
 from uvicorn.config import LOGGING_CONFIG
-from src.app import cors as app  # type: ignore # noqa: F401
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()

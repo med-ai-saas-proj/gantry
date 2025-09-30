@@ -10,7 +10,7 @@ RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 
 WORKDIR /app
 COPY pyproject.toml uv.lock /app/
-RUN --mount=type=ssh,id=schema_repo_read_ssh_key uv sync --frozen
+RUN --mount=type=ssh,id=schema_repo_read_ssh_key uv sync --frozen --all-extras --no-dev
 RUN uv run --no-sync crawl4ai-setup
 
 COPY . .
