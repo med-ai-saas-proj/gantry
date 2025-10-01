@@ -3,8 +3,7 @@ name: Build and Deploy to VM
 on:
   push:
     branches:
-      - main # Or your deployment branch
-      - master # Or your deployment branch
+      - prod
   workflow_dispatch:
 
 jobs:
