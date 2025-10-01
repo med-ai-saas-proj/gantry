@@ -317,12 +317,6 @@ class CrawlerService:
             normalized: list[CrawlResult] = []
             for r in underlying_results:
                 if getattr(r, "success", False):
-                    fit_markdown = str(r.markdown.fit_markdown)
-                    content = (
-                        fit_markdown
-                        if len(fit_markdown.replace("\n", "").strip()) > 1
-                        else str(r.markdown.raw_markdown)
-                    )
                     metadata = getattr(r, "metadata", {}) or {}
                     thumbnail_url = (
                         metadata.get(
@@ -358,6 +352,15 @@ class CrawlerService:
                         title=title,
                         description=description,
                     )
+
+                    fit_markdown = str(r.markdown.fit_markdown)
+                    if fit_markdown.replace("\n", "").strip():
+                        content = fit_markdown
+                    else:
+                        self.logger.info(
+                            f"Cannot generate fit markdown for {page_url}, used raw_markdown"
+                        )
+                        content = str(r.markdown.raw_markdown)
 
                     normalized.append(
                         {
