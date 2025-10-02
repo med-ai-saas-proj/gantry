@@ -7,6 +7,7 @@ from mako.template import Template
 
 template_dir = os.path.join("templates", "new_module")
 mako_suffix = ".mako"
+test_file_template: Template | None = None
 
 
 def main(app_name: str, overwrite: bool = False):
@@ -14,6 +15,10 @@ def main(app_name: str, overwrite: bool = False):
     paths: dict[str, str] = {}
     for root, dirs, files in os.walk(template_dir):
         for file in files:
+            if file == "_test.py.mako":
+                global test_file_template
+                test_file_template = Template(os.path.join(root, file))
+                continue
             paths[file.split(".")[0]] = os.path.join(root, file)
     questions = [
         inquirer.Checkbox(
@@ -39,13 +44,24 @@ def main(app_name: str, overwrite: bool = False):
     for file in file_to_create:
         path = paths[file]
         template = Template(filename=path)
-        if os.path.exists(path) and not overwrite:
+        create_file_path = os.path.join("src", app_name, file + ".py")
+        create_test_file_path = os.path.join(
+            "src", app_name, file + "_test.py"
+        )
+        if os.path.exists(create_file_path) and not overwrite:
             continue
         with open(
-            os.path.join("src", app_name, file + ".py"),
+            create_file_path,
             "w",
         ) as f:
             content = template.render(app_name=app_name, has_router=has_router)
+            assert isinstance(content, str)
+            f.write(content)
+        with open(
+            create_test_file_path,
+            "w",
+        ) as f:
+            content = template.render(file=file)
             assert isinstance(content, str)
             f.write(content)
 
