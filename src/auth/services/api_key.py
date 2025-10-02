@@ -61,16 +61,17 @@ class ApiKeyServices:
             list of API key records (without the actual key values)
         """
         api_keys = await self.postgres_service.get_by_condition(
-            repo=ApiKeyRepo, conditions={
-            "logical": "and",
-            "conditions": [
-                {
-                    "field": "user_id",
-                    "operator": "=",
-                    "value": uuid.UUID(user_id),
-                }
-            ],
-        }
+            repo=ApiKeyRepo,
+            conditions={
+                "logical": "and",
+                "conditions": [
+                    {
+                        "field": "user_id",
+                        "operator": "=",
+                        "value": uuid.UUID(user_id),
+                    }
+                ],
+            },
         )
 
         # Return API keys without the hashed key value for security

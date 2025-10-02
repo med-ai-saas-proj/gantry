@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 
 
 api_router = APIRouter(
-    prefix='/api',
+    prefix="/api",
     # default_response_class=JSONResponse,
     # responses={
     #     400: {"model": ErrorResponseModel},

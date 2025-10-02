@@ -15,9 +15,9 @@ from patient_record_processing.schemas.vn_moh import flat
 
 
 class EHRFormat(str, Enum):
-    custom_json = 'custom_json'
-    fhir = 'fhir'
-    vn_moh = 'vn_moh'
+    custom_json = "custom_json"
+    fhir = "fhir"
+    vn_moh = "vn_moh"
 
 
 class InputEHR_CustomJSON(BaseDTO):
@@ -37,7 +37,7 @@ class InputEHR_VN_MOH(BaseDTO):
 
 InputEHR: TypeAlias = Annotated[
     Union[InputEHR_CustomJSON, InputEHR_FHIR, InputEHR_VN_MOH],
-    Field(discriminator='type'),
+    Field(discriminator="type"),
 ]
 
 
@@ -62,5 +62,5 @@ InputPrescription: TypeAlias = Annotated[
         InputPrescription_FHIR,
         InputPrescription_VN_MOH,
     ],
-    Field(discriminator='type'),
+    Field(discriminator="type"),
 ]

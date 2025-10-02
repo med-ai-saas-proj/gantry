@@ -114,7 +114,9 @@ class PostgresRepo(BaseRepo[T]):
         update_columns = query_values.columns.copy()
         for col in identity_columns:
             update_columns.remove(col)
-        sql_columns = ", ".join(literal_objects(list_text=query_values.columns))
+        sql_columns = ", ".join(
+            literal_objects(list_text=query_values.columns)
+        )
         sql_set_columns = ", ".join(
             cls.query_builder.set_values(
                 left_sequences=literal_objects(update_columns, alias=""),

@@ -13,7 +13,6 @@ CONTEXTVAR = ContextVar[Any]("var", default=None)
 
 
 class BaseSession(Generic[Session_T]):
-
     def __init__(self, pool: BaseConnectorPool):
         self.pool = pool
         self.sessions: dict[uuid.UUID, Session_T] = {}

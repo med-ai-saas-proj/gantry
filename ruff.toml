@@ -19,7 +19,7 @@ extend-select = [
     "SIM",  # flake8-simplify
     "I",    # isort 
 ]
-extend-ignore = ["UP007", "UP035", "UP045"]
+extend-ignore = ["UP007", "UP035", "UP045", "F401"]
 
 [lint.pydocstyle]
 convention = "google"

@@ -9,5 +9,6 @@ from ..query_builder import (
     ConditionItem,
 )
 
+
 class PostgresQueryBuilder(BaseSqlQueryBuilder):
     pass

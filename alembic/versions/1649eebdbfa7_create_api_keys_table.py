@@ -5,6 +5,7 @@ Revises: 310ab3cafdbf
 Create Date: 2025-09-16 17:59:54.801410
 
 """
+
 from alembic import op
 
 from typing import Union, Sequence
@@ -13,8 +14,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '1649eebdbfa7'
-down_revision: Union[str, Sequence[str], None] = '310ab3cafdbf'
+revision: str = "1649eebdbfa7"
+down_revision: Union[str, Sequence[str], None] = "310ab3cafdbf"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -77,13 +78,13 @@ def upgrade() -> None:
             nullable=False,
         ),
     )
-    
+
     # Create index on user_id for better query performance
     op.create_index("ix_api_keys_user_id", "api_keys", ["user_id"])
-    
+
     # Create index on api_key for faster lookups
     op.create_index("ix_api_keys_api_key", "api_keys", ["api_key"])
-    
+
     # Create index on is_active for filtering active keys
     op.create_index("ix_api_keys_is_active", "api_keys", ["is_active"])
 

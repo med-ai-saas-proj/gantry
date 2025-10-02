@@ -11,7 +11,7 @@ class EHRDict:
     content: dict[str, Any]
 
     @staticmethod
-    def from_input_ehr(input_ehr: InputEHR) -> 'EHRDict':
+    def from_input_ehr(input_ehr: InputEHR) -> "EHRDict":
         match input_ehr.type:
             case EHRFormat.custom_json:
                 assert input_ehr.custom_json
@@ -31,7 +31,7 @@ class PrescriptionDict:
     @staticmethod
     def from_input_prescription(
         input_ehr: InputPrescription,
-    ) -> 'PrescriptionDict':
+    ) -> "PrescriptionDict":
         match input_ehr.type:
             case EHRFormat.custom_json:
                 assert input_ehr.custom_json

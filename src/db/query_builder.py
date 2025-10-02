@@ -95,7 +95,9 @@ class SqlQuery:
 
     def copy(self):
         new_object = SqlQuery(
-            sql=self.sql, params=self.params.copy(), columns=self.columns.copy()
+            sql=self.sql,
+            params=self.params.copy(),
+            columns=self.columns.copy(),
         )
         return new_object
 
