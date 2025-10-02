@@ -1,25 +1,30 @@
-# This file is the entrypoint for debugging
-from dotenv import load_dotenv
-
-load_dotenv(".env")
+"""
+This file is the entrypoint for debugging
+"""
 
 from src.main.app import cors as app  # type: ignore # noqa: F401
 
 import argparse
 
 import uvicorn
+from dotenv import load_dotenv
 from uvicorn.config import LOGGING_CONFIG
+
+
+load_dotenv(".env")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("-p", "--port", required=False, help="port", default="8000")
+    ap.add_argument(
+        "-p", "--port", required=False, help="port", default="8000"
+    )
     ap.add_argument(
         "-w", "--workers", required=False, help="number workers", default="1"
     )
     args = vars(ap.parse_args())
-    LOGGING_CONFIG["formatters"]["default"][
-        "fmt"
-    ] = "%(asctime)s [%(name)s] %(levelprefix)s %(message)s"
+    LOGGING_CONFIG["formatters"]["default"]["fmt"] = (
+        "%(asctime)s [%(name)s] %(levelprefix)s %(message)s"
+    )
     uvicorn.run(
         app,
         host="0.0.0.0",

@@ -57,6 +57,8 @@ def main(app_name: str, overwrite: bool = False):
             content = template.render(app_name=app_name, has_router=has_router)
             assert isinstance(content, str)
             f.write(content)
+        if file == "__init__.py":
+            continue
         with open(
             create_test_file_path,
             "w",
