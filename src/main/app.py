@@ -13,6 +13,7 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 from pydantic import ValidationError
+from scalar_fastapi import get_scalar_api_reference
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response, JSONResponse
@@ -23,9 +24,9 @@ app = FastAPI(
     title="Venera API",
     description="Welcome to API documentation",
     # root_path="/api/v1",
-    docs_url="/docs",  # if env.DEBUG else None,
-    # openapi_url="/docs/openapi.json",
-    redoc_url="/docs",  # if env.DEBUG else None,
+    docs_url=None,  # "/docs" if env.DEBUG else None,
+    openapi_url="/docs/openapi.json",
+    redoc_url=None,  # "/docs" if env.DEBUG else None,
 )
 cors = CORSMiddleware(
     app,
@@ -159,4 +160,14 @@ async def global_middleware(request: Request, call_next):
 
 
 app.include_router(router=api_router)
+
+
+@app.get("/docs", include_in_schema=False)
+async def scalar_html():
+    return get_scalar_api_reference(
+        openapi_url=app.openapi_url,
+        title=app.title,
+    )
+
+
 app.mount("/", StaticFiles(directory="statics", html=True), name="static")

@@ -1,9 +1,9 @@
+import src.db.postgres.consts as postgres_consts
 from alembic import context
 
 from logging.config import fileConfig
 
 from sqlalchemy import pool, engine_from_config
-from src.main.consts.env import EnvConsts
 
 
 # this is the Alembic Config object, which provides
@@ -40,7 +40,7 @@ def run_migrations_offline() -> None:
 
     """
     context.configure(
-        url=EnvConsts.CORE_DNS,
+        url=postgres_consts.CORE_DNS,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -58,7 +58,7 @@ def run_migrations_online() -> None:
 
     """
     configuration = config.get_section(config.config_ini_section, {})
-    configuration["sqlalchemy.url"] = EnvConsts.CORE_DNS
+    configuration["sqlalchemy.url"] = postgres_consts.CORE_DNS
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",

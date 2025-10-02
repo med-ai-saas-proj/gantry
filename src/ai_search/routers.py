@@ -3,13 +3,14 @@ from src.auth.entities.user import User
 from src.shared.utils.logger import LOGGER
 from src.shared.custom_types.responses import SSEResponse
 
-from .services import Answer
+from .services import Answer, SSEContent
 from .initialize import AI_SEARCH_SERVICE
 
 from typing import Annotated
 
 from fastapi import Body, Security, APIRouter
 from fastapi.responses import JSONResponse
+from pydantic import TypeAdapter
 
 
 ai_search_router = APIRouter(prefix="/ai_search", tags=["Doctor Help"])
@@ -17,7 +18,7 @@ ai_search_router = APIRouter(prefix="/ai_search", tags=["Doctor Help"])
 
 @ai_search_router.post(
     "",
-    response_model=Answer,
+    response_model=Answer | SSEContent,
     responses={
         200: {
             "content": {
@@ -30,7 +31,7 @@ async def ai_search(
     user: Annotated[User, Security(get_current_user)],
     query: str = Body(..., embed=True),
     stream: bool = Body(False, embed=True),
-):
+) -> SSEResponse | JSONResponse:
     LOGGER.debug("user", user_id=user["id"])
     if stream:
         return SSEResponse(
