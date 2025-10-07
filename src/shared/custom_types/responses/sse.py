@@ -82,7 +82,9 @@ class SSEResponse(StreamingResponse):
         elif isinstance(data, str):
             result = f"data: {data}\n\n".encode()
         else:
-            result = f"data: {json.dumps(data)}\n\n".encode()
+            result = (
+                f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode()
+            )
 
         if event is not None:
             result = f"event: {event}\n".encode("utf-8") + result
