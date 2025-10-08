@@ -170,10 +170,9 @@ class BaseSqlQueryBuilder:
 
     @classmethod
     def where(cls, conditions: SqlConditionInterface, alias=None):
-        """
-        alias: Optional
-            can set alias in any condition, alias parameter will pass and use in sub condition
-            alias in conditions parameter will overwrite alias parameter
+        """alias: Optional
+        can set alias in any condition, alias parameter will pass and use in sub condition
+        alias in conditions parameter will overwrite alias parameter
         """
         sql = []
         alias_string = ""

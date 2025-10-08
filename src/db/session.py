@@ -36,8 +36,8 @@ class BaseSession(Generic[Session_T]):
     ) -> Callable[..., _GeneratorContextManager[Session_T]]:
         @contextmanager
         def session_scope(new=False):
-            """
-            Provide a transactional scope around a series of operations.
+            """Provide a transactional scope around a series of operations.
+
             Shouldn't keep session alive too long, it will block a connection of pool connections.
             """
             if not new:

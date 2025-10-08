@@ -9,7 +9,7 @@ class CErrorResponse(MessagedResponse, Exception):
         self,
         status_code,
         message,
-        data: Union[List, BaseDict, Any] = None,
+        data: Union[list, BaseDict, Any] = None,
         errors: BaseDict | None = None,
     ):
         super(Exception, self).__init__(message)

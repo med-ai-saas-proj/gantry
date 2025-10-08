@@ -9,7 +9,7 @@ class CPaginationResponse(MessagedResponse):
         self,
         status_code,
         message,
-        data: Union[List, BaseDict, Any],
+        data: Union[list, BaseDict, Any],
         page,
         page_size,
         total,
@@ -19,7 +19,7 @@ class CPaginationResponse(MessagedResponse):
         self.page_size = page_size
         self.total = total
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         result = super().to_dict()
         if self.page is not None:
             result["page"] = self.page

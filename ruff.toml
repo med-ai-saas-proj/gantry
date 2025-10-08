@@ -4,7 +4,7 @@ include = [
     "src/**/*.py",
     "scripts/**/*.py",
     "templates/**/*.py",
-    # "templates/**/*.py.mako",
+    "templates/**/*.py.mako",
     "alembic/**/*.py",
 ]
 line-length = 79

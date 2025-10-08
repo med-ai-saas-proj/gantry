@@ -1,3 +1,4 @@
+"""This file contain definition of ${app_name}'s routers."""
 from src.auth.security import get_current_user
 from src.auth.entities.user import User
 from src.shared.utils.logger import LOGGER

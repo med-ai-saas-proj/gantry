@@ -345,7 +345,7 @@ class CrawlerService:
                         )
                         or ""
                     )
-                    page_url = getattr(r, "url") or url
+                    page_url = r.url or url
                     self.logger.debug(
                         "Crawl success",
                         url=page_url,

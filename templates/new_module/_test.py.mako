@@ -1,3 +1,4 @@
+"""Test cases for ${file}."""
 import unittest
 from . import ${file}
 

@@ -49,7 +49,7 @@ class PostgresRepo(BaseRepo[T]):
         columns = [column[0] for column in cur.description]
         results = []
         for row in cur.fetchall():
-            results.append(dict(zip(columns, row)))
+            results.append(dict(zip(columns, row, strict=True)))
         return results
 
     @classmethod

@@ -27,8 +27,7 @@ async def create_api_key(
     request: CreateApiKeyRequestDTO,
     current_user: User = Security(get_current_user),
 ):
-    """
-    Create a new API key for the authenticated user.
+    """Create a new API key for the authenticated user.
     """
     api_key_data = await API_KEY_SERVICE.create_api_key(
         user_id=str(current_user["id"]),
@@ -54,8 +53,7 @@ async def create_api_key(
 async def list_api_keys(
     current_user: User = Security(get_current_user),
 ):
-    """
-    List all API keys for the authenticated user.
+    """List all API keys for the authenticated user.
     """
     api_keys_data = await API_KEY_SERVICE.get_user_api_keys(
         str(current_user["id"])
@@ -89,8 +87,7 @@ async def delete_api_key(
     request: DeleteApiKeyRequestDTO,
     current_user: User = Security(get_current_user),
 ):
-    """
-    Delete an API key for the authenticated user.
+    """Delete an API key for the authenticated user.
     """
     deleted = await API_KEY_SERVICE.delete_by_id(
         current_user["id"],

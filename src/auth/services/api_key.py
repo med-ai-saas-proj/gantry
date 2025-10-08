@@ -51,8 +51,7 @@ class ApiKeyServices:
         }
 
     async def get_user_api_keys(self, user_id: str) -> list[dict]:
-        """
-        Retrieves all API keys for a specific user.
+        """Retrieves all API keys for a specific user.
 
         Args:
             user_id: The ID of the user

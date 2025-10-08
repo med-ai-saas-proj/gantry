@@ -8,8 +8,7 @@ from pydantic_ai.toolsets import FunctionToolset
 
 
 async def visit_web_page(ctx: RunContext, url: str):
-    """
-    Visit a webpage at the given url and reads its content as markdown string. Use this to browse webpages.
+    """Visit a webpage at the given url and reads its content as markdown string. Use this to browse webpages.
 
     Args:
         url (str): Url of the webpage to visit
@@ -26,8 +25,7 @@ async def web_search(
     query: str,
     date_restrict: Optional[SearchTimeRange] = None,
 ):
-    """
-    Perform a search through many medical sites for a query and return top search results with titles, url and snippet. Use this tool to access up-to-date information from the web or when responding to the user requires information about their location. Some examples of when to use the this tool include:
+    """Perform a search through many medical sites for a query and return top search results with titles, url and snippet. Use this tool to access up-to-date information from the web or when responding to the user requires information about their location. Some examples of when to use the this tool include:
 
     - Local Information: weather, local businesses, events.
     - Freshness: if up-to-date information on a topic could change or enhance the answer.

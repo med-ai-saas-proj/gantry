@@ -10,9 +10,9 @@ from patient_record_processing import toDateTime
 
 
 def prune_and_preprocess_input_ehr(ehr_dict: EHRDict) -> EHRDict:
-    """
-    Prune empty values and do some preprocessing:
-        - convert vn_moh datetime format to YYYY/MM/DD HH:MM
+    """Prune empty values and do some preprocessing.
+
+    - convert vn_moh datetime format to YYYY/MM/DD HH:MM
     """
     match ehr_dict.type:
         case EHRFormat.custom_json:
@@ -30,8 +30,7 @@ def prune_and_preprocess_input_ehr(ehr_dict: EHRDict) -> EHRDict:
 
 
 def convert_datetime(d: dict[str, Any]):
-    """
-    Recursively find and convert value of datetime keys (start with or end with "ngay", but not "so_ngay") to YYYY/MM/DD HH:MM
+    """Recursively find and convert value of datetime keys (start with or end with "ngay", but not "so_ngay") to YYYY/MM/DD HH:MM
     Modify inplace
     """
     d = d.copy()

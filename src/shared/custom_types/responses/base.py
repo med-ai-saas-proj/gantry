@@ -9,7 +9,7 @@ class MessagedResponse:
     data: Any = None
     errors: Any = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         result = {"statusCode": self.status_code, "message": self.message}
         if self.data:
             result["data"] = self.data

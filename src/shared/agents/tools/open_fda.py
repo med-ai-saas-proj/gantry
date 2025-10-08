@@ -107,8 +107,7 @@ Given a drug name, this function returns details about overdose risks, contraind
 def extract_nested_fields(
     records: list[dict], fields: list[str], keywords=None
 ) -> list[dict]:
-    """
-    Recursively extracts nested fields from a list of dictionaries.
+    """Recursively extracts nested fields from a list of dictionaries.
 
     :param records: List of dictionaries from which to extract fields
     :param fields: List of nested fields to extract, each specified with dot notation (e.g., 'openfda.brand_name')
@@ -144,8 +143,7 @@ def extract_nested_fields(
 def map_properties_to_openfda_fields(
     arguments: dict, search_fields: dict
 ) -> dict:
-    """
-    Maps the provided arguments to the corresponding openFDA fields based on the search_fields mapping.
+    """Maps the provided arguments to the corresponding openFDA fields based on the search_fields mapping.
 
     :param arguments: The input arguments containing property names and values.
     :param search_fields: The mapping of property names to openFDA fields.
@@ -170,9 +168,7 @@ def map_properties_to_openfda_fields(
 def extract_sentences_with_keywords(
     text_list: list[str], keywords: list[str]
 ) -> str:
-    """
-    Extracts sentences containing any of the specified keywords from the text.
-    """
+    """Extracts sentences containing any of the specified keywords from the text."""
     sentences_with_keywords = []
     for text in text_list:
         sentence_pattern = re.compile(r"(?<=[.!?]) +")

@@ -14,7 +14,7 @@ from ..entities.user import User
 
 from http import HTTPStatus
 from typing import TypedDict
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timezone, timedelta
 
 from fastapi import Security, APIRouter
 from fastapi.responses import JSONResponse
@@ -65,9 +65,9 @@ async def login(
     payload = {
         "user_id": user["id"],
         "email": user["email"],
-        "exp": datetime.now(timezone.utc)
+        "exp": datetime.now(UTC)
         + timedelta(hours=24),  # 24 hour expiry
-        "iat": datetime.now(timezone.utc),
+        "iat": datetime.now(UTC),
     }
 
     token = utils.create_token(payload)
