@@ -17,29 +17,31 @@ EventType = TypeVar("EventType", Enum, str, None)
 T = TypeVar("T", dict, str, bytes)
 
 
+class SSEContent[EventType, T](TypedDict):
+    event: EventType
+    data: T
+    # def __init__(self) -> None:
+    #     need_prop = ["event", "data"]
+    #     for prop in need_prop:
+    #         if not hasattr(self, prop):
+    #             raise NotImplementedError(
+    #                 f"Subclass '{self.__class__.__name__}' must define a '{prop}' attribute."
+    #             )
+
+    # def get_event(self) -> EventType:
+    #     return self.event
+
+    # def get_data(self) -> T:
+    #     return self.data
+
+
+SSEStream: TypeAlias = Union[AsyncIterable[SSEContent], Iterable[SSEContent]]
+
+
 class SSEResponse(StreamingResponse):
-    class Content[EventType, T](TypedDict):
-        event: EventType
-        data: T
-        # def __init__(self) -> None:
-        #     need_prop = ["event", "data"]
-        #     for prop in need_prop:
-        #         if not hasattr(self, prop):
-        #             raise NotImplementedError(
-        #                 f"Subclass '{self.__class__.__name__}' must define a '{prop}' attribute."
-        #             )
-
-        # def get_event(self) -> EventType:
-        #     return self.event
-
-        # def get_data(self) -> T:
-        #     return self.data
-
-    Stream: TypeAlias = Union[AsyncIterable[Content], Iterable[Content]]
-
     def __init__(
         self,
-        stream: Stream,
+        stream: SSEStream,
         status_code: int = 200,
         headers: dict[str, str] | None = None,
         media_type: str = "text/event-stream",
@@ -58,7 +60,7 @@ class SSEResponse(StreamingResponse):
         )
 
     @staticmethod
-    async def to_async_iterable(sync_iterable: Iterable[Content]):
+    async def to_async_iterable(sync_iterable: Iterable[SSEContent]):
         """Converts a synchronous iterable into an asynchronous iterable."""
         for item in sync_iterable:
             # You can add awaitable operations here if needed,
@@ -67,14 +69,14 @@ class SSEResponse(StreamingResponse):
             yield item
 
     @staticmethod
-    async def stream_format_sse(stream: Stream):
+    async def stream_format_sse(stream: SSEStream):
         if isinstance(stream, Iterable):
             stream = SSEResponse.to_async_iterable(stream)
         async for content in stream:
             yield SSEResponse.format_sse(content)
 
     @staticmethod
-    def format_sse(content: Content) -> bytes:
+    def format_sse(content: SSEContent) -> bytes:
         data = content["data"]
         event = content["event"]
         if isinstance(data, bytes):
@@ -87,5 +89,5 @@ class SSEResponse(StreamingResponse):
             )
 
         if event is not None:
-            result = f"event: {event}\n".encode("utf-8") + result
+            result = f"event: {event}\n".encode() + result
         return result

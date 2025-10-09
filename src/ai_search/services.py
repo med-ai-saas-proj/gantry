@@ -1,5 +1,8 @@
 from src.db.postgres.service import PostgresService
 from src.shared.agents.shared_types import AnswerStruct
+from src.shared.dtos.generation_output import Usage
+
+from .dtos import Answer
 
 import asyncio
 from enum import Enum
@@ -10,6 +13,7 @@ from typing import (
     Callable,
     Optional,
     TypedDict,
+    NotRequired,
     AsyncIterable,
 )
 from functools import partial
@@ -73,7 +77,7 @@ class StreamDelta(TypedDict):
 
 class StreamDone(TypedDict):
     event: Literal[Event.done]
-    data: Done
+    data: Usage
 
 
 class StreamThinkDelta(TypedDict):
@@ -94,19 +98,6 @@ class StreamToolResult(TypedDict):
 SSEContent = Union[
     StreamDelta, StreamThinkDelta, StreamToolCall, StreamToolResult, StreamDone
 ]
-
-
-class UsedTool(TypedDict):
-    tool_call_id: str
-    tool_name: str
-    args: dict[str, Any]
-    result: Union[str, list, dict]
-
-
-class Answer(TypedDict):
-    output: str
-    reasoning: Optional[str]
-    used_tools: list[UsedTool]
 
 
 AQueue = asyncio.Queue[SSEContent]
@@ -199,7 +190,16 @@ class AISearchService:
                     )
                     # yield new_response
                     agent_result = answer
-                await queue.put({"event": Event.done, "data": {"d": ""}})
+                usage = run.usage()
+                await queue.put(
+                    {
+                        "event": Event.done,
+                        "data": {
+                            "input_tokens": usage.input_tokens,
+                            "output_tokens": usage.output_tokens,
+                        },
+                    }
+                )
         except Exception as e:
             self.logger.error(__file__, error=e)
             result = {"result": agent_result, "error": str(e)}
@@ -229,15 +229,18 @@ class AISearchService:
 
     async def generate_advice(self, user_id: str, query: str) -> Answer:
         # Why does this instead of run_sync?
-        # Anthropic said: non-streaming Messages API requests are not expected to exceed a 10 minute timeout
+        # Anthropic said: non-streaming Messages API requests are not expected
+        # to exceed a 10 minute timeout
         # https://docs.anthropic.com/en/api/errors#long-requests
         res = ""
         thought = ""
-        used_tools: dict[str, UsedTool] = {}
+        # used_tools: dict[str, UsedTool] = {}
+        usage: Usage | None = None
         # async queue.get():
         async for output in self.generate_advice_stream(user_id, query):
             match output["event"]:
                 case Event.done:
+                    usage = output["data"]
                     break
                 case Event.delta:
                     res += output["data"]["d"]
@@ -252,8 +255,12 @@ class AISearchService:
                     used_tools[output["data"]["tool_call_id"]]["result"] = (
                         output["data"]["result"]
                     )
+        assert usage, "Usage is none, check _generate_advice_stream"
         return {
-            "output": res,
-            "used_tools": list(used_tools.values()),
+            "result": res,
+            # "used_tools": list(used_tools.values()),
             "reasoning": thought if thought else None,
+            "citation": [],
+            "references": [],
+            # "usage": usage,
         }

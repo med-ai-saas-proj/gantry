@@ -3,7 +3,6 @@ from src.ehr.dtos import InputEHR
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict
 from src.db.postgres.service import PostgresService
-from src.shared.custom_types.responses import SSEResponse
 
 from enum import Enum
 from typing import (
@@ -33,8 +32,6 @@ class DoneData(TypedDict):
 
 
 DataType = Union[DeltaData, DoneData]
-
-SSEResponseContent = SSEResponse.Content[Event, DataType]
 
 
 class StreamDelta(TypedDict):
@@ -74,7 +71,7 @@ class EHRSummaryService:
 
     async def summarize_ehr_stream(
         self, user_id: str, ehr: InputEHR
-    ) -> AsyncGenerator[SSEContent, None]:
+    ) -> AsyncGenerator[SSEContent]:
         ehr_dict = EHRDict.from_input_ehr(ehr)
         result = {"result": ""}
         try:
