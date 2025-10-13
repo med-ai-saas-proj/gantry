@@ -7,7 +7,7 @@ include = [
     "templates/**/*.py.mako",
     "alembic/**/*.py",
 ]
-line-length = 79
+line-length = 80
 
 [lint]
 # Add the `line-too-long` rule to the enforced rule set.
