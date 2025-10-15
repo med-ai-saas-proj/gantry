@@ -7,10 +7,13 @@ Feature:
 Reason: 
 
 """
-from typing import Sequence, Union
-
 from alembic import op
+
+from typing import Sequence, Union
+from pathlib import Path
+
 import sqlalchemy as sa
+
 ${imports if imports else ""}
 
 # revision identifiers, used by Alembic.
@@ -19,12 +22,20 @@ down_revision: Union[str, Sequence[str], None] = ${repr(down_revision)}
 branch_labels: Union[str, Sequence[str], None] = ${repr(branch_labels)}
 depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
 
+script_path = Path(__file__).resolve()
+script_directory = script_path.parent
 
 def upgrade() -> None:
     """Upgrade schema."""
+    with open(script_directory / "${up_revision}_upgrade.sql") as f:
+        sql = f.read()
+    op.execute(sql)
     ${upgrades if upgrades else "pass"}
 
 
 def downgrade() -> None:
     """Downgrade schema."""
+    with open(script_directory / "${up_revision}_downgrade.sql") as f:
+        sql = f.read()
+    op.execute(sql)
     ${downgrades if downgrades else "pass"}

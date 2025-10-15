@@ -9,26 +9,30 @@ from pydantic import Field
 class StreamFormat(str, Enum):
     """Stream response format.
 
-    If default, the stream will follow the format of non stream result,
-    no event will be emmitted, only data example:
+    If default, the stream will follow the json patch format with, example:
     - `data: {"summary": "This "}`
     - `data: {"summary": "is "}`
     - `data: {"summary": "a "}`
-    - `data: {"summary": "test "}`
-    - `data: {"metrics": {"token_used": 33}}`
+    - `data: {"summary": "test"}`
+
+    A final event will be emit to send the full response,
+    the output will be none to save bandwidth. Example:
+    - `event: final_result`
+    - `data: {"id": "...", "output": null, "status": "completed", ...}`
+
 
     If responses format is ag_ui then the stream will follow
     [AG UI format](https://docs.ag-ui.com/concepts/events)
     """
 
-    default = "default"
+    json_patch = "json_patch"
     ag_ui = "ag_ui"
 
 
 class StreamOptions(BaseDTO):
     """Options for streaming responses. Only set this if `stream: true`."""
 
-    response_type: StreamFormat = StreamFormat.default
+    response_type: StreamFormat = StreamFormat.json_patch
 
 
 class GenerationInput(BaseDTO):
@@ -44,6 +48,9 @@ class GenerationInput(BaseDTO):
             "conversation after this response completes."
         ),
     ] = None
+    model: Annotated[
+        str, Field(description="Model ID used to generate the response.")
+    ]
     stream: Annotated[
         bool,
         Field(

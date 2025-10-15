@@ -79,3 +79,14 @@ AI related APIs for medical applications
 - [ ] STT
 - [ ] Deep research cho bác sĩ
 - [ ] AI hỗ trợ chuẩn đoán bệnh, Differential diagnosis
+
+## How to run python script
+
+`UV_ENV_FILE=.env uv run -m scripts.setup_test_account`
+
+## Notes
+
+- How to store Messages:
+  - Many tables, each for a message part then use view for convenient query (sound stupid)
+  - 1 table with jsonb
+- Insert entry into db first then update generation result.

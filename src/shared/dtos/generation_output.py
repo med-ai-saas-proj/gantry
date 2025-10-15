@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Annotated, TypedDict, NotRequired, Literal, Union
+from typing import Union, Literal, Annotated, TypedDict, NotRequired
 
 from pydantic import Field
 
@@ -67,7 +67,17 @@ class GenerationOutput[T](TypedDict):
     ]
 
 
-class _ReferenceStartEndIndexMixin(TypedDict):
+class ReferenceType(str, Enum):
+    """Types of references that the model makes."""
+
+    document = "document"
+    webpage = "webpage"
+    inline_text = "inline_text"
+
+
+class Citation(TypedDict):
+    """Citation of the generated messages."""
+
     start_index: Annotated[
         int,
         Field(
@@ -82,137 +92,10 @@ class _ReferenceStartEndIndexMixin(TypedDict):
             description="Index of the last character of the cited reference.",
         ),
     ]
-
-
-class ReferenceType(str, Enum):
-    """Types of references that the model makes."""
-
-    document = "document"
-    webpage = "webpage"
-    inline_text = "inline_text"
-
-
-class DocumentReference(_ReferenceStartEndIndexMixin):
-    """Webpage content that the model is referencing to."""
-
-    type: Literal[ReferenceType.document]
-    id: Annotated[
-        str,
-        Field(description="Id of the referenced document"),
+    reference_type: Annotated[
+        ReferenceType,
+        Field(description="The type of reference this citation uses."),
     ]
-    title: Annotated[
-        str,
-        Field(description="Title of the referenced document"),
-    ]
-
-
-class WebpageContent(_ReferenceStartEndIndexMixin):
-    """Webpage content (paragraph) that the model is referencing to."""
-
-    id: Annotated[
-        str,
-        Field(description="Id of the webpage content block"),
-    ]
-    content: Annotated[
-        str,
-        Field(
-            description=("Text content of the webpage paragraph or block"),
-        ),
-    ]
-
-
-class WebpageReference(TypedDict):
-    """Webpage that the model is referencing to."""
-
-    type: Literal[ReferenceType.webpage]
-    id: Annotated[
-        str,
-        Field(description="Id of the referenced webpage"),
-    ]
-    url: Annotated[
-        str,
-        Field(description="URL of the referenced webpage"),
-    ]
-    title: Annotated[
-        NotRequired[str | None],
-        Field(description="Optional title of the webpage"),
-    ]
-    image_url: Annotated[
-        NotRequired[str | None],
-        Field(description="Optional image URL representing the webpage"),
-    ]
-    contents: Annotated[
-        list[WebpageContent],
-        Field(
-            description=(
-                "List of content blocks (paragraphs) from the webpage"
-            ),
-        ),
-    ]
-
-
-class InlineTextReference(_ReferenceStartEndIndexMixin):
-    """Previous message that the model is referencing to."""
-
-    type: Literal[ReferenceType.inline_text]
-    id: Annotated[
-        str,
-        Field(
-            description=(
-                "Id of the inline text (previous message) being referenced"
-            ),
-        ),
-    ]
-
-
-Reference = Annotated[
-    Union[DocumentReference, WebpageReference, InlineTextReference],
-    Field(
-        discriminator="type",
-        description="References used to generate the answer",
-    ),
-]
-
-
-class Citation(TypedDict):
-    """Citation for the message."""
-
-    start_index: Annotated[
-        int,
-        Field(
-            gt=0,
-            description="Index of the first character "
-            "in the message that need citing.",
-        ),
-    ]
-    end_index: Annotated[
-        int,
-        Field(
-            gt=0,
-            description="Index of the last character "
-            "in the message that need citing.",
-        ),
-    ]
-    reference_id: Annotated[
-        str,
-        Field(
-            description="Id of the reference that this citation is"
-            " referencing to"
-        ),
-    ]
-
-
-class ReferenceCitationMixin(TypedDict):
-    """Mixin for references and citations."""
-
-    citation: Annotated[
-        list[Citation],
-        Field(
-            description="Response's citations, model may not cite "
-            "all used references"
-        ),
-    ]
-    references: Annotated[
-        list[Reference],
-        Field(description="References used to generate the response."),
-    ]
+    title: Annotated[str, Field(description="Title of the cited reference")]
+    src: Annotated[str, Field(description="Source of the cited reference")]
+    content: Annotated[str, Field(description="Cited content")]

@@ -541,6 +541,8 @@
 
           const result = await apiCall("/ai_search", "POST", {
             query,
+            model: "",
+            convesation_id: "",
             stream: false,
           });
           if (result) displayResponse(result);

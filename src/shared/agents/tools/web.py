@@ -1,10 +1,15 @@
 from src.crawler.services import SearchTimeRange
 from src.crawler.initialize import CRAWLER_SERVICE
+from src.shared.utils.logger import LOGGER
 
-from typing import Optional
+from typing import Optional, TypedDict
 
 from pydantic_ai import RunContext
 from pydantic_ai.toolsets import FunctionToolset
+
+
+class ViewedUrlsMixin(TypedDict):
+    viewed_urls: list[str]
 
 
 async def visit_web_page(ctx: RunContext, url: str):
@@ -21,7 +26,7 @@ async def visit_web_page(ctx: RunContext, url: str):
 
 
 async def web_search(
-    ctx: RunContext,
+    ctx: RunContext[ViewedUrlsMixin | None],
     query: str,
     date_restrict: Optional[SearchTimeRange] = None,
 ):
@@ -42,6 +47,15 @@ async def web_search(
     """
     try:
         results = await CRAWLER_SERVICE.discover(query, 5, date_restrict)
+        if (
+            ctx.deps
+            and isinstance(ctx.deps, dict)
+            and "viewed_urls" in ctx.deps
+            and isinstance(ctx.deps["viewed_urls"], list)
+        ):
+            ctx.deps["viewed_urls"] = [it["url"] for it in results]
+        else:
+            LOGGER.warn("Wrong dependency type, please check")
         return results
     except Exception as e:
         return {"error": str(e)}

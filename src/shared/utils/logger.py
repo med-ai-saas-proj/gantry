@@ -6,6 +6,7 @@ import logging
 
 import orjson
 import structlog
+from structlog.processors import CallsiteParameter
 
 
 def orjson_renderer(_, __, event_dict):
@@ -27,6 +28,13 @@ def configure_default_logging(
 ) -> structlog.stdlib.BoundLogger:
     pre_chain = [
         structlog.contextvars.merge_contextvars,
+        structlog.processors.CallsiteParameterAdder(
+            [
+                CallsiteParameter.FILENAME,
+                CallsiteParameter.LINENO,
+                CallsiteParameter.FUNC_NAME,
+            ]
+        ),
         structlog.processors.add_log_level,
         structlog.processors.StackInfoRenderer(),
         ms_timestamper,

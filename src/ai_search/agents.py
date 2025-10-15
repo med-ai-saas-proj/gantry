@@ -1,14 +1,19 @@
 from src.shared import llms
-from src.shared.agents.tools.web import WEB_TOOLSET
+from src.shared.agents.tools.web import WEB_TOOLSET, ViewedUrlsMixin
 from src.shared.agents.shared_types import AnswerStruct
 from src.shared.agents.shared_instruction import add_current_date
 
 from pydantic_ai import Agent
 
 
+class Dep(ViewedUrlsMixin):
+    pass
+
+
 AI_SEARCH_AGENT = Agent(
     model=llms.big_model,
     output_type=AnswerStruct,
+    deps_type=Dep,
     name="ai_search_agent",
     end_strategy="exhaustive",
     toolsets=[WEB_TOOLSET],

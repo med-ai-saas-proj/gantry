@@ -1,13 +1,17 @@
 from src.auth.security import get_current_user
 from src.auth.entities.user import User
 from src.shared.utils.logger import LOGGER
-from src.shared.custom_types.responses import SSEResponse
-from src.shared.dtos.generation_output import ResponseStatus
+from src.shared.custom_types.responses.sse import SSEResponse, SSEContent
+from src.shared.dtos.generation_output import (
+    ResponseStatus,
+    Usage,
+    GenerationOutput,
+)
 
-from .dtos import AiSearchInput, AiSearchOutput
+from .dtos import AiSearchInput, AiSearchOutput, Answer
 from .initialize import AI_SEARCH_SERVICE
 
-from typing import Annotated
+from typing import Annotated, AsyncGenerator, Any
 
 from fastapi import Body, Security, APIRouter
 from pydantic import TypeAdapter
@@ -35,8 +39,8 @@ ai_search_router = APIRouter(prefix="/ai_search", tags=["Doctor Help"])
                                 output={
                                     "result": "This is the result",
                                     "reasoning": None,
-                                    "references": [],
-                                    "citation": [],
+                                    "viewed_pages": [],
+                                    "citations": [],
                                 },
                                 usage={
                                     "input_tokens": 10,
@@ -56,10 +60,14 @@ async def ai_search(
     LOGGER.debug("user", user_id=user["id"])
     if input.stream:
         return SSEResponse(
-            AI_SEARCH_SERVICE.generate_advice_stream(user["id"], input.query),
+            convert_stream(
+                AI_SEARCH_SERVICE.generate_advice_stream(
+                    user["id"], input.query
+                ),
+            )
         )
     else:
-        analysis = await AI_SEARCH_SERVICE.generate_advice(
+        analysis, usage = await AI_SEARCH_SERVICE.generate_advice(
             user["id"], input.query
         )
         return JSONResponse(
@@ -68,6 +76,23 @@ async def ai_search(
                 conversation_id="",
                 status=ResponseStatus.completed,
                 output=analysis,
-                usage={"input_tokens": 0, "output_tokens": 0},
+                usage=usage,
             )
         )
+
+
+async def convert_stream(stream: AsyncGenerator[Answer | Usage]):
+    async for it in stream:
+        if "input_tokens" in it:
+            yield SSEContent(
+                event=None,
+                data=GenerationOutput[None](
+                    id="",
+                    conversation_id="",
+                    status=ResponseStatus.completed,
+                    output=None,
+                    usage=it,
+                ),
+            )
+        else:
+            yield SSEContent(event="final_result", data=it)
