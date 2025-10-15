@@ -57,6 +57,7 @@ ai_search_router = APIRouter(prefix="/ai_search", tags=["Doctor Help"])
 async def ai_search(
     user: Annotated[User, Security(get_current_user)], input: AiSearchInput
 ) -> SSEResponse | JSONResponse:
+    """Use AI to search the internet and summarize the result."""
     LOGGER.debug("user", user_id=user["id"])
     if input.stream:
         return SSEResponse(
@@ -81,7 +82,7 @@ async def ai_search(
         )
 
 
-async def convert_stream(stream: AsyncGenerator[Answer | Usage]):
+async def _convert_stream(stream: AsyncGenerator[Answer | Usage]):
     async for it in stream:
         if "input_tokens" in it:
             yield SSEContent(

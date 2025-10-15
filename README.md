@@ -2,10 +2,37 @@
 
 AI related APIs for medical applications
 
+## Frontend dev notes
+
+- Build server: `docker compose build --ssh schema_repo_read_ssh_key=$HOME/.ssh/<ssh key with access to Venera-AI/patient-record-processing>`
+- Start server: `docker compose up`
+- Register test account and api key: `docker exec api_hub_server uv run script/setup_test_account.py`
+- Docs site: <http://localhost:8000/docs/>
+- Env file:
+  - `.env.postgres`:
+
+    ```env
+    POSTGRES_DB=tailm
+    POSTGRES_USER=internet_crawler
+    POSTGRES_PASSWORD=123456
+    ```
+
+  - `.env`:
+
+    ```env
+    CORE_DNS=postgresql://internet_crawler:123456@localhost:5432/tailm
+    STAGE=local
+    DEBUG=1
+
+    ANTHROPIC_API_KEY=
+    GOOGLE_PROGRAMMABLE_SEARCH_API_KEY=""
+    GOOGLE_PROGRAMMABLE_SEARCH_CX=
+    ```
+
 ## Feat todo
 
 - [ ] Login + SignUp with CSRF protection
-  - [ ] Backend (DB schema, JWT, 2FA, https://fastapi.tiangolo.com/tutorial/security/)
+  - [ ] Backend (DB schema, JWT, 2FA, <https://fastapi.tiangolo.com/tutorial/security/>)
   - [ ] Frontend (React/Svelte/Solid/HTML, prefer static site gen from server to support CSRF)
 - [ ] API key + permission control
   - [ ] CRUD API key frontend (if static login then this static too, no need for REST, better security)
@@ -16,7 +43,7 @@ AI related APIs for medical applications
   - [ ] Pick one
   - [ ] Setup
 - [ ] Docs site
-  - [ ] Pick (Refer OpenAPI compatible frontend, Recommend: https://github.com/scalar/scalar)
+  - [ ] Pick (Refer OpenAPI compatible frontend, Recommend: <https://github.com/scalar/scalar>)
   - [ ] Integrate with fastapi auto gen OpenAPI docs
 - [ ] Conversation
   - [ ] DB schema
