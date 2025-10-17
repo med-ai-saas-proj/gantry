@@ -65,37 +65,3 @@ class GenerationOutput[T](TypedDict):
         Usage,
         Field(description="Token usage breakdown for this response"),
     ]
-
-
-class ReferenceType(str, Enum):
-    """Types of references that the model makes."""
-
-    document = "document"
-    webpage = "webpage"
-    inline_text = "inline_text"
-
-
-class Citation(TypedDict):
-    """Citation of the generated messages."""
-
-    start_index: Annotated[
-        int,
-        Field(
-            gt=0,
-            description="Index of the first character of the cited reference.",
-        ),
-    ]
-    end_index: Annotated[
-        int,
-        Field(
-            gt=0,
-            description="Index of the last character of the cited reference.",
-        ),
-    ]
-    reference_type: Annotated[
-        ReferenceType,
-        Field(description="The type of reference this citation uses."),
-    ]
-    title: Annotated[str, Field(description="Title of the cited reference")]
-    src: Annotated[str, Field(description="Source of the cited reference")]
-    content: Annotated[str, Field(description="Cited content")]

@@ -25,14 +25,14 @@ class StreamFormat(str, Enum):
     [AG UI format](https://docs.ag-ui.com/concepts/events)
     """
 
-    json_patch = "json_patch"
+    default = "default"
     ag_ui = "ag_ui"
 
 
 class StreamOptions(BaseDTO):
     """Options for streaming responses. Only set this if `stream: true`."""
 
-    response_type: StreamFormat = StreamFormat.json_patch
+    response_type: StreamFormat = StreamFormat.default
 
 
 class GenerationInput(BaseDTO):

@@ -1,17 +1,13 @@
+from src.chat.dtos import ChatOutput, StreamEvent
 from src.auth.security import get_current_user
 from src.auth.entities.user import User
 from src.shared.utils.logger import LOGGER
-from src.shared.custom_types.responses.sse import SSEResponse, SSEContent
-from src.shared.dtos.generation_output import (
-    ResponseStatus,
-    Usage,
-    GenerationOutput,
-)
+from src.shared.custom_types.responses.sse import SSEContent, SSEResponse
 
-from .dtos import AiSearchInput, AiSearchOutput, Answer
+from .dtos import AiSearchInput
 from .initialize import AI_SEARCH_SERVICE
 
-from typing import Annotated, AsyncGenerator, Any
+from typing import Any, Annotated, AsyncGenerator
 
 from fastapi import Body, Security, APIRouter
 from pydantic import TypeAdapter
@@ -23,33 +19,12 @@ ai_search_router = APIRouter(prefix="/ai_search", tags=["Doctor Help"])
 
 @ai_search_router.post(
     "",
-    response_model=AiSearchOutput,
+    response_model=ChatOutput | StreamEvent,
     responses={
         200: {
             "content": {
                 "stream/text-event": {},
-                "application/json": {
-                    "examples": {
-                        "standard": {
-                            "summary": "Typical item",
-                            "value": AiSearchOutput(
-                                id="resp_123",
-                                conversation_id="conv_123",
-                                status=ResponseStatus.completed,
-                                output={
-                                    "result": "This is the result",
-                                    "reasoning": None,
-                                    "viewed_pages": [],
-                                    "citations": [],
-                                },
-                                usage={
-                                    "input_tokens": 10,
-                                    "output_tokens": 10,
-                                },
-                            ),
-                        },
-                    }
-                },
+                "application/json": {},
             },
         },
     },
@@ -61,39 +36,8 @@ async def ai_search(
     LOGGER.debug("user", user_id=user["id"])
     if input.stream:
         return SSEResponse(
-            convert_stream(
-                AI_SEARCH_SERVICE.generate_advice_stream(
-                    user["id"], input.query
-                ),
-            )
+            AI_SEARCH_SERVICE.ai_search_stream(user["id"], input.query),
         )
     else:
-        analysis, usage = await AI_SEARCH_SERVICE.generate_advice(
-            user["id"], input.query
-        )
-        return JSONResponse(
-            AiSearchOutput(
-                id="",
-                conversation_id="",
-                status=ResponseStatus.completed,
-                output=analysis,
-                usage=usage,
-            )
-        )
-
-
-async def _convert_stream(stream: AsyncGenerator[Answer | Usage]):
-    async for it in stream:
-        if "input_tokens" in it:
-            yield SSEContent(
-                event=None,
-                data=GenerationOutput[None](
-                    id="",
-                    conversation_id="",
-                    status=ResponseStatus.completed,
-                    output=None,
-                    usage=it,
-                ),
-            )
-        else:
-            yield SSEContent(event="final_result", data=it)
+        output = await AI_SEARCH_SERVICE.ai_search(user["id"], input.query)
+        return JSONResponse(output)
