@@ -2,14 +2,28 @@
 
 AI related APIs for medical applications
 
-## Frontend dev notes
+## Dev notes
 
-- Build server: `docker compose build --ssh schema_repo_read_ssh_key=$HOME/.ssh/<ssh key with access to Venera-AI/patient-record-processing>`
-- Start server: `docker compose up`
-- Register test account and api key: `docker exec api_hub_server uv run script/setup_test_account.py`
-- Docs site: <http://localhost:8000/docs/>
-- Env file:
-  - `.env.postgres`:
+### Getting API keys
+
+#### LLM
+
+1. Go to <https://groq.com/> and get a free API key, this is `GROQ_API_KEY`
+
+#### Google Programmable search API key
+
+1. clc.fitus.edu.vn is not gonna work
+1. Go to <https://programmablesearchengine.google.com/about/> and create a new customized search engine, then grab **Search engine ID**, this is `GOOGLE_PROGRAMMABLE_SEARCH_CX` env variable
+1. Go to <https://developers.google.com/custom-search/v1/introduction> and get a free api key, this is `GOOGLE_PROGRAMMABLE_SEARCH_API_KEY` env variable
+
+### Running the dev server
+
+### Setup the test account and env file
+
+1. Register test account and api key: `docker exec api_hub_server uv run script/setup_test_account.py`
+1. Docs site: <http://localhost:8000/docs/>
+1. Env file:
+    - `.env.postgres`:
 
     ```env
     POSTGRES_DB=tailm
@@ -17,17 +31,23 @@ AI related APIs for medical applications
     POSTGRES_PASSWORD=123456
     ```
 
-  - `.env`:
+    - `.env`:
 
     ```env
     CORE_DNS=postgresql://internet_crawler:123456@localhost:5432/tailm
     STAGE=local
     DEBUG=1
 
-    ANTHROPIC_API_KEY=
+    GROQ_API_KEY=
     GOOGLE_PROGRAMMABLE_SEARCH_API_KEY=""
     GOOGLE_PROGRAMMABLE_SEARCH_CX=
     ```
+
+## Frontend dev notes
+
+1. Check out [Getting API key](#getting-api-keys) and [Setup test account and env file](#setup-the-test-account-and-env-file)
+1. Build server: `docker compose build --ssh schema_repo_read_ssh_key=$HOME/.ssh/<ssh key with access to Venera-AI/patient-record-processing>`
+1. Start server: `docker compose up`
 
 ## Feat todo
 
