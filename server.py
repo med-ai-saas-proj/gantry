@@ -1,6 +1,4 @@
-"""
-This file is the entrypoint for debugging
-"""
+"""This file is the entrypoint for debugging."""
 
 from src.main.app import cors as app  # type: ignore # noqa: F401
 
@@ -15,9 +13,7 @@ load_dotenv(".env")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument(
-        "-p", "--port", required=False, help="port", default="8000"
-    )
+    ap.add_argument("-p", "--port", required=False, help="port", default="8000")
     ap.add_argument(
         "-w", "--workers", required=False, help="number workers", default="1"
     )

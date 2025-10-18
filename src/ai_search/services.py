@@ -167,6 +167,7 @@ class AISearchService:
         queue: AQueue,
     ):
         async for event in event_stream:
+            self.logger.debug("Got new event", new_event=event)
             to_put: chat_dtos.StreamEvent | None = None
             match event.event_kind:
                 case "part_start":
@@ -276,10 +277,12 @@ class AISearchService:
                         },
                     }
                 case "final_result":
+                    self.logger.debug("Got final result")
                     pass
                 case _:
                     pass
             if to_put is not None:
+                self.logger.debug("to_put", to_put=to_put)
                 await queue.put(to_put)
 
     async def _ai_search_stream(
@@ -289,6 +292,7 @@ class AISearchService:
         queue: AQueue,
     ):
         agent_result = ""
+        self.logger.debug("Ai search is running")
         await queue.put(
             {
                 "event": chat_dtos.StreamEventType.conversation_start,
@@ -298,6 +302,7 @@ class AISearchService:
                 },
             }
         )
+        self.logger.debug("Ai search is running 2")
         async with self.agent.run_stream(
             query,
             deps={"viewed_urls": []},
@@ -305,6 +310,7 @@ class AISearchService:
                 self.event_stream_handler, queue=queue
             ),
         ) as run:
+            self.logger.debug("Ai search is running loop")
             try:
                 i = 0
                 async for output, end in run.stream_responses():
@@ -396,6 +402,7 @@ class AISearchService:
         while True:
             try:
                 it = await queue.get()
+                self.logger.debug("Got new output", it=it)
                 yield it
                 if it["event"] == chat_dtos.StreamEventType.final_result:
                     break
