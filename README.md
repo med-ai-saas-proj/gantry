@@ -16,8 +16,6 @@ AI related APIs for medical applications
 1. Go to <https://programmablesearchengine.google.com/about/> and create a new customized search engine, then grab **Search engine ID**, this is `GOOGLE_PROGRAMMABLE_SEARCH_CX` env variable
 1. Go to <https://developers.google.com/custom-search/v1/introduction> and get a free api key, this is `GOOGLE_PROGRAMMABLE_SEARCH_API_KEY` env variable
 
-### Running the dev server
-
 ### Setup the test account and env file
 
 1. Register test account and api key: `docker exec api_hub_server uv run script/setup_test_account.py`
@@ -43,10 +41,20 @@ AI related APIs for medical applications
     GOOGLE_PROGRAMMABLE_SEARCH_CX=
     ```
 
+### Running the dev server
+
+1. Start DBs: `docker compose -f compose.dev.yaml up`
+1. Start Server: `./scripts/dev.sh`
+
+### Lint and formatting
+
+- Sort imports: `uvx ruff check --fix`
+- Format: vscode Ruff extention, `uvx ruff format --fix`
+
 ## Frontend dev notes
 
 1. Check out [Getting API key](#getting-api-keys) and [Setup test account and env file](#setup-the-test-account-and-env-file)
-1. Build server: `docker compose build --ssh schema_repo_read_ssh_key=$HOME/.ssh/<ssh key with access to Venera-AI/patient-record-processing>`
+1. Build server: `docker compose build`
 1. Start server: `docker compose up`
 
 ## Feat todo

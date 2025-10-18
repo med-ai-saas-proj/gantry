@@ -1,5 +1,7 @@
 from src.shared.dtos.base import Field, BaseDTO
 
+from . import vn_moh
+
 from enum import Enum
 from typing import (
     Any,
@@ -11,7 +13,6 @@ from typing import (
 
 from fhir.resources.bundle import Bundle
 from fhir.resources.medication import Medication
-from patient_record_processing.schemas.vn_moh import flat
 
 
 class EHRFormat(str, Enum):
@@ -32,10 +33,10 @@ class InputEHR_FHIR(BaseDTO):
 
 class InputEHR_VN_MOH(BaseDTO):
     type: Literal[EHRFormat.vn_moh]
-    vn_moh: flat.VN_MOH
+    vn_moh: vn_moh.VN_MOH
 
 
-InputEHR: TypeAlias = Annotated[
+InputEHR = Annotated[
     Union[InputEHR_CustomJSON, InputEHR_FHIR, InputEHR_VN_MOH],
     Field(discriminator="type"),
 ]
@@ -53,7 +54,7 @@ class InputPrescription_FHIR(BaseDTO):
 
 class InputPrescription_VN_MOH(BaseDTO):
     type: Literal[EHRFormat.vn_moh]
-    vn_moh: list[flat.ChiTietThuoc]
+    vn_moh: list[vn_moh.ChiTietThuoc]
 
 
 InputPrescription: TypeAlias = Annotated[
