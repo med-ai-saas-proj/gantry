@@ -6,7 +6,7 @@ from .custom_types import EHRDict
 
 from typing import Any
 
-from patient_record_processing import toDateTime
+from .vn_moh import toDateTime
 
 
 def prune_and_preprocess_input_ehr(ehr_dict: EHRDict) -> EHRDict:

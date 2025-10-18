@@ -478,3 +478,63 @@ class VN_MOH(TypedDict, total=False):
     giay_cn_nghi_duong_thai: GiayCnNghiDuongThai
     giay_cn_nghi_viec_bhxh: GiayCnNghiViecBhxh
     giam_dinh_y_khoa: GiamDinhYKhoa
+
+
+from datetime import datetime
+from collections.abc import Iterable
+from typing import Optional
+
+
+def toDateTime(ee: Optional[str]) -> Optional[str]:
+    """
+    Converts a string representing a date and time in the format 'YYYYMMDDHHMM' to a formatted string 'YYYY/MM/DD HH:MM'.
+
+    If the input string is shorter than 12 characters, it is right-padded with zeros.
+    If the input is None, returns None.
+
+    Args:
+        ee (Optional[str]): The date-time string to convert.
+
+    Returns:
+        Optional[str]: The formatted date-time string, or None if input is None.
+    """
+    if ee is None:
+        return None
+    ee = ee.ljust(12, "0")
+    return datetime.strptime(ee, "%Y%m%d%H%M").strftime("%Y/%m/%d %H:%M")
+
+
+def splitKhoaDieuTri(s: list[str]) -> list[str]:
+    """Splits each string in the input list representing concatenated department codes into individual codes.
+
+    Each code is assumed to start with 'K' followed by two digits. If an element in the input list is longer than 3 characters,
+    it is split into multiple codes of the form 'Kxx' (where xx are two digits), starting from the second character.
+
+    Args:
+        s (list[str]): A list of strings, each representing one or more concatenated department codes.
+
+    Returns:
+        list[str]: A list of unique department codes extracted from the input.
+
+    Examples:
+        `splitKhoaDieuTri("K192021") == ["K19", "K20", "K21"]`
+    """
+    tmp = set(s)
+    for i in range(len(s)):
+        if len(s[i]) > 3:
+            tmp.remove(s[i])
+            for j in range(1, len(s[i]), 2):
+                tmp.add("K" + s[i][j : j + 2])
+    return list(tmp)
+
+
+def toList(obj, none_empty=True) -> list:
+    if obj is None and none_empty:
+        return []
+    if isinstance(obj, list):
+        return obj
+    if isinstance(obj, str) or isinstance(obj, dict):
+        return [obj]
+    if isinstance(obj, Iterable):
+        return list(obj)
+    return [obj]
