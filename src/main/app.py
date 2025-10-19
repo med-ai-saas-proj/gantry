@@ -9,6 +9,7 @@ from .routers import api_router
 import json
 import time
 import uuid
+import traceback
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -112,7 +113,10 @@ async def internal_exception_handler(request: Request, exception):
             errors=errors,
         )
         error_response = exception.to_dict()
-    LOGGER.error(json.dumps(error_response))
+    LOGGER.error(
+        json.dumps(error_response),
+        traceback=traceback.format_exception(exception),
+    )
     return JSONResponse(
         status_code=exception.status_code,
         content=error_response,
@@ -153,6 +157,7 @@ async def global_middleware(request: Request, call_next):
             method=request.method,
             url=str(request.url),
             error=str(e),
+            traceback=traceback.format_exception(e),
         )
         raise
     finally:

@@ -9,14 +9,23 @@ from pydantic import Field
 class StreamFormat(str, Enum):
     """Stream response format.
 
-    If default, the stream will follow the json patch format with, example:
-    - `data: {"summary": "This "}`
-    - `data: {"summary": "is "}`
-    - `data: {"summary": "a "}`
-    - `data: {"summary": "test"}`
-
+    If default, the stream will follow this format.
     A final event will be emit to send the full response,
     the output will be none to save bandwidth. Example:
+
+    - `event: conversation_start`
+    - `data: {"conversation_id": "conv_123"}`
+    - `event: part_start`
+    - `data: thinking`
+    - `event: part_delta`
+    - `data: {"delta": "Thinking..."}`
+    - `event: part_start`
+    - `data: output`
+    - `event: part_delta`
+    - `data: {"delta": "This is"}`
+    - `event: part_delta`
+    - `data: {"delta": " the result"}`
+    - `event: final_result`
     - `event: final_result`
     - `data: {"id": "...", "output": null, "status": "completed", ...}`
 

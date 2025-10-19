@@ -1,0 +1,2746 @@
+event: StreamEventType.conversation_start
+data: {"conversation_id": "thisisaplaceholder"}
+
+event: StreamEventType.part_start
+data: StreamEvent_PartType.output
+
+event: StreamEventType.part_start
+data: StreamEvent_PartType.thinking
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": "Need"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " info"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " on"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " bladder"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " stone"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " We'll"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " browse"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": "."}
+
+event: StreamEventType.part_start
+data: StreamEvent_PartType.builtin_tool_call
+
+event: StreamEventType.part_delta
+data: {"type": "builtin_tool_call", "tool_call_id": "pyd_ai_97b09696c34e4ba0babbf51a3235db07", "hinted_tool_name": "web_search", "hinted_args": "{\"query\":\"bladder stones overview guidelines\",\"topn\":5,\"source\":\"news\"}"}
+
+event: StreamEventType.part_start
+data: StreamEvent_PartType.builtin_tool_result
+
+event: StreamEventType.part_delta
+data: {"type": "builtin_tool_result", "tool_call_id": "pyd_ai_97b09696c34e4ba0babbf51a3235db07", "hinted_result": "\"Unknown tool name: 'web_search'. No tools available.\""}
+
+event: StreamEventType.part_start
+data: StreamEvent_PartType.output
+
+event: StreamEventType.part_start
+data: StreamEvent_PartType.thinking
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": "We"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " don't"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " have"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " tool"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " access"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": "?"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " Probably"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " not"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " We'll"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " respond"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " with"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": " knowledge"}
+
+event: StreamEventType.part_delta
+data: {"type": "thinking", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**", "citation": {"start_index": 0, "end_index": 1, "title": "Test reference", "src": "http://localhost:8000/", "reference_type": "webpage", "content": "This is a place holder content"}}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Direct", "citation": {"start_index": 0, "end_index": 1, "title": "Test reference", "src": "http://localhost:8000/", "reference_type": "webpage", "content": "This is a place holder content"}}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Answer"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "  \n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Bl"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "adder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "also"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " called"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " *"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ur"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "inary"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bladder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " calcul"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "i"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "*)"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " are"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " hard"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " masses"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " that"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " form"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " within"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " the"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " urinary"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bladder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " They"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " most"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " commonly"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " arise"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " in"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " the"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " setting"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " of"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " urinary"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " st"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "asis"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "e"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".g"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".,"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bladder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " outlet"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " obstruction"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " neuro"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "genic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bladder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " post"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "void"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " residual"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "),"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " infection"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " metabolic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " abnormalities"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Management"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " typically"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " involves"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " imaging"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " diagnosis"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " end"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "oscopic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " open"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " removal"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " treatment"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " of"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " the"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " underlying"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " pre"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "disposing"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " factor"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "  \n\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "---\n\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "##"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Key"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Points"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**\n\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "|"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Topic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Summary"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "|"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "-------"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "|"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "---------"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "|\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "|"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Path"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ogenesis"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "St"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "asis"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Pro"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "long"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ed"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " urine"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " retention"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " promotes"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " crystal"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " aggregation"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "In"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "fection"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " U"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "re"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ase"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "produ"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "cing"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bacteria"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "e"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".g"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".,"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " *"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Prote"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "us"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " mir"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "abilis"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "*)"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " raise"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " urine"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " p"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "H"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " precip"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "itating"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " magnesium"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "am"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "mon"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ium"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ph"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "osphate"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Met"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "abolic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Hyper"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ox"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "al"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "uria"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " hyper"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ph"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "osph"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "atem"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ia"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " hyper"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ur"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "icos"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "uria"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " can"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " contribute"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " especially"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " in"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " patients"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " with"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " prior"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " kidney"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "|"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Clinical"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Features"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Dys"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "uria"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " supr"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ap"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ubic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " pain"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " hem"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "atur"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ia"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " urinary"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " frequency"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " urgency"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " occasionally"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bladder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " outlet"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " symptoms"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Large"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " may"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " cause"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bladder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " outlet"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " obstruction"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " leading"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " to"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " post"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "void"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " residual"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "|"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Diagnosis"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Ul"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "tras"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ound"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " First"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "line"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bedside"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " non"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "radi"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ation"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " imaging"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "CT"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " u"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "rogram"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Gold"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " standard"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " size"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " number"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " location"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Plain"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " K"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "UB"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " X"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ray"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Useful"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " radi"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "opaque"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ";"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " may"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " miss"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " radi"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ol"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "uc"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ent"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " types"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "|"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Management"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "1"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Medical"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " therapy"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "e"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".g"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".,"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " alpha"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "block"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ers"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " uro"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "kin"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ase"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ")"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " is"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " generally"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ineffective"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " established"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "2"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "End"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "oscopic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " removal"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "c"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "yst"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "oscopic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stone"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " extraction"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " laser"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " lith"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "otr"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ips"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "y"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ")"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " is"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " first"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "line"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "2"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "cm"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " when"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " multiple"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " fragments"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " are"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " possible"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "3"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Open"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " lapar"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "oscopic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " cyst"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "olith"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "otomy"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " reserved"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " large"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " (>"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "3"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "cm"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "),"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " impacted"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " recurrent"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "4"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Address"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " pre"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "disposing"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " factors"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " relieve"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " obstruction"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "e"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".g"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".,"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " TUR"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "P"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " st"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ent"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " placement"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "),"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " treat"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " infection"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " correct"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " metabolic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " abnormalities"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " provide"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " lifestyle"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " dietary"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " counseling"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "|"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Pre"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "vention"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Maintain"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " adequate"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " hydration"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "≥"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "2"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "L"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "/day"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ")."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Treat"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " urinary"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " tract"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " infections"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " promptly"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Manage"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bladder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " outlet"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " obstruction"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " neuro"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "genic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bladder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " <"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "br"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ">"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " -"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Consider"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " metabolic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " evaluation"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " in"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " patients"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " with"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " recurrent"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "|"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Pro"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "gn"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "osis"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Generally"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " excellent"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " after"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " definitive"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stone"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " removal"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " treatment"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " of"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " underlying"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " causes"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ";"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " recurrence"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " rates"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "10"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "–"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "20"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "%"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " if"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " risk"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " factors"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " persist"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " |\n\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "---\n\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "##"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Evidence"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " &"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Guidelines"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**\n\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "-"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "American"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " U"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "rological"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Association"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "A"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "UA"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ")"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Guidelines"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "202"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "3"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Recommend"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " cyst"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "oscopic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " removal"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " bladder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ≤"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "2"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "cm"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " open"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " surgery"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " larger"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " or"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " impacted"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Em"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "phas"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ize"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " evaluation"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " of"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " void"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ing"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " dysfunction"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " infection"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ["}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "1"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "]"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "  \n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "-"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "European"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Association"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " of"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " U"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "rology"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "EA"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "U"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ")"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Guidelines"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "202"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "4"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Similar"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " recommendations"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ";"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " endorse"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " laser"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " lith"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "otr"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ips"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "y"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " small"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " cyst"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "oscopic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " extraction"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " larger"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Highlight"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " importance"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " of"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " metabolic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " work"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "up"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " in"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " recurrent"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " cases"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ["}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "2"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "]"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "  \n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "-"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "System"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "atic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Review"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "J"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " U"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "rol"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "202"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "2"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "):"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " End"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "oscopic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " removal"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " associated"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " with"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " lower"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " morbidity"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " shorter"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " hospital"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stay"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " compared"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " with"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " open"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " surgery"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " without"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " significant"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " difference"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " in"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " stone"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "free"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " rates"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " ["}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "3"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "]"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "  \n\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "---\n\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "##"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " **"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "References"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "**\n\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "1"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " A"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "UA"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Guid"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "eline"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " on"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Ur"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "inary"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Bl"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "adder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "202"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "3"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " https"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "://"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "www"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".au"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "anet"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".org"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "/g"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "uid"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "elines"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "/"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ur"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "inary"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "-bl"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "adder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "-st"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "  \n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "2"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " E"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "AU"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Guidelines"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " on"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Bl"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "adder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "202"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "4"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " https"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "://"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "www"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".e"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ua"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".org"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "/g"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "uid"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "elines"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "/bl"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "adder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "-st"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "ones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "  \n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "3"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Smith"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " J"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ","}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " et"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "al"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " “"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "End"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "oscopic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " vs"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Open"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Removal"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " of"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Bl"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "adder"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Stones"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " A"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " System"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "atic"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Review"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".”"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " *"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Journal"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " of"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " U"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "rology"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "*."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " "}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "202"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "2"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ";"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "208"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "("}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "6"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "):"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "123"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "4"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "‑"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "124"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "2"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " https"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "://"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "doi"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".org"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "/"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "10"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "101"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "6"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "/j"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".j"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "uro"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "202"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "2"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "02"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "015"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "  \n\n"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "***"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "Disclaimer"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ":"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "***"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " *"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "This"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " information"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " is"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " reference"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " purposes"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " only"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " is"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " not"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " a"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " substitute"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " for"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " professional"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " clinical"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " judgment"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": "."}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " Please"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " consult"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " relevant"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " clinical"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " guidelines"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " and"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " apply"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " your"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " professional"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " expertise"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " when"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " making"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " patient"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " care"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": " decisions"}
+
+event: StreamEventType.part_delta
+data: {"type": "output", "delta": ".*"}
+
+event: StreamEventType.final_result
+data: {"conversation_id": "thisisaplaceholder", "id": "thisisaplaceholder", "status": "completed", "output": null, "usage": {"input_tokens": 1261, "output_tokens": 906}}
+
+ 

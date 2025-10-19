@@ -2,11 +2,10 @@ from src.shared.utils import dict_utils
 from src.shared.utils.logger import LOGGER
 
 from .dtos import EHRFormat
+from .vn_moh import toDateTime
 from .custom_types import EHRDict
 
 from typing import Any
-
-from .vn_moh import toDateTime
 
 
 def prune_and_preprocess_input_ehr(ehr_dict: EHRDict) -> EHRDict:

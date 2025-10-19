@@ -1,7 +1,9 @@
 # AI generated from sql.py
 
-from typing import TypedDict
+from typing import Optional, TypedDict
+from datetime import datetime
 from dataclasses import dataclass
+from collections.abc import Iterable
 
 
 class TrangThaiKcb(TypedDict, total=False):
@@ -480,14 +482,8 @@ class VN_MOH(TypedDict, total=False):
     giam_dinh_y_khoa: GiamDinhYKhoa
 
 
-from datetime import datetime
-from collections.abc import Iterable
-from typing import Optional
-
-
 def toDateTime(ee: Optional[str]) -> Optional[str]:
-    """
-    Converts a string representing a date and time in the format 'YYYYMMDDHHMM' to a formatted string 'YYYY/MM/DD HH:MM'.
+    """Converts a string representing a date and time in the format 'YYYYMMDDHHMM' to a formatted string 'YYYY/MM/DD HH:MM'.
 
     If the input string is shorter than 12 characters, it is right-padded with zeros.
     If the input is None, returns None.

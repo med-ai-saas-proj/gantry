@@ -5,7 +5,7 @@ from src.shared.dtos.generation_output import GenerationOutput
 from src.shared.custom_types.responses.sse import SSEContent as BaseStreamEvent
 
 from enum import Enum
-from typing import Any, Literal, Sequence, Annotated, TypedDict
+from typing import Any, Literal, Sequence, Annotated, TypedDict, NotRequired
 
 from pydantic import Field
 
@@ -242,7 +242,6 @@ class StreamEvent_ConversationStartData(TypedDict):
     """Contain conversation info start."""
 
     conversation_id: str
-    message_id: str
 
 
 StreamEvent_ConversationStart = BaseStreamEvent[
@@ -261,7 +260,7 @@ class StreamEvent_PartDelta_Output(TypedDict):
     type: Literal[StreamEvent_PartType.output]
     delta: str | None
     citation: Annotated[
-        Citation | None,
+        NotRequired[Citation],
         Field(description="Citation to be added to citation list"),
     ]
 
@@ -311,5 +310,5 @@ StreamEvent = Annotated[
     | StreamEvent_PartStart
     | StreamEvent_PartDelta
     | StreamEvent_FinalResult,
-    Field(discriminator="event"),
+    Field(discriminator="event", description="Stream events"),
 ]

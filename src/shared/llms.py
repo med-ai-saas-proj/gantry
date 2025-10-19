@@ -5,21 +5,39 @@ from pydantic_ai.providers.groq import GroqProvider
 
 
 big_model = GroqModel(
-    "llama-3.1-8b-instant",
+    "openai/gpt-oss-20b",
     provider=GroqProvider(api_key=env_const.GROQ_API_KEY),
-    settings={"max_tokens": 32000, "parallel_tool_calls": True},
+    settings={
+        "max_tokens": 32000,
+        "parallel_tool_calls": True,
+        "extra_body": {
+            "reasoning_effort": "low",
+        },
+    },
 )
 
 medium_model = GroqModel(
-    "llama-3.1-8b-instant",
+    "openai/gpt-oss-20b",
     provider=GroqProvider(api_key=env_const.GROQ_API_KEY),
-    settings={"max_tokens": 32000, "parallel_tool_calls": True},
+    settings={
+        "max_tokens": 32000,
+        "parallel_tool_calls": True,
+        "extra_body": {
+            "reasoning_effort": "low",
+        },
+    },
 )
 
 small_model = GroqModel(
-    "llama-3.1-8b-instant",
+    "openai/gpt-oss-20b",
     provider=GroqProvider(api_key=env_const.GROQ_API_KEY),
-    settings={"max_tokens": 32000, "parallel_tool_calls": True},
+    settings={
+        "max_tokens": 32000,
+        "parallel_tool_calls": True,
+        "extra_body": {
+            "reasoning_effort": "low",
+        },
+    },
 )
 
 

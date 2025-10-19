@@ -1,4 +1,14 @@
-from src.chat import dtos as chat_dtos
+from src.chat.dtos import (
+    ChatOutput,
+    StreamEvent,
+    ReferenceType,
+    StreamEventType,
+    ModelResponseContent,
+    StreamEvent_PartType,
+    StreamEvent_FinalResult,
+    ModelResponse_ContentType,
+    StreamEvent_PartDelta_Output,
+)
 from src.shared.consts import messages_const
 from src.db.postgres.service import PostgresService
 from src.shared.agents.shared_types import AnswerStruct
@@ -29,87 +39,105 @@ from pydantic_ai.messages import (
 )
 
 
-AQueue = asyncio.Queue[chat_dtos.StreamEvent]
+def _create_new_part(event: StreamEvent) -> ModelResponseContent:
+    match event:
+        case StreamEvent_PartType.output:
+            return {
+                "type": ModelResponse_ContentType.text,
+                "content": "",
+                "citations": [],
+            }
+        case StreamEvent_PartType.thinking:
+            return {
+                "type": ModelResponse_ContentType.thinking,
+                "content": None,
+            }
+        case StreamEvent_PartType.builtin_tool_call:
+            return {
+                "type": ModelResponse_ContentType.builtin_tool_call,
+                "tool_call_id": "",
+                "hinted_tool_name": None,
+                "hinted_args": None,
+            }
+        case StreamEvent_PartType.builtin_tool_result:
+            return {
+                "type": ModelResponse_ContentType.builtin_tool_result,
+                "tool_call_id": "",
+                "hinted_result": None,
+            }
+        case _:
+            raise RuntimeError("New type, check out create new part", __file__)
 
 
 async def aggregate_stream(
-    stream: AsyncGenerator[chat_dtos.StreamEvent],
-) -> chat_dtos.ChatOutput:
+    stream: AsyncGenerator[StreamEvent],
+) -> ChatOutput:
     # Why does this instead of run_sync?
     # Anthropic said: non-streaming Messages API requests are not expected
     # to exceed a 10 minute timeout
     # https://docs.anthropic.com/en/api/errors#long-requests
 
+    event_part_map: dict[StreamEvent_PartType, ModelResponse_ContentType] = {
+        StreamEvent_PartType.output: ModelResponse_ContentType.text,
+        StreamEvent_PartType.thinking: ModelResponse_ContentType.thinking,
+        StreamEvent_PartType.builtin_tool_call: ModelResponse_ContentType.builtin_tool_call,
+        StreamEvent_PartType.builtin_tool_result: ModelResponse_ContentType.builtin_tool_result,
+    }
+
     final_output: GenerationOutput[None] | None = None
-    model_response: list[chat_dtos.ModelResponseContent] = []
-    last_part: chat_dtos.ModelResponseContent | None = None
+    model_response: list[ModelResponseContent] = []
+    last_part: ModelResponseContent | None = None
 
     async for output in stream:
         match output["event"]:
-            case chat_dtos.StreamEventType.conversation_start:
+            case StreamEventType.conversation_start:
                 pass
-            case chat_dtos.StreamEventType.part_start:
-                part_start_data = output["data"]
-                if last_part:
+            case StreamEventType.part_start:
+                if (
+                    last_part
+                    and last_part["type"] != event_part_map[output["data"]]
+                ):
                     model_response.append(last_part)
-                    last_part = None
-                match part_start_data:
-                    case chat_dtos.StreamEvent_PartType.output:
-                        last_part = {
-                            "type": chat_dtos.ModelResponse_ContentType.text,
-                            "content": "",
-                            "citations": [],
-                        }
-                    case chat_dtos.StreamEvent_PartType.thinking:
-                        last_part = {
-                            "type": chat_dtos.ModelResponse_ContentType.thinking,
-                            "content": None,
-                        }
-                    case chat_dtos.StreamEvent_PartType.builtin_tool_call:
-                        last_part = {
-                            "type": chat_dtos.ModelResponse_ContentType.builtin_tool_call,
-                            "tool_call_id": "",
-                            "hinted_tool_name": None,
-                            "hinted_args": None,
-                        }
-                    case chat_dtos.StreamEvent_PartType.builtin_tool_result:
-                        last_part = {
-                            "type": chat_dtos.ModelResponse_ContentType.builtin_tool_result,
-                            "tool_call_id": "",
-                            "hinted_result": None,
-                        }
-                    case _:
-                        last_part = None
-            case chat_dtos.StreamEventType.part_delta:
+                    last_part = _create_new_part(output)
+                if last_part is None:
+                    last_part = _create_new_part(output)
+            case StreamEventType.part_delta:
                 part_delta_data = output["data"]
+                if (
+                    last_part
+                    and last_part["type"]
+                    != event_part_map[part_delta_data["type"]]
+                ):
+                    model_response.append(last_part)
+                    last_part = _create_new_part(output)
                 assert last_part is not None, (
                     "Check ai search stream aggregation"
                 )
                 match part_delta_data["type"]:
-                    case chat_dtos.StreamEvent_PartType.output:
+                    case StreamEvent_PartType.output:
                         assert (
-                            last_part["type"]
-                            == chat_dtos.ModelResponse_ContentType.text
-                        )
+                            last_part["type"] == ModelResponse_ContentType.text
+                        ), last_part["type"]
+
                         last_part["content"] += part_delta_data["delta"] or ""
-                        if part_delta_data["citation"]:
+                        if "citation" in part_delta_data:
                             last_part["citations"].append(
                                 part_delta_data["citation"]
                             )
-                    case chat_dtos.StreamEvent_PartType.thinking:
+                    case StreamEvent_PartType.thinking:
                         assert (
                             last_part["type"]
-                            == chat_dtos.ModelResponse_ContentType.thinking
-                        )
+                            == ModelResponse_ContentType.thinking
+                        ), last_part["type"]
                         if part_delta_data["delta"]:
                             if last_part["content"] is None:
                                 last_part["content"] = ""
                             last_part["content"] += part_delta_data["delta"]
-                    case chat_dtos.StreamEvent_PartType.builtin_tool_call:
+                    case StreamEvent_PartType.builtin_tool_call:
                         assert (
                             last_part["type"]
-                            == chat_dtos.ModelResponse_ContentType.builtin_tool_call
-                        )
+                            == ModelResponse_ContentType.builtin_tool_call
+                        ), last_part["type"]
                         last_part["tool_call_id"] = part_delta_data[
                             "tool_call_id"
                         ]
@@ -119,11 +147,11 @@ async def aggregate_stream(
                         last_part["hinted_args"] = part_delta_data[
                             "hinted_args"
                         ]
-                    case chat_dtos.StreamEvent_PartType.builtin_tool_result:
+                    case StreamEvent_PartType.builtin_tool_result:
                         assert (
                             last_part["type"]
-                            == chat_dtos.ModelResponse_ContentType.builtin_tool_result
-                        )
+                            == ModelResponse_ContentType.builtin_tool_result
+                        ), last_part["type"]
                         last_part["tool_call_id"] = part_delta_data[
                             "tool_call_id"
                         ]
@@ -132,11 +160,11 @@ async def aggregate_stream(
                         ]
                     case _:
                         pass
-            case chat_dtos.StreamEventType.final_result:
+            case StreamEventType.final_result:
                 final_output = output["data"]
 
     assert final_output is not None, "Check ai search stream aggregation"
-    final_output_ = cast(chat_dtos.ChatOutput, final_output)
+    final_output_ = cast(ChatOutput, final_output)
     final_output_["output"] = model_response
     return final_output_
 
@@ -146,7 +174,8 @@ class AISearchService:
         self,
         session_scope: Callable[..., _GeneratorContextManager],
         logger: BoundLogger,
-        agent: Agent[Dep, AnswerStruct],
+        agent: Agent[Dep, str],
+        # agent: Agent[Dep, AnswerStruct],
     ):
         self.postgres_service = PostgresService(session_scope=session_scope)
         self.agent = agent
@@ -156,82 +185,111 @@ class AISearchService:
         self,
         user_id: str,
         query: str,
-        result: dict,
+        result: ChatOutput,
     ):
         pass
 
-    async def event_stream_handler(
-        self,
-        ctx: RunContext[Dep],
-        event_stream: AsyncIterable[AgentStreamEvent],
-        queue: AQueue,
-    ):
-        async for event in event_stream:
+    async def ai_search_stream(
+        self, user_id: str, query: str
+    ) -> AsyncGenerator[StreamEvent]:
+        i = 0
+        yield {
+            "event": StreamEventType.conversation_start,
+            "data": {
+                "conversation_id": "thisisaplaceholder",
+            },
+        }
+        async for event in self.agent.run_stream_events(
+            query, deps={"viewed_urls": []}
+        ):
             self.logger.debug("Got new event", new_event=event)
-            to_put: chat_dtos.StreamEvent | None = None
             match event.event_kind:
                 case "part_start":
-                    part_start_data: chat_dtos.StreamEvent_PartType = (
-                        chat_dtos.StreamEvent_PartType.output
-                    )
-                    match event.part.part_kind:
+                    part = event.part
+                    match part.part_kind:
                         case "text":
-                            part_start_data = (
-                                chat_dtos.StreamEvent_PartType.output
-                            )
+                            yield {
+                                "event": StreamEventType.part_start,
+                                "data": StreamEvent_PartType.output,
+                            }
+                            if part.has_content():
+                                yield {
+                                    "event": StreamEventType.part_delta,
+                                    "data": {
+                                        "type": StreamEvent_PartType.output,
+                                        "delta": part.content,
+                                    },
+                                }
                         case "thinking":
-                            part_start_data = (
-                                chat_dtos.StreamEvent_PartType.thinking
-                            )
+                            yield {
+                                "event": StreamEventType.part_start,
+                                "data": StreamEvent_PartType.thinking,
+                            }
+                            if part.has_content():
+                                yield {
+                                    "event": StreamEventType.part_delta,
+                                    "data": {
+                                        "type": StreamEvent_PartType.thinking,
+                                        "delta": part.content,
+                                    },
+                                }
                         case "tool-call":
-                            part_start_data = (
-                                chat_dtos.StreamEvent_PartType.builtin_tool_call
-                            )
+                            yield {
+                                "event": StreamEventType.part_start,
+                                "data": StreamEvent_PartType.builtin_tool_call,
+                            }
                         case "builtin-tool-call":
-                            part_start_data = (
-                                chat_dtos.StreamEvent_PartType.builtin_tool_call
-                            )
+                            yield {
+                                "event": StreamEventType.part_start,
+                                "data": StreamEvent_PartType.builtin_tool_call,
+                            }
                         case "builtin-tool-return":
-                            part_start_data = chat_dtos.StreamEvent_PartType.builtin_tool_result
+                            yield {
+                                "event": StreamEventType.part_start,
+                                "data": StreamEvent_PartType.builtin_tool_result,
+                            }
                         case _:
-                            part_start_data = None
-
-                    if part_start_data:
-                        to_put = {
-                            "event": chat_dtos.StreamEventType.part_start,
-                            "data": part_start_data,
-                        }
+                            pass
                 case "part_delta":
-                    part_delta_data: (
-                        chat_dtos.StreamEvent_PartDeltaData | None
-                    ) = None
+                    mapped_event = StreamEventType.part_delta
                     delta = event.delta
                     match delta.part_delta_kind:
                         case "text":
-                            part_delta_data = {
-                                "type": chat_dtos.StreamEvent_PartType.output,
+                            data: StreamEvent_PartDelta_Output = {
+                                "type": StreamEvent_PartType.output,
                                 "delta": delta.content_delta,
-                                "citation": None,
+                            }
+                            if i < 2:
+                                data["citation"] = {
+                                    "start_index": 0,
+                                    "end_index": 1,
+                                    "title": "Test reference",
+                                    "src": "http://localhost:8000/",
+                                    "reference_type": ReferenceType.webpage,
+                                    "content": "This is a place holder content",
+                                }
+                                i += 1
+                            yield {
+                                "event": mapped_event,
+                                "data": data,
                             }
                         case "thinking":
-                            part_delta_data = {
-                                "type": chat_dtos.StreamEvent_PartType.thinking,
-                                "delta": delta.content_delta,
+                            yield {
+                                "event": mapped_event,
+                                "data": {
+                                    "type": StreamEvent_PartType.thinking,
+                                    "delta": delta.content_delta,
+                                },
                             }
                         case "tool_call":
-                            part_delta_data = None
+                            pass
                         case _:
-                            part_delta_data = None
-                    if part_delta_data:
-                        to_put = {
-                            "event": chat_dtos.StreamEventType.part_delta,
-                            "data": part_delta_data,
-                        }
+                            pass
                 case "function_tool_call":
-                    to_put = {
-                        "event": chat_dtos.StreamEventType.part_delta,
+                    yield {
+                        "event": StreamEventType.part_delta,
                         "data": {
-                            "type": chat_dtos.StreamEvent_PartType.builtin_tool_call,
+                            "type": StreamEvent_PartType.builtin_tool_call,
                             "tool_call_id": event.part.tool_call_id,
                             "hinted_tool_name": event.part.tool_name,
                             "hinted_args": event.part.args_as_json_str(),
@@ -239,16 +297,14 @@ class AISearchService:
                     }
                 case "function_tool_result":
                     # Put part start to signify the end of last part
-                    await queue.put(
-                        {
-                            "event": chat_dtos.StreamEventType.part_start,
-                            "data": chat_dtos.StreamEvent_PartType.builtin_tool_result,
-                        }
-                    )
-                    to_put = {
-                        "event": chat_dtos.StreamEventType.part_delta,
+                    yield {
+                        "event": StreamEventType.part_start,
+                        "data": StreamEvent_PartType.builtin_tool_result,
+                    }
+                    yield {
+                        "event": StreamEventType.part_delta,
                         "data": {
-                            "type": chat_dtos.StreamEvent_PartType.builtin_tool_result,
+                            "type": StreamEvent_PartType.builtin_tool_result,
                             "tool_call_id": event.result.tool_call_id,
                             "hinted_result": json.dumps(
                                 event.result.content, ensure_ascii=False
@@ -256,20 +312,20 @@ class AISearchService:
                         },
                     }
                 case "builtin_tool_call":
-                    to_put = {
-                        "event": chat_dtos.StreamEventType.part_delta,
+                    yield {
+                        "event": StreamEventType.part_delta,
                         "data": {
-                            "type": chat_dtos.StreamEvent_PartType.builtin_tool_call,
+                            "type": StreamEvent_PartType.builtin_tool_call,
                             "tool_call_id": event.part.tool_call_id,
                             "hinted_tool_name": event.part.tool_name,
                             "hinted_args": event.part.args_as_json_str(),
                         },
                     }
                 case "builtin_tool_result":
-                    to_put = {
-                        "event": chat_dtos.StreamEventType.part_delta,
+                    yield {
+                        "event": StreamEventType.part_delta,
                         "data": {
-                            "type": chat_dtos.StreamEvent_PartType.builtin_tool_result,
+                            "type": StreamEvent_PartType.builtin_tool_result,
                             "tool_call_id": event.result.tool_call_id,
                             "hinted_result": json.dumps(
                                 event.result.content, ensure_ascii=False
@@ -277,78 +333,12 @@ class AISearchService:
                         },
                     }
                 case "final_result":
+                    pass
+                case "agent_run_result":
                     self.logger.debug("Got final result")
-                    pass
-                case _:
-                    pass
-            if to_put is not None:
-                self.logger.debug("to_put", to_put=to_put)
-                await queue.put(to_put)
-
-    async def _ai_search_stream(
-        self,
-        user_id: str,
-        query: str,
-        queue: AQueue,
-    ):
-        agent_result = ""
-        self.logger.debug("Ai search is running")
-        await queue.put(
-            {
-                "event": chat_dtos.StreamEventType.conversation_start,
-                "data": {
-                    "conversation_id": "placeholdervalue",
-                    "message_id": "placeholdervalue",
-                },
-            }
-        )
-        self.logger.debug("Ai search is running 2")
-        async with self.agent.run_stream(
-            query,
-            deps={"viewed_urls": []},
-            event_stream_handler=partial(
-                self.event_stream_handler, queue=queue
-            ),
-        ) as run:
-            self.logger.debug("Ai search is running loop")
-            try:
-                i = 0
-                async for output, end in run.stream_responses():
-                    try:
-                        validated_output = await run.validate_response_output(
-                            output,
-                            allow_partial=not end,
-                        )
-                    except ValidationError:
-                        continue
-                    answer = validated_output["answer"]
-                    new_response = answer[len(agent_result) :]
-                    await queue.put(
-                        {
-                            "event": chat_dtos.StreamEventType.part_delta,
-                            "data": {
-                                "type": chat_dtos.StreamEvent_PartType.output,
-                                "delta": new_response,
-                                "citation": {
-                                    "start_index": 0,
-                                    "end_index": 1,
-                                    "title": "Test reference",
-                                    "src": "http://localhost:8000/",
-                                    "reference_type": chat_dtos.ReferenceType.webpage,
-                                    "content": "This is a place holder content",
-                                }
-                                if i < 2
-                                else None,
-                            },
-                        }
-                    )
-                    i += 1
-                    # yield new_response
-                    agent_result = answer
-                usage = run.usage()
-                await queue.put(
-                    {
-                        "event": chat_dtos.StreamEventType.final_result,
+                    usage = event.result.usage()
+                    result: StreamEvent_FinalResult = {
+                        "event": StreamEventType.final_result,
                         "data": {
                             "conversation_id": "thisisaplaceholder",
                             "id": "thisisaplaceholder",
@@ -360,57 +350,67 @@ class AISearchService:
                             },
                         },
                     }
-                )
+                    yield result
+                    self.logger.debug("Result", result=result)
+                    result_ = cast(ChatOutput, result)
+                    result_["output"] = []
+                    self._store_ehr_and_result(user_id, query, result_)
+                case _:
+                    pass
 
-            except Exception as e:
-                usage = run.usage()
-                await queue.put(
-                    {
-                        "event": chat_dtos.StreamEventType.final_result,
-                        "data": {
-                            "conversation_id": "thisisaplaceholder",
-                            "id": "thisisaplaceholder",
-                            "status": ResponseStatus.error,
-                            "error": {
-                                "code": "500",
-                                "message": messages_const.INTERNAL_SERVER_ERROR,
-                            },
-                            "output": None,
-                            "usage": {
-                                "input_tokens": usage.input_tokens,
-                                "output_tokens": usage.output_tokens,
-                            },
-                        },
-                    }
-                )
-                self.logger.error("Internal server error", error=e)
-                result = {"result": agent_result, "error": str(e)}
-                raise e
-            finally:
-                result = {"result": agent_result}
-                self.logger.debug("Result", result=result)
-                self._store_ehr_and_result(user_id, query, result)
-                queue.shutdown()
-
-    async def ai_search_stream(
-        self, user_id: str, query: str
-    ) -> AsyncGenerator[chat_dtos.StreamEvent]:
-        queue = AQueue()
-        generate_advice_task = asyncio.ensure_future(
-            self._ai_search_stream(user_id, query, queue)
-        )
-        while True:
-            try:
-                it = await queue.get()
-                self.logger.debug("Got new output", it=it)
-                yield it
-                if it["event"] == chat_dtos.StreamEventType.final_result:
-                    break
-            except:
-                break
-            queue.task_done()
-
-        # await queue.join()
-
-    async def ai_search(self, user_id: str, query: str) -> chat_dtos.ChatOutput:
-        return await aggregate_stream(self.ai_search_stream(user_id, query))
+    async def ai_search(self, user_id: str, query: str) -> ChatOutput:
+        run = await self.agent.run(query, deps={"viewed_urls": []})
+        usage = run.usage()
+        messages: list[ModelResponseContent] = []
+        for message in run.new_messages():
+            parts = message.parts
+            for part in parts:
+                match part.part_kind:
+                    case "thinking":
+                        if part.has_content():
+                            messages.append(
+                                {
+                                    "type": ModelResponse_ContentType.thinking,
+                                    "content": part.content,
+                                }
+                            )
+                    case "text":
+                        if part.has_content():
+                            messages.append(
+                                {
+                                    "type": ModelResponse_ContentType.text,
+                                    "content": part.content,
+                                    "citations": [],
+                                }
+                            )
+                    case "tool-call" | "builtin-tool-call":
+                        messages.append(
+                            {
+                                "type": ModelResponse_ContentType.builtin_tool_call,
+                                "tool_call_id": part.tool_call_id,
+                                "hinted_tool_name": part.tool_name,
+                                "hinted_args": part.args_as_json_str(),
+                            }
+                        )
+                    case "tool-return" | "builtin-tool-return":
+                        messages.append(
+                            {
+                                "type": ModelResponse_ContentType.builtin_tool_result,
+                                "tool_call_id": part.tool_call_id,
+                                "hinted_result": None,
+                            }
+                        )
+                    case _:
+                        self.logger.warn("Unprocessed part", part=part)
+                        pass
+        result: ChatOutput = {
+            "conversation_id": "thisisaplaceholder",
+            "id": "thisisaplaceholder",
+            "status": ResponseStatus.completed,
+            "output": messages,
+            "usage": {
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+            },
+        }
+        return result

@@ -12,7 +12,7 @@ class Dep(ViewedUrlsMixin):
 
 AI_SEARCH_AGENT = Agent(
     model=llms.big_model,
-    output_type=AnswerStruct,
+    # output_type=AnswerStruct,
     deps_type=Dep,
     name="ai_search_agent",
     end_strategy="exhaustive",
