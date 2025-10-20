@@ -9,9 +9,7 @@ from src.chat.dtos import (
     ModelResponse_ContentType,
     StreamEvent_PartDelta_Output,
 )
-from src.shared.consts import messages_const
 from src.db.postgres.service import PostgresService
-from src.shared.agents.shared_types import AnswerStruct
 from src.shared.dtos.generation_output import (
     ResponseStatus,
     GenerationOutput,
@@ -20,23 +18,17 @@ from src.shared.dtos.generation_output import (
 from .agents import Dep
 
 import json
-import asyncio
 from typing import (
-    Any,
     Callable,
-    AsyncIterable,
+    Sequence,
     AsyncGenerator,
     cast,
 )
-from functools import partial
 from contextlib import _GeneratorContextManager
 
-from pydantic import ValidationError
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent
 from structlog.stdlib import BoundLogger
-from pydantic_ai.messages import (
-    AgentStreamEvent,
-)
+from pydantic_ai.messages import ModelRequest, ModelResponse
 
 
 def _create_new_part(event: StreamEvent) -> ModelResponseContent:
@@ -353,7 +345,9 @@ class AISearchService:
                     yield result
                     self.logger.debug("Result", result=result)
                     result_ = cast(ChatOutput, result)
-                    result_["output"] = []
+                    result_["output"] = _convert_to_ours(
+                        event.result.new_messages(), self.logger
+                    )
                     self._store_ehr_and_result(user_id, query, result_)
                 case _:
                     pass
@@ -361,48 +355,8 @@ class AISearchService:
     async def ai_search(self, user_id: str, query: str) -> ChatOutput:
         run = await self.agent.run(query, deps={"viewed_urls": []})
         usage = run.usage()
-        messages: list[ModelResponseContent] = []
-        for message in run.new_messages():
-            parts = message.parts
-            for part in parts:
-                match part.part_kind:
-                    case "thinking":
-                        if part.has_content():
-                            messages.append(
-                                {
-                                    "type": ModelResponse_ContentType.thinking,
-                                    "content": part.content,
-                                }
-                            )
-                    case "text":
-                        if part.has_content():
-                            messages.append(
-                                {
-                                    "type": ModelResponse_ContentType.text,
-                                    "content": part.content,
-                                    "citations": [],
-                                }
-                            )
-                    case "tool-call" | "builtin-tool-call":
-                        messages.append(
-                            {
-                                "type": ModelResponse_ContentType.builtin_tool_call,
-                                "tool_call_id": part.tool_call_id,
-                                "hinted_tool_name": part.tool_name,
-                                "hinted_args": part.args_as_json_str(),
-                            }
-                        )
-                    case "tool-return" | "builtin-tool-return":
-                        messages.append(
-                            {
-                                "type": ModelResponse_ContentType.builtin_tool_result,
-                                "tool_call_id": part.tool_call_id,
-                                "hinted_result": None,
-                            }
-                        )
-                    case _:
-                        self.logger.warn("Unprocessed part", part=part)
-                        pass
+        messages = _convert_to_ours(run.new_messages(), self.logger)
+
         result: ChatOutput = {
             "conversation_id": "thisisaplaceholder",
             "id": "thisisaplaceholder",
@@ -414,3 +368,51 @@ class AISearchService:
             },
         }
         return result
+
+
+def _convert_to_ours(
+    msgs: Sequence[ModelRequest | ModelResponse], logger: BoundLogger
+):
+    messages: list[ModelResponseContent] = []
+    for message in msgs:
+        parts = message.parts
+        for part in parts:
+            match part.part_kind:
+                case "thinking":
+                    if part.has_content():
+                        messages.append(
+                            {
+                                "type": ModelResponse_ContentType.thinking,
+                                "content": part.content,
+                            }
+                        )
+                case "text":
+                    if part.has_content():
+                        messages.append(
+                            {
+                                "type": ModelResponse_ContentType.text,
+                                "content": part.content,
+                                "citations": [],
+                            }
+                        )
+                case "tool-call" | "builtin-tool-call":
+                    messages.append(
+                        {
+                            "type": ModelResponse_ContentType.builtin_tool_call,
+                            "tool_call_id": part.tool_call_id,
+                            "hinted_tool_name": part.tool_name,
+                            "hinted_args": part.args_as_json_str(),
+                        }
+                    )
+                case "tool-return" | "builtin-tool-return":
+                    messages.append(
+                        {
+                            "type": ModelResponse_ContentType.builtin_tool_result,
+                            "tool_call_id": part.tool_call_id,
+                            "hinted_result": None,
+                        }
+                    )
+                case _:
+                    logger.warn("Unprocessed part", part=part)
+                    pass
+    return messages
