@@ -19,7 +19,7 @@ async def main():
         user = await user_service.get_user_by_email(email)
         print(f"Account already created {email=}, {password=}")
     payload = {
-        "user_id": user["id"],
+        "user_id": str(user["id"]),
         "email": user["email"],
         "exp": datetime.now(UTC) + timedelta(days=365),
         "iat": datetime.now(UTC),
