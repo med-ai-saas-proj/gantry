@@ -49,7 +49,7 @@ CREATE TABLE ai_models (
     instruction TEXT NOT NULL
 );
 CREATE INDEX idx_ai_models_user_id_name ON ai_models(user_id, name);
-ALTER TABLE ai_models ADD CONSTRAINT constraint_ai_models_user_id_name_unique UNIQUE (user_id, name)
+ALTER TABLE ai_models ADD CONSTRAINT constraint_ai_models_user_id_name_unique UNIQUE (user_id, name);
 
 CREATE TABLE message_roles (
     pk SMALLSERIAL PRIMARY KEY,
