@@ -16,35 +16,36 @@ AI related APIs for medical applications
 1. Go to <https://programmablesearchengine.google.com/about/> and create a new customized search engine, then grab **Search engine ID**, this is `GOOGLE_PROGRAMMABLE_SEARCH_CX` env variable
 1. Go to <https://developers.google.com/custom-search/v1/introduction> and get a free api key, this is `GOOGLE_PROGRAMMABLE_SEARCH_API_KEY` env variable
 
-### Setup the test account and env file
+### Setup env file
 
-1. Register test account and api key: `docker exec api_hub_server uv run script/setup_test_account.py`
 1. Docs site: <http://localhost:8000/docs/>
 1. Env file:
-    - `.env.postgres`:
 
-    ```env
-    POSTGRES_DB=tailm
-    POSTGRES_USER=internet_crawler
-    POSTGRES_PASSWORD=123456
-    ```
+   - `.env.postgres`:
 
-    - `.env` and `prod.env`:
+   ```env
+   POSTGRES_DB=tailm
+   POSTGRES_USER=internet_crawler
+   POSTGRES_PASSWORD=123456
+   ```
 
-    ```env
-    CORE_DNS=postgresql://internet_crawler:123456@localhost:5432/tailm
-    STAGE=local
-    DEBUG=1
+   - `.env` and `prod.env`:
 
-    GROQ_API_KEY=
-    GOOGLE_PROGRAMMABLE_SEARCH_API_KEY=""
-    GOOGLE_PROGRAMMABLE_SEARCH_CX=
-    ```
+   ```env
+   CORE_DNS=postgresql://internet_crawler:123456@localhost:5432/tailm
+   STAGE=local
+   DEBUG=1
+
+   GROQ_API_KEY=
+   GOOGLE_PROGRAMMABLE_SEARCH_API_KEY=""
+   GOOGLE_PROGRAMMABLE_SEARCH_CX=
+   ```
 
 ### Running the dev server
 
 1. Start DBs: `docker compose -f compose.dev.yaml up`
 1. Start Server: `./scripts/dev.sh`
+1. Register test account and api key: `uv run --no-sync -m scripts.setup_test_account`
 
 ### Lint and formatting
 
@@ -53,9 +54,10 @@ AI related APIs for medical applications
 
 ## Frontend dev notes
 
-1. Check out [Getting API key](#getting-api-keys) and [Setup test account and env file](#setup-the-test-account-and-env-file)
+1. Check out [Getting API key](#getting-api-keys)
 1. Build server: `docker compose build`
 1. Start server: `docker compose up`
+1. Register test account and api key: `docker exec hist-api-integration-main-1 uv run --no-sync -m scripts.setup_test_account`
 
 ## Feat todo
 
