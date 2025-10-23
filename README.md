@@ -29,7 +29,7 @@ AI related APIs for medical applications
     POSTGRES_PASSWORD=123456
     ```
 
-    - `.env`:
+    - `.env` and `prod.env`:
 
     ```env
     CORE_DNS=postgresql://internet_crawler:123456@localhost:5432/tailm

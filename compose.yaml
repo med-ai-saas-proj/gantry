@@ -23,7 +23,6 @@ services:
       - redis_network
 
   main:
-    container_name: api_hub_server
     depends_on:
       db:
         condition: service_healthy

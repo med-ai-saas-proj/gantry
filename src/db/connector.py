@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 
 from sqlalchemy.orm import Session
 
@@ -7,15 +7,19 @@ from sqlalchemy.orm import Session
 
 
 class BaseConnectorPool(ABC):
+    @abstractmethod
     def get(self) -> Session: ...
 
     @classmethod
+    @abstractmethod
     def put(cls, session: Session): ...
 
     @classmethod
+    @abstractmethod
     def commit(cls, session: Session): ...
 
     @classmethod
+    @abstractmethod
     def rollback(cls, session: Session): ...
 
 

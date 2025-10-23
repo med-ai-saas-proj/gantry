@@ -10,7 +10,7 @@ ENV PATH="/root/.local/bin/:$PATH"
 
 WORKDIR /app
 COPY pyproject.toml uv.lock /app/
-RUN sync --frozen --all-extras --no-dev
+RUN uv sync --frozen --all-extras --no-dev
 RUN uv run --no-sync crawl4ai-setup
 
 COPY . .
