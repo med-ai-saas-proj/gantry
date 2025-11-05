@@ -1,6 +1,5 @@
 import os
-import dotenv
-dotenv.load_dotenv()
+
 
 STAGE = os.environ["STAGE"]  # PROD, DEV, LOCAL
 DEBUG = int(os.environ.get("DEBUG", "0"))
