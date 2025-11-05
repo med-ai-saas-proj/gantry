@@ -5,6 +5,7 @@ from .v1 import v1_router
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
+from .v2 import v2_router
 
 # class ErrorDetailModel(BaseDTO):
 #     field: list[str]
@@ -28,3 +29,5 @@ api_router = APIRouter(
 )
 
 api_router.include_router(v1_router)
+
+api_router.include_router(v2_router)
