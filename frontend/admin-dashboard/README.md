@@ -1,75 +1,86 @@
-# React + TypeScript + Vite
+# Admin Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An admin dashboard application built with React, used for managing the backend system of the project.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Framework**: React 19 with TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS 4
+- **State Management**: Zustand
+- **Data Fetching**: TanStack Query (React Query)
+- **Routing**: React Router DOM
+- **Forms**: React Hook Form + Zod
+- **HTTP Client**: Axios
+- **Code Quality**: Biome
+- **Package Manager**: pnpm
 
-## React Compiler
+## Prerequisites
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+- Node.js (latest LTS [recommended](https://nodejs.org/en))
+- pnpm (Install [here](https://pnpm.io/))
 
-Note: This will impact Vite dev & build performances.
+## Installation
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Start the development server:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+pnpm dev
 ```
+
+## Building
+
+Create a production build:
+
+```bash
+pnpm build
+```
+
+Preview the production build:
+
+```bash
+pnpm preview
+```
+
+## Code Quality
+**Note:** All for the following steps are done automatically when you make a commit, handled by `husky` and `lint-staged`.
+
+**Recommended:** Install the [Biome](https://biomejs.dev/reference/vscode/) extension for auto formatting and error highlighting.
+
+Format code:
+
+```bash
+pnpm format
+```
+
+Lint code:
+
+```bash
+pnpm lint
+```
+
+Fix all issues:
+
+```bash
+pnpm check:fix
+```
+
+## Adding UI Components
+
+This project uses [shadcn/ui](https://ui.shadcn.com/) for pre-built components.
+
+Install components using the CLI:
+
+```bash
+npx shadcn@latest add button
+npx shadcn@latest add card
+npx shadcn@latest add input
+```
+
+Browse available components at [ui.shadcn.com](https://ui.shadcn.com/).
