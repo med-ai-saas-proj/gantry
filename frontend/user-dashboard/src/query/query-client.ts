@@ -1,11 +1,12 @@
 import { QueryClient } from '@tanstack/react-query';
 
 export const query_client = new QueryClient({
+  // TODO: Set using ENV for dev and production values
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: 0,
       refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000,
+      staleTime: 0,
     },
   },
 });
