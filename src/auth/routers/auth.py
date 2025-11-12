@@ -65,8 +65,7 @@ async def login(
     payload = {
         "user_id": user["id"],
         "email": user["email"],
-        "exp": datetime.now(UTC)
-        + timedelta(hours=24),  # 24 hour expiry
+        "exp": datetime.now(UTC) + timedelta(hours=24),  # 24 hour expiry
         "iat": datetime.now(UTC),
     }
 

@@ -27,6 +27,4 @@ async def get_current_user(request: Request):
             raise HTTPException(
                 status_code=401, detail="Invalid token"
             ) from None
-    raise HTTPException(
-        status_code=401, detail="No valid authentication found"
-    )
+    raise HTTPException(status_code=401, detail="No valid authentication found")

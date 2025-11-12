@@ -12,14 +12,17 @@ class ViewedUrlsMixin(TypedDict):
     viewed_urls: list[str]
 
 
-async def visit_web_page(ctx: RunContext, url: str):
-    """Visit a webpage at the given url and reads its content as markdown string. Use this to browse webpages.
+async def visit_web_page(ctx: RunContext, url: str, query: str | None = None):
+    """Visit a webpage at the given url and reads its content.
+
+    Use this to browse webpages.
 
     Args:
         url (str): Url of the webpage to visit
+        query (str, optional): Optional search query to provide context for the visit. When provided, the crawler may prioritize or extract content related to this query. Defaults to None.
     """
     try:
-        crawled = await CRAWLER_SERVICE.crawl_one(url)
+        crawled = await CRAWLER_SERVICE.crawl_one(url, query=query)
         return crawled[0]
     except Exception as e:
         return {"error": str(e)}

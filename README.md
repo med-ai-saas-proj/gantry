@@ -2,6 +2,10 @@
 
 AI related APIs for medical applications
 
+## How to write agent instruction
+
+- 2rd person (e.g. You are a ....)
+
 ## Dev notes
 
 ### Getting API keys

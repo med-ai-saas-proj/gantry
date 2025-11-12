@@ -30,7 +30,7 @@ def configure_default_logging(
         structlog.contextvars.merge_contextvars,
         structlog.processors.CallsiteParameterAdder(
             [
-                CallsiteParameter.FILENAME,
+                CallsiteParameter.PATHNAME,
                 CallsiteParameter.LINENO,
                 CallsiteParameter.FUNC_NAME,
             ]

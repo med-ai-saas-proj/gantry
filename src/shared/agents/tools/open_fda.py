@@ -129,9 +129,7 @@ def extract_nested_fields(
                     and key != "brand_name"
                 ):
                     if len(keywords) > 0:
-                        value = extract_sentences_with_keywords(
-                            value, keywords
-                        )
+                        value = extract_sentences_with_keywords(value, keywords)
                 extracted_record[field] = value
             except KeyError:
                 extracted_record[field] = None
@@ -175,9 +173,7 @@ def extract_sentences_with_keywords(
         sentences = sentence_pattern.split(text)
 
         for sentence in sentences:
-            if any(
-                keyword.lower() in sentence.lower() for keyword in keywords
-            ):
+            if any(keyword.lower() in sentence.lower() for keyword in keywords):
                 sentences_with_keywords.append(sentence)
 
     return "......".join(sentences_with_keywords)

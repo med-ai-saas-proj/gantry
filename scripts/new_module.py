@@ -45,9 +45,7 @@ def main(app_name: str, overwrite: bool = False):
         path = paths[file]
         template = Template(filename=path)
         create_file_path = os.path.join("src", app_name, file + ".py")
-        create_test_file_path = os.path.join(
-            "src", app_name, file + "_test.py"
-        )
+        create_test_file_path = os.path.join("src", app_name, file + "_test.py")
         if os.path.exists(create_file_path) and not overwrite:
             continue
         with open(
