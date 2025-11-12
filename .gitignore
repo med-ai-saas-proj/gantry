@@ -9,3 +9,7 @@
 *.yml
 
 .venv/
+
+.husky/_
+
+node_modules/
