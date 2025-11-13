@@ -2,6 +2,7 @@ from src.db.postgres.service import PostgresService
 
 import asyncio
 from typing import (
+    final,
     Literal,
     Callable,
     Iterable,
@@ -12,7 +13,12 @@ from typing import (
 from contextlib import _GeneratorContextManager
 
 import requests
-from crawl4ai import BrowserConfig, AsyncWebCrawler, CrawlerRunConfig
+from crawl4ai import (
+    RateLimiter,
+    BrowserConfig,
+    AsyncWebCrawler,
+    CrawlerRunConfig,
+)
 from pydantic import BaseModel
 from structlog.stdlib import BoundLogger
 from crawl4ai.deep_crawling import DeepCrawlStrategy, BFSDeepCrawlStrategy
@@ -51,6 +57,7 @@ class DiscoverResult(TypedDict):
     thumbnail_url: str
 
 
+@final
 class CrawlerService:
     def __init__(
         self,
@@ -62,11 +69,21 @@ class CrawlerService:
     ):
         self.logger = logger
         self.postgres_service = PostgresService(session_scope)
-        self._search_lock = asyncio.Lock()
+
+        self._rate_limiter = RateLimiter()
+        self._crawler_semaphore = asyncio.Semaphore(max_concurrent_crawler)
+        self._crawler = AsyncWebCrawler(
+            config=BrowserConfig(
+                headless=True,
+                java_script_enabled=True,
+                light_mode=False,
+                enable_stealth=False,
+            )
+        )
+
         self.google_search_api_key = google_search_api_key
         self.google_search_cx = google_search_cx
         self.max_conncurrent_crawler = max_concurrent_crawler
-        self._crawler_semaphore = asyncio.Semaphore(max_concurrent_crawler)
         self.excluded_selector = ",".join(
             [
                 "footer",
@@ -114,7 +131,9 @@ class CrawlerService:
                 f"{unit_map[time_restrict.unit]}{time_restrict.num}"
             )
 
-        await self._throttle_search_api()
+        await self._rate_limiter.wait_if_needed(
+            "https://www.googleapis.com/customsearch/v1"
+        )
         response = requests.get(
             "https://www.googleapis.com/customsearch/v1", params=params
         )
@@ -148,19 +167,18 @@ class CrawlerService:
         pruned: bool = True,
         deep_crawl_strategy: Optional[DeepCrawlStrategy] = None,
         # BFSDeepCrawlStrategy(max_depth=1, include_external=False, max_pages=50),
-        crawler: Optional[AsyncWebCrawler] = None,
     ):
         if pruned:
             if query:
                 prune_filter = BM25ContentFilter(
                     user_query=query,
-                    bm25_threshold=1.4,
+                    bm25_threshold=1.2,
                     language="english",  # use for stemming
                     use_stemming=True,
                 )
             else:
                 prune_filter = PruningContentFilter(
-                    threshold=0.4,
+                    threshold=0.8,
                     threshold_type="fixed",
                     min_word_threshold=10,
                 )
@@ -175,6 +193,7 @@ class CrawlerService:
                 "escape_html": escape_html,
             },
             content_filter=prune_filter,
+            content_source="fit_html",
         )
         config = CrawlerRunConfig(
             markdown_generator=md_generator,
@@ -184,20 +203,14 @@ class CrawlerService:
             excluded_selector=self.excluded_selector,
             remove_forms=True,
             deep_crawl_strategy=deep_crawl_strategy,
+            delay_before_return_html=3,
+            magic=True,
         )
 
         try:
-            if crawler is None:
-                async with AsyncWebCrawler(
-                    config=BrowserConfig(
-                        enable_stealth=True,  # Simple flag to enable
-                        headless=False,  # Better for avoiding detection
-                    )
-                ) as crawler:
-                    return await self._run_with_crawler(url, config, crawler)
-            return await self._run_with_crawler(url, config, crawler)
+            return await self._run_with_crawler(url, config)
         except Exception as e:
-            self.logger.error("Crawl error", url=url, error=str(e))
+            self.logger.error("Crawl error", url=url, error=str(object=e))
 
     async def crawl_many(
         self,
@@ -227,26 +240,24 @@ class CrawlerService:
             List of dicts (one per URL) with keys: 'url', 'title',
             'description', 'content', and 'image_url'.
         """
-        async with AsyncWebCrawler() as crawler:
-            tasks = [
-                self.crawl_one(
-                    url=url,
-                    query=query,
-                    ignore_links=ignore_links,
-                    ignore_images=ignore_images,
-                    escape_html=escape_html,
-                    pruned=pruned,
-                    deep_crawl_strategy=deep_crawl_strategy,
-                    crawler=crawler,
-                )
-                for url in urls
-            ]
-            per_url_lists = await asyncio.gather(*tasks)
-            # Flatten list[list[CrawlResult]] -> list[CrawlResult]
-            flattened: list[CrawlResult] = [
-                item for sublist in per_url_lists for item in (sublist or [])
-            ]
-            return flattened
+        tasks = [
+            self.crawl_one(
+                url=url,
+                query=query,
+                ignore_links=ignore_links,
+                ignore_images=ignore_images,
+                escape_html=escape_html,
+                pruned=pruned,
+                deep_crawl_strategy=deep_crawl_strategy,
+            )
+            for url in urls
+        ]
+        per_url_lists = await asyncio.gather(*tasks)
+        # Flatten list[list[CrawlResult]] -> list[CrawlResult]
+        flattened: list[CrawlResult] = [
+            item for sublist in per_url_lists for item in (sublist or [])
+        ]
+        return flattened
 
     async def discover(
         self,
@@ -255,7 +266,7 @@ class CrawlerService:
         time_range: Optional[SearchTimeRange] = None,
         pruned: bool = True,
         ignore_links: bool = True,
-        ignore_images: bool = False,
+        ignore_images: bool = True,
         escape_html: bool = False,
     ) -> list[DiscoverResult]:
         """Search the web, then crawl results to enrich content.
@@ -297,12 +308,12 @@ class CrawlerService:
         self,
         url: str,
         crawler_config: CrawlerRunConfig,
-        active_crawler: AsyncWebCrawler,
     ) -> list[CrawlResult]:
+        await self._rate_limiter.wait_if_needed(url)
         async with self._crawler_semaphore:
-            crawl_result = await active_crawler.arun(
+            crawl_result = await self._crawler.arun(
                 url=url,
-                crawler_config=crawler_config,
+                config=crawler_config,
             )
             # Normalize to a list of underlying results when deep crawl
             if isinstance(crawl_result, AsyncGenerator):
@@ -372,9 +383,3 @@ class CrawlerService:
                     )
 
         return normalized
-
-    async def _throttle_search_api(self):
-        # Acquire the lock to ensure only one search API call at a time
-        async with self._search_lock:
-            # Optionally, add a delay here if stricter rate limiting is needed
-            await asyncio.sleep(0.02)  # 20ms delay between requests
