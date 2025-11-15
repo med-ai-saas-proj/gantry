@@ -1,29 +1,40 @@
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { z } from 'zod';
 import { Button } from '@/components/shadcn/button';
 import { Input } from '@/components/shadcn/input';
 import { useLogin } from '@/hooks/auth-hooks';
 import { useAuthStore } from '@/store/auth-store';
 
+const loginSchema = z.object({
+  email: z.email('Invalid email address'),
+  password: z.string().min(6, 'Password must be at least 6 characters'),
+});
+
+type LoginFormData = z.infer<typeof loginSchema>;
+
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
 
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  });
+
   const { mutate: login, isPending, isError, error } = useLogin();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    login(
-      { email, password },
-      {
-        onSuccess: (data) => {
-          setAuth(data.token, data.user);
-          navigate('/dashboard');
-        },
-      }
-    );
+  const onSubmit = (data: LoginFormData) => {
+    login(data, {
+      onSuccess: (response) => {
+        setAuth(response.token, response.user);
+        navigate('/dashboard');
+      },
+    });
   };
 
   return (
@@ -33,27 +44,39 @@ const Login = () => {
           <h1 className="text-4xl font-bold tracking-tight">Login</h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-4">
-            <Input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              disabled={isPending}
-              className="rounded-full"
-            />
+            <div>
+              <Input
+                type="email"
+                placeholder="Email"
+                disabled={isPending}
+                className="rounded-full"
+                aria-invalid={!!errors.email}
+                {...register('email')}
+              />
+              {errors.email && (
+                <p className="text-destructive text-xs mt-1.5 px-4">
+                  {errors.email.message}
+                </p>
+              )}
+            </div>
 
-            <Input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={isPending}
-              className="rounded-full"
-            />
+            <div>
+              <Input
+                type="password"
+                placeholder="Password"
+                disabled={isPending}
+                className="rounded-full"
+                aria-invalid={!!errors.password}
+                {...register('password')}
+              />
+              {errors.password && (
+                <p className="text-destructive text-xs mt-1.5 px-4">
+                  {errors.password.message}
+                </p>
+              )}
+            </div>
           </div>
 
           {isError && (
@@ -62,7 +85,11 @@ const Login = () => {
             </div>
           )}
 
-          <Button type="submit" disabled={isPending}>
+          <Button
+            type="submit"
+            disabled={isPending}
+            className="w-full rounded-full"
+          >
             {isPending ? 'Logging in...' : 'Login'}
           </Button>
         </form>
