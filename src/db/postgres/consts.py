@@ -1,6 +1,4 @@
 import os
-import dotenv
-dotenv.load_dotenv()
 
 CORE_DNS = os.environ["CORE_DNS"]
 CORE_MAX_CONN = int(os.environ.get("CORE_MAX_CONN", "1"))

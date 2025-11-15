@@ -43,6 +43,12 @@ AI related APIs for medical applications
    GROQ_API_KEY=
    GOOGLE_PROGRAMMABLE_SEARCH_API_KEY=""
    GOOGLE_PROGRAMMABLE_SEARCH_CX=
+
+   DB_USER=postgres
+   DB_PASSWORD=123456
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_NAME=main_database
    ```
 
 ### Running the dev server
