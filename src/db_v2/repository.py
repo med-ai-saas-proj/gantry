@@ -1,20 +1,42 @@
-from abc import abstractmethod, ABC
-from dataclasses import asdict
-from typing import Generic, TypeVar, Callable, get_type_hints
-from typing import Any, Optional
-from sqlalchemy.sql import ColumnElement
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from sqlalchemy import Table, Column, delete, insert, select, Select, RowMapping
-
 from src.db_v2.base import BaseEntity, TableColumns
 
-TKey = TypeVar('TKey')
-TEntity = TypeVar('TEntity', bound=BaseEntity)
+from abc import ABC, abstractmethod
+from typing import Any, Generic, TypeVar, Callable, Optional, get_type_hints
+from dataclasses import asdict
+
+from sqlalchemy import (
+    Table,
+    Column,
+    Delete,
+    Select,
+    Update,
+    RowMapping,
+    delete,
+    select,
+)
+from sqlalchemy.sql import ColumnElement
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql.dml import Insert
+
+
+TKey = TypeVar("TKey")
+TEntity = TypeVar("TEntity", bound=BaseEntity)
 
 
 class OperationBuilder(Generic[TEntity]):
-    def __init__(self, session: AsyncSession, stmt, repo: "Repository", mapping_many: bool = False):
+    stmt: Insert | Update | Delete
+    repo: "Repository"
+    session: AsyncSession
+    many: bool
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        stmt: Insert | Update | Delete,
+        repo: "Repository",
+        mapping_many: bool = False,
+    ):
         self.session = session
         self.stmt = stmt
         self.repo = repo
@@ -29,10 +51,14 @@ class OperationBuilder(Generic[TEntity]):
             self._returning_columns = self.repo.columns
         return self
 
-    async def _run(self) -> None | TEntity | list[TEntity] | tuple | list[tuple]:
+    async def _run(
+        self,
+    ) -> None | TEntity | list[TEntity] | tuple | list[tuple]:
         """Internal async executor called when awaited."""
         if self._returning_columns:
-            res = await self.session.execute(self.stmt.returning(*self._returning_columns))
+            res = await self.session.execute(
+                self.stmt.returning(*self._returning_columns)
+            )
             if self.many:
                 rows = res.mappings().all()
                 result = [self.repo.to_entity(row) for row in rows]
@@ -46,6 +72,38 @@ class OperationBuilder(Generic[TEntity]):
 
     def __await__(self):
         return self._run().__await__()
+
+
+class InsertOperationBuilder(OperationBuilder[TEntity]):
+    stmt: Insert
+
+    def __init__(
+        self,
+        session: AsyncSession,
+        stmt: Insert,
+        repo: "Repository",
+        mapping_many: bool = False,
+    ):
+        super().__init__(session, stmt, repo, mapping_many)
+
+    def on_conflict_do_nothing(self, index_elements: list[Column[Any]]):
+        """Add ON CONFLICT DO NOTHING clause to the insert statement."""
+        self.stmt = self.stmt.on_conflict_do_nothing(
+            index_elements=index_elements
+        )
+        return self
+
+    def on_conflict_do_update(
+        self,
+        index_elements: list[Column[Any]],
+        set_: dict[str, Any],
+    ):
+        """Add ON CONFLICT DO UPDATE clause to the insert statement."""
+        self.stmt = self.stmt.on_conflict_do_update(
+            index_elements=index_elements, set_=set_
+        )
+        return self
+
 
 class Repository(ABC, Generic[TEntity, TKey]):
     @property
@@ -73,7 +131,9 @@ class Repository(ABC, Generic[TEntity, TKey]):
             column = getattr(self.c, attr_name, None)
             if isinstance(column, Column):
                 self.columns.append(column)
-        print(f"Initialized Repo for table {self.table.name} with columns: {[col.name for col in self.columns]}")
+        print(
+            f"Initialized Repo for table {self.table.name} with columns: {[col.name for col in self.columns]}"
+        )
 
     def to_entity(self, data: RowMapping) -> TEntity:
         return self.entity_type(**data)
@@ -82,14 +142,19 @@ class Repository(ABC, Generic[TEntity, TKey]):
         data = asdict(entity)
         data.pop("created_at", None)
         data.pop("updated_at", None)
-        if self.entity_type.__key__ in data and data[self.entity_type.__key__] is None:
+        if (
+            self.entity_type.__key__ in data
+            and data[self.entity_type.__key__] is None
+        ):
             data.pop(self.entity_type.__key__)
         return data
 
     @staticmethod
-    async def select_one(session: AsyncSession,
-                         stmt: Select,
-                         mapping: Callable[[RowMapping], any]) -> any:
+    async def select_one(
+        session: AsyncSession,
+        stmt: Select,
+        mapping: Callable[[RowMapping], any],
+    ) -> any:
         res = await session.execute(stmt)
         row = res.mappings().first()
         if row:
@@ -97,35 +162,33 @@ class Repository(ABC, Generic[TEntity, TKey]):
         return None
 
     @staticmethod
-    async def select_many(session: AsyncSession,
-                          stmt: Select,
-                          mapping: Callable[[RowMapping], any]) -> list[TEntity]:
+    async def select_many(
+        session: AsyncSession,
+        stmt: Select,
+        mapping: Callable[[RowMapping], any],
+    ) -> list[TEntity]:
         res = await session.execute(stmt)
         rows = res.mappings().all()
         return [mapping(row) for row in rows]
 
-    async def get_one(self, session: AsyncSession, stmt: Select) -> TEntity | None:
-        return await self.select_one(
-            session,
-            stmt,
-            self.to_entity
-        )
+    async def get_one(
+        self, session: AsyncSession, stmt: Select
+    ) -> TEntity | None:
+        return await self.select_one(session, stmt, self.to_entity)
 
-    async def get_many(self, session: AsyncSession, stmt: Select) -> list[TEntity]:
-        return await self.select_many(
-            session,
-            stmt,
-            self.to_entity
-        )
+    async def get_many(
+        self, session: AsyncSession, stmt: Select
+    ) -> list[TEntity]:
+        return await self.select_many(session, stmt, self.to_entity)
 
     async def get_all(self, session: AsyncSession) -> list[TEntity]:
         return await self.select_many(
-            session,
-            select(self.table),
-            self.to_entity
+            session, select(self.table), self.to_entity
         )
 
-    async def get_by_id(self, session: AsyncSession, record_id: TKey) -> TEntity | None:
+    async def get_by_id(
+        self, session: AsyncSession, record_id: TKey
+    ) -> TEntity | None:
         key_column: Column[TKey] = getattr(self.c, self.c.__key__)
         if key_column is None:
             raise ValueError("TableColumns must define a KEY column for update")
@@ -133,60 +196,57 @@ class Repository(ABC, Generic[TEntity, TKey]):
         return await self.select_one(
             session,
             select(self.table).where(key_column == record_id).limit(1),
-            self.to_entity
+            self.to_entity,
         )
 
-    def insert(self,
-                     session: AsyncSession,
-                     record: TEntity) -> OperationBuilder[TEntity]:
+    def insert(
+        self, session: AsyncSession, record: TEntity
+    ) -> OperationBuilder[TEntity]:
         data = self.to_dict(record)
-        return OperationBuilder(
-            session,
-            stmt=insert(self.table).values(data),
-            repo=self
+        return InsertOperationBuilder(
+            session, stmt=insert(self.table).values(data), repo=self
         )
 
-    def insert_many(self,
-                          session: AsyncSession,
-                          records: list[TEntity]) -> OperationBuilder[TEntity]:
+    def insert_many(
+        self, session: AsyncSession, records: list[TEntity]
+    ) -> OperationBuilder[TEntity]:
         data_list = [self.to_dict(record) for record in records]
-        return OperationBuilder(
+        return InsertOperationBuilder(
             session,
             stmt=insert(self.table).values(data_list),
             repo=self,
-            mapping_many=True
+            mapping_many=True,
         )
 
-    def delete(self, session: AsyncSession, record_id: TKey) -> OperationBuilder[TEntity]:
+    def delete(
+        self, session: AsyncSession, record_id: TKey
+    ) -> OperationBuilder[TEntity]:
         key_column: Column[TKey] = getattr(self.c, self.c.__key__)
         if key_column is None:
             raise ValueError("TableColumns must define a KEY column for update")
         return OperationBuilder(
             session,
-            stmt=(
-                delete(self.table)
-                .where(key_column == record_id)
-            ),
-            repo=self
-        )
-
-    def delete_many(self, session: AsyncSession,
-                          record_ids: list[TKey]) -> OperationBuilder[TEntity]:
-        key_column: Column[TKey] = getattr(self.c, self.c.__key__)
-        if key_column is None:
-            raise ValueError("TableColumns must define a KEY column for update")
-
-        return OperationBuilder(
-            session,
-            stmt=(
-                delete(self.table)
-                .where(key_column.in_(record_ids))
-            ),
+            stmt=(delete(self.table).where(key_column == record_id)),
             repo=self,
-            mapping_many=True
         )
 
-    def update(self, session: AsyncSession, record: TEntity) -> OperationBuilder[TEntity]:
+    def delete_many(
+        self, session: AsyncSession, record_ids: list[TKey]
+    ) -> OperationBuilder[TEntity]:
+        key_column: Column[TKey] = getattr(self.c, self.c.__key__)
+        if key_column is None:
+            raise ValueError("TableColumns must define a KEY column for update")
+
+        return OperationBuilder(
+            session,
+            stmt=(delete(self.table).where(key_column.in_(record_ids))),
+            repo=self,
+            mapping_many=True,
+        )
+
+    def update(
+        self, session: AsyncSession, record: TEntity
+    ) -> OperationBuilder[TEntity]:
         data = self.to_dict(record)
         key = self.entity_type.__key__
 
@@ -201,9 +261,7 @@ class Repository(ABC, Generic[TEntity, TKey]):
         return OperationBuilder(
             session,
             stmt=(
-                self.table.update()
-                .where(key_column == record_id)
-                .values(data)
+                self.table.update().where(key_column == record_id).values(data)
             ),
-            repo=self
+            repo=self,
         )
