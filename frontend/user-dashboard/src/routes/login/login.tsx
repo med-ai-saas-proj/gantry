@@ -8,7 +8,7 @@ import { useLogin } from '@/hooks/auth-hooks';
 import { useAuthStore } from '@/store/auth-store';
 
 const loginSchema = z.object({
-  email: z.email('Invalid email address'),
+  email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
@@ -45,37 +45,41 @@ const Login = () => {
         </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="space-y-4">
-            <div>
+          <div className="space-y-2">
+            <div className="min-h-18">
               <Input
                 type="email"
                 placeholder="Email"
                 disabled={isPending}
-                className="rounded-full"
+                className="rounded-full p-6"
                 aria-invalid={!!errors.email}
                 {...register('email')}
               />
-              {errors.email && (
-                <p className="text-destructive text-xs mt-1.5 px-4">
-                  {errors.email.message}
-                </p>
-              )}
+              <div className="h-5 mt-1.5 px-4">
+                {errors.email && (
+                  <p className="text-destructive text-xs">
+                    {errors.email.message}
+                  </p>
+                )}
+              </div>
             </div>
 
-            <div>
+            <div className="min-h-18">
               <Input
                 type="password"
                 placeholder="Password"
                 disabled={isPending}
-                className="rounded-full"
+                className="rounded-full p-6"
                 aria-invalid={!!errors.password}
                 {...register('password')}
               />
-              {errors.password && (
-                <p className="text-destructive text-xs mt-1.5 px-4">
-                  {errors.password.message}
-                </p>
-              )}
+              <div className="h-5 mt-1.5 px-4">
+                {errors.password && (
+                  <p className="text-destructive text-xs">
+                    {errors.password.message}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -88,6 +92,7 @@ const Login = () => {
           <Button
             type="submit"
             disabled={isPending}
+            size={'lg'}
             className="w-full rounded-full"
           >
             {isPending ? 'Logging in...' : 'Login'}
