@@ -22,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from ..auth_v2.initialize import init_auth_service
+from ..auth.initialize import init_auth_service
 
 
 @contextlib.asynccontextmanager
@@ -30,18 +30,19 @@ async def lifespan(app: FastAPI):
     LOGGER.info("Application startup")
 
     await init_auth_service(
-        user_config= {
+        user_config={
             "secret_key": "your_user_secret_key",
             "algorithm": "HS256",
-            "access_token_expire_minutes": 30
+            "access_token_expire_minutes": 30,
         },
-        api_key_config= {
+        api_key_config={
             "key_secret": "your_api",
             "api_key_length": 32,
-            "expiration_days": 30
-        }
+            "expiration_days": 30,
+        },
     )
     yield
+
 
 app = FastAPI(
     title="Venera API",
@@ -199,4 +200,3 @@ async def scalar_html():
 
 
 app.mount("/", StaticFiles(directory="statics", html=True), name="static")
-

@@ -5,19 +5,28 @@ from uuid import uuid4
 
 from sqlalchemy import Column, String, UUID, Boolean, Table
 
-from src.db_v2.base import metadata, timestamps, BaseEntity, TimestampsFields, TableColumns
+from src.db_v2.base import (
+    metadata,
+    timestamps,
+    BaseEntity,
+    TimestampsFields,
+    TableColumns,
+)
 from src.db_v2.repository import Repository
 
 Users = Table(
-    'users',
+    "users",
     metadata,
-    Column('id', UUID, primary_key=True, unique=True, nullable=False, default=uuid4),
-    Column('username', String, unique=True, nullable=False),
-    Column('email', String, unique=True, nullable=False),
-    Column('hashed_password', String, nullable=False),
-    Column('is_active', Boolean, default=True),
-    *timestamps()
+    Column(
+        "id", UUID, primary_key=True, unique=True, nullable=False, default=uuid4
+    ),
+    Column("username", String, unique=True, nullable=False),
+    Column("email", String, unique=True, nullable=False),
+    Column("hashed_password", String, nullable=False),
+    Column("is_active", Boolean, default=True),
+    *timestamps(),
 )
+
 
 @dataclass(kw_only=True)
 class User(BaseEntity, TimestampsFields):

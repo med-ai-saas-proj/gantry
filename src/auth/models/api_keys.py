@@ -3,38 +3,53 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Column, String, DateTime, UUID, Table, ForeignKeyConstraint, ForeignKey
+from sqlalchemy import (
+    Column,
+    String,
+    DateTime,
+    UUID,
+    Table,
+    ForeignKeyConstraint,
+    ForeignKey,
+)
 
-from src.db_v2.base import metadata, timestamps, TableColumns, TimestampsFields, BaseEntity
+from src.db_v2.base import (
+    metadata,
+    timestamps,
+    TableColumns,
+    TimestampsFields,
+    BaseEntity,
+)
 from src.db_v2.repository import Repository
 
 ApiKeyPermissions = Table(
-    'api_key_permissions',
+    "api_key_permissions",
     metadata,
-    Column('api_key_id', UUID, primary_key=True),
-    Column('permission_name', String, primary_key=True),
-    ForeignKeyConstraint(['api_key_id'], ['api_keys.id']),
-    ForeignKeyConstraint(['permission_name'], ['permissions.name'])
+    Column("api_key_id", UUID, primary_key=True),
+    Column("permission_name", String, primary_key=True),
+    ForeignKeyConstraint(["api_key_id"], ["api_keys.id"]),
+    ForeignKeyConstraint(["permission_name"], ["permissions.name"]),
 )
 
 
 ApiKeys = Table(
-    'api_keys',
+    "api_keys",
     metadata,
-    Column('id', UUID, primary_key=True, unique=True, nullable=False),
-    Column('owner_id', UUID, ForeignKey('users.id'), nullable=False),
-    Column('hashed_key', String, unique=True, nullable=False),
-    Column('expiration_date', DateTime, nullable=True),
-    *timestamps()
+    Column("id", UUID, primary_key=True, unique=True, nullable=False),
+    Column("owner_id", UUID, ForeignKey("users.id"), nullable=False),
+    Column("hashed_key", String, unique=True, nullable=False),
+    Column("expiration_date", DateTime, nullable=True),
+    *timestamps(),
 )
 
 Permissions = Table(
-    'permissions',
+    "permissions",
     metadata,
-    Column('name', String, primary_key=True, unique=True, nullable=False),
-    Column('description', String, nullable=True),
-    *timestamps()
+    Column("name", String, primary_key=True, unique=True, nullable=False),
+    Column("description", String, nullable=True),
+    *timestamps(),
 )
+
 
 class ApiKeyPermissionRepo(Repository):
     class TableColumns:
@@ -44,6 +59,7 @@ class ApiKeyPermissionRepo(Repository):
     table = ApiKeyPermissions
     c = TableColumns
     entity_type = None  # No specific entity class for this association table
+
 
 @dataclass(kw_only=True)
 class ApiKey(BaseEntity, TimestampsFields):
@@ -63,16 +79,17 @@ class ApiKeyRepo(Repository[ApiKey, str]):
         created_at: Column[DateTime] = ApiKeys.c.created_at
         updated_at: Column[DateTime] = ApiKeys.c.updated_at
 
-
     table = ApiKeys
     c = TableColumns
     entity_type = ApiKey
+
 
 @dataclass(kw_only=True)
 class Permission(BaseEntity, TimestampsFields):
     __key__ = "name"
     name: str
     description: Optional[str]
+
 
 class PermissionRepo(Repository[Permission, str]):
     class TableColumns(TableColumns):
@@ -85,4 +102,3 @@ class PermissionRepo(Repository[Permission, str]):
     table = Permissions
     c = TableColumns
     entity_type = Permission
-

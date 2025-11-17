@@ -12,6 +12,7 @@ from src.db_v2.repository import Repository
 from ..models.api_keys import ApiKey, PermissionRepo, ApiKeyPermissionRepo
 from ..models.initialize import user_repo, permission_repo, api_key_repo
 
+
 class ApiKeyServiceConfig(TypedDict):
     key_secret: str
     api_key_length: NotRequired[int]
@@ -19,15 +20,20 @@ class ApiKeyServiceConfig(TypedDict):
     api_key_format: NotRequired[Callable[[str, str], str]]
     get_api_key_parts: NotRequired[Callable[[str], tuple[str, str]]]
 
+
 class ApiKeyService:
     def __init__(self, config: ApiKeyServiceConfig):
-        self.key_secret = config['key_secret']
+        self.key_secret = config["key_secret"]
 
-        self.api_key_format = config.get('api_key_format', ApiKeyService.internal_format_api_key)
-        self.get_api_key_parts = config.get('get_api_key_parts', ApiKeyService.internal_get_api_key_parts)
+        self.api_key_format = config.get(
+            "api_key_format", ApiKeyService.internal_format_api_key
+        )
+        self.get_api_key_parts = config.get(
+            "get_api_key_parts", ApiKeyService.internal_get_api_key_parts
+        )
 
-        self.api_key_length = config.get('api_key_length', 32)
-        self.expiration_days = config.get('expiration_days', 30)
+        self.api_key_length = config.get("api_key_length", 32)
+        self.expiration_days = config.get("expiration_days", 30)
 
     def create_api_key_secret(self) -> str:
         return secrets.token_urlsafe(self.api_key_length)
@@ -39,14 +45,18 @@ class ApiKeyService:
     @staticmethod
     def internal_get_api_key_parts(formatted_key: str) -> tuple[str, str]:
         try:
-            prefix, rest = formatted_key.split('_', 1)
-            key_id, secret = rest.split('.', 1)
+            prefix, rest = formatted_key.split("_", 1)
+            key_id, secret = rest.split(".", 1)
             return key_id, secret
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid API key format")
+            raise HTTPException(
+                status_code=400, detail="Invalid API key format"
+            )
 
     def hash_api_key(self, api_key: str) -> str:
-        return hmac.new(self.key_secret.encode(), api_key.encode(), 'sha256').hexdigest()
+        return hmac.new(
+            self.key_secret.encode(), api_key.encode(), "sha256"
+        ).hexdigest()
 
     async def create_api_key(self, user_id: str, permissions: list[str]) -> str:
         async with session_manager.get_session() as session:
@@ -56,8 +66,9 @@ class ApiKeyService:
 
             permission_rep = await permission_repo.get_many(
                 session,
-                select(PermissionRepo.table)
-                    .where(PermissionRepo.c.name.in_(permissions))
+                select(PermissionRepo.table).where(
+                    PermissionRepo.c.name.in_(permissions)
+                ),
             )
 
             existing_permissions = {perm.name for perm in permission_rep}
@@ -65,7 +76,7 @@ class ApiKeyService:
             if not_existing_permissions:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Permissions not found: {', '.join(not_existing_permissions)}"
+                    detail=f"Permissions not found: {', '.join(not_existing_permissions)}",
                 )
 
             api_key_id = uuid.uuid4()
@@ -79,21 +90,29 @@ class ApiKeyService:
                 id=str(api_key_id),
                 owner_id=user_id,
                 hashed_key=hashed_key,
-                expiration_date=datetime.now() + timedelta(days=self.expiration_days)
+                expiration_date=datetime.now()
+                + timedelta(days=self.expiration_days),
             )
             await api_key_repo.insert(session, new_api_key)
             await session.execute(
-                insert(ApiKeyPermissionRepo.table).values([
-                    {"api_key_id": api_key_id, "permission_name": perm_name} for perm_name in permissions
-                ])
+                insert(ApiKeyPermissionRepo.table).values(
+                    [
+                        {"api_key_id": api_key_id, "permission_name": perm_name}
+                        for perm_name in permissions
+                    ]
+                )
             )
             await session.commit()
 
         return formatted_key
 
-    async def verify_api_key(self, api_key: str, required_permissions: list[str]) -> str:
+    async def verify_api_key(
+        self, api_key: str, required_permissions: list[str]
+    ) -> str:
         if len(required_permissions) == 0:
-            raise ValueError("At least one permission must be specified for verification")
+            raise ValueError(
+                "At least one permission must be specified for verification"
+            )
 
         async with session_manager.get_session() as session:
             key_id, _ = self.get_api_key_parts(api_key)
@@ -103,7 +122,9 @@ class ApiKeyService:
                 raise HTTPException(status_code=401, detail="Invalid API key")
 
             if key.expiration_date < datetime.now():
-                raise HTTPException(status_code=401, detail="API key has expired")
+                raise HTTPException(
+                    status_code=401, detail="API key has expired"
+                )
 
             hashed_key = self.hash_api_key(api_key)
             if not hmac.compare_digest(hashed_key, key.hashed_key):
@@ -111,20 +132,24 @@ class ApiKeyService:
 
             existing_permissions: list[str] = await Repository.select_many(
                 session,
-                select(ApiKeyPermissionRepo.c.permission_name)
-                .where(
+                select(ApiKeyPermissionRepo.c.permission_name).where(
                     (ApiKeyPermissionRepo.c.api_key_id == key.id)
-                    & (ApiKeyPermissionRepo.c.permission_name.in_(required_permissions)
-                    )),
-                lambda x: x['permission_name']
+                    & (
+                        ApiKeyPermissionRepo.c.permission_name.in_(
+                            required_permissions
+                        )
+                    )
+                ),
+                lambda x: x["permission_name"],
             )
 
-            missing_permissions = set(required_permissions) - set(existing_permissions)
+            missing_permissions = set(required_permissions) - set(
+                existing_permissions
+            )
             if missing_permissions:
                 raise HTTPException(
                     status_code=403,
-                    detail=f"Missing permissions: {', '.join(missing_permissions)}"
+                    detail=f"Missing permissions: {', '.join(missing_permissions)}",
                 )
 
         return key.owner_id
-

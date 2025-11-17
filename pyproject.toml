@@ -32,6 +32,10 @@ dependencies = [
 [tool.pyright]
 exclude = ["*.pyi?$", "*__pycache__*", ".venv"]
 
+[tool.uv.scripts]
+db_migrate = "alembic revision --autogenerate"
+db_upgrade = "alembic upgrade head"
+
 [dependency-groups]
 dev = [
     "flake8>=7.3.0",

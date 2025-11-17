@@ -1,4 +1,6 @@
-from src.auth import User, get_current_user
+from src.auth.depends.auth import get_current_user
+from src.auth.entities.auth_info import AuthInfo as User
+
 from src.ehr.dtos import InputEHR, InputPrescription
 from src.shared.utils.logger import LOGGER
 from src.shared.custom_types.responses import SSEResponse
