@@ -1,3 +1,4 @@
+from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from src.db_v2.consts import DB_ASYNC_URL

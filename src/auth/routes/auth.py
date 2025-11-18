@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi.params import Depends
 
-from ..initialize import get_user_service
+from ..initialize import user_service
 from ..schemas.users import (
     EmailRegisterRequest,
     RegisterResponse,
@@ -16,7 +16,6 @@ router = APIRouter(prefix="/auth")
 @router.post("/email-register", response_model=RegisterResponse)
 async def register_user(
     request: EmailRegisterRequest,
-    user_service: UserService = Depends(get_user_service),
 ):
     user = await user_service.email_register(
         email=request.email,
@@ -30,7 +29,6 @@ async def register_user(
 @router.post("/login", response_model=LoginResponse)
 async def login_user(
     request: EmailLoginRequest,
-    user_service: UserService = Depends(get_user_service),
 ):
     token = await user_service.email_login(
         email=request.username, password=request.password

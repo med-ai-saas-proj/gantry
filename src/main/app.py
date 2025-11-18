@@ -22,27 +22,6 @@ from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from ..auth.initialize import init_auth_service
-
-
-@contextlib.asynccontextmanager
-async def lifespan(app: FastAPI):
-    LOGGER.info("Application startup")
-
-    await init_auth_service(
-        user_config={
-            "secret_key": "your_user_secret_key",
-            "algorithm": "HS256",
-            "access_token_expire_minutes": 30,
-        },
-        api_key_config={
-            "key_secret": "your_api",
-            "api_key_length": 32,
-            "expiration_days": 30,
-        },
-    )
-    yield
-
 
 app = FastAPI(
     title="Venera API",
@@ -51,7 +30,6 @@ app = FastAPI(
     docs_url=None,  # "/docs" if env.DEBUG else None,
     openapi_url="/docs/openapi.json",
     redoc_url=None,  # "/docs" if env.DEBUG else None,
-    lifespan=lifespan,
 )
 cors = CORSMiddleware(
     app,

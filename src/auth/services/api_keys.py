@@ -15,7 +15,7 @@ from ..models.initialize import user_repo, permission_repo, api_key_repo
 
 class ApiKeyServiceConfig(TypedDict):
     key_secret: str
-    api_key_length: NotRequired[int]
+    api_key_secret_length: NotRequired[int]
     expiration_days: NotRequired[int]
     api_key_format: NotRequired[Callable[[str, str], str]]
     get_api_key_parts: NotRequired[Callable[[str], tuple[str, str]]]
@@ -32,11 +32,11 @@ class ApiKeyService:
             "get_api_key_parts", ApiKeyService.internal_get_api_key_parts
         )
 
-        self.api_key_length = config.get("api_key_length", 32)
+        self.api_key_secret_length = config.get("api_key_secret_length", 32)
         self.expiration_days = config.get("expiration_days", 30)
 
     def create_api_key_secret(self) -> str:
-        return secrets.token_urlsafe(self.api_key_length)
+        return secrets.token_urlsafe(self.api_key_secret_length)
 
     @staticmethod
     def internal_format_api_key(api_key: str, secret: str) -> str:

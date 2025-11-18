@@ -27,14 +27,11 @@ dependencies = [
     "python-jose>=3.5.0",
     "passlib[bcrypt]==1.7.4",
     "psycopg2-binary>=2.9.11",
+    "redis>=7.0.1",
 ]
 
 [tool.pyright]
 exclude = ["*.pyi?$", "*__pycache__*", ".venv"]
-
-[tool.uv.scripts]
-db_migrate = "alembic revision --autogenerate"
-db_upgrade = "alembic upgrade head"
 
 [dependency-groups]
 dev = [
