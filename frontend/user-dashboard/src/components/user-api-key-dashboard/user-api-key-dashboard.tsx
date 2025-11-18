@@ -1,5 +1,5 @@
-import { Lock, Plus } from 'lucide-react';
-import { Button } from '../shadcn/button';
+import { Lock } from 'lucide-react';
+import { UserAPIKeyDialog } from './user-api-key-dialog';
 
 const UserAPIKeyDashboard = () => {
   return (
@@ -18,10 +18,7 @@ const UserAPIKeyDashboard = () => {
           <Lock />
         </div>
         <p className="font-bold">Create an API key to access the OpenAI API</p>
-        <Button className="mt-3">
-          <Plus />
-          Create new secret key
-        </Button>
+        <UserAPIKeyDialog />
       </div>
     </div>
   );
