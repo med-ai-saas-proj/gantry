@@ -1,17 +1,17 @@
-from typing import TypedDict
+from typing import TypedDict, NotRequired
 
 
 class JwtPayload(TypedDict):
     sub: str
-    name: str
+    email: str
+    exp: NotRequired[str]
 
 
 class AuthInfo(TypedDict):
     id: str
-    username: str
+    email: str
 
 
 class TokenInfo(TypedDict):
     access_token: str
-    token_type: str
     expires_in: int

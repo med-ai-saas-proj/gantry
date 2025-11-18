@@ -28,10 +28,13 @@ dependencies = [
     "passlib[bcrypt]==1.7.4",
     "psycopg2-binary>=2.9.11",
     "redis>=7.0.1",
+    "pydantic-settings>=2.11.0",
+    "safe-result>=4.0.3",
 ]
 
 [tool.pyright]
 exclude = ["*.pyi?$", "*__pycache__*", ".venv"]
+
 
 [dependency-groups]
 dev = [

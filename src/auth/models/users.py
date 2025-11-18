@@ -1,18 +1,19 @@
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Optional
-from uuid import uuid4
-
-from sqlalchemy import Column, String, UUID, Boolean, Table
-
 from src.db_v2.base import (
+    BaseEntity,
+    TableColumns,
+    TimestampsFields,
     metadata,
     timestamps,
-    BaseEntity,
-    TimestampsFields,
-    TableColumns,
 )
 from src.db_v2.repository import Repository
+
+from uuid import uuid4
+from typing import Optional
+from datetime import datetime
+from dataclasses import dataclass
+
+from sqlalchemy import UUID, Table, Column, String, Boolean
+
 
 Users = Table(
     "users",

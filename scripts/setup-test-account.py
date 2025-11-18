@@ -1,9 +1,10 @@
 from src.auth import utils
-from src.auth.services.user import UserService
 from src.db.postgres.initialize import CORE_DB_SESSION_SCOPE
 
 import asyncio
 from datetime import UTC, datetime, timedelta
+
+from src.auth.services.user import UserService
 
 
 user_service = UserService(CORE_DB_SESSION_SCOPE)
