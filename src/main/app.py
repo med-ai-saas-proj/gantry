@@ -1,20 +1,24 @@
-import contextlib
-
 from src.shared.utils import request_id_utils
-from src.shared.consts import env_const, common_const, messages_const
-from src.shared.dtos.base import PYDANTIC_DISCRIMINATOR_KEY
-from src.shared.utils.logger import LOGGER
-from src.shared.custom_types.responses.error import CErrorResponse
+from src.shared.consts import common_const, messages_const
+from src.shared.settings import AppSettings, getAppSetting
+from src.shared.utils.logger import BoundLogger, getLogger
+from src.shared.dtos.error_output import (
+    ProblemDetails,
+    problemDetailsFromRecoverableError,
+)
+from src.shared.custom_types.error_exception import (
+    RecoverableError,
+    UnrecoverableError,
+)
 
 from .routers import api_router
 
-import json
 import time
 import uuid
 import traceback
-from typing import Any
+from typing import Annotated
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from pydantic import ValidationError
 from scalar_fastapi import get_scalar_api_reference
 from fastapi.exceptions import RequestValidationError
@@ -30,6 +34,12 @@ app = FastAPI(
     docs_url=None,  # "/docs" if env.DEBUG else None,
     openapi_url="/docs/openapi.json",
     redoc_url=None,  # "/docs" if env.DEBUG else None,
+    responses={
+        400: {"model": ProblemDetails},
+        401: {"model": ProblemDetails},
+        422: {"model": ProblemDetails},
+        500: {"model": ProblemDetails},
+    },
 )
 cors = CORSMiddleware(
     app,
@@ -40,32 +50,64 @@ cors = CORSMiddleware(
 )
 
 
+@app.exception_handler(RecoverableError)
+async def recoverableErrorHandler(
+    req: Request, e: RecoverableError
+) -> JSONResponse:
+    return JSONResponse(
+        problemDetailsFromRecoverableError(e), status_code=e.status
+    )
+
+
+@app.exception_handler(UnrecoverableError)
+async def unrecoverableErrorHandler(
+    req: Request,
+    exception: UnrecoverableError,
+):
+    logger = getLogger()
+    app_settings = getAppSetting()
+
+    logger.error(
+        "Got an unrecoverable error, you should definitely check your code out",
+        traceback=traceback.format_exception(exception),
+    )
+    if app_settings.debug:
+        return Response(
+            "\n".join(traceback.format_exception(exception)), status_code=500
+        )
+    return Response(messages_const.INTERNAL_SERVER_ERROR, status_code=500)
+
+
 @app.exception_handler(RequestValidationError)
 async def fastapi_exception_handler(
-    request: Request, exception: RequestValidationError
+    request: Request,
+    exception: RequestValidationError,
 ):
     errors = exception.errors()
-    parsed_errors = {}
-    for error in errors:
-        locs = error["loc"]
-        mssg_list = None
-        ref_parsed_errors = parsed_errors
-        for loc_i in range(len(locs)):
-            loc = locs[loc_i]
-            if loc not in ref_parsed_errors:
-                ref_parsed_errors[loc] = [] if loc_i == len(locs) - 1 else {}
-            if loc_i == len(locs) - 1:
-                mssg_list: Any = ref_parsed_errors[loc]
-            ref_parsed_errors = ref_parsed_errors[loc]
-        mssg_list.append(error["msg"])
-    exception_response = CErrorResponse(
-        status_code=400,
-        message=messages_const.BAD_REQUEST,
-        errors=parsed_errors,
-    )
+    """
+    Error look like this:
+    {
+        "loc": ["body", "price"],
+        "msg": "value is not a valid float",
+        "type": "type_error.float"
+    }
+    """
+
+    exception_response: ProblemDetails = {
+        "status": 400,
+        "title": messages_const.BAD_REQUEST,
+        "errors": [
+            {
+                "detail": error.get("msg"),
+                "header": error.get("type"),
+                "pointer": "/".join(error.get("loc", [])),
+            }
+            for error in errors
+        ],
+    }
     return JSONResponse(
-        status_code=exception_response.status_code,
-        content=exception_response.to_dict(),
+        status_code=400,
+        content=exception_response,
     )
 
 
@@ -74,59 +116,52 @@ async def pydantic_exception_handler(
     request: Request, exception: ValidationError
 ):
     errors = exception.errors()
-    parsed_errors = {}
-    mssg_list: list[str] | None = None
-    for error in errors:
-        locs = error["loc"]
-        mssg_list = None
-        ref_parsed_errors = parsed_errors
-        for loc_i in range(len(locs)):
-            loc = locs[loc_i]
-            if isinstance(loc, str):
-                if PYDANTIC_DISCRIMINATOR_KEY in loc:
-                    continue
-            if loc not in ref_parsed_errors:
-                ref_parsed_errors[loc] = [] if loc_i == len(locs) - 1 else {}
-            if loc_i == len(locs) - 1:
-                mssg_list = ref_parsed_errors[loc]
-            ref_parsed_errors = ref_parsed_errors[loc]
-        if mssg_list:
-            mssg_list.append(error["msg"])
-    exception_response = CErrorResponse(
-        status_code=400,
-        message=messages_const.BAD_REQUEST,
-        errors=parsed_errors,
-    )
+    exception_response: ProblemDetails = {
+        "status": 400,
+        "title": messages_const.BAD_REQUEST,
+        "errors": [
+            {
+                "header": error["type"],
+                "detail": error["msg"],
+                "parameter": ".".join(map(str, error["loc"])),
+                "pointer": error.get("url", ""),
+            }
+            for error in errors
+        ],
+    }
     return JSONResponse(
-        status_code=exception_response.status_code,
-        content=exception_response.to_dict(),
+        status_code=400,
+        content=exception_response,
     )
 
 
 @app.exception_handler(Exception)
-async def internal_exception_handler(request: Request, exception):
-    if isinstance(exception, CErrorResponse):
-        error_response = exception.to_dict()
-    else:
-        errors = None if not env_const.DEBUG else {"key": str(exception)}
-        exception = CErrorResponse(
-            status_code=500,
-            message=messages_const.INTERNAL_SERVER_ERROR,
-            errors=errors,
-        )
-        error_response = exception.to_dict()
-    LOGGER.error(
-        json.dumps(error_response),
+async def internal_exception_handler(
+    request: Request,
+    exception: Exception,
+):
+    logger = getLogger()
+    app_settings = getAppSetting()
+
+    logger.error(
+        "Got a weird exception here, you should definitely check your code out!",
         traceback=traceback.format_exception(exception),
     )
-    return JSONResponse(
-        status_code=exception.status_code,
-        content=error_response,
-    )
+    if app_settings.debug:
+        return Response(
+            status_code=500,
+            content="\n".join(traceback.format_exception(exception)),
+        )
+    return Response(messages_const.INTERNAL_SERVER_ERROR, status_code=500)
 
 
 @app.middleware("http")
-async def global_middleware(request: Request, call_next):
+async def global_middleware(
+    request: Request,
+    call_next,
+):
+    logger = getLogger()
+
     start_time = time.time_ns() // 1_000_000
     request_id = request.headers.get(common_const.REQUEST_ID_HEADER, None)
     if request_id is None:
@@ -141,7 +176,7 @@ async def global_middleware(request: Request, call_next):
         if res is not None:
             res.headers[common_const.REQUEST_ID_HEADER] = request_id
             process_time = time.time_ns() // 1_000_000 - start_time
-            LOGGER.info(
+            logger.info(
                 "Request",
                 requestId=request_id,
                 latencyMs=process_time,
@@ -152,7 +187,7 @@ async def global_middleware(request: Request, call_next):
         return res
     except Exception as e:
         process_time = time.time_ns() // 1_000_000 - start_time
-        LOGGER.error(
+        logger.error(
             "Request failed",
             requestId=request_id,
             latencyMs=process_time,
@@ -167,6 +202,14 @@ async def global_middleware(request: Request, call_next):
 
 
 app.include_router(router=api_router)
+
+
+@app.get("/testShit")
+async def testShit(
+    logger: Annotated[BoundLogger, Depends(getLogger)],
+    app_settings: Annotated[AppSettings, Depends(getAppSetting)],
+):
+    return Response(status_code=200)
 
 
 @app.get("/docs", include_in_schema=False)

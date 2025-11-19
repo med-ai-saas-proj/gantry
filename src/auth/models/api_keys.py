@@ -1,26 +1,27 @@
+from src.db_v2.base import (
+    BaseEntity,
+    TableColumns,
+    TimestampsFields,
+    metadata,
+    timestamps,
+)
+from src.db_v2.repository import Repository
+
 import uuid
-from dataclasses import dataclass
-from datetime import datetime
 from typing import Optional
+from datetime import datetime
+from dataclasses import dataclass
 
 from sqlalchemy import (
+    UUID,
+    Table,
     Column,
     String,
     DateTime,
-    UUID,
-    Table,
-    ForeignKeyConstraint,
     ForeignKey,
+    ForeignKeyConstraint,
 )
 
-from src.db_v2.base import (
-    metadata,
-    timestamps,
-    TableColumns,
-    TimestampsFields,
-    BaseEntity,
-)
-from src.db_v2.repository import Repository
 
 ApiKeyPermissions = Table(
     "api_key_permissions",

@@ -1,7 +1,8 @@
+from ..depends.auth import required_permission
+
 from fastapi import APIRouter
 from fastapi.params import Depends
 
-from ..depends.auth import required_permission
 
 router = APIRouter(prefix="/test")
 

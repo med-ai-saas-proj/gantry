@@ -1,16 +1,20 @@
-from datetime import datetime, timedelta, timezone
-from typing import TypedDict, NotRequired
-
-from fastapi import HTTPException
-
-from jose import jwt
-from passlib.context import CryptContext
-from sqlalchemy import select
-
 from src.db_v2.initialize import session_manager
-from ..entities.auth_info import JwtPayload, AuthInfo, TokenInfo
-from ..models.users import UserRepo, User
+from src.shared.consts.common_const import TIME_FORMAT
+from src.shared.custom_types.error_exception import RecoverableError
+
+from ..models.users import User, UserRepo
 from ..models.initialize import user_repo
+from ..entities.auth_info import AuthInfo, TokenInfo, JwtPayload
+
+from typing import Literal, TypedDict, NotRequired
+from datetime import UTC, datetime, timezone, timedelta
+
+from jose import JWTError, jwt
+from fastapi import HTTPException
+from sqlalchemy import select
+from safe_result import Ok, Err, Result, safe_with
+from passlib.context import CryptContext
+
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -23,31 +27,50 @@ def get_password_hash(password) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(
+class JWTEncodeError(RecoverableError):
+    code = "jwt_encode"
+    title = "JWT token encode error"
+
+
+def generateAccessToken(
     data: JwtPayload,
     secret_key: str,
     algorithm: str,
     expires_delta: int | None = None,
-) -> str:
+) -> Result[str, JWTEncodeError]:
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=expires_delta)
-        to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, secret_key, algorithm=algorithm)
+        expire = datetime.now(UTC) + timedelta(minutes=expires_delta)
+        to_encode.update({"exp": expire.strftime(TIME_FORMAT)})
+    try:
+        return Ok(jwt.encode(to_encode, secret_key, algorithm=algorithm))
+    except JWTError:
+        return Err(JWTEncodeError())
 
 
-def get_current_user_from_token(
+class InvalidTokenError(RecoverableError):
+    code = "invalid_access_token"
+    title = "Invalid access token"
+    detail = "Access token is not set or is invalid (expired, corrupted, ...)"
+
+
+def getCurrentUserFromToken(
     token: str, secret_key: str, algorithm: str
-) -> AuthInfo:
+) -> Result[AuthInfo, InvalidTokenError]:
     try:
         payload = jwt.decode(token, secret_key, algorithms=[algorithm])
-        user_id: str = payload.get("sub")
-        username: str = payload.get("name")
-        if username is None or user_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-        return {"id": user_id, "username": username}
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        return Err(InvalidTokenError())
+    user_id = payload.get("sub")
+    user_email = payload.get("email")
+    if (
+        user_email is None
+        or user_id is None
+        or not isinstance(user_email, str)
+        or not isinstance(user_id, str)
+    ):
+        return Err(InvalidTokenError())
+    return Ok[AuthInfo]({"id": user_id, "email": user_email})
 
 
 class UserServiceConfig(TypedDict):
@@ -64,9 +87,9 @@ class UserService:
             "access_token_expire_minutes", 60
         )
 
-    async def email_register(self, username: str, email: str, password: str):
+    async def emailRegister(self, username: str, email: str, password: str):
         async with session_manager.get_session() as session:
-            existed_user: User = await user_repo.get_one(
+            existed_user = await user_repo.get_one(
                 session,
                 select(UserRepo.table)
                 .where(
@@ -90,7 +113,14 @@ class UserService:
             await session.commit()
             return res
 
-    async def email_login(self, email: str, password: str) -> TokenInfo:
+    class InvalidCredentialError(RecoverableError):
+        code = "invalid_credential"
+        title = "Invalid email or password"
+        detail = "The provided email or password is incorrect"
+
+    async def emailLogin(
+        self, email: str, password: str
+    ):  # -> Result[TokenInfo, InvalidCredentialError | JWTEncodeError]:
         async with session_manager.get_session() as session:
             user = await user_repo.get_one(
                 session,
@@ -100,26 +130,24 @@ class UserService:
             )
 
             if not user or not verify_password(password, user.hashed_password):
-                raise HTTPException(
-                    status_code=401, detail="Invalid email or password"
-                )
+                return Err(self.InvalidCredentialError())
 
-            token = create_access_token(
+            return generateAccessToken(
                 data={
                     "sub": str(user.id),
-                    "name": user.username,
+                    "email": user.email,
                 },
                 secret_key=self.secret_key,
                 algorithm=self.algorithm,
                 expires_delta=self.access_token_expire_minutes,
+            ).and_then(
+                lambda token: Ok[TokenInfo](
+                    {
+                        "access_token": token,
+                        "expires_in": self.access_token_expire_minutes * 60,
+                    }
+                )
             )
-            return {
-                "access_token": token,
-                "token_type": "bearer",
-                "expires_in": self.access_token_expire_minutes * 60,
-            }
 
-    def get_user_info_from_token(self, token: str) -> AuthInfo:
-        return get_current_user_from_token(
-            token, self.secret_key, self.algorithm
-        )
+    def getUserInfoFromToken(self, token: str):
+        return getCurrentUserFromToken(token, self.secret_key, self.algorithm)

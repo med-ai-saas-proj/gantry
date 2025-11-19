@@ -1,9 +1,15 @@
-from sqlalchemy import MetaData
-from sqlalchemy.ext.asyncio import create_async_engine
-
-from src.db_v2.consts import DB_ASYNC_URL
 from src.db_v2.session import AsyncSessionManager
 
-async_engine = create_async_engine(DB_ASYNC_URL, echo=True)
+from .settings import getDBSettings
+
+from redis import Redis
+from sqlalchemy.ext.asyncio import create_async_engine
+
+
+async_engine = create_async_engine(
+    getDBSettings().postgres_connection_uri.encoded_string(), echo=True
+)
 
 session_manager = AsyncSessionManager(async_engine)
+
+redis = Redis.from_url(getDBSettings().redis_connection_uri.encoded_string())

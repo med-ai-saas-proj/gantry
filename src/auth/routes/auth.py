@@ -1,41 +1,32 @@
-from fastapi import APIRouter
-from fastapi.params import Depends
+from ..dtos import LoginInput, LoginOutputSuccess
+from ..factories import UserService, getUserService
 
-from ..initialize import user_service
-from ..schemas.users import (
-    EmailRegisterRequest,
-    RegisterResponse,
-    EmailLoginRequest,
-    LoginResponse,
+from typing import Annotated
+
+from fastapi import Body, Depends, APIRouter
+from safe_result import Ok, Err
+
+
+router = APIRouter(prefix="/auth", tags=["Auth"])
+
+
+@router.post(
+    "/login",
+    responses={
+        200: {"model": LoginOutputSuccess},
+    },
 )
-from ..services.users import UserService
-
-router = APIRouter(prefix="/auth")
-
-
-@router.post("/email-register", response_model=RegisterResponse)
-async def register_user(
-    request: EmailRegisterRequest,
-):
-    user = await user_service.email_register(
-        email=request.email,
-        password=request.password,
-        username=request.username,
-    )
-
-    return RegisterResponse(user_id=str(user.id), username=user.username)
-
-
-@router.post("/login", response_model=LoginResponse)
 async def login_user(
-    request: EmailLoginRequest,
-):
-    token = await user_service.email_login(
-        email=request.username, password=request.password
+    credential: Annotated[LoginInput, Body()],
+    user_service: Annotated[UserService, Depends(getUserService)],
+) -> LoginOutputSuccess:
+    token_ = await user_service.emailLogin(
+        credential.email, credential.password.get_secret_value()
     )
-
-    return LoginResponse(
-        access_token=token["access_token"],
-        token_type=token["token_type"],
-        expires_in=token["expires_in"],
-    )
+    token = token_.unwrap()
+    return {
+        "token_type": "Bearer",
+        "access_token": token["access_token"],
+        "expire_in": token["expires_in"],
+        "refresh_token": "",
+    }

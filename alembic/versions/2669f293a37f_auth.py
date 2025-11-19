@@ -10,12 +10,12 @@ Reason:
 
 from alembic import op
 
-from typing import Sequence, Union
+from typing import Union, Sequence
 from pathlib import Path
 
 import sqlalchemy as sa
-
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "2669f293a37f"
