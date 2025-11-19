@@ -12,8 +12,31 @@ from datetime import UTC, datetime, timezone, timedelta
 from jose import JWTError, jwt
 from fastapi import HTTPException
 from sqlalchemy import select
-from safe_result import Ok, Err, Result, safe_with
+from safe_result import Ok, Err, Result
 from passlib.context import CryptContext
+
+
+class UserExistedError(RecoverableError):
+    code = "user_existed"
+    title = "User already exists"
+    detail = (
+        "The provided email was used for another account, try login instead"
+    )
+    status = 400
+
+
+class InvalidCredentialError(RecoverableError):
+    code = "invalid_credential"
+    title = "Invalid email or password"
+    detail = "The provided email or password is incorrect"
+    status = 400
+
+
+class InvalidTokenError(RecoverableError):
+    code = "invalid_access_token"
+    title = "Invalid access token"
+    detail = "Access token is not set or is invalid (expired, corrupted, ...)"
+    status = 400
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -46,12 +69,6 @@ def generateAccessToken(
         return Ok(jwt.encode(to_encode, secret_key, algorithm=algorithm))
     except JWTError:
         return Err(JWTEncodeError())
-
-
-class InvalidTokenError(RecoverableError):
-    code = "invalid_access_token"
-    title = "Invalid access token"
-    detail = "Access token is not set or is invalid (expired, corrupted, ...)"
 
 
 def getCurrentUserFromToken(
@@ -87,7 +104,9 @@ class UserService:
             "access_token_expire_minutes", 60
         )
 
-    async def emailRegister(self, username: str, email: str, password: str):
+    async def emailRegister(
+        self, username: str, email: str, password: str
+    ) -> Result[User, UserExistedError]:
         async with session_manager.get_session() as session:
             existed_user = await user_repo.get_one(
                 session,
@@ -100,10 +119,7 @@ class UserService:
             )
 
             if existed_user:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Username or email already registered",
-                )
+                return Err(UserExistedError())
 
             hashed_password = get_password_hash(password)
             new_user = User(
@@ -111,12 +127,7 @@ class UserService:
             )
             res: User = await user_repo.insert(session, new_user).returning()
             await session.commit()
-            return res
-
-    class InvalidCredentialError(RecoverableError):
-        code = "invalid_credential"
-        title = "Invalid email or password"
-        detail = "The provided email or password is incorrect"
+            return Ok(res)
 
     async def emailLogin(
         self, email: str, password: str

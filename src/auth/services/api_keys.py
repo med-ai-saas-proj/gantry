@@ -1,6 +1,9 @@
 from src.db_v2.initialize import session_manager
 from src.db_v2.repository import Repository
-from src.shared.custom_types.error_exception import RecoverableError
+from src.shared.custom_types.error_exception import (
+    RecoverableError,
+    UnrecoverableError,
+)
 
 from ..models.api_keys import ApiKey, PermissionRepo, ApiKeyPermissionRepo
 from ..models.initialize import user_repo, api_key_repo, permission_repo
@@ -17,21 +20,28 @@ from safe_result import Ok, Err, Result
 
 
 class InvalidPermissionError(RecoverableError):
+    status = 400
     code = "invalid_permission"
     title = "Invalid permission"
     detail = "Permission requested does not exists"
 
 
 class InvalidAPIKey(RecoverableError):
+    status = 400
     code = "invalid_api_key"
     title = "Invalid API key"
     detail = "API key is not set or invalid (does not exists)"
 
 
 class InsufficientPermission(RecoverableError):
+    status = 400
     code = "insufficient_permission"
     title = "Insufficient permission"
     detail = "API key's permission is not sufficient for this resource"
+
+
+class UserTableError(UnrecoverableError):
+    detail = "Check the user table, there is null in there"
 
 
 class ApiKeyServiceConfig(TypedDict):
@@ -83,13 +93,11 @@ class ApiKeyService:
 
     async def create_api_key(
         self, user_id: str, permissions: list[str]
-    ) -> Result[str, InvalidPermissionError]:
+    ) -> Result[str, InvalidPermissionError | UserTableError]:
         async with session_manager.get_session() as session:
             user = await user_repo.get_by_id(session, user_id)
             if user is None:
-                raise HTTPException(
-                    status_code=500, detail="Internal server error"
-                )
+                return Err(UserTableError())
 
             permission_rep = await permission_repo.get_many(
                 session,
@@ -131,7 +139,7 @@ class ApiKeyService:
 
     async def verify_api_key(
         self, api_key: str, required_permissions: list[str]
-    ) -> Result[str, InvalidAPIKey | InsufficientPermission]:
+    ) -> Result[str, InvalidAPIKey | InsufficientPermission | UserTableError]:
         if len(required_permissions) == 0:
             raise ValueError(
                 "At least one permission must be specified for verification"
@@ -149,7 +157,7 @@ class ApiKeyService:
                 return Err(InvalidAPIKey())
 
             if key.expiration_date is None or key.owner_id is None:
-                raise HTTPException(status_code=500)
+                return Err(UserTableError())
 
             if key.expiration_date < datetime.now():
                 return Err(InvalidAPIKey())
