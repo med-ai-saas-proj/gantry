@@ -11,9 +11,9 @@ router = APIRouter(prefix="/api_keys")
 @router.post("/")
 async def create_api_key(
     request: CreateApiKeyRequest,
-    user: AuthInfo = Security(get_current_user),
+    auth_info: AuthInfo = Security(get_current_user),
 ):
     api_key = await api_key_service.create_api_key(
-        user["id"], request.permissions
+        auth_info["id"], request.permissions
     )
     return {"api_key": api_key}

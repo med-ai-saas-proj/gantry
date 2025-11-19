@@ -1,5 +1,3 @@
-import contextlib
-
 from src.shared.utils import request_id_utils
 from src.shared.consts import env_const, common_const, messages_const
 from src.shared.dtos.base import PYDANTIC_DISCRIMINATOR_KEY
