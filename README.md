@@ -32,12 +32,6 @@ AI related APIs for medical applications
    POSTGRES_USER=internet_crawler
    POSTGRES_PASSWORD=123456
    ```
-   
-   - `.env.redis`:
-
-   ```env
-   REDIS_PASSWORD=1234
-   ```
 
    - `.env` and `prod.env`:
 
@@ -45,30 +39,25 @@ AI related APIs for medical applications
    CORE_DNS=postgresql://internet_crawler:123456@localhost:5432/tailm
    STAGE=local
    DEBUG=1
-  
+
    GROQ_API_KEY=
    GOOGLE_PROGRAMMABLE_SEARCH_API_KEY=""
    GOOGLE_PROGRAMMABLE_SEARCH_CX=
-  
+
    DB_USER=postgres
    DB_PASSWORD=123456
    DB_HOST=localhost
    DB_PORT=5432
    DB_NAME=main_database
    
-   ACCESS_TOKEN_SECRET=thisisaverysecretkey
+   
+   JWT_SECRET=thisisasecret
    ACCESS_TOKEN_EXPIRE_MINUTES=30
-   REFRESH_TOKEN_SECRET=thisisanothersecretkey
-   REFRESH_TOKEN_EXPIRE_DAYS=7
    
    API_KEY_SECRET=thisisasecret
    API_KEY_SECRET_LENGTH=32
-   
+    
    API_KEY_EXPIRE_DAYS=30
-   
-   REDIS_HOST=localhost
-   REDIS_PORT=6379
-   REDIS_PASSWORD=1234
    ```
 
 ### Running the dev server
