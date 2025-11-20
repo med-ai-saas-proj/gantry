@@ -1,49 +1,51 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { Button } from '@/components/shadcn/button';
 import { Input } from '@/components/shadcn/input';
-import { useLogin } from '@/hooks/auth-hooks';
-import { useAuthStore } from '@/store/auth-store';
+import { useAuthStatus, useLogin } from '@/hooks/auth-hooks';
 
-const loginSchema = z.object({
+const login_schema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 });
 
-type LoginFormData = z.infer<typeof loginSchema>;
+type LoginFormData = z.infer<typeof login_schema>;
 
 const Login = () => {
   const navigate = useNavigate();
-  const setAuth = useAuthStore((state) => state.setAuth);
-
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(login_schema),
   });
 
-  const { mutate: login, isPending, isError, error } = useLogin();
+  const { mutate, isPending, isError, error } = useLogin();
+  const isAuthenticated = useAuthStatus();
 
   const onSubmit = (data: LoginFormData) => {
-    login(data, {
-      onSuccess: (response) => {
-        setAuth(response.token, response.user);
+    mutate(data, {
+      onSuccess: () => {
         navigate('/dashboard');
       },
     });
   };
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold tracking-tight">Login</h1>
         </div>
-
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           <div className="space-y-2">
             <div className="min-h-18">
@@ -63,7 +65,6 @@ const Login = () => {
                 )}
               </div>
             </div>
-
             <div className="min-h-18">
               <Input
                 type="password"
@@ -82,13 +83,11 @@ const Login = () => {
               </div>
             </div>
           </div>
-
           {isError && (
             <div className="text-destructive text-sm text-center">
               {error?.message || 'Login failed. Please try again.'}
             </div>
           )}
-
           <Button
             type="submit"
             disabled={isPending}

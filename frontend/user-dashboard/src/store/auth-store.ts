@@ -5,7 +5,7 @@ import type { User } from '@/types/auth';
 interface AuthState {
   token: string | null;
   user: User | null;
-  setAuth: (token: string, user: User) => void;
+  setAuth: (token: string) => void;
   logout: () => void;
 }
 
@@ -14,11 +14,11 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       token: null,
       user: null,
-      setAuth: (token, user) => set({ token, user }),
+      setAuth: (token) => set({ token }),
       logout: () => set({ token: null, user: null }),
     }),
     {
-      name: 'venera-auth',
+      name: 'med--ai-saas-auth',
     }
   )
 );
