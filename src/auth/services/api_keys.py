@@ -12,7 +12,7 @@ from typing import Callable, TypedDict, NotRequired
 from datetime import datetime, timedelta
 
 from fastapi import HTTPException
-from sqlalchemy import insert, select
+from sqlalchemy import insert, select, delete
 from safe_result import Ok, Err, Result
 
 
@@ -82,7 +82,7 @@ class ApiKeyService:
         ).hexdigest()
 
     async def create_api_key(
-        self, user_id: str, permissions: list[str]
+        self, user_id: str, permissions: list[str], name: str | None = None
     ) -> Result[str, InvalidPermissionError]:
         async with session_manager.get_session() as session:
             user = await user_repo.get_by_id(session, user_id)
@@ -112,7 +112,9 @@ class ApiKeyService:
             new_api_key = ApiKey(
                 id=str(api_key_id),
                 owner_id=user_id,
+                name=name,
                 hashed_key=hashed_key,
+                is_active=True,
                 expiration_date=datetime.now()
                 + timedelta(days=self.expiration_days),
             )
@@ -128,6 +130,52 @@ class ApiKeyService:
             await session.commit()
 
         return Ok(formatted_key)
+
+    async def get_user_api_keys(self, user_id: str) -> list[ApiKey]:
+        async with session_manager.get_session() as session:
+            stmt = select(api_key_repo.table).where(
+                api_key_repo.c.owner_id == user_id
+            )
+            return await api_key_repo.get_many(session, stmt)
+
+    async def update_api_key(
+        self, user_id: str, key_id: str, name: str | None, is_active: bool | None
+    ) -> Result[ApiKey, InvalidAPIKey]:
+        async with session_manager.get_session() as session:
+            key = await api_key_repo.get_by_id(session, key_id)
+
+            # Verify existence and ownership
+            if key is None or str(key.owner_id) != user_id:
+                return Err(InvalidAPIKey())
+
+            if name is not None:
+                key.name = name
+            if is_active is not None:
+                key.is_active = is_active
+
+            await api_key_repo.update(session, key)
+            await session.commit()
+            return Ok(key)
+
+    async def revoke_api_key(
+        self, user_id: str, key_id: str
+    ) -> Result[bool, InvalidAPIKey]:
+        async with session_manager.get_session() as session:
+            key = await api_key_repo.get_by_id(session, key_id)
+
+            # Verify existence and ownership
+            if key is None or str(key.owner_id) != user_id:
+                return Err(InvalidAPIKey())
+
+            await session.execute(
+                delete(ApiKeyPermissionRepo.table).where(
+                    ApiKeyPermissionRepo.c.api_key_id == key.id
+                )
+            )
+
+            await api_key_repo.delete(session, key_id)
+            await session.commit()
+            return Ok(True)
 
     async def verify_api_key(
         self, api_key: str, required_permissions: list[str]
@@ -146,6 +194,10 @@ class ApiKeyService:
 
             key = await api_key_repo.get_by_id(session, key_id)
             if key is None:
+                return Err(InvalidAPIKey())
+
+            # Check active status
+            if not key.is_active:
                 return Err(InvalidAPIKey())
 
             if key.expiration_date is None or key.owner_id is None:

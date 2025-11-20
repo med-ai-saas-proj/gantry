@@ -41,7 +41,8 @@ def generateAccessToken(
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(UTC) + timedelta(minutes=expires_delta)
-        to_encode.update({"exp": expire.strftime(TIME_FORMAT)})
+        # exp MUST be a number containing a NumericDate value: https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.4
+        to_encode.update({"exp": int(expire.timestamp())})
     try:
         return Ok(jwt.encode(to_encode, secret_key, algorithm=algorithm))
     except JWTError:

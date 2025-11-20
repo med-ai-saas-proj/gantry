@@ -1,6 +1,7 @@
 from src.shared.dtos.base import BaseDTO
 from src.shared.dtos.error_output import ProblemDetails
 
+from datetime import datetime
 from typing import Literal, TypedDict
 
 from pydantic import Field, EmailStr, SecretStr
@@ -26,3 +27,16 @@ class CrateAPIKeyInput(BaseDTO):
 
 class CrateAPIKeyOutputSuccess(TypedDict):
     key: str
+
+
+class ApiKeyResponse(TypedDict):
+    id: str
+    name: str | None
+    is_active: bool
+    expiration_date: datetime | None
+    created_at: datetime | None
+
+
+class UpdateApiKeyInput(BaseDTO):
+    name: str | None = None
+    is_active: bool | None = None

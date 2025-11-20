@@ -63,8 +63,10 @@ def upgrade() -> None:
         "api_keys",
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("owner_id", sa.UUID(), nullable=False),
+        sa.Column("name", sa.String(), nullable=True),
         sa.Column("hashed_key", sa.String(), nullable=False),
         sa.Column("expiration_date", sa.DateTime(), nullable=True),
+        sa.Column("is_active", sa.Boolean(), nullable=True, default=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(

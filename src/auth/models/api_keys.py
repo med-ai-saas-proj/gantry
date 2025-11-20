@@ -13,6 +13,7 @@ from datetime import datetime
 from dataclasses import dataclass
 
 from sqlalchemy import (
+    Boolean,
     UUID,
     Table,
     Column,
@@ -38,7 +39,9 @@ ApiKeys = Table(
     metadata,
     Column("id", UUID, primary_key=True, unique=True, nullable=False),
     Column("owner_id", UUID, ForeignKey("users.id"), nullable=False),
+    Column("name", String, nullable=True),
     Column("hashed_key", String, unique=True, nullable=False),
+    Column("is_active", Boolean, default=True, nullable=False),
     Column("expiration_date", DateTime, nullable=True),
     *timestamps(),
 )
@@ -67,7 +70,9 @@ class ApiKey(BaseEntity, TimestampsFields):
     id: Optional[str] = None
 
     owner_id: Optional[str]
+    name: Optional[str]
     hashed_key: str
+    is_active: bool = True
     expiration_date: Optional[datetime]
 
 
@@ -75,7 +80,9 @@ class ApiKeyRepo(Repository[ApiKey, str]):
     class TableColumns(TableColumns):
         id: Column[str] = ApiKeys.c.id
         owner_id: Column[str] = ApiKeys.c.owner_id
+        name: Column[str] = ApiKeys.c.name
         hashed_key: Column[str] = ApiKeys.c.hashed_key
+        is_active: Column[bool] = ApiKeys.c.is_active
         expiration_date: Column[DateTime] = ApiKeys.c.expiration_date
         created_at: Column[DateTime] = ApiKeys.c.created_at
         updated_at: Column[DateTime] = ApiKeys.c.updated_at

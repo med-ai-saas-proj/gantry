@@ -4,7 +4,7 @@ from typing import TypedDict, NotRequired
 class JwtPayload(TypedDict):
     sub: str
     email: str
-    exp: NotRequired[str]
+    exp: NotRequired[int]
 
 
 class AuthInfo(TypedDict):
