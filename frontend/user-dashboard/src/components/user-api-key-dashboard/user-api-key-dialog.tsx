@@ -1,5 +1,7 @@
-import { Plus } from 'lucide-react';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 import { Button } from '@/components/shadcn/button';
 import {
   Dialog,
@@ -9,58 +11,93 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/shadcn/dialog';
 import { Input } from '@/components/shadcn/input';
 import { Label } from '@/components/shadcn/label';
+import { useUserAPIKeyStore } from '@/store/user-api-key-store';
+import type { UserAPIKey } from '@/types/user-api-key';
 import { UserAPIKeySaveDialog } from './user-api-key-save-dialog';
 
-const UserAPIKeyDialog = () => {
-  const [openCreate, setOpenCreate] = useState(false);
+const apiCreationSchema = z.object({
+  name: z.string().min(1, 'Name must be at least 1 character long'),
+});
+
+type ApiCreationFormData = z.infer<typeof apiCreationSchema>;
+
+const UserAPIKeyDialog = ({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) => {
+  const addAPIKey = useUserAPIKeyStore((state) => state.addAPIKey);
+
   const [openSave, setOpenSave] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ApiCreationFormData>({
+    resolver: zodResolver(apiCreationSchema),
+  });
 
-    setOpenCreate(false);
+  const onSubmit = (data: ApiCreationFormData) => {
     setOpenSave(true);
+    onOpenChange(false);
+
+    const name = data.name;
+
+    const newKey: Omit<UserAPIKey, 'id' | 'createdAt' | 'lastUsed'> = {
+      name,
+      secretKey: 'sk-' + crypto.randomUUID().replace(/-/g, ''),
+      createdBy: 'Current User',
+      permissions: ['read', 'write'],
+    };
+
+    addAPIKey(newKey);
   };
 
   return (
     <>
-      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
-        <form id="create-secret-key-form" onSubmit={handleSubmit}>
-          <DialogTrigger asChild>
-            <Button className="mt-3">
-              <Plus />
-              Create new secret key
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Create new secret key</DialogTitle>
-              <DialogDescription>
-                This API key is tied to your user and can make requests against
-                the selected project. If you are removed from the organiation or
-                project, this key will be disabled.
-              </DialogDescription>
-            </DialogHeader>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create new secret key</DialogTitle>
+            <DialogDescription>
+              This API key is tied to your user and can make requests against
+              the selected project. If you are removed from the organiation or
+              project, this key will be disabled.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit(onSubmit)}>
             <div className="grid gap-4">
               <div className="grid gap-3">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" name="name" defaultValue="Pedro Duarte" />
+                <Label>Name</Label>
+                <Input
+                  id="name"
+                  defaultValue="Pedro Duarte"
+                  aria-invalid={!!errors.name}
+                  {...register('name')}
+                />
+                <div className="h-5 mt-1.5 px-4">
+                  {errors.name && (
+                    <p className="text-destructive text-xs">
+                      {errors.name.message}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
             <DialogFooter>
               <DialogClose asChild>
                 <Button variant="outline">Cancel</Button>
               </DialogClose>
-              <Button type="submit" form="create-secret-key-form">
-                Create secret key
-              </Button>
+              <Button type="submit">Create secret key</Button>
             </DialogFooter>
-          </DialogContent>
-        </form>
+          </form>
+        </DialogContent>
       </Dialog>
 
       <UserAPIKeySaveDialog open={openSave} onOpenChange={setOpenSave} />
@@ -68,4 +105,4 @@ const UserAPIKeyDialog = () => {
   );
 };
 
-export { UserAPIKeyDialog };
+export default UserAPIKeyDialog;
