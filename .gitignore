@@ -5,7 +5,11 @@
 !.vscode/launch.json
 
 # Environments
-*.env*
+.env*
 *.yml
 
 .venv/
+
+.husky/_
+
+node_modules/

@@ -1,11 +1,13 @@
 from . import request_id_utils
-from ..consts import env_const
+from ..settings import AppStage, getAppSetting
 
 import time
 import logging
+from functools import lru_cache
 
 import orjson
 import structlog
+from structlog.stdlib import BoundLogger
 from structlog.processors import CallsiteParameter
 
 
@@ -24,8 +26,9 @@ def request_ider(_, __, event_dict):
 
 
 def configure_default_logging(
-    env, logger: logging.Logger
+    logger: logging.Logger,
 ) -> structlog.stdlib.BoundLogger:
+    settings = getAppSetting()
     pre_chain = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.CallsiteParameterAdder(
@@ -41,12 +44,11 @@ def configure_default_logging(
         request_ider,
     ]
     processors = pre_chain
-    is_dev = env.lower() in ["dev", "local"]
-    min_level = logging.DEBUG if is_dev else logging.INFO
+    min_level = logging.DEBUG if settings.debug else logging.INFO
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(min_level)
 
-    if env.lower() in ["prod", "dev"]:
+    if settings.stage == AppStage.PROD:
         processors += [orjson_renderer]
     else:
         processors += [structlog.dev.ConsoleRenderer()]
@@ -61,4 +63,9 @@ def configure_default_logging(
     )
 
 
-LOGGER = configure_default_logging(env_const.STAGE, logging.getLogger("core"))
+@lru_cache(1)
+def getLogger() -> BoundLogger:
+    return configure_default_logging(logging.getLogger("core"))
+
+
+LOGGER: BoundLogger = getLogger()

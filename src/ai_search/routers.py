@@ -1,7 +1,7 @@
 from src.chat.dtos import ChatOutput, StreamEvent
-from src.auth.security import get_current_user
-from src.auth.entities.user import User
+from src.auth.depends.auth import get_current_user
 from src.shared.utils.logger import LOGGER
+from src.auth.entities.auth_info import AuthInfo as User
 from src.shared.custom_types.responses.sse import SSEContent, SSEResponse
 
 from .dtos import AiSearchInput

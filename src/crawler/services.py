@@ -2,13 +2,13 @@ from src.db.postgres.service import PostgresService
 
 import asyncio
 from typing import (
-    final,
     Literal,
     Callable,
     Iterable,
     Optional,
     TypedDict,
     AsyncGenerator,
+    final,
 )
 from contextlib import _GeneratorContextManager
 

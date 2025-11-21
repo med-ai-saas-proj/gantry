@@ -18,13 +18,6 @@ from fastapi.responses import JSONResponse
 
 api_router = APIRouter(
     prefix="/api",
-    # default_response_class=JSONResponse,
-    # responses={
-    #     400: {"model": ErrorResponseModel},
-    #     401: {"model": ErrorResponseModel},
-    #     422: {"model": ErrorResponseModel},
-    #     500: {"model": ErrorResponseModel},
-    # },
 )
 
 api_router.include_router(v1_router)
