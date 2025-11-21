@@ -8,6 +8,33 @@ AI related APIs for medical applications
 
 ## Dev notes
 
+### Lint and formatting
+
+```bash
+./scripts/tidy.sh
+```
+
+### Running the dev server
+
+1. Check out [Getting API key](#getting-api-keys)
+1. Check out [Setup env file](#setup-env-file)
+1. Start DBs: `docker compose -f compose.dev.yaml up`
+1. Start Server: `./scripts/dev.sh`
+1. Register test account and api key: `./scripts/setup-test-account.sh`
+
+### How to run backend server if you are purely a frontend dev (Not reccomended)
+
+1. Check out [Getting API key](#getting-api-keys)
+1. Check out [Setup env file](#setup-env-file)
+1. Build server: `docker compose build`
+1. Start server: `docker compose up`
+1. Register test account and api key: `docker exec hist-api-integration-main-1 ./scripts/setup-test-account.sh`
+1. If done correctly, the docs will show up at: <http://localhost:8000/docs/>
+
+### Frontend dev notes
+
+- Vu should fill this in
+
 ### Getting API keys
 
 #### LLM
@@ -22,8 +49,10 @@ AI related APIs for medical applications
 
 ### Setup env file
 
-1. Docs site: <http://localhost:8000/docs/>
-1. Env file:
+You will need to find and fill in all the `example.env` files, then save them as their original name but remove the `example` part (`example.env` => `.env`).
+
+1. Run this command and it will tell you what file to fill in: `find . -type f -name 'example.env*'`
+1. Some basic config:
 
    - `.env.postgres`:
 
@@ -33,52 +62,23 @@ AI related APIs for medical applications
    POSTGRES_PASSWORD=123456
    ```
 
-   - `.env` and `prod.env`:
+   - `.env`:
 
    ```env
-   CORE_DNS=postgresql://internet_crawler:123456@localhost:5432/tailm
-   STAGE=local
+   STAGE=DEV
    DEBUG=1
+   CORE_DNS=postgresql://internet_crawler:123456@localhost:5432/tailm
+   DB_POSTGRES_CONNECTION_URI=postgresql+asyncpg://internet_crawler:123456@localhost:5432/tailm
+   DB_REDIS_CONNECTION_URI=redis://:@localhost:6379/0
 
-   GROQ_API_KEY=
-   GOOGLE_PROGRAMMABLE_SEARCH_API_KEY=""
-   GOOGLE_PROGRAMMABLE_SEARCH_CX=
-
-   DB_USER=postgres
-   DB_PASSWORD=123456
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=main_database
-   
-   
-   JWT_SECRET=thisisasecret
-   ACCESS_TOKEN_EXPIRE_MINUTES=30
-   
-   API_KEY_SECRET=thisisasecret
-   API_KEY_SECRET_LENGTH=32
-    
-   API_KEY_EXPIRE_DAYS=30
+   AUTH_JWT_SECRET=shit
+   AUTH_ACCESS_TOKEN_EXPIRE_MINUTES=30
+   AUTH_API_KEY_SECRET=shit
+   AUTH_API_KEY_SECRET_LENGTH=32
+   AUTH_API_KEY_EXPIRE_DAYS=30
    ```
 
-### Running the dev server
-
-1. Start DBs: `docker compose -f compose.dev.yaml up`
-1. Start Server: `./scripts/dev.sh`
-1. Register test account and api key: `uv run --no-sync -m scripts.setup_test_account`
-
-### Lint and formatting
-
-- Sort imports: `uvx ruff check --fix`
-- Format: vscode Ruff extention, `uvx ruff format --fix`
-
-## Frontend dev notes
-
-1. Check out [Getting API key](#getting-api-keys)
-1. Build server: `docker compose build`
-1. Start server: `docker compose up`
-1. Register test account and api key: `docker exec hist-api-integration-main-1 uv run --no-sync -m scripts.setup_test_account`
-
-## Feat todo
+## Feat todo (this is old, used for reference)
 
 - [ ] Login + SignUp with CSRF protection
   - [ ] Backend (DB schema, JWT, 2FA, <https://fastapi.tiangolo.com/tutorial/security/>)
