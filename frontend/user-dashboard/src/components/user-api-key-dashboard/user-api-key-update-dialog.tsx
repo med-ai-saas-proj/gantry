@@ -1,11 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Label } from '@radix-ui/react-label';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import z from 'zod';
 import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -39,13 +41,11 @@ const UserAPIKeyUpdateDialog = ({
 
   const {
     register,
+    reset,
     handleSubmit,
     formState: { errors },
   } = useForm<ApiUpdateFormData>({
     resolver: zodResolver(apiUpdateSchema),
-    defaultValues: {
-      name: apiKey?.name || '',
-    },
   });
 
   const onSubmit = (data: ApiUpdateFormData) => {
@@ -61,12 +61,21 @@ const UserAPIKeyUpdateDialog = ({
     updateAPIKey(apikeyId, newKey);
   };
 
+  useEffect(() => {
+    if (apiKey) {
+      reset({
+        name: apiKey.name,
+      });
+    }
+  }, [apiKey, reset]);
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Edit secret key</DialogTitle>
+            <DialogDescription>Edit your api key information</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)}>
             <div className="grid gap-4">
@@ -74,7 +83,6 @@ const UserAPIKeyUpdateDialog = ({
                 <Label>Name</Label>
                 <Input
                   id="name"
-                  defaultValue={apiKey?.name}
                   aria-invalid={!!errors.name}
                   {...register('name')}
                 />
