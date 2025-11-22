@@ -7,7 +7,14 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const token = useAuthStore((state) => state.token);
+  const isTokenExpired = useAuthStore((state) => state.isTokenExpired);
+  const logout = useAuthStore((state) => state.logout);
   const location = useLocation();
+
+  // TODO: Temporary handler for expired token, improve later
+  if (isTokenExpired()) {
+    logout();
+  }
 
   if (!token) {
     // Redirect to login but save the attempted location

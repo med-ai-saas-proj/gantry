@@ -15,7 +15,7 @@ export const useCreateUserApiKey = () => {
   return useMutation({
     mutationFn: async (credentials: CreateApiKeyRequest) => {
       const { data } = await apiClient.post<CreateApiKeyResponse>(
-        '/api_keys',
+        '/api_keys/',
         credentials
       );
       return data;
