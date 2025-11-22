@@ -16,7 +16,10 @@ interface UserAPIKeyState {
 
 interface UserAPIKeyActions {
   addAPIKey: (key: Omit<UserAPIKey, 'id' | 'createdAt' | 'lastUsed'>) => void;
-  updateAPIKey: (key: UserAPIKey) => void;
+  updateAPIKey: (
+    id: string,
+    key: Pick<UserAPIKey, 'name' | 'permissions'>
+  ) => void;
   deleteAPIKey: (id: string) => void;
 }
 
@@ -38,10 +41,10 @@ export const useUserAPIKeyStore = create<UserAPIKeyStore>((set) => ({
       ],
     })),
 
-  updateAPIKey: (updatedKey) =>
+  updateAPIKey: (id, updatedKey) =>
     set((state) => ({
       apiKeys: state.apiKeys.map((key) =>
-        key.id === updatedKey.id ? updatedKey : key
+        key.id === id ? { ...key, ...updatedKey } : key
       ),
     })),
 
