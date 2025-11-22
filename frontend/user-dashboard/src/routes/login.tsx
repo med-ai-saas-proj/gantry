@@ -14,7 +14,7 @@ const login_schema = z.object({
 
 type LoginFormData = z.infer<typeof login_schema>;
 
-const Login = () => {
+const LoginPage = () => {
   const navigate = useNavigate();
   const {
     register,
@@ -102,4 +102,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default LoginPage;
