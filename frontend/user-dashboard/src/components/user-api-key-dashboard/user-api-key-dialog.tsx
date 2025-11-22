@@ -14,6 +14,7 @@ import {
 } from '@/components/shadcn/dialog';
 import { Input } from '@/components/shadcn/input';
 import { Label } from '@/components/shadcn/label';
+import { useCreateUserApiKey } from '@/hooks/user-api-key-hooks';
 import { useUserAPIKeyStore } from '@/store/user-api-key-store';
 import type { UserAPIKey } from '@/types/user-api-key';
 import { UserAPIKeySaveDialog } from './user-api-key-save-dialog';
@@ -32,6 +33,7 @@ const UserAPIKeyDialog = ({
   onOpenChange: (open: boolean) => void;
 }) => {
   const addAPIKey = useUserAPIKeyStore((state) => state.addAPIKey);
+  const createApiKeyMutation = useCreateUserApiKey();
 
   const [openSave, setOpenSave] = useState(false);
 
@@ -43,20 +45,27 @@ const UserAPIKeyDialog = ({
     resolver: zodResolver(apiCreationSchema),
   });
 
-  const onSubmit = (data: ApiCreationFormData) => {
-    setOpenSave(true);
-    onOpenChange(false);
+  const onSubmit = async (data: ApiCreationFormData) => {
+    try {
+      const response = await createApiKeyMutation.mutateAsync({
+        name: data.name,
+        project_id: 'default',
+        permissions: ['read', 'write'],
+      });
 
-    const name = data.name;
+      const newKey: Omit<UserAPIKey, 'id' | 'createdAt' | 'lastUsed'> = {
+        name: data.name,
+        secretKey: response.key,
+        createdBy: 'Current User',
+        permissions: ['read', 'write'],
+      };
 
-    const newKey: Omit<UserAPIKey, 'id' | 'createdAt' | 'lastUsed'> = {
-      name,
-      secretKey: 'sk-' + crypto.randomUUID().replace(/-/g, ''),
-      createdBy: 'Current User',
-      permissions: ['read', 'write'],
-    };
-
-    addAPIKey(newKey);
+      addAPIKey(newKey);
+      setOpenSave(true);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Failed to create API key:', error);
+    }
   };
 
   return (
