@@ -1,29 +1,14 @@
 'use client';
 
-import {
-  // Trash2,
-  type LucideIcon,
-  // Folder,
-  // Forward,
-  MoreHorizontal,
-} from 'lucide-react';
+import { type LucideIcon, MoreHorizontal } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 
-// import {
-//   DropdownMenu,
-//   DropdownMenuContent,
-//   DropdownMenuItem,
-//   DropdownMenuSeparator,
-//   DropdownMenuTrigger,
-// } from "@/components/shadcn/dropdown-menu";
 import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
-  // SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
-  // useSidebar,
 } from '@/components/shadcn/sidebar';
 
 export function NavProjects({
@@ -35,7 +20,6 @@ export function NavProjects({
     icon: LucideIcon;
   }[];
 }) {
-  // const { isMobile } = useSidebar();
   const { pathname } = useLocation();
 
   return (
@@ -50,33 +34,6 @@ export function NavProjects({
                 <span>{item.name}</span>
               </NavLink>
             </SidebarMenuButton>
-            {/* <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuAction showOnHover>
-                  <MoreHorizontal />
-                  <span className="sr-only">More</span>
-                </SidebarMenuAction>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-48 rounded-lg"
-                side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
-              >
-                <DropdownMenuItem>
-                  <Folder className="text-muted-foreground" />
-                  <span>View Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Forward className="text-muted-foreground" />
-                  <span>Share Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Trash2 className="text-muted-foreground" />
-                  <span>Delete Project</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu> */}
           </SidebarMenuItem>
         ))}
         <SidebarMenuItem>
