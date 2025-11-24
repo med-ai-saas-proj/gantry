@@ -1,4 +1,5 @@
 #! /bin/bash
+set -ex
 export UV_ENV_FILE=.env
 uv run --no-sync crawl4ai-setup
 uv run --no-sync alembic upgrade head
