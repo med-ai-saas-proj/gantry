@@ -1,26 +1,21 @@
-from datetime import UTC, datetime, timedelta
-from typing import TypedDict, NotRequired
+from src.db_v2.initialize import redis as redis_client, session_manager
+from src.shared.custom_types.error_exception import (
+    RecoverableError,
+    UnrecoverableError,
+)
 
-from jose import JWTError, jwt
-from passlib.context import CryptContext
-from safe_result import Ok, Err, Result
-from sqlalchemy import select
-
-from src.db_v2.initialize import redis as redis_client
-from src.db_v2.initialize import session_manager
-from src.shared.custom_types.error_exception import RecoverableError
+from ..models.users import User, UserRepo
+from ..models.initialize import user_repo
 from ..entities.auth_info import AuthInfo, TokenInfo, JwtPayload
 
-from typing import Literal, TypedDict, NotRequired
-from datetime import UTC, datetime, timezone, timedelta
+from typing import TypedDict, NotRequired
+from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
 from sqlalchemy import select
 from safe_result import Ok, Err, Result
 from passlib.context import CryptContext
-
-from ..models.initialize import user_repo
-from ..models.users import User, UserRepo
+from structlog.stdlib import BoundLogger
 
 
 class TooManyLoginAttemptsError(RecoverableError):
@@ -60,10 +55,8 @@ class InvalidRefreshTokenError(RecoverableError):
     status = 401
 
 
-class JWTEncodeError(RecoverableError):
-    code = "jwt_encode"
-    title = "JWT token encode error"
-    status = 401
+class JWTEncodeError(UnrecoverableError):
+    detail = "JWT encode error, we **** up, check the code. FAST!!!"
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -81,16 +74,16 @@ def createAccessToken(
     data: JwtPayload,
     secret_key: str,
     algorithm: str,
-    expires_delta: int | None = None,
+    expires_delta: timedelta | None = None,
 ) -> Result[str, JWTEncodeError]:
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.now(UTC) + timedelta(seconds=expires_delta)
+        expire = datetime.now(UTC) + expires_delta
         to_encode.update({"exp": int(expire.timestamp())})
     try:
         return Ok(jwt.encode(to_encode, secret_key, algorithm=algorithm))
-    except JWTError:
-        return Err(JWTEncodeError())
+    except JWTError as e:
+        return Err(JWTEncodeError(e))
 
 
 def getCurrentUserFromToken(
@@ -99,7 +92,7 @@ def getCurrentUserFromToken(
     try:
         payload = jwt.decode(token, secret_key, algorithms=[algorithm])
     except JWTError as e:
-        return Err(InvalidAccessTokenError())
+        return Err(InvalidAccessTokenError(e))
     user_id = payload.get("sub")
     user_email = payload.get("email")
     if (
@@ -124,20 +117,21 @@ class UserServiceConfig(TypedDict):
 
 
 class UserService:
-    def __init__(self, config: UserServiceConfig):
+    def __init__(self, config: UserServiceConfig, logger: BoundLogger):
+        self.logger = logger
         self.access_token_secret_key = config["access_token_secret_key"]
         self.access_token_algorithm = config["access_token_algorithm"]
-        self.access_token_expire_minutes = config.get(
-            "access_token_expire_minutes", 60
+        self.access_token_expire = timedelta(
+            minutes=config.get("access_token_expire_minutes", 60)
         )
         self.refresh_token_secret_key = config["refresh_token_secret_key"]
         self.refresh_token_algorithm = config["refresh_token_algorithm"]
-        self.refresh_token_expire_days = config.get(
-            "refresh_token_expire_days", 30
+        self.refresh_token_expire = timedelta(
+            days=config.get("refresh_token_expire_days", 30)
         )
         self.max_login_attempts = config.get("max_login_attempts", 3)
-        self.login_attempt_window_minutes = config.get(
-            "login_attempt_window_minutes", 15
+        self.login_attempt_window = timedelta(
+            minutes=config.get("login_attempt_window_minutes", 15)
         )
 
     async def emailRegister(
@@ -189,7 +183,7 @@ class UserService:
                 await redis_client.incr(f"auth:login_attempt:{email}", 1)
                 await redis_client.expire(
                     f"auth:login_attempt:{email}",
-                    time=self.login_attempt_window_minutes * 60,
+                    time=self.login_attempt_window,
                 )
                 return Err(InvalidCredentialError())
 
@@ -200,7 +194,7 @@ class UserService:
                 },
                 secret_key=self.access_token_secret_key,
                 algorithm=self.access_token_algorithm,
-                expires_delta=self.access_token_expire_minutes * 60,
+                expires_delta=self.access_token_expire,
             ).unwrap()
 
             refresh_token = createAccessToken(
@@ -210,26 +204,25 @@ class UserService:
                 },
                 secret_key=self.refresh_token_secret_key,
                 algorithm=self.refresh_token_algorithm,
-                expires_delta=self.refresh_token_expire_days * 24 * 60 * 60,
+                expires_delta=self.refresh_token_expire,
             ).unwrap()
 
             await redis_client.delete(f"auth:login_attempt:{email}")
             await redis_client.set(
                 f"auth:refresh_token:{str(user.id)}:{refresh_token}",
                 "",  # value is not important
-                ex=self.refresh_token_expire_days * 24 * 60 * 60,
+                ex=self.refresh_token_expire,
             )
 
             return Ok[TokenInfo](
                 {
                     "access_token": access_token,
                     "token_type": "Bearer",
-                    "expires_in": self.access_token_expire_minutes * 60,
+                    "expires_in": int(self.access_token_expire.total_seconds()),
                     "refresh_token": refresh_token,
-                    "refresh_token_expires_in": self.refresh_token_expire_days
-                    * 24
-                    * 60
-                    * 60,
+                    "refresh_token_expires_in": int(
+                        self.refresh_token_expire.total_seconds()
+                    ),
                 }
             )
 
@@ -244,16 +237,21 @@ class UserService:
         TokenInfo,
         InvalidAccessTokenError | JWTEncodeError | InvalidRefreshTokenError,
     ]:
-        print("Refreshing access token with refresh token:", refresh_token)
-        print("Secret key:", self.refresh_token_secret_key)
-        print("Algorithm:", self.refresh_token_algorithm)
-        print("Expire:", self.refresh_token_expire_days)
+        self.logger.debug(
+            "Refreshing access token with refresh token:", refresh_token
+        )
+        self.logger.debug("Secret key:", self.refresh_token_secret_key)
+        self.logger.debug("Algorithm:", self.refresh_token_algorithm)
+        self.logger.debug("Expire:", self.refresh_token_expire.total_seconds())
         auth_info = getCurrentUserFromToken(
             refresh_token,
             self.refresh_token_secret_key,
             self.refresh_token_algorithm,
-        ).unwrap()
-        user_id = auth_info["id"]
+        )
+        if auth_info.error is not None:
+            return auth_info
+
+        user_id = auth_info.value["id"]
         redis_key = f"auth:refresh_token:{user_id}:{refresh_token}"
         exists = await redis_client.exists(redis_key)
         if not exists:
@@ -262,18 +260,18 @@ class UserService:
         access_token = createAccessToken(
             data={
                 "sub": str(user_id),
-                "email": auth_info["email"],
+                "email": auth_info.value["email"],
             },
             secret_key=self.access_token_secret_key,
             algorithm=self.access_token_algorithm,
-            expires_delta=self.access_token_expire_minutes * 60,
+            expires_delta=self.access_token_expire,
         ).unwrap()
 
         return Ok[TokenInfo](
             {
                 "access_token": access_token,
                 "token_type": "Bearer",
-                "expires_in": self.access_token_expire_minutes * 60,
+                "expires_in": int(self.access_token_expire.total_seconds()),
             }
         )
 

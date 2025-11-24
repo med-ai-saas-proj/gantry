@@ -1,12 +1,19 @@
+from ..dtos import (
+    LoginInput,
+    LogoutRequest,
+    LoginOutputSuccess,
+    RefreshAccessTokenInput,
+    RefreshAccessTokenOutputSuccess,
+)
+from ..factories import UserService, getUserService
+from ..depends.auth import get_current_user
+from ..entities.auth_info import AuthInfo
+
 from typing import Annotated
 
 from fastapi import Body, Depends, APIRouter
 from fastapi.params import Security
 
-from ..depends.auth import get_current_user
-from ..dtos import LoginInput, LoginOutputSuccess, RefreshAccessTokenInput, RefreshAccessTokenOutputSuccess, LogoutRequest
-from ..entities.auth_info import AuthInfo
-from ..factories import UserService, getUserService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -33,15 +40,22 @@ async def login_user(
         "refresh_token_expires_in": token["refresh_token_expires_in"],
     }
 
-@router.post("/refresh-token",
-     responses={
-            200: {"model": RefreshAccessTokenOutputSuccess},
-     })
-async def refresh_token(request: Annotated[RefreshAccessTokenInput, Body()],
-                        user_service: Annotated[UserService, Depends(getUserService)]) -> RefreshAccessTokenOutputSuccess:
-    token = (await user_service.refreshAccessToken(
-        refresh_token=request.refresh_token
-    )).unwrap()
+
+@router.post(
+    "/refresh-token",
+    responses={
+        200: {"model": RefreshAccessTokenOutputSuccess},
+    },
+)
+async def refresh_token(
+    request: Annotated[RefreshAccessTokenInput, Body()],
+    user_service: Annotated[UserService, Depends(getUserService)],
+) -> RefreshAccessTokenOutputSuccess:
+    token = (
+        await user_service.refreshAccessToken(
+            refresh_token=request.refresh_token
+        )
+    ).unwrap()
 
     return RefreshAccessTokenOutputSuccess(
         access_token=token["access_token"],
@@ -50,13 +64,15 @@ async def refresh_token(request: Annotated[RefreshAccessTokenInput, Body()],
     )
 
 
-@router.post("/logout",
+@router.post(
+    "/logout",
     responses={
         200: {"description": "Logout successful"},
-    })
+    },
+)
 async def logout_user(
     request: Annotated[LogoutRequest, Body()],
     user_service: Annotated[UserService, Depends(getUserService)],
-    auth_info: Annotated[AuthInfo, Security(get_current_user)]
+    auth_info: Annotated[AuthInfo, Security(get_current_user)],
 ):
     await user_service.logout(auth_info, request.refresh_token)

@@ -1,15 +1,16 @@
-from typing import Annotated
-
-from fastapi import Depends, Security
-from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
-
-from ..entities.auth_info import AuthInfo
 from ..factories import (
     UserService,
     ApiKeyService,
     getUserService,
     getAPIKeyService,
 )
+from ..entities.auth_info import AuthInfo
+
+from typing import Annotated
+
+from fastapi import Depends, Security
+from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
+
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 

@@ -1,5 +1,3 @@
-from ..custom_types.error_exception import RecoverableError
-
 from typing import TypedDict, NotRequired
 
 
@@ -22,14 +20,3 @@ class ProblemDetails(TypedDict):
     code: NotRequired[str]  # max_length 50
     detail: NotRequired[str]  # max_length 4096
     errors: NotRequired[list[ErrorDetail]]  # max_items 1000
-
-
-def problemDetailsFromRecoverableError(
-    error: RecoverableError,
-) -> ProblemDetails:
-    res: ProblemDetails = {"status": error.status, "title": error.title}
-    if error.code:
-        res.update({"code": error.code})
-    if error.detail:
-        res.update({"detail": error.detail})
-    return res

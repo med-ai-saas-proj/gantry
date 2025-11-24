@@ -1,8 +1,10 @@
-from functools import lru_cache
+from src.shared.utils.logger import getLogger
 
-from .services.api_keys import ApiKeyService
-from .services.users import UserService
 from .settings import getAuthSettings
+from .services.users import UserService
+from .services.api_keys import ApiKeyService
+
+from functools import lru_cache
 
 
 @lru_cache(1)
@@ -18,7 +20,8 @@ def getUserService():
             "refresh_token_expire_days": auth_settings.refresh_token_expire_days,
             "login_attempt_window_minutes": auth_settings.login_attempt_window_minutes,
             "max_login_attempts": auth_settings.max_login_attempts,
-        }
+        },
+        logger=getLogger(),
     )
 
 
@@ -30,5 +33,6 @@ def getAPIKeyService():
             "key_secret": auth_settings.api_key_secret.get_secret_value(),
             "api_key_secret_length": auth_settings.api_key_secret_length,
             "expiration_days": auth_settings.api_key_expire_days,
-        }
+        },
+        logger=getLogger(),
     )

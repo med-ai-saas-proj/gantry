@@ -1,11 +1,9 @@
-import traceback
 from src.shared.utils import request_id_utils
 from src.shared.consts import common_const, messages_const
 from src.shared.settings import AppSettings, getAppSetting
 from src.shared.utils.logger import BoundLogger, getLogger
 from src.shared.dtos.error_output import (
     ProblemDetails,
-    problemDetailsFromRecoverableError,
 )
 from src.shared.custom_types.error_exception import (
     RecoverableError,
@@ -22,7 +20,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, Request
 from pydantic import ValidationError
 from scalar_fastapi import get_scalar_api_reference
-from fastapi.exceptions import RequestValidationError
+from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -57,14 +55,15 @@ async def recoverableErrorHandler(
 ) -> JSONResponse:
     if getAppSetting().debug:
         assert e._stack_frames is not None
-        getLogger().debug(
+        getLogger().error(
             "Error from",
             exception="".join(traceback.format_exception_only(e)),
+            original_exception="".join(
+                traceback.format_exception_only(e._from)
+            ),
             stack="".join(e._stack_frames),
         )
-    return JSONResponse(
-        problemDetailsFromRecoverableError(e), status_code=e.status
-    )
+    return JSONResponse(e.format(), status_code=e.status)
 
 
 @app.exception_handler(UnrecoverableError)
@@ -85,10 +84,9 @@ async def unrecoverableErrorHandler(
     return Response(messages_const.INTERNAL_SERVER_ERROR, status_code=500)
 
 
-@app.exception_handler(RequestValidationError)
 async def fastapi_exception_handler(
     request: Request,
-    exception: RequestValidationError,
+    exception: RequestValidationError | ResponseValidationError,
 ):
     errors = exception.errors()
     """
@@ -112,10 +110,16 @@ async def fastapi_exception_handler(
             for error in errors
         ],
     }
+    if getAppSetting().debug:
+        exception_response["type"] = "fast_api_exception_handler"
     return JSONResponse(
         status_code=400,
         content=exception_response,
     )
+
+
+app.exception_handler(RequestValidationError)(fastapi_exception_handler)
+app.exception_handler(ResponseValidationError)(fastapi_exception_handler)
 
 
 @app.exception_handler(ValidationError)
@@ -136,6 +140,11 @@ async def pydantic_exception_handler(
             for error in errors
         ],
     }
+    if getAppSetting().debug:
+        exception_response["type"] = "pydantic_exception_handler"
+        getLogger().error(
+            "...", traceback="".join(traceback.format_exception(exception))
+        )
     return JSONResponse(
         status_code=400,
         content=exception_response,

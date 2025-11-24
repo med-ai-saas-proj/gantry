@@ -1,8 +1,8 @@
+from src.shared.dtos.base import BaseDTO
+
 from typing import Literal, TypedDict
 
-from pydantic import Field, EmailStr, SecretStr, BaseModel
-
-from src.shared.dtos.base import BaseDTO
+from pydantic import Field, EmailStr, BaseModel, SecretStr
 
 
 class LoginInput(BaseDTO):
@@ -10,9 +10,11 @@ class LoginInput(BaseDTO):
     email: EmailStr
     password: SecretStr = Field(..., description="User's password")
 
+
 class RefreshAccessTokenInput(BaseDTO):
     grant_type: Literal["refresh_token"]
     refresh_token: str
+
 
 class LoginOutputSuccess(TypedDict):
     access_token: str
@@ -31,10 +33,12 @@ class CreateAPIKeyInput(BaseDTO):
 class CreateAPIKeyOutputSuccess(TypedDict):
     key: str
 
+
 class RefreshAccessTokenOutputSuccess(TypedDict):
     access_token: str
     token_type: Literal["Bearer"]
     expires_in: int
+
 
 class LogoutRequest(BaseDTO):
     refresh_token: str = Field(..., description="Revoked refresh token")
