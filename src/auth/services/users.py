@@ -10,7 +10,6 @@ from typing import Literal, TypedDict, NotRequired
 from datetime import UTC, datetime, timezone, timedelta
 
 from jose import JWTError, jwt
-from fastapi import HTTPException
 from sqlalchemy import select
 from safe_result import Ok, Err, Result
 from passlib.context import CryptContext
@@ -29,14 +28,14 @@ class InvalidCredentialError(RecoverableError):
     code = "invalid_credential"
     title = "Invalid email or password"
     detail = "The provided email or password is incorrect"
-    status = 400
+    status = 401
 
 
 class InvalidTokenError(RecoverableError):
     code = "invalid_access_token"
     title = "Invalid access token"
     detail = "Access token is not set or is invalid (expired, corrupted, ...)"
-    status = 400
+    status = 401
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -141,7 +140,7 @@ class UserService:
             )
 
             if not user or not verify_password(password, user.hashed_password):
-                return Err(self.InvalidCredentialError())
+                return Err(InvalidCredentialError())
 
             return generateAccessToken(
                 data={

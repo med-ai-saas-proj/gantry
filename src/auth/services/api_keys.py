@@ -27,14 +27,14 @@ class InvalidPermissionError(RecoverableError):
 
 
 class InvalidAPIKey(RecoverableError):
-    status = 400
+    status = 401
     code = "invalid_api_key"
     title = "Invalid API key"
     detail = "API key is not set or invalid (does not exists)"
 
 
 class InsufficientPermission(RecoverableError):
-    status = 400
+    status = 401
     code = "insufficient_permission"
     title = "Insufficient permission"
     detail = "API key's permission is not sufficient for this resource"
