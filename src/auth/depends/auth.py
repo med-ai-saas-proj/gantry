@@ -1,19 +1,15 @@
-from src.shared.dtos.error_output import problemDetailsFromRecoverableError
+from typing import Annotated
 
+from fastapi import Depends, Security
+from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
+
+from ..entities.auth_info import AuthInfo
 from ..factories import (
     UserService,
     ApiKeyService,
     getUserService,
     getAPIKeyService,
 )
-from ..entities.auth_info import AuthInfo
-
-from typing import Annotated
-
-from fastapi import Depends, Security, HTTPException
-from safe_result import Ok, Err
-from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
-
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
 
@@ -22,7 +18,7 @@ def get_current_user(
     token: Annotated[str, Security(oauth2_scheme)],
     user_service: Annotated[UserService, Depends(getUserService)],
 ) -> AuthInfo:
-    return user_service.getUserInfoFromToken(token).unwrap()
+    return user_service.getUserInfoFromAccessToken(token).unwrap()
 
 
 API_KEY_NAME = "X-API-Key"

@@ -1,11 +1,8 @@
-from .settings import AuthSetting, getAuthSettings
-from .services.users import UserService
-from .services.api_keys import ApiKeyService
-
-from typing import Annotated
 from functools import lru_cache
 
-from fastapi import Depends
+from .services.api_keys import ApiKeyService
+from .services.users import UserService
+from .settings import getAuthSettings
 
 
 @lru_cache(1)
@@ -13,9 +10,14 @@ def getUserService():
     auth_settings = getAuthSettings()
     return UserService(
         config={
-            "secret_key": auth_settings.api_key_secret.get_secret_value(),
-            "algorithm": "HS256",
+            "access_token_algorithm": "HS256",
             "access_token_expire_minutes": auth_settings.access_token_expire_minutes,
+            "access_token_secret_key": auth_settings.api_key_secret.get_secret_value(),
+            "refresh_token_algorithm": "HS256",
+            "refresh_token_secret_key": auth_settings.refresh_token_secret.get_secret_value(),
+            "refresh_token_expire_days": auth_settings.refresh_token_expire_days,
+            "login_attempt_window_minutes": auth_settings.login_attempt_window_minutes,
+            "max_login_attempts": auth_settings.max_login_attempts,
         }
     )
 

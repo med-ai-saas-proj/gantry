@@ -15,3 +15,5 @@ class AuthInfo(TypedDict):
 class TokenInfo(TypedDict):
     access_token: str
     expires_in: int
+    refresh_token: NotRequired[str]
+    refresh_token_expires_in: NotRequired[int]
