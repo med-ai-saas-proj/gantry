@@ -1,3 +1,4 @@
+import traceback
 from src.shared.utils import request_id_utils
 from src.shared.consts import common_const, messages_const
 from src.shared.settings import AppSettings, getAppSetting
@@ -54,6 +55,13 @@ cors = CORSMiddleware(
 async def recoverableErrorHandler(
     req: Request, e: RecoverableError
 ) -> JSONResponse:
+    if getAppSetting().debug:
+        assert e._stack_frames is not None
+        getLogger().debug(
+            "Error from",
+            exception="".join(traceback.format_exception_only(e)),
+            stack="".join(e._stack_frames),
+        )
     return JSONResponse(
         problemDetailsFromRecoverableError(e), status_code=e.status
     )
@@ -69,12 +77,11 @@ async def unrecoverableErrorHandler(
 
     logger.error(
         "Got an unrecoverable error, you should definitely check your code out",
-        traceback=traceback.format_exception(exception),
+        exception="".join(traceback.format_exception_only(exception)),
+        stack="".join(exception._stack_frames),
     )
     if app_settings.debug:
-        return Response(
-            "\n".join(traceback.format_exception(exception)), status_code=500
-        )
+        return Response("".join(exception._stack_frames), status_code=500)
     return Response(messages_const.INTERNAL_SERVER_ERROR, status_code=500)
 
 
@@ -150,7 +157,7 @@ async def internal_exception_handler(
     if app_settings.debug:
         return Response(
             status_code=500,
-            content="\n".join(traceback.format_exception(exception)),
+            content="".join(traceback.format_exception(exception)),
         )
     return Response(messages_const.INTERNAL_SERVER_ERROR, status_code=500)
 
@@ -202,14 +209,6 @@ async def global_middleware(
 
 
 app.include_router(router=api_router)
-
-
-@app.get("/testShit")
-async def testShit(
-    logger: Annotated[BoundLogger, Depends(getLogger)],
-    app_settings: Annotated[AppSettings, Depends(getAppSetting)],
-):
-    return Response(status_code=200)
 
 
 @app.get("/docs", include_in_schema=False)

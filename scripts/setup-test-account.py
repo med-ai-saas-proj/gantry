@@ -1,7 +1,7 @@
+from src.auth.factories import getUserService
+
 import asyncio
 from datetime import UTC, datetime, timedelta
-
-from src.auth.factories import getUserService
 
 
 username = "test"
