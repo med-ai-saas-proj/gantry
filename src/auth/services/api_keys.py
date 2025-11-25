@@ -154,7 +154,11 @@ class ApiKeyService:
             return await api_key_repo.get_many(session, stmt)
 
     async def update_api_key(
-        self, user_id: str, key_id: str, name: str | None, is_active: bool | None
+        self,
+        user_id: str,
+        key_id: str,
+        name: str | None,
+        is_active: bool | None,
     ) -> Result[ApiKey, InvalidAPIKey]:
         async with session_manager.get_session() as session:
             key = await api_key_repo.get_by_id(session, key_id)

@@ -28,13 +28,13 @@ async def create_api_key(
     api_key_service: Annotated[ApiKeyService, Depends(getAPIKeyService)],
 ) -> CreateAPIKeyOutputSuccess:
     api_key = await api_key_service.create_api_key(
-        auth_info["id"], request.permissions
+        auth_info["id"], request.permissions, request.name
     )
     return {"key": api_key.unwrap()}
 
 
 @router.get(
-    "/",
+    "",
     responses={
         200: {"model": list[ApiKeyResponse]},
     },
