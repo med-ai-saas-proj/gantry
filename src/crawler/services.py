@@ -184,7 +184,7 @@ class CrawlerService:
                 )
         else:
             prune_filter = None
-        self.logger.debug("Filter", filter=prune_filter)
+        # self.logger.debug("Filter", filter=prune_filter)
 
         md_generator = DefaultMarkdownGenerator(
             options={
@@ -286,7 +286,7 @@ class CrawlerService:
             ignore_links=ignore_links,
             ignore_images=ignore_images,
             escape_html=escape_html,
-            deep_crawl_strategy=BFSDeepCrawlStrategy(max_depth=1, max_pages=20),
+            deep_crawl_strategy=BFSDeepCrawlStrategy(max_depth=1, max_pages=5),
         )
         data_by_url = {item.get("url"): item for item in crawled}
         results: list[DiscoverResult] = []

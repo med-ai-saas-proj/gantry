@@ -1,4 +1,4 @@
-from typing import TypedDict, NotRequired
+from typing import Literal, TypedDict, NotRequired
 
 
 class JwtPayload(TypedDict):
@@ -15,3 +15,6 @@ class AuthInfo(TypedDict):
 class TokenInfo(TypedDict):
     access_token: str
     expires_in: int
+    token_type: Literal["Bearer"]
+    refresh_token: NotRequired[str]
+    refresh_token_expires_in: NotRequired[int]

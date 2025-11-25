@@ -1,5 +1,5 @@
 from src.ehr.dtos import InputEHR, InputPrescription
-from src.auth.depends.auth import get_current_user
+from src.auth.depends.auth import required_permission
 from src.shared.utils.logger import LOGGER
 from src.auth.entities.auth_info import AuthInfo as User
 from src.shared.custom_types.responses import SSEResponse
@@ -28,20 +28,20 @@ rx_advisor_router = APIRouter(prefix="/rx_advisor", tags=["Doctor Help"])
     },
 )
 async def rx_advisor(
-    user: Annotated[User, Security(get_current_user)],
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
     ehr: InputEHR,
     prescription: InputPrescription,
     stream: bool = Body(False, embed=True),
 ):
-    LOGGER.debug("user", user_id=user["id"])
+    LOGGER.debug("user", user_id=user_id)
     if stream:
         return SSEResponse(
             RX_ADVISOR_SERVICE.generate_advice_stream(
-                user["id"], ehr, prescription
+                user_id, ehr, prescription
             ),
         )
     else:
         analysis = await RX_ADVISOR_SERVICE.generate_advice(
-            user["id"], ehr, prescription
+            user_id, ehr, prescription
         )
         return JSONResponse(analysis)

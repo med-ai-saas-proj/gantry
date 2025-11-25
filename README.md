@@ -8,6 +8,39 @@ AI related APIs for medical applications
 
 ## Dev notes
 
+### Pre-commit
+
+- Pls install the pre commit hooks to ensure code quality
+- To install run: `uv run pre-commit install`
+
+### Formatting
+
+- Run `./scripts/tidy.sh` to format and sort imports. THIS IS VERY IMPORTANT!!!
+
+### Running the dev server
+
+1. Check out [Getting API key](#getting-api-keys)
+1. Check out [Setup env file](#setup-env-file)
+1. Install dependency, setup libraries: `scripts/setup-dev.sh`
+1. Start DBs: `docker compose -f compose.dev.yaml up`
+1. Migrate DB: `UV_ENV_FILE=.env uv run alembic upgrade head`
+1. Register test account and api key: `./scripts/setup-test-account.sh`
+1. Start Server: `./scripts/dev.sh`
+
+### Some useful scripts
+
+- Generate `example.env` files for `.env` files: `scripts/gen-example-env.sh`
+- Reset the database state: `scripts/reset-db.sh`. Remember to migrate and recreate the test account.
+
+### How to run production server
+
+1. Check out [Getting API key](#getting-api-keys)
+1. Check out [Setup env file](#setup-env-file)
+1. Build server: `docker compose build`
+1. Start server: `docker compose up`
+1. Register test account and api key: `docker exec hist-api-integration-main-1 ./scripts/setup-test-account.sh`
+1. If done correctly, the docs will show up at: <http://localhost:8000/docs/>
+
 ### Getting API keys
 
 #### LLM
@@ -22,63 +55,11 @@ AI related APIs for medical applications
 
 ### Setup env file
 
-1. Docs site: <http://localhost:8000/docs/>
-1. Env file:
+You will need to find and fill in all the `example.env` files, then save them as their original name but remove the `example` part (`example.env` => `.env`).
 
-   - `.env.postgres`:
+1. Run this command and it will tell you what file to fill in: `find . -type f -name 'example.env*'`
 
-   ```env
-   POSTGRES_DB=tailm
-   POSTGRES_USER=internet_crawler
-   POSTGRES_PASSWORD=123456
-   ```
-
-   - `.env` and `prod.env`:
-
-   ```env
-   CORE_DNS=postgresql://internet_crawler:123456@localhost:5432/tailm
-   STAGE=local
-   DEBUG=1
-
-   GROQ_API_KEY=
-   GOOGLE_PROGRAMMABLE_SEARCH_API_KEY=""
-   GOOGLE_PROGRAMMABLE_SEARCH_CX=
-
-   DB_USER=postgres
-   DB_PASSWORD=123456
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=main_database
-   
-   
-   JWT_SECRET=thisisasecret
-   ACCESS_TOKEN_EXPIRE_MINUTES=30
-   
-   API_KEY_SECRET=thisisasecret
-   API_KEY_SECRET_LENGTH=32
-    
-   API_KEY_EXPIRE_DAYS=30
-   ```
-
-### Running the dev server
-
-1. Start DBs: `docker compose -f compose.dev.yaml up`
-1. Start Server: `./scripts/dev.sh`
-1. Register test account and api key: `uv run --no-sync -m scripts.setup_test_account`
-
-### Lint and formatting
-
-- Sort imports: `uvx ruff check --fix`
-- Format: vscode Ruff extention, `uvx ruff format --fix`
-
-## Frontend dev notes
-
-1. Check out [Getting API key](#getting-api-keys)
-1. Build server: `docker compose build`
-1. Start server: `docker compose up`
-1. Register test account and api key: `docker exec hist-api-integration-main-1 uv run --no-sync -m scripts.setup_test_account`
-
-## Feat todo
+## Feat todo (this is old, used for reference)
 
 - [ ] Login + SignUp with CSRF protection
   - [ ] Backend (DB schema, JWT, 2FA, <https://fastapi.tiangolo.com/tutorial/security/>)

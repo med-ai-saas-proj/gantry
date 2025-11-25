@@ -50,6 +50,7 @@ async def web_search(
     """
     try:
         results = await CRAWLER_SERVICE.discover(query, 5, date_restrict)
+        LOGGER.debug("Done crawling")
         if (
             ctx.deps
             and isinstance(ctx.deps, dict)

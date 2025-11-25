@@ -12,9 +12,10 @@ from alembic import op
 
 from typing import Union, Sequence
 from pathlib import Path
+from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
+from sqlalchemy.dialects.postgresql import dialect
 
 
 # revision identifiers, used by Alembic.
@@ -43,6 +44,9 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("name"),
         sa.UniqueConstraint("name"),
         schema="app",
+    )
+    op.execute(
+        "INSERT INTO app.permissions (name, description, created_at, updated_at) VALUES ('placeholder', 'You know what it do', NOW(), NOW())"
     )
     op.create_table(
         "users",

@@ -10,7 +10,7 @@ services:
       # /var/lib/postgresql/data to /var/lib/postgresql: https://github.com/docker-library/postgres/pull/1259
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      test: sh -c "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,6 +22,12 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
+    command: sh -c "redis-server --requirepass $$REDIS_PASSWORD"
+    env_file:
+      - .env.redis
+    volumes:
+      - redis_data:/data
 
 volumes:
   postgres_data:
+  redis_data:
