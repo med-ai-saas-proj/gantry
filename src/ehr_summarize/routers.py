@@ -1,5 +1,5 @@
 from src.ehr.dtos import InputEHR
-from src.auth.depends.auth import get_current_user
+from src.auth.depends.auth import required_permission
 from src.shared.utils.logger import LOGGER
 from src.auth.entities.auth_info import AuthInfo as User
 from src.shared.custom_types.responses import SSEResponse
@@ -31,15 +31,15 @@ class EHRSummary(TypedDict):
     },
 )
 async def summarize_ehr(
-    user: Annotated[User, Security(get_current_user)],
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
     ehr: InputEHR,
     stream: bool = Body(False, embed=True),
 ):
-    LOGGER.debug("user", user_id=user["id"])
+    LOGGER.debug("user", user_id=user_id)
     if stream:
         return SSEResponse(
-            EHR_SUMMARY_SERVICE.summarize_ehr_stream(user["id"], ehr)
+            EHR_SUMMARY_SERVICE.summarize_ehr_stream(user_id, ehr)
         )
     else:
-        summary = await EHR_SUMMARY_SERVICE.summarize_ehr(user["id"], ehr)
+        summary = await EHR_SUMMARY_SERVICE.summarize_ehr(user_id, ehr)
         return JSONResponse({"summary": summary})
