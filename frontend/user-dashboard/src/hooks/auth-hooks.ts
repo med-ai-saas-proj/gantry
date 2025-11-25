@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { API_ENDPOINTS } from '@/hooks/endponts';
 import apiClient from '@/query/api-client';
 import { useAuthStore } from '@/store/auth-store';
 
@@ -22,8 +23,8 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: async (credentials: { email: string; password: string }) => {
       const { data } = await apiClient.post<LoginResponse>(
-        '/auth/login',
-        credentials
+        API_ENDPOINTS.LOGIN,
+        { ...credentials, grant_type: 'password' }
       );
       return data;
     },
@@ -67,7 +68,7 @@ export const useSignOut = () => {
 
   return useMutation({
     mutationFn: async () => {
-      await apiClient.post('auth/logout');
+      await apiClient.post(API_ENDPOINTS.LOGOUT);
     },
     onSuccess: () => {
       logout();

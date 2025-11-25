@@ -46,26 +46,22 @@ const UserAPIKeyDialog = ({
   });
 
   const onSubmit = async (data: ApiCreationFormData) => {
-    try {
-      const response = await createApiKeyMutation.mutateAsync({
-        name: data.name,
-        project_id: 'default',
-        permissions: ['read', 'write'],
-      });
+    const response = await createApiKeyMutation.mutateAsync({
+      name: data.name,
+      project_id: 'default',
+      permissions: ['placeholder'],
+    });
 
-      const newKey: Omit<UserAPIKey, 'id' | 'createdAt' | 'lastUsed'> = {
-        name: data.name,
-        secretKey: response.key,
-        createdBy: 'Current User',
-        permissions: ['read', 'write'],
-      };
+    const newKey: Omit<UserAPIKey, 'id' | 'createdAt' | 'lastUsed'> = {
+      name: data.name,
+      secretKey: response.key,
+      createdBy: 'Current User',
+      permissions: ['placeholder'],
+    };
 
-      addAPIKey(newKey);
-      setOpenSave(true);
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Failed to create API key:', error);
-    }
+    addAPIKey(newKey);
+    setOpenSave(true);
+    onOpenChange(false);
   };
 
   return (

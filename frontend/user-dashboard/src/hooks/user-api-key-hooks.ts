@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
+import { API_ENDPOINTS } from '@/hooks/endponts';
 import apiClient from '@/query/api-client';
 
 interface CreateApiKeyRequest {
@@ -15,7 +16,7 @@ export const useCreateUserApiKey = () => {
   return useMutation({
     mutationFn: async (credentials: CreateApiKeyRequest) => {
       const { data } = await apiClient.post<CreateApiKeyResponse>(
-        '/api_keys/',
+        API_ENDPOINTS.API_KEYS,
         credentials
       );
       return data;
@@ -31,7 +32,7 @@ export const useUpdateUserApiKey = () => {
       permissions?: string[];
     }) => {
       const { data } = await apiClient.put(
-        `/api_keys/${credentials.apikeyId}`,
+        `${API_ENDPOINTS.API_KEYS}/${credentials.apikeyId}`,
         {
           name: credentials.name,
           permissions: credentials.permissions,
@@ -45,7 +46,9 @@ export const useUpdateUserApiKey = () => {
 export const useDeleteUserApiKey = () => {
   return useMutation({
     mutationFn: async (apikeyId: string) => {
-      const { data } = await apiClient.delete(`/api_keys/${apikeyId}`);
+      const { data } = await apiClient.delete(
+        `${API_ENDPOINTS.API_KEYS}/${apikeyId}`
+      );
       return data;
     },
   });
