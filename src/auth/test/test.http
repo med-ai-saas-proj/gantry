@@ -1,4 +1,4 @@
-@baseUrl=http://localhost:8001/api/v2
+@baseUrl=http://localhost:8001/api/v1
 
 # Test your FastAPI endpoints
 
@@ -17,14 +17,40 @@ Content-Type: application/json
 
 {
   "grant_type": "password",
-  "username": "test@example.com",
+  "email": "test@example.com",
   "password": "123456"
+}
+
+
+> {%
+ client.global.set("access_token", response.body.access_token)
+  client.global.set("refresh_token", response.body.refresh_token)
+ %}
+
+
+###
+
+POST {{baseUrl}}/auth/refresh-token
+Content-Type: application/json
+
+{
+  "grant_type": "refresh_token",
+  "refresh_token": "{{refresh_token}}"
 }
 
 > {%
  client.global.set("access_token", response.body.access_token)
  %}
 
+###
+
+POST {{baseUrl}}/auth/logout
+Content-Type: application/json
+Authorization: Bearer {{access_token}}
+
+{
+  "refresh_token": "{{refresh_token}}"
+}
 ###
 POST {{baseUrl}}/api_keys/
 Content-Type: application/json

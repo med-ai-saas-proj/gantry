@@ -4,5 +4,12 @@ repos:
       - id: tidy
         name: Format & sort imports
         entry: ./scripts/tidy.sh
-        language: system
-        types: [shell]
+        language: script
+        files: ^.*\.py$
+
+      - id: update-example-env-files
+        name: Update example.env files
+        entry: ./scripts/gen-example-env.sh
+        language: script
+        always_run: true
+        files: ^$

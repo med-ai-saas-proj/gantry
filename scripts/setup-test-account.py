@@ -1,12 +1,12 @@
+from src.auth.factories import getUserService
+
 import asyncio
 from datetime import UTC, datetime, timedelta
-
-from src.auth.factories import getUserService
 
 
 username = "test"
 email = "test@test.com"
-password = "Thisisaverystrongpassword123"
+password = "Thisisastrongpassword123"
 
 
 async def main():

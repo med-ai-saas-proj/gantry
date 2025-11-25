@@ -2,7 +2,7 @@ from src.db_v2.session import AsyncSessionManager
 
 from .settings import getDBSettings
 
-from redis import Redis
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine
 
 
