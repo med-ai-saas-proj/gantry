@@ -1,2 +1,0 @@
-cd frontend/user-dashboard
-npx lint-staged
