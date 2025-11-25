@@ -6,6 +6,7 @@ Extracts variable names and infers their value types.
 import os
 import re
 import sys
+from typing import Iterable
 from pathlib import Path
 
 
@@ -43,12 +44,6 @@ def infer_type(value: str) -> str:
     ):
         return "json"
 
-    # Check for URL
-    if value.startswith(
-        ("http://", "https://", "ftp://", "postgres://", "mysql://")
-    ):
-        return "url"
-
     # Check for path-like (contains / or \)
     if "/" in value or "\\" in value:
         return "path"
@@ -57,7 +52,7 @@ def infer_type(value: str) -> str:
     return "str"
 
 
-def parse_env_file(file_path: Path) -> dict[str, str]:
+def parse_env_file(file_path: Path) -> Iterable[tuple[str, str] | str]:
     """Parse a .env file and extract variable names and their inferred types.
 
     Args:
@@ -66,8 +61,6 @@ def parse_env_file(file_path: Path) -> dict[str, str]:
     Returns:
         Dictionary mapping variable names to their inferred types
     """
-    env_vars = {}
-
     try:
         with open(file_path, encoding="utf-8") as f:
             for line in f:
@@ -75,10 +68,12 @@ def parse_env_file(file_path: Path) -> dict[str, str]:
 
                 # Skip empty lines and comments
                 if not line or line.startswith("#"):
+                    yield line
                     continue
 
                 # Parse the line
                 if "=" not in line:
+                    yield line
                     continue
 
                 # Handle key=value pairs
@@ -87,6 +82,7 @@ def parse_env_file(file_path: Path) -> dict[str, str]:
 
                 # Skip if key is empty
                 if not key:
+                    yield line
                     continue
 
                 # Remove quotes from value if present
@@ -94,31 +90,31 @@ def parse_env_file(file_path: Path) -> dict[str, str]:
 
                 # Infer type
                 inferred_type = infer_type(value)
-                env_vars[key] = inferred_type
+                yield (key, inferred_type)
 
     except OSError as e:
         print(f"Error reading file {file_path}: {e}", file=sys.stderr)
 
-    return env_vars
 
-
-def generate_example_env(env_vars: dict[str, str], original_file: Path) -> str:
+def generate_example_env(original_file: Path) -> str:
     """Generate content for an example.env file.
 
     Args:
-        env_vars: Dictionary mapping variable names to their types
         original_file: Path to the original .env file
 
     Returns:
-        String content for the example.env file
+        String content for the example.env file>
     """
-    lines = [f"# Example environment variables from {original_file.name}\n"]
+    env_vars = parse_env_file(original_file)
+    lines = [f"# Example environment variables for {original_file.name}"]
 
-    for key in sorted(env_vars.keys()):
-        var_type = env_vars[key]
-        lines.append(f"{key}=<{var_type}>\n")
+    for line in env_vars:
+        if isinstance(line, tuple):
+            lines.append(f"{line[0]}=<{line[1]}>")
+        else:
+            lines.append(line)
 
-    return "".join(lines)
+    return "\n".join(lines)
 
 
 def find_and_process_env_files(root_dir: Path) -> None:
@@ -160,14 +156,8 @@ def find_and_process_env_files(root_dir: Path) -> None:
         print(f"Processing: {env_file}")
 
         # Parse the env file
-        env_vars = parse_env_file(env_file)
-
-        if not env_vars:
-            print("  ⚠️  No variables found\n")
-            continue
-
         # Generate example file
-        example_content = generate_example_env(env_vars, env_file)
+        example_content = generate_example_env(env_file)
 
         # Determine output filename
         if env_file.name == ".env":
@@ -180,10 +170,7 @@ def find_and_process_env_files(root_dir: Path) -> None:
         try:
             with open(example_file, "w", encoding="utf-8") as f:
                 f.write(example_content)
-            print(
-                f"  ✓ Generated: {example_file.relative_to(root_dir)} "
-                f"({len(env_vars)} variables)\n"
-            )
+            print(f"  ✓ Generated: {example_file.relative_to(root_dir)}\n")
         except OSError as e:
             print(f"  ✗ Error writing {example_file}: {e}\n", file=sys.stderr)
 

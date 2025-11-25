@@ -32,32 +32,32 @@ AI related APIs for medical applications
    POSTGRES_USER=internet_crawler
    POSTGRES_PASSWORD=123456
    ```
+   
+   - `.env.redis`:
+
+   ```env
+   REDIS_PASSWORD=1234
+   ```
 
    - `.env` and `prod.env`:
 
    ```env
-   CORE_DNS=postgresql://internet_crawler:123456@localhost:5432/tailm
-   STAGE=local
-   DEBUG=1
-
-   GROQ_API_KEY=
-   GOOGLE_PROGRAMMABLE_SEARCH_API_KEY=""
-   GOOGLE_PROGRAMMABLE_SEARCH_CX=
-
-   DB_USER=postgres
-   DB_PASSWORD=123456
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=main_database
    
-   
-   JWT_SECRET=thisisasecret
-   ACCESS_TOKEN_EXPIRE_MINUTES=30
-   
-   API_KEY_SECRET=thisisasecret
-   API_KEY_SECRET_LENGTH=32
-    
-   API_KEY_EXPIRE_DAYS=30
+   AUTH_ACCESS_TOKEN_EXPIRE_MINUTES=<int>
+   AUTH_ACCESS_TOKEN_SECRET=<str>
+   AUTH_REFRESH_TOKEN_EXPIRE_DAYS=<int>
+   AUTH_REFRESH_TOKEN_SECRET=<str>
+   AUTH_API_KEY_EXPIRE_DAYS=<int>
+   AUTH_API_KEY_SECRET=<str>
+   AUTH_API_KEY_SECRET_LENGTH=<int>
+   CORE_DNS=<path>
+   DB_POSTGRES_CONNECTION_URI=<path>
+   DB_REDIS_CONNECTION_URI=<path>
+   DEBUG=<int>
+   GOOGLE_PROGRAMMABLE_SEARCH_API_KEY=<str>
+   GOOGLE_PROGRAMMABLE_SEARCH_CX=<str>
+   GROQ_API_KEY=<str>
+   STAGE=<str>
    ```
 
 ### Running the dev server

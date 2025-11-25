@@ -5,7 +5,8 @@
 !.vscode/launch.json
 
 # Environments
-*.env*
+.env*
+prod.env
 *.yml
 
 .venv/

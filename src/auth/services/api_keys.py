@@ -1,6 +1,9 @@
 from src.db_v2.initialize import session_manager
 from src.db_v2.repository import Repository
-from src.shared.custom_types.error_exception import RecoverableError
+from src.shared.custom_types.error_exception import (
+    RecoverableError,
+    UnrecoverableError,
+)
 
 from ..models.api_keys import ApiKey, PermissionRepo, ApiKeyPermissionRepo
 from ..models.initialize import user_repo, api_key_repo, permission_repo
@@ -11,27 +14,34 @@ import secrets
 from typing import Callable, TypedDict, NotRequired
 from datetime import datetime, timedelta
 
-from fastapi import HTTPException
 from sqlalchemy import insert, select
 from safe_result import Ok, Err, Result
+from structlog.stdlib import BoundLogger
 
 
 class InvalidPermissionError(RecoverableError):
+    status = 400
     code = "invalid_permission"
     title = "Invalid permission"
     detail = "Permission requested does not exists"
 
 
 class InvalidAPIKey(RecoverableError):
+    status = 401
     code = "invalid_api_key"
     title = "Invalid API key"
     detail = "API key is not set or invalid (does not exists)"
 
 
 class InsufficientPermission(RecoverableError):
+    status = 401
     code = "insufficient_permission"
     title = "Insufficient permission"
     detail = "API key's permission is not sufficient for this resource"
+
+
+class UserTableError(UnrecoverableError):
+    detail = "Check the user table, there is null in there"
 
 
 class ApiKeyServiceConfig(TypedDict):
@@ -45,7 +55,8 @@ class ApiKeyServiceConfig(TypedDict):
 
 
 class ApiKeyService:
-    def __init__(self, config: ApiKeyServiceConfig):
+    def __init__(self, config: ApiKeyServiceConfig, logger: BoundLogger):
+        self.logger = logger
         self.key_secret = config["key_secret"]
 
         self.api_key_format = config.get(
@@ -56,25 +67,29 @@ class ApiKeyService:
         )
 
         self.api_key_secret_length = config.get("api_key_secret_length", 32)
-        self.expiration_days = config.get("expiration_days", 30)
+        self.expiration = timedelta(days=config.get("expiration_days", 30))
 
     def create_api_key_secret(self) -> str:
         return secrets.token_urlsafe(self.api_key_secret_length)
 
     @staticmethod
     def internal_format_api_key(api_key: str, secret: str) -> str:
-        return f"key_{api_key}.{secret}"
+        return f"sk_{api_key}.{secret}"
 
     @staticmethod
     def internal_get_api_key_parts(
         formatted_key: str,
     ) -> Result[tuple[str, str], InvalidAPIKey]:
+        prefix = "sk_"
         try:
-            prefix, rest = formatted_key.split("_", 1)
+            if not formatted_key.startswith(prefix):
+                return Err(InvalidAPIKey())
+
+            rest = formatted_key.removeprefix(prefix)
             key_id, secret = rest.split(".", 1)
             return Ok((key_id, secret))
-        except ValueError:
-            return Err(InvalidAPIKey())
+        except Exception as e:
+            return Err(InvalidAPIKey(e))
 
     def hash_api_key(self, api_key: str) -> str:
         return hmac.new(
@@ -83,13 +98,11 @@ class ApiKeyService:
 
     async def create_api_key(
         self, user_id: str, permissions: list[str]
-    ) -> Result[str, InvalidPermissionError]:
+    ) -> Result[str, InvalidPermissionError | UserTableError]:
         async with session_manager.get_session() as session:
             user = await user_repo.get_by_id(session, user_id)
             if user is None:
-                raise HTTPException(
-                    status_code=500, detail="Internal server error"
-                )
+                return Err(UserTableError())
 
             permission_rep = await permission_repo.get_many(
                 session,
@@ -99,6 +112,9 @@ class ApiKeyService:
             )
 
             existing_permissions = {perm.name for perm in permission_rep}
+            self.logger.debug(
+                "Got perms", existing_permissions=existing_permissions
+            )
             not_existing_permissions = set(permissions) - existing_permissions
             if not_existing_permissions:
                 return Err(InvalidPermissionError())
@@ -113,8 +129,7 @@ class ApiKeyService:
                 id=str(api_key_id),
                 owner_id=user_id,
                 hashed_key=hashed_key,
-                expiration_date=datetime.now()
-                + timedelta(days=self.expiration_days),
+                expiration_date=datetime.now() + self.expiration,
             )
             await api_key_repo.insert(session, new_api_key)
             await session.execute(
@@ -131,7 +146,7 @@ class ApiKeyService:
 
     async def verify_api_key(
         self, api_key: str, required_permissions: list[str]
-    ) -> Result[str, InvalidAPIKey | InsufficientPermission]:
+    ) -> Result[str, InvalidAPIKey | InsufficientPermission | UserTableError]:
         if len(required_permissions) == 0:
             raise ValueError(
                 "At least one permission must be specified for verification"
@@ -149,7 +164,7 @@ class ApiKeyService:
                 return Err(InvalidAPIKey())
 
             if key.expiration_date is None or key.owner_id is None:
-                raise HTTPException(status_code=500)
+                return Err(UserTableError())
 
             if key.expiration_date < datetime.now():
                 return Err(InvalidAPIKey())
