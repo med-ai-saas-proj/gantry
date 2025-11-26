@@ -13,6 +13,10 @@ from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/login")
+api_key_header = APIKeyHeader(
+    name="X-Api-Key",
+    description="API authorization header. Put your API token here.",
+)
 
 
 def get_current_user(
@@ -24,7 +28,7 @@ def get_current_user(
 
 def required_permission(permission: list[str]):
     async def get_api_key(
-        api_key: Annotated[str, Security(oauth2_scheme)],
+        api_key: Annotated[str, Security(api_key_header)],
         api_key_service: Annotated[ApiKeyService, Depends(getAPIKeyService)],
     ):
         user_info = await api_key_service.verify_api_key(api_key, permission)
