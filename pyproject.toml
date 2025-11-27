@@ -30,6 +30,7 @@ dependencies = [
     "redis>=7.0.1",
     "pydantic-settings>=2.11.0",
     "safe-result>=4.0.3",
+    "sqlmodel>=0.0.27",
 ]
 
 [tool.pyrefly]
@@ -47,6 +48,7 @@ dev = [
     "openapi-generator-cli[jdk4py]>=7.15.0",
     "pre-commit>=4.4.0",
     "pyrefly>=0.42.3",
+    "pyright>=1.1.407",
     "ruff>=0.14.4",
     "typer>=0.19.1",
 ]

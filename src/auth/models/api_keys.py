@@ -1,105 +1,72 @@
+"""API Key and permission entity."""
+
 from src.db_v2.base import (
     BaseEntity,
-    TableColumns,
-    TimestampsFields,
-    metadata,
-    timestamps,
 )
-from src.db_v2.repository import Repository
+from src.auth.models.users import User
 
 import uuid
-from typing import Optional
-from datetime import datetime
-from dataclasses import dataclass
+import datetime
 
 from sqlalchemy import (
     UUID,
-    Table,
-    Column,
     String,
     DateTime,
     ForeignKey,
-    ForeignKeyConstraint,
 )
+from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 
-ApiKeyPermissions = Table(
-    "api_key_permissions",
-    metadata,
-    Column("api_key_id", UUID, primary_key=True),
-    Column("permission_name", String, primary_key=True),
-    ForeignKeyConstraint(["api_key_id"], ["api_keys.id"]),
-    ForeignKeyConstraint(["permission_name"], ["permissions.name"]),
-)
+class ApiKeyPermissions(BaseEntity):
+    """API Key and Permission relation entity."""
+
+    __tablename__ = "API_KEY_PERMISSIONS"
+
+    api_key_id: Mapped[uuid.UUID] = mapped_column(
+        UUID, ForeignKey("api_keys.id"), primary_key=True
+    )
+    permission_name: Mapped[str] = mapped_column(
+        String, ForeignKey("permissions.name"), primary_key=True
+    )
 
 
-ApiKeys = Table(
-    "api_keys",
-    metadata,
-    Column("id", UUID, primary_key=True, unique=True, nullable=False),
-    Column("owner_id", UUID, ForeignKey("users.id"), nullable=False),
-    Column("hashed_key", String, unique=True, nullable=False),
-    Column("expiration_date", DateTime, nullable=True),
-    *timestamps(),
-)
+class ApiKey(BaseEntity):
+    """API Key."""
 
-Permissions = Table(
-    "permissions",
-    metadata,
-    Column("name", String, primary_key=True, unique=True, nullable=False),
-    Column("description", String, nullable=True),
-    *timestamps(),
-)
+    __tablename__ = "API_KEYS"
 
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID, primary_key=True, unique=True, nullable=False
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        UUID, ForeignKey("users.id"), nullable=False
+    )
+    hashed_key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    expiration_date: Mapped[datetime.datetime] = mapped_column(
+        DateTime, nullable=True
+    )
 
-class ApiKeyPermissionRepo(Repository):
-    class TableColumns:
-        api_key_id: Column[uuid.UUID] = ApiKeyPermissions.c.api_key_id
-        permission_name: Column[str] = ApiKeyPermissions.c.permission_name
+    permissions: Mapped[list["Permission"]] = relationship(
+        "Permission",
+        secondary=ApiKeyPermissions.__table__,
+        back_populates="api_keys",
+    )
 
-    table = ApiKeyPermissions
-    c = TableColumns
-    entity_type = None  # No specific entity class for this association table
+    user: Mapped["User"] = relationship("User", foreign_keys=[owner_id])
 
 
-@dataclass(kw_only=True)
-class ApiKey(BaseEntity, TimestampsFields):
-    id: Optional[str] = None
+class Permission(BaseEntity):
+    """Permission class."""
 
-    owner_id: Optional[str]
-    hashed_key: str
-    expiration_date: Optional[datetime]
+    __tablename__ = "PERMISSIONS"
 
+    name: Mapped[str] = mapped_column(
+        String, primary_key=True, unique=True, nullable=False
+    )
+    description: Mapped[str] = mapped_column(String, nullable=True)
 
-class ApiKeyRepo(Repository[ApiKey, str]):
-    class TableColumns(TableColumns):
-        id: Column[str] = ApiKeys.c.id
-        owner_id: Column[str] = ApiKeys.c.owner_id
-        hashed_key: Column[str] = ApiKeys.c.hashed_key
-        expiration_date: Column[DateTime] = ApiKeys.c.expiration_date
-        created_at: Column[DateTime] = ApiKeys.c.created_at
-        updated_at: Column[DateTime] = ApiKeys.c.updated_at
-
-    table = ApiKeys
-    c = TableColumns
-    entity_type = ApiKey
-
-
-@dataclass(kw_only=True)
-class Permission(BaseEntity, TimestampsFields):
-    __key__ = "name"
-    name: str
-    description: Optional[str]
-
-
-class PermissionRepo(Repository[Permission, str]):
-    class TableColumns(TableColumns):
-        __key__ = "name"
-        name: Column[str] = Permissions.c.name
-        description: Column[Optional[str]] = Permissions.c.description
-        created_at: Column[DateTime] = Permissions.c.created_at
-        updated_at: Column[DateTime] = Permissions.c.updated_at
-
-    table = Permissions
-    c = TableColumns
-    entity_type = Permission
+    api_keys: Mapped[list[ApiKey]] = relationship(
+        "ApiKey",
+        secondary=ApiKeyPermissions.__table__,
+        back_populates="permissions",
+    )

@@ -1,36 +1,30 @@
-from typing import Optional
-from datetime import datetime
-from dataclasses import dataclass
+"""Base entity for SQLAlchemy models."""
 
-from sqlalchemy import Column, DateTime, MetaData, func
+from datetime import UTC, datetime
 
-
-metadata = MetaData(schema="app")
+from sqlalchemy import DateTime, func
+from sqlalchemy.orm import Mapped, mapped_column, declarative_base
 
 
-def timestamps() -> list[Column]:
-    return [
-        Column("created_at", DateTime, nullable=False, default=func.now()),
-        Column(
-            "updated_at",
-            DateTime,
-            nullable=False,
-            default=func.now(),
-            onupdate=func.now(),
-        ),
-    ]
+Base = declarative_base()
 
 
-class TableColumns:
-    __key__ = "id"
+class BaseEntity(Base):
+    """Base Entity."""
 
+    __abstract__ = True
 
-@dataclass(kw_only=True)
-class BaseEntity:
-    __key__ = "id"
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.now(UTC),
+        server_default=func.now(),
+        nullable=False,
+    )
 
-
-@dataclass(kw_only=True)
-class TimestampsFields:
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.now(UTC),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )

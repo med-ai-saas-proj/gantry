@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, RedisDsn, PostgresDsn
+from pydantic import RedisDsn, PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,4 +12,4 @@ class DBSettings(BaseSettings):
 
 @lru_cache(1)
 def getDBSettings():
-    return DBSettings()
+    return DBSettings()  # type: ignore

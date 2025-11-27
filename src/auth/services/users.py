@@ -1,24 +1,34 @@
+"""User service."""
+
 from src.db_v2.initialize import redis as redis_client, session_manager
+from src.auth.repositories.initialize import user_repo
 from src.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
 )
 
-from ..models.users import User, UserRepo
-from ..models.initialize import user_repo
-from ..entities.auth_info import AuthInfo, TokenInfo, JwtPayload
+from ..models.users import User
+from ..entities.auth_info import (
+    AuthInfo,
+    JwtPayload,
+    LoginTokenData,
+    RefreshTokenData,
+)
+from ...shared.utils.result import err
 
+import uuid
 from typing import TypedDict, NotRequired
 from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
-from sqlalchemy import select
 from safe_result import Ok, Err, Result
 from passlib.context import CryptContext
 from structlog.stdlib import BoundLogger
 
 
 class TooManyLoginAttemptsError(RecoverableError):
+    """Raised when too many login attempts are made in a short period."""
+
     code = "too_many_login_attempts"
     title = "Too many login attempts"
     detail = "You have exceeded the maximum number of login attempts. Please try again later."
@@ -26,6 +36,8 @@ class TooManyLoginAttemptsError(RecoverableError):
 
 
 class UserExistedError(RecoverableError):
+    """Raised when trying to register a user that already exists."""
+
     code = "user_existed"
     title = "User already exists"
     detail = (
@@ -35,6 +47,8 @@ class UserExistedError(RecoverableError):
 
 
 class InvalidCredentialError(RecoverableError):
+    """Raised when invalid credentials are provided."""
+
     code = "invalid_credential"
     title = "Invalid email or password"
     detail = "The provided email or password is incorrect"
@@ -42,6 +56,8 @@ class InvalidCredentialError(RecoverableError):
 
 
 class InvalidAccessTokenError(RecoverableError):
+    """Raised when an invalid access token is provided."""
+
     code = "invalid_access_token"
     title = "Invalid access token"
     detail = "Access token is not set or is invalid (expired, corrupted, ...)"
@@ -49,6 +65,8 @@ class InvalidAccessTokenError(RecoverableError):
 
 
 class InvalidRefreshTokenError(RecoverableError):
+    """Raised when an invalid refresh token is provided."""
+
     code = "invalid_refresh_token"
     title = "Invalid refresh token"
     detail = "Refresh token is not set or is invalid (expired, corrupted, ...)"
@@ -56,21 +74,23 @@ class InvalidRefreshTokenError(RecoverableError):
 
 
 class JWTEncodeError(UnrecoverableError):
+    """Raised when there is an error encoding a JWT."""
+
     detail = "JWT encode error, we **** up, check the code. FAST!!!"
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def verify_password(plain_password, hashed_password) -> bool:
+def _verifyPassword(plain_password, hashed_password) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def get_password_hash(password) -> str:
+def _getPasswordHash(password) -> str:
     return pwd_context.hash(password)
 
 
-def createAccessToken(
+def _createAccessToken(
     data: JwtPayload,
     secret_key: str,
     algorithm: str,
@@ -81,12 +101,14 @@ def createAccessToken(
         expire = datetime.now(UTC) + expires_delta
         to_encode.update({"exp": int(expire.timestamp())})
     try:
-        return Ok(jwt.encode(to_encode, secret_key, algorithm=algorithm))
+        return Ok(
+            jwt.encode(dict(**to_encode), secret_key, algorithm=algorithm)
+        )
     except JWTError as e:
         return Err(JWTEncodeError(e))
 
 
-def getCurrentUserFromToken(
+def _getCurrentUserFromToken(
     token: str, secret_key: str, algorithm: str
 ) -> Result[AuthInfo, InvalidAccessTokenError]:
     try:
@@ -106,6 +128,8 @@ def getCurrentUserFromToken(
 
 
 class UserServiceConfig(TypedDict):
+    """Configuration for UserService."""
+
     access_token_secret_key: str
     access_token_algorithm: str
     access_token_expire_minutes: NotRequired[int]
@@ -117,7 +141,10 @@ class UserServiceConfig(TypedDict):
 
 
 class UserService:
+    """User service."""
+
     def __init__(self, config: UserServiceConfig, logger: BoundLogger):
+        """Initialize UserService with configuration and logger."""
         self.logger = logger
         self.access_token_secret_key = config["access_token_secret_key"]
         self.access_token_algorithm = config["access_token_algorithm"]
@@ -137,57 +164,49 @@ class UserService:
     async def emailRegister(
         self, username: str, email: str, password: str
     ) -> Result[User, UserExistedError]:
+        """Register a new user with email and password."""
         async with session_manager.get_session() as session:
-            existed_user = await user_repo.get_one(
-                session,
-                select(UserRepo.table)
-                .where(
-                    (UserRepo.c.username == username)
-                    | (UserRepo.c.email == email)
-                )
-                .limit(1),
+            existed_user = await user_repo.getByUsernameOrEmail(
+                session, username, email
             )
 
             if existed_user:
                 return Err(UserExistedError())
 
-            hashed_password = get_password_hash(password)
+            hashed_password = _getPasswordHash(password)
             new_user = User(
                 username=username, email=email, hashed_password=hashed_password
             )
-            res: User = await user_repo.insert(session, new_user).returning()
+            session.add(new_user)
             await session.commit()
-            return Ok(res)
+            await session.refresh(new_user)
+            return Ok(new_user)
 
     async def emailLogin(
         self, email: str, password: str
     ) -> Result[
-        TokenInfo,
+        LoginTokenData,
         InvalidCredentialError | JWTEncodeError | TooManyLoginAttemptsError,
     ]:
+        """Login a user with email and password."""
         async with session_manager.get_session() as session:
-            login_attempt = await redis_client.get(
-                f"auth:login_attempt:{email}"
-            )
+            redis_key_login_attempt = self._redisKeyForLoginAttempt(email)
+
+            login_attempt = await redis_client.get(redis_key_login_attempt)
             if login_attempt and int(login_attempt) >= self.max_login_attempts:
                 return Err(TooManyLoginAttemptsError())
 
-            user = await user_repo.get_one(
-                session,
-                select(UserRepo.table)
-                .where(UserRepo.c.email == email)
-                .limit(1),
-            )
+            user = await user_repo.getByEmail(session, email)
 
-            if not user or not verify_password(password, user.hashed_password):
-                await redis_client.incr(f"auth:login_attempt:{email}", 1)
+            if not user or not _verifyPassword(password, user.hashed_password):
+                await redis_client.incr(redis_key_login_attempt, 1)
                 await redis_client.expire(
-                    f"auth:login_attempt:{email}",
+                    redis_key_login_attempt,
                     time=self.login_attempt_window,
                 )
                 return Err(InvalidCredentialError())
 
-            access_token = createAccessToken(
+            access_token_ = _createAccessToken(
                 data={
                     "sub": str(user.id),
                     "email": user.email,
@@ -195,9 +214,11 @@ class UserService:
                 secret_key=self.access_token_secret_key,
                 algorithm=self.access_token_algorithm,
                 expires_delta=self.access_token_expire,
-            ).unwrap()
+            )
+            if err(access_token_):
+                return access_token_
 
-            refresh_token = createAccessToken(
+            refresh_token_ = _createAccessToken(
                 data={
                     "sub": str(user.id),
                     "email": user.email,
@@ -205,16 +226,21 @@ class UserService:
                 secret_key=self.refresh_token_secret_key,
                 algorithm=self.refresh_token_algorithm,
                 expires_delta=self.refresh_token_expire,
-            ).unwrap()
+            )
+            if err(refresh_token_):
+                return refresh_token_
 
-            await redis_client.delete(f"auth:login_attempt:{email}")
+            access_token = access_token_.unwrap()
+            refresh_token = refresh_token_.unwrap()
+
+            await redis_client.delete(redis_key_login_attempt)
             await redis_client.set(
-                f"auth:refresh_token:{str(user.id)}:{refresh_token}",
+                self._redisKeyForRefreshToken(user.id, refresh_token),
                 "",  # value is not important
                 ex=self.refresh_token_expire,
             )
 
-            return Ok[TokenInfo](
+            return Ok[LoginTokenData](
                 {
                     "access_token": access_token,
                     "token_type": "Bearer",
@@ -226,48 +252,64 @@ class UserService:
                 }
             )
 
+    def _redisKeyForRefreshToken(
+        self, user_id: uuid.UUID | str, refresh_token: str
+    ) -> str:
+        return f"auth:refresh_token:{user_id}:{refresh_token}"
+
+    def _redisKeyForLoginAttempt(self, email: str) -> str:
+        return f"auth:login_attempt:{email}"
+
     def getUserInfoFromAccessToken(self, token: str):
-        return getCurrentUserFromToken(
+        """Get user info from access token."""
+        return _getCurrentUserFromToken(
             token, self.access_token_secret_key, self.access_token_algorithm
         )
 
     async def refreshAccessToken(
         self, refresh_token: str
     ) -> Result[
-        TokenInfo,
+        RefreshTokenData,
         InvalidAccessTokenError | JWTEncodeError | InvalidRefreshTokenError,
     ]:
+        """Generate a new access token using the provided refresh token."""
         self.logger.debug(
             "Refreshing access token with refresh token:", refresh_token
         )
         self.logger.debug("Secret key:", self.refresh_token_secret_key)
         self.logger.debug("Algorithm:", self.refresh_token_algorithm)
         self.logger.debug("Expire:", self.refresh_token_expire.total_seconds())
-        auth_info = getCurrentUserFromToken(
+        auth_info_ = _getCurrentUserFromToken(
             refresh_token,
             self.refresh_token_secret_key,
             self.refresh_token_algorithm,
         )
-        if auth_info.error is not None:
-            return auth_info
+        if err(auth_info_):
+            return auth_info_
 
-        user_id = auth_info.value["id"]
-        redis_key = f"auth:refresh_token:{user_id}:{refresh_token}"
+        auth_info = auth_info_.unwrap()
+        user_id = auth_info["id"]
+        redis_key = self._redisKeyForRefreshToken(user_id, refresh_token)
         exists = await redis_client.exists(redis_key)
         if not exists:
             return Err(InvalidRefreshTokenError())
 
-        access_token = createAccessToken(
+        access_token_ = _createAccessToken(
             data={
                 "sub": str(user_id),
-                "email": auth_info.value["email"],
+                "email": auth_info["email"],
             },
             secret_key=self.access_token_secret_key,
             algorithm=self.access_token_algorithm,
             expires_delta=self.access_token_expire,
-        ).unwrap()
+        )
 
-        return Ok[TokenInfo](
+        if err(access_token_):
+            return access_token_
+
+        access_token = access_token_.unwrap()
+
+        return Ok[RefreshTokenData](
             {
                 "access_token": access_token,
                 "token_type": "Bearer",
@@ -276,9 +318,7 @@ class UserService:
         )
 
     async def logout(self, auth_info: AuthInfo, refresh_token: str):
+        """Invalidate the refresh token by deleting it from Redis."""
         user_id = auth_info["id"]
-        pattern = f"auth:refresh_token:{user_id}:{refresh_token}"
-        keys = await redis_client.keys(pattern)
-        if keys:
-            await redis_client.delete(*keys)
-        return
+        redis_key = self._redisKeyForRefreshToken(user_id, refresh_token)
+        await redis_client.delete(redis_key)

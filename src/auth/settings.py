@@ -19,4 +19,4 @@ class AuthSetting(BaseSettings):
 
 @lru_cache(1)
 def getAuthSettings() -> AuthSetting:
-    return AuthSetting()
+    return AuthSetting()  # type: ignore

@@ -1,3 +1,5 @@
+"""API key management routes."""
+
 from ..dtos import (
     CreateAPIKeyInput,
     CreateAPIKeyOutputSuccess,
@@ -25,7 +27,8 @@ async def create_api_key(
     auth_info: Annotated[AuthInfo, Security(get_current_user)],
     api_key_service: Annotated[ApiKeyService, Depends(getAPIKeyService)],
 ) -> CreateAPIKeyOutputSuccess:
-    api_key = await api_key_service.create_api_key(
+    """Create a new API key with specified permissions for the authenticated user."""
+    api_key = await api_key_service.createApiKey(
         auth_info["id"], request.permissions
     )
     return {"key": api_key.unwrap()}
