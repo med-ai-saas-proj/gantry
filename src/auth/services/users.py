@@ -177,7 +177,7 @@ class UserService:
             new_user = User(
                 username=username, email=email, hashed_password=hashed_password
             )
-            session.add(new_user)
+            await user_repo.add(session, new_user)
             await session.commit()
             await session.refresh(new_user)
             return Ok(new_user)
@@ -273,12 +273,12 @@ class UserService:
         InvalidAccessTokenError | JWTEncodeError | InvalidRefreshTokenError,
     ]:
         """Generate a new access token using the provided refresh token."""
-        self.logger.debug(
-            "Refreshing access token with refresh token:", refresh_token
-        )
-        self.logger.debug("Secret key:", self.refresh_token_secret_key)
-        self.logger.debug("Algorithm:", self.refresh_token_algorithm)
-        self.logger.debug("Expire:", self.refresh_token_expire.total_seconds())
+        # self.logger.debug(
+        #     "Refreshing access token with refresh token:", refresh_token
+        # )
+        # self.logger.debug("Secret key:", self.refresh_token_secret_key)
+        # self.logger.debug("Algorithm:", self.refresh_token_algorithm)
+        # self.logger.debug("Expire:", self.refresh_token_expire.total_seconds())
         auth_info_ = _getCurrentUserFromToken(
             refresh_token,
             self.refresh_token_secret_key,

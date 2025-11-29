@@ -15,6 +15,8 @@ v1_router.include_router(rx_advisor_router)
 v1_router.include_router(ai_search_router)
 v1_router.include_router(auth.router)
 v1_router.include_router(api_keys.router)
+# for test only
+v1_router.include_router(test.router)
 
 
 @v1_router.get("/healthcheck", response_model=MessagedResponse)

@@ -1,7 +1,7 @@
 """Service for managing API keys and their permissions."""
 
 from src.db_v2.initialize import session_manager
-from src.auth.entities.auth_info import LoginTokenData, APIKeyInfo
+from src.auth.entities.auth_info import APIKeyInfo
 from src.auth.repositories.initialize import (
     user_repo,
     api_key_repo,
@@ -119,20 +119,20 @@ class ApiKeyService:
     ) -> Result[str, InvalidPermissionError | UserNotFoundError]:
         """Create an API key for a user with specified permissions."""
         async with session_manager.get_session() as session:
-            user = await user_repo.getById(session, uuid.UUID(user_id))
+            user = await user_repo.getByKey(session, uuid.UUID(user_id))
             if user is None:
                 return Err(UserNotFoundError())
 
-            permission_res = await permission_repo.getPermissionByNames(
+            permission_res = await permission_repo.getManyByKeys(
                 session, permissions
             )
 
             existing_permissions: set[str] = {
                 perm.name for perm in permission_res
             }
-            self.logger.debug(
-                "Got perms", existing_permissions=existing_permissions
-            )
+            # self.logger.debug(
+            #     "Got perms", existing_permissions=existing_permissions
+            # )
             not_existing_permissions = set(permissions) - existing_permissions
             if not_existing_permissions:
                 return Err(InvalidPermissionError())
@@ -148,13 +148,12 @@ class ApiKeyService:
                 hashed_key=hashed_key,
                 expiration_date=datetime.now() + self.expiration,
             )
-            session.add(new_api_key)
+            await api_key_repo.add(session, new_api_key)
             await api_key_repo.addPermissionsToApiKey(
                 session, api_key_id, permissions
             )
             await session.commit()
-
-        return Ok(formatted_key)
+            return Ok(formatted_key)
 
     async def verifyApiKey(
         self, api_key: str, required_permissions: list[str]
@@ -174,7 +173,7 @@ class ApiKeyService:
 
             key_id, _ = key_parts_.unwrap()
 
-            key = await api_key_repo.getApiKeyById(session, uuid.UUID(key_id))
+            key = await api_key_repo.getByKey(session, uuid.UUID(key_id))
             if key is None:
                 return Err(InvalidAPIKey())
 
@@ -188,9 +187,9 @@ class ApiKeyService:
             if not hmac.compare_digest(hashed_key, key.hashed_key):
                 return Err(InvalidAPIKey())
 
-            existing_permissions = key.permissions
-            missing_permissions = set(required_permissions) - set(
-                existing_permissions
+            existing_permissions = {perm.name for perm in key.permissions}
+            missing_permissions = (
+                set(required_permissions) - existing_permissions
             )
             if missing_permissions:
                 return Err(InsufficientPermission())

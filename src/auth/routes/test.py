@@ -1,7 +1,12 @@
+"""Test routes for api key authentication and authorization."""
+
+from src.auth.entities.auth_info import APIKeyInfo
+
 from ..depends.auth import required_permission
 
-from fastapi import APIRouter
-from fastapi.params import Depends
+from typing import Annotated
+
+from fastapi import Security, APIRouter
 
 
 router = APIRouter(prefix="/test")
@@ -9,17 +14,26 @@ router = APIRouter(prefix="/test")
 
 @router.get("/")
 async def test_endpoint(
-    owner_id: str = Depends(required_permission(["test-permission-1"])),
+    api_key_info: Annotated[
+        APIKeyInfo, Security(required_permission(["test-permission-1"]))
+    ],
 ):
+    """A test endpoint that requires 'test-permission-1' permission."""
     return {
-        "message": f"Test endpoint is working for user {owner_id} with test-permission-1"
+        "message": f"Test endpoint is working for user {api_key_info['user_id']} with test-permission-1"
     }
 
 
 @router.get("/admin")
 async def admin_endpoint(
-    admin_id: str = Depends(required_permission(["admin-permission"])),
+    api_key_info: Annotated[
+        APIKeyInfo,
+        Security(
+            required_permission(["test-permission-admin", "test-permission-1"])
+        ),
+    ],
 ):
+    """A test endpoint that requires 'test-permission-admin' and 'test-permission-1' permissions."""
     return {
-        "message": f"Admin endpoint is working for admin {admin_id} with admin-permission"
+        "message": f"Admin endpoint is working for admin {api_key_info['user_id']} with admin-permission"
     }

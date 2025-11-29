@@ -4,27 +4,27 @@ from src.db_v2.repository import Repository
 from src.auth.models.api_keys import ApiKey, Permission, ApiKeyPermissions
 
 import uuid
-from typing import Sequence
+from typing import override
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class PermissionRepository(Repository):
+class PermissionRepository(Repository[Permission, str]):
     """Permission repository."""
 
-    async def getPermissionByNames(
-        self, session: AsyncSession, name_list: list[str]
-    ) -> Sequence[Permission]:
-        """Get permission by names."""
-        return await self.selectMany(
-            session, select(Permission).where(Permission.name.in_(name_list))
-        )
+    def __init__(self):
+        """Initialize PermissionRepository."""
+        super().__init__(Permission, Permission.name)
 
 
-class ApiKeyRepository(Repository):
+class ApiKeyRepository(Repository[ApiKey, uuid.UUID]):
     """API key repository."""
+
+    def __init__(self):
+        """Initialize ApiKeyRepository."""
+        super().__init__(ApiKey, ApiKey.id)
 
     async def addPermissionsToApiKey(
         self,
@@ -43,14 +43,15 @@ class ApiKeyRepository(Repository):
             ]
         )
 
-    async def getApiKeyById(
-        self, session: AsyncSession, api_key_id: uuid.UUID
+    @override
+    async def getByKey(
+        self, session: AsyncSession, key: uuid.UUID
     ) -> ApiKey | None:
         """Get API key by its ID."""
         return await self.selectOne(
             session,
             select(ApiKey)
             .options(selectinload(ApiKey.permissions))
-            .where(ApiKey.id == api_key_id)
+            .where(ApiKey.id == key)
             .limit(1),
         )

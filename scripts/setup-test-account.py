@@ -1,7 +1,6 @@
 from src.auth.factories import getUserService
 
 import asyncio
-from datetime import UTC, datetime, timedelta
 
 
 username = "test"
@@ -12,11 +11,11 @@ password = "Thisisastrongpassword123"
 async def main():
     user_service = getUserService()
     try:
-        user = await user_service.emailRegister(username, email, password)
-        print(f"Created a test account with {email=}, {password=}")
-    except:
-        user = await user_service.emailLogin(email, password)
-        print(f"Account already created {email=}, {password=}")
+        user_ = await user_service.emailRegister(username, email, password)
+        user = user_.unwrap()
+        print(f"Created a test account with {user.email}, {user.id}")
+    except Exception as e:
+        print("Failed to create test account:", e)
 
 
 if __name__ == "__main__":

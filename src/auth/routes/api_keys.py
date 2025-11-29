@@ -17,12 +17,12 @@ router = APIRouter(prefix="/api_keys", tags=["API keys"])
 
 
 @router.post(
-    "",
+    "/",
     responses={
         200: {"model": CreateAPIKeyOutputSuccess},
     },
 )
-async def create_api_key(
+async def createApiKey(
     request: Annotated[CreateAPIKeyInput, Body()],
     auth_info: Annotated[AuthInfo, Security(get_current_user)],
     api_key_service: Annotated[ApiKeyService, Depends(getAPIKeyService)],

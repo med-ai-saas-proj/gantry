@@ -52,7 +52,7 @@ async def login(
         200: {"model": RefreshAccessTokenOutputSuccess},
     },
 )
-async def refresh_token(
+async def refreshToken(
     request: Annotated[RefreshAccessTokenInput, Body()],
     user_service: Annotated[UserService, Depends(getUserService)],
 ) -> RefreshAccessTokenOutputSuccess:

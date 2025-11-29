@@ -8,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class UserRepository(Repository[User, uuid.UUID]):
-    model = User
-    key = User.id
+    def __init__(self) -> None:
+        """Initialize UserRepository."""
+        super().__init__(User, User.id)
 
     async def getByUsernameOrEmail(
         self, session: AsyncSession, username: str, email: str

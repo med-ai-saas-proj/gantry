@@ -23,10 +23,10 @@ class ApiKeyPermissions(BaseEntity):
     __tablename__ = "API_KEY_PERMISSIONS"
 
     api_key_id: Mapped[uuid.UUID] = mapped_column(
-        UUID, ForeignKey("api_keys.id"), primary_key=True
+        UUID, ForeignKey("API_KEYS.id"), primary_key=True
     )
     permission_name: Mapped[str] = mapped_column(
-        String, ForeignKey("permissions.name"), primary_key=True
+        String, ForeignKey("PERMISSIONS.name"), primary_key=True
     )
 
 
@@ -39,7 +39,7 @@ class ApiKey(BaseEntity):
         UUID, primary_key=True, unique=True, nullable=False
     )
     owner_id: Mapped[uuid.UUID] = mapped_column(
-        UUID, ForeignKey("users.id"), nullable=False
+        UUID, ForeignKey("USERS.id"), nullable=False
     )
     hashed_key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     expiration_date: Mapped[datetime.datetime] = mapped_column(

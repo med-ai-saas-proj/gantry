@@ -19,11 +19,11 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-from src.db_v2.base import metadata  # noqa
-import src.auth.models.users
-import src.auth.models.api_keys
+from src.db_v2.base import Base  # noqa
+import src.auth.models.users  # noqa
+import src.auth.models.api_keys  # noqa
 
-target_metadata = metadata
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

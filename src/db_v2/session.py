@@ -18,7 +18,9 @@ class AsyncSessionManager:
         async with AsyncSession(self.async_engine) as session:
             try:
                 yield session
-                await session.commit()
+                # manual commit in caller, because `return Error(...)`
+                # in code can't roll back (it not raises an exception)
+                # await session.commit()
             except Exception:
                 await session.rollback()
                 raise
