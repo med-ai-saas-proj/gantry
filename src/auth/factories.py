@@ -1,4 +1,10 @@
+"""Factories for authentication services."""
 from src.shared.utils.logger import getLogger
+from src.auth.repositories.factories import (
+    getUserRepository,
+    getApiKeyRepository,
+    getPermissionRepository,
+)
 
 from .settings import getAuthSettings
 from .services.users import UserService
@@ -9,6 +15,7 @@ from functools import lru_cache
 
 @lru_cache(1)
 def getUserService():
+    """Get singleton UserService instance."""
     auth_settings = getAuthSettings()
     return UserService(
         config={
@@ -22,11 +29,13 @@ def getUserService():
             "max_login_attempts": auth_settings.max_login_attempts,
         },
         logger=getLogger(),
+        user_repo=getUserRepository(),
     )
 
 
 @lru_cache(1)
 def getAPIKeyService():
+    """Get singleton ApiKeyService instance."""
     auth_settings = getAuthSettings()
     return ApiKeyService(
         config={
@@ -35,4 +44,7 @@ def getAPIKeyService():
             "expiration_days": auth_settings.api_key_expire_days,
         },
         logger=getLogger(),
+        user_repo=getUserRepository(),
+        api_key_repo=getApiKeyRepository(),
+        permission_repo=getPermissionRepository(),
     )

@@ -1,7 +1,7 @@
 """User service."""
 
 from src.db_v2.initialize import redis as redis_client, session_manager
-from src.auth.repositories.initialize import user_repo
+from src.auth.repositories.users import UserRepository
 from src.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
@@ -143,7 +143,11 @@ class UserServiceConfig(TypedDict):
 class UserService:
     """User service."""
 
-    def __init__(self, config: UserServiceConfig, logger: BoundLogger):
+    def __init__(self,
+                 config: UserServiceConfig,
+                 logger: BoundLogger,
+                 user_repo: UserRepository
+                 ):
         """Initialize UserService with configuration and logger."""
         self.logger = logger
         self.access_token_secret_key = config["access_token_secret_key"]
@@ -160,13 +164,14 @@ class UserService:
         self.login_attempt_window = timedelta(
             minutes=config.get("login_attempt_window_minutes", 15)
         )
+        self.user_repo = user_repo
 
     async def emailRegister(
         self, username: str, email: str, password: str
     ) -> Result[User, UserExistedError]:
         """Register a new user with email and password."""
         async with session_manager.get_session() as session:
-            existed_user = await user_repo.getByUsernameOrEmail(
+            existed_user = await self.user_repo.getByUsernameOrEmail(
                 session, username, email, [User.id]
             )
 
@@ -177,7 +182,7 @@ class UserService:
             new_user = User(
                 username=username, email=email, hashed_password=hashed_password
             )
-            await user_repo.add(session, new_user)
+            await self.user_repo.add(session, new_user)
             await session.commit()
             await session.refresh(new_user)
             return Ok(new_user)
@@ -196,7 +201,7 @@ class UserService:
             if login_attempt and int(login_attempt) >= self.max_login_attempts:
                 return Err(TooManyLoginAttemptsError())
 
-            user = await user_repo.getByEmail(
+            user = await self.user_repo.getByEmail(
                 session, email, [User.id, User.email, User.hashed_password]
             )
 

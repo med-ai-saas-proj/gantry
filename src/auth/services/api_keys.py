@@ -4,10 +4,10 @@ from src.db_v2.initialize import session_manager
 from src.auth.models.users import User
 from src.auth.models.api_keys import ApiKey, Permission
 from src.auth.entities.auth_info import APIKeyInfo
-from src.auth.repositories.initialize import (
-    user_repo,
-    api_key_repo,
-    permission_repo,
+from src.auth.repositories.users import UserRepository
+from src.auth.repositories.api_keys import (
+    ApiKeyRepository,
+    PermissionRepository,
 )
 from src.shared.custom_types.error_exception import (
     RecoverableError,
@@ -72,7 +72,14 @@ class ApiKeyServiceConfig(TypedDict):
 class ApiKeyService:
     """Service for managing API keys and their permissions."""
 
-    def __init__(self, config: ApiKeyServiceConfig, logger: BoundLogger):
+    def __init__(
+        self,
+        config: ApiKeyServiceConfig,
+        logger: BoundLogger,
+        user_repo: UserRepository,
+        api_key_repo: ApiKeyRepository,
+        permission_repo: PermissionRepository,
+    ):
         """Initialize the ApiKeyService with configuration and logger."""
         self.logger = logger
         self.key_secret = config["key_secret"]
@@ -86,6 +93,10 @@ class ApiKeyService:
 
         self.api_key_secret_length = config.get("api_key_secret_length", 32)
         self.expiration = timedelta(days=config.get("expiration_days", 30))
+
+        self.user_repo = user_repo
+        self.api_key_repo = api_key_repo
+        self.permission_repo = permission_repo
 
     def _create_api_key_secret(self) -> str:
         return secrets.token_urlsafe(self.api_key_secret_length)
@@ -119,13 +130,13 @@ class ApiKeyService:
     ) -> Result[str, InvalidPermissionError | UserNotFoundError]:
         """Create an API key for a user with specified permissions."""
         async with session_manager.get_session() as session:
-            user = await user_repo.getByKey(
+            user = await self.user_repo.getByKey(
                 session, uuid.UUID(user_id), [User.id]
             )
             if user is None:
                 return Err(UserNotFoundError())
 
-            permission_res = await permission_repo.getManyByKeys(
+            permission_res = await self.permission_repo.getManyByKeys(
                 session, permissions, [Permission.name]
             )
 
@@ -150,8 +161,8 @@ class ApiKeyService:
                 hashed_key=hashed_key,
                 expiration_date=datetime.now() + self.expiration,
             )
-            await api_key_repo.add(session, new_api_key)
-            await api_key_repo.addPermissionsToApiKey(
+            await self.api_key_repo.add(session, new_api_key)
+            await self.api_key_repo.addPermissionsToApiKey(
                 session, api_key_id, permissions
             )
             await session.commit()
@@ -175,7 +186,7 @@ class ApiKeyService:
 
             key_id, _ = key_parts_.unwrap()
 
-            key = await api_key_repo.getByKey(
+            key = await self.api_key_repo.getByKey(
                 session,
                 uuid.UUID(key_id),
                 [
