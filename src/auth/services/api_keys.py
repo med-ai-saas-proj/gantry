@@ -1,6 +1,8 @@
 """Service for managing API keys and their permissions."""
 
 from src.db_v2.initialize import session_manager
+from src.auth.models.users import User
+from src.auth.models.api_keys import ApiKey, Permission
 from src.auth.entities.auth_info import APIKeyInfo
 from src.auth.repositories.initialize import (
     user_repo,
@@ -11,8 +13,6 @@ from src.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
 )
-
-from ..models.api_keys import ApiKey
 
 import hmac
 import uuid
@@ -119,12 +119,14 @@ class ApiKeyService:
     ) -> Result[str, InvalidPermissionError | UserNotFoundError]:
         """Create an API key for a user with specified permissions."""
         async with session_manager.get_session() as session:
-            user = await user_repo.getByKey(session, uuid.UUID(user_id))
+            user = await user_repo.getByKey(
+                session, uuid.UUID(user_id), [User.id]
+            )
             if user is None:
                 return Err(UserNotFoundError())
 
             permission_res = await permission_repo.getManyByKeys(
-                session, permissions
+                session, permissions, [Permission.name]
             )
 
             existing_permissions: set[str] = {
@@ -173,7 +175,17 @@ class ApiKeyService:
 
             key_id, _ = key_parts_.unwrap()
 
-            key = await api_key_repo.getByKey(session, uuid.UUID(key_id))
+            key = await api_key_repo.getByKey(
+                session,
+                uuid.UUID(key_id),
+                [
+                    ApiKey.owner_id,
+                    ApiKey.hashed_key,
+                    ApiKey.expiration_date,
+                ],
+                {ApiKey.permissions: [Permission.name]},
+            )
+
             if key is None:
                 return Err(InvalidAPIKey())
 

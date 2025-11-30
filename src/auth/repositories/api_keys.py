@@ -4,10 +4,7 @@ from src.db_v2.repository import Repository
 from src.auth.models.api_keys import ApiKey, Permission, ApiKeyPermissions
 
 import uuid
-from typing import override
 
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -41,17 +38,4 @@ class ApiKeyRepository(Repository[ApiKey, uuid.UUID]):
                 )
                 for permission in permissions
             ]
-        )
-
-    @override
-    async def getByKey(
-        self, session: AsyncSession, key: uuid.UUID
-    ) -> ApiKey | None:
-        """Get API key by its ID."""
-        return await self.selectOne(
-            session,
-            select(ApiKey)
-            .options(selectinload(ApiKey.permissions))
-            .where(ApiKey.id == key)
-            .limit(1),
         )

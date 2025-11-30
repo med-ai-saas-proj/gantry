@@ -167,7 +167,7 @@ class UserService:
         """Register a new user with email and password."""
         async with session_manager.get_session() as session:
             existed_user = await user_repo.getByUsernameOrEmail(
-                session, username, email
+                session, username, email, [User.id]
             )
 
             if existed_user:
@@ -196,7 +196,9 @@ class UserService:
             if login_attempt and int(login_attempt) >= self.max_login_attempts:
                 return Err(TooManyLoginAttemptsError())
 
-            user = await user_repo.getByEmail(session, email)
+            user = await user_repo.getByEmail(
+                session, email, [User.id, User.email, User.hashed_password]
+            )
 
             if not user or not _verifyPassword(password, user.hashed_password):
                 await redis_client.incr(redis_key_login_attempt, 1)

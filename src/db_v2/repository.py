@@ -9,8 +9,12 @@ from sqlalchemy import (
     Select,
     select,
 )
-from sqlalchemy.orm import InstrumentedAttribute, selectinload
+from sqlalchemy.orm import InstrumentedAttribute, load_only, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+type ColumnList = Sequence[InstrumentedAttribute] | None
+type RelationLoadMap = dict[InstrumentedAttribute, ColumnList] | None
 
 
 class Repository[TEntity: BaseEntity, TKey](ABC):
@@ -22,28 +26,62 @@ class Repository[TEntity: BaseEntity, TKey](ABC):
         self.key = key
 
     async def getByKey(
-        self, session: AsyncSession, key: TKey
+        self,
+        session: AsyncSession,
+        key: TKey,
+        load_columns: ColumnList = None,
+        load_relations: RelationLoadMap = None,
     ) -> TEntity | None:
         """Get entity by its primary key."""
+        stmt = select(self.model).where(self.key.__eq__(key)).limit(1)
+        stmt = self.buildOptions(
+            stmt,
+            load_columns,
+            load_relations,
+        )
         return await self.selectOne(
             session,
-            select(self.model).where(self.key == key).limit(1),  # noqa
+            stmt,
         )
 
     async def getManyByKeys(
-        self, session: AsyncSession, keys: Sequence[TKey]
+        self,
+        session: AsyncSession,
+        keys: Sequence[TKey],
+        load_columns: ColumnList = None,
+        load_relations: RelationLoadMap = None,
     ) -> Sequence[TEntity]:
         """Get multiple entities by their primary keys."""
-        return await self.selectMany(
-            session,
-            select(self.model).where(self.key.in_(keys)),
+        stmt = select(self.model).where(self.key.in_(keys))
+        stmt = self.buildOptions(
+            stmt,
+            load_columns,
+            load_relations,
         )
+        return await self.selectMany(session, stmt)
 
-    async def getAll(self, session: AsyncSession) -> Sequence[TEntity]:
+    async def getAll(
+        self,
+        session: AsyncSession,
+        load_columns: ColumnList = None,
+        load_relations: RelationLoadMap = None,
+        offset: int | None = None,
+        limit: int | None = None,
+    ) -> Sequence[TEntity]:
         """Get all entities of this type."""
+        stmt = select(self.model)
+        stmt = self.buildOptions(
+            stmt,
+            load_columns,
+            load_relations,
+        )
+        if offset is not None:
+            stmt.offset(offset)
+        if limit is not None:
+            stmt.limit(limit)
         return await self.selectMany(
             session,
-            select(self.model),
+            stmt,
         )
 
     async def add(self, session: AsyncSession, entity: TEntity) -> None:
@@ -63,7 +101,7 @@ class Repository[TEntity: BaseEntity, TKey](ABC):
 
     async def deleteByKey(self, session: AsyncSession, key: TKey) -> None:
         """Delete an entity by its primary key."""
-        entity = await self.getByKey(session, key)
+        entity = await self.getByKey(session, key, [self.key])
         if entity:
             await session.delete(entity)
 
@@ -71,7 +109,7 @@ class Repository[TEntity: BaseEntity, TKey](ABC):
         self, session: AsyncSession, keys: Sequence[TKey]
     ) -> None:
         """Delete multiple entities by their primary keys."""
-        entities = await self.getManyByKeys(session, keys)
+        entities = await self.getManyByKeys(session, keys, [self.key])
         for entity in entities:
             await session.delete(entity)
 
@@ -80,6 +118,28 @@ class Repository[TEntity: BaseEntity, TKey](ABC):
         """Execute select statement and return single entity or None."""
         res = await session.execute(stmt)
         return res.scalars().first()
+
+    @staticmethod
+    def buildOptions(
+        select_stmt: Select,
+        load_columns: ColumnList = None,
+        load_relations: RelationLoadMap = None,
+    ):
+        """Build SQLAlchemy options for loading columns and relations."""
+        if load_columns:
+            select_stmt = select_stmt.options(
+                *[load_only(col) for col in load_columns]
+            )
+        if load_relations:
+            select_stmt = select_stmt.options(
+                *[
+                    selectinload(rel).load_only(*cols)
+                    if cols
+                    else selectinload(rel)
+                    for rel, cols in load_relations.items()
+                ]
+            )
+        return select_stmt
 
     @staticmethod
     async def selectMany(
