@@ -1,7 +1,5 @@
 """Repository base class."""
 
-from src.db_v2.base import BaseEntity
-
 from abc import ABC
 from typing import Sequence
 
@@ -9,7 +7,12 @@ from sqlalchemy import (
     Select,
     select,
 )
-from sqlalchemy.orm import InstrumentedAttribute, load_only, selectinload
+from sqlalchemy.orm import (
+    DeclarativeBase,
+    InstrumentedAttribute,
+    load_only,
+    selectinload,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -17,7 +20,7 @@ type ColumnList = Sequence[InstrumentedAttribute] | None
 type RelationLoadMap = dict[InstrumentedAttribute, ColumnList] | None
 
 
-class Repository[TEntity: BaseEntity, TKey](ABC):
+class Repository[TEntity: DeclarativeBase, TKey](ABC):
     """Base repository class."""
 
     def __init__(self, model: type[TEntity], key: InstrumentedAttribute[TKey]):

@@ -1,32 +1,18 @@
 """Base entity for SQLAlchemy models."""
 
-from datetime import UTC, datetime
-
-from sqlalchemy import DateTime, MetaData, func
-from sqlalchemy.orm import Mapped, mapped_column, declarative_base
+from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
 
 
-metadata = MetaData(schema="app")
-Base = declarative_base(metadata=metadata)
+naming_convention = {
+    "ix": "idx_%(column_0_N_label)s",
+    "uq": "%(table_name)s_%(column_0_N_name)s_uq",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "%(table_name)s_%(column_0_name)s_fkey",
+    "pk": "%(table_name)s_pkey",
+}
 
 
-class BaseEntity(Base):
-    """Base Entity."""
+class BaseSQLModel(MappedAsDataclass, DeclarativeBase, kw_only=True):
+    """This should be the base of all SQL model."""
 
-    __abstract__ = True
-
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.now(UTC).replace(tzinfo=None),
-        server_default=func.now(),
-        nullable=False,
-    )
-
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        default=datetime.now(UTC).replace(tzinfo=None),
-        server_default=func.now(),
-        onupdate=datetime.now(UTC).replace(tzinfo=None),
-        server_onupdate=func.now(),
-        nullable=False,
-    )
+    pass

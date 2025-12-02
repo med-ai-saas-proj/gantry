@@ -1,4 +1,5 @@
 """Factories for authentication services."""
+
 from src.shared.utils.logger import getLogger
 from src.auth.repositories.factories import (
     getUserRepository,
@@ -6,9 +7,9 @@ from src.auth.repositories.factories import (
     getPermissionRepository,
 )
 
-from .settings import getAuthSettings
-from .services.users import UserService
-from .services.api_keys import ApiKeyService
+from .users import UserService
+from .api_keys import ApiKeyService
+from ..settings import getAuthSettings
 
 from functools import lru_cache
 

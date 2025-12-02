@@ -1,4 +1,4 @@
-from src.auth.factories import getUserService
+from src.auth.services.factories import getUserService
 
 import asyncio
 

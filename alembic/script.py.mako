@@ -27,15 +27,9 @@ script_directory = script_path.parent
 
 def upgrade() -> None:
     """Upgrade schema."""
-    with open(script_directory / "${up_revision}_upgrade.sql") as f:
-        sql = f.read()
-    op.execute(sql)
-    ${upgrades if upgrades else "pass"}
+    ${upgrades if upgrades else "You are done"}
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    with open(script_directory / "${up_revision}_downgrade.sql") as f:
-        sql = f.read()
-    op.execute(sql)
-    ${downgrades if downgrades else "pass"}
+    ${downgrades if downgrades else "You are done"}

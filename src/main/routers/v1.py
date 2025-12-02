@@ -1,4 +1,5 @@
 """API v1 router."""
+
 from src.ai_search import ai_search_router
 from src.rx_advisor import rx_advisor_router
 from src.auth.routes import auth, test, api_keys

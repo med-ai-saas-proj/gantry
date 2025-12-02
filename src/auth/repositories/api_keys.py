@@ -1,27 +1,27 @@
 """API key repository."""
 
 from src.db_v2.repository import Repository
-from src.auth.models.api_keys import ApiKey, Permission, ApiKeyPermissions
+from src.auth.models.api_keys import ApiKeys, Permissions, ApiKeyPermissions
 
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class PermissionRepository(Repository[Permission, str]):
+class PermissionRepository(Repository[Permissions, str]):
     """Permission repository."""
 
     def __init__(self):
         """Initialize PermissionRepository."""
-        super().__init__(Permission, Permission.name)
+        super().__init__(Permissions, Permissions.name)
 
 
-class ApiKeyRepository(Repository[ApiKey, uuid.UUID]):
+class ApiKeyRepository(Repository[ApiKeys, uuid.UUID]):
     """API key repository."""
 
     def __init__(self):
         """Initialize ApiKeyRepository."""
-        super().__init__(ApiKey, ApiKey.id)
+        super().__init__(ApiKeys, ApiKeys.id)
 
     async def addPermissionsToApiKey(
         self,

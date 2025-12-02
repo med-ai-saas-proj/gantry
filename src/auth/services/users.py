@@ -7,14 +7,13 @@ from src.shared.custom_types.error_exception import (
     UnrecoverableError,
 )
 
-from ..models.users import User
+from ..models.users import Users
 from ..entities.auth_info import (
     AuthInfo,
     JwtPayload,
     LoginTokenData,
     RefreshTokenData,
 )
-from ...shared.utils.result import err
 
 import uuid
 from typing import TypedDict, NotRequired
@@ -143,11 +142,12 @@ class UserServiceConfig(TypedDict):
 class UserService:
     """User service."""
 
-    def __init__(self,
-                 config: UserServiceConfig,
-                 logger: BoundLogger,
-                 user_repo: UserRepository
-                 ):
+    def __init__(
+        self,
+        config: UserServiceConfig,
+        logger: BoundLogger,
+        user_repo: UserRepository,
+    ):
         """Initialize UserService with configuration and logger."""
         self.logger = logger
         self.access_token_secret_key = config["access_token_secret_key"]
@@ -168,18 +168,18 @@ class UserService:
 
     async def emailRegister(
         self, username: str, email: str, password: str
-    ) -> Result[User, UserExistedError]:
+    ) -> Result[Users, UserExistedError]:
         """Register a new user with email and password."""
         async with session_manager.get_session() as session:
             existed_user = await self.user_repo.getByUsernameOrEmail(
-                session, username, email, [User.id]
+                session, username, email, [Users.id]
             )
 
             if existed_user:
                 return Err(UserExistedError())
 
             hashed_password = _getPasswordHash(password)
-            new_user = User(
+            new_user = Users(
                 username=username, email=email, hashed_password=hashed_password
             )
             await self.user_repo.add(session, new_user)
@@ -202,7 +202,7 @@ class UserService:
                 return Err(TooManyLoginAttemptsError())
 
             user = await self.user_repo.getByEmail(
-                session, email, [User.id, User.email, User.hashed_password]
+                session, email, [Users.id, Users.email, Users.hashed_password]
             )
 
             if not user or not _verifyPassword(password, user.hashed_password):
@@ -222,7 +222,7 @@ class UserService:
                 algorithm=self.access_token_algorithm,
                 expires_delta=self.access_token_expire,
             )
-            if err(access_token_):
+            if access_token_.error is not None:
                 return access_token_
 
             refresh_token_ = _createAccessToken(
@@ -234,7 +234,7 @@ class UserService:
                 algorithm=self.refresh_token_algorithm,
                 expires_delta=self.refresh_token_expire,
             )
-            if err(refresh_token_):
+            if refresh_token_.error is not None:
                 return refresh_token_
 
             access_token = access_token_.unwrap()
@@ -291,7 +291,7 @@ class UserService:
             self.refresh_token_secret_key,
             self.refresh_token_algorithm,
         )
-        if err(auth_info_):
+        if auth_info_.error is not None:
             return auth_info_
 
         auth_info = auth_info_.unwrap()
@@ -311,7 +311,7 @@ class UserService:
             expires_delta=self.access_token_expire,
         )
 
-        if err(access_token_):
+        if access_token_.error is not None:
             return access_token_
 
         access_token = access_token_.unwrap()

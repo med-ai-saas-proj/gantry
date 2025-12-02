@@ -18,4 +18,4 @@ class AppSettings(BaseSettings):
 
 @lru_cache(1)
 def getAppSetting():
-    return AppSettings() # type: ignore
+    return AppSettings()
