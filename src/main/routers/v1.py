@@ -1,3 +1,4 @@
+from src.chat import chat_router
 from src.ai_search import ai_search_router
 from src.rx_advisor import rx_advisor_router
 from src.auth.routes import auth, test, api_keys
@@ -15,6 +16,7 @@ v1_router.include_router(rx_advisor_router)
 v1_router.include_router(ai_search_router)
 v1_router.include_router(auth.router)
 v1_router.include_router(api_keys.router)
+v1_router.include_router(chat_router)
 
 
 @v1_router.get("/healthcheck", response_model=MessagedResponse)
