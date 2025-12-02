@@ -1,14 +1,15 @@
 """This file contain definition of chat's routers."""
 
-from src.auth.depends.auth import get_current_user
+from src.auth.depends.auth import required_permission
 from src.shared.utils.logger import LOGGER
-from src.auth.entities.auth_info import AuthInfo as User
+from src.shared.custom_types.responses.sse import SSEResponse
 
 from .dtos import ChatInput, ChatOutput
+from .factories import ChatService, getChatService
 
 from typing import Annotated
 
-from fastapi import Body, Query, Security, APIRouter
+from fastapi import Body, Depends, Security, APIRouter
 from fastapi.responses import JSONResponse
 
 
@@ -16,32 +17,42 @@ model_router = APIRouter(prefix="/models")
 
 
 @model_router.get(path="")
-def get_all_model(user: Annotated[User, Security(get_current_user)], input):
+def get_all_model(
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
+    input,
+):
     pass
 
 
 @model_router.get(path="/{model_name}")
 def get_model(
-    user: Annotated[User, Security(get_current_user)], model_name: str
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
+    model_name: str,
+    chat_service: Annotated[ChatService, Depends(getChatService)],
 ):
     pass
 
 
 @model_router.post(path="")
-def create_model(user: Annotated[User, Security(get_current_user)], input):
+def create_model(
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
+    input,
+):
     pass
 
 
 @model_router.put(path="{model_name}")
 def update_model(
-    user: Annotated[User, Security(get_current_user)], model_name: str
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
+    model_name: str,
 ):
     pass
 
 
 @model_router.delete(path="/{model_name}")
 def delete_model(
-    user: Annotated[User, Security(get_current_user)], model_name: str
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
+    model_name: str,
 ):
     pass
 
@@ -50,11 +61,20 @@ chat_router = APIRouter(prefix="/chat")
 
 
 @chat_router.post("", response_model=ChatOutput)
-def chat(
-    user: Annotated[User, Security(get_current_user)],
+async def chat(
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
+    chat_service: Annotated[ChatService, Depends(getChatService)],
     input: Annotated[ChatInput, Body()],
 ):
-    pass
+    """Just the good old chatbot."""
+    LOGGER.debug("user", user_id=user_id)
+    if input.stream:
+        return SSEResponse(
+            chat_service.chat_stream(user_id, input.input),
+        )
+    else:
+        output = await chat_service.chat(user_id, input.input)
+        return JSONResponse(output)
 
 
 conversation_router = APIRouter(prefix="/conversation")
@@ -62,7 +82,7 @@ conversation_router = APIRouter(prefix="/conversation")
 
 @conversation_router.post("")
 def create_conversation(
-    user: Annotated[User, Security(get_current_user)],
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
     input,
 ):
     return {"id": "conv-123981"}
@@ -70,7 +90,8 @@ def create_conversation(
 
 @conversation_router.get("/{conversation_id}")
 def get_conversation(
-    user: Annotated[User, Security(get_current_user)], conversation_id: str
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
+    conversation_id: str,
 ):
     return {
         "id": "conv-1231",
@@ -82,7 +103,7 @@ def get_conversation(
 
 @conversation_router.put("/{conversation_id}")
 def replace_conversation_metadata(
-    user: Annotated[User, Security(get_current_user)],
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
     conversation_id: str,
     metadata: Annotated[dict[str, str], Body(embed=True)],
 ):
@@ -91,7 +112,7 @@ def replace_conversation_metadata(
 
 @conversation_router.patch("/{conversation_id}")
 def merge_conversation_metadata(
-    user: Annotated[User, Security(get_current_user)],
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
     conversation_id: str,
     new_metadata: Annotated[dict[str, str | None], Body(embed=True)],
 ):
@@ -101,7 +122,7 @@ def merge_conversation_metadata(
 
 @conversation_router.get("/{conversation_id}/messages")
 def get_messages(
-    user: Annotated[User, Security(get_current_user)],
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
     conversation_id: str,
     limit,
     order,
@@ -116,6 +137,7 @@ def get_messages(
 
 @conversation_router.get(path="/attatchment/{attachment_id}")
 def get_attachment(
-    user: Annotated[User, Security(get_current_user)], attatchment_id: str
+    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
+    attatchment_id: str,
 ):
     pass
