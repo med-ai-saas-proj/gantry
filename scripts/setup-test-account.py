@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from src.auth.services.factories import getUserService
 
 import asyncio
@@ -13,7 +17,7 @@ async def main():
     try:
         user_ = await user_service.emailRegister(username, email, password)
         user = user_.unwrap()
-        print(f"Created a test account with {user.email}, {user.id}")
+        print(f"Created a test account with {user.username}, {user.uid}")
     except Exception as e:
         print("Failed to create test account:", e)
 

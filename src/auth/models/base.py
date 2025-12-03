@@ -1,7 +1,8 @@
-from src.db_v2.base import BaseSQLModel, naming_convention
-from src.db_v2.initialize import async_engine
+"""Base SQL Model for Auth module."""
 
-from sqlalchemy import MetaData
+from src.db_v2.base import BaseSQLModel, naming_convention
+
+from sqlalchemy.sql.schema import MetaData
 
 
 class AuthBaseSQLModel(BaseSQLModel):

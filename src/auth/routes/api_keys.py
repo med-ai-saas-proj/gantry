@@ -1,12 +1,12 @@
 """API key management routes."""
 
-from ..dtos import (
-    CreateAPIKeyInput,
-    CreateAPIKeyOutputSuccess,
+from .dtos import (
+    CreateAPIKeyRequest,
+    CreateAPIKeySuccessResponse,
 )
-from ..factories import ApiKeyService, getAPIKeyService
 from ..depends.auth import get_current_user
 from ..services.users import AuthInfo
+from ..services.factories import ApiKeyService, getAPIKeyService
 
 from typing import Annotated
 
@@ -19,16 +19,16 @@ router = APIRouter(prefix="/api_keys", tags=["API keys"])
 @router.post(
     "/",
     responses={
-        200: {"model": CreateAPIKeyOutputSuccess},
+        200: {"model": CreateAPIKeySuccessResponse},
     },
 )
 async def createApiKey(
-    request: Annotated[CreateAPIKeyInput, Body()],
+    request: Annotated[CreateAPIKeyRequest, Body()],
     auth_info: Annotated[AuthInfo, Security(get_current_user)],
     api_key_service: Annotated[ApiKeyService, Depends(getAPIKeyService)],
-) -> CreateAPIKeyOutputSuccess:
+) -> CreateAPIKeySuccessResponse:
     """Create a new API key with specified permissions for the authenticated user."""
     api_key = await api_key_service.createApiKey(
-        auth_info["id"], request.permissions
+        auth_info["uid"], request.permissions
     )
     return {"key": api_key.unwrap()}

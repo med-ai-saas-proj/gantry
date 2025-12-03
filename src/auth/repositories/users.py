@@ -14,7 +14,7 @@ class UserRepository(Repository[Users, uuid.UUID]):
 
     def __init__(self) -> None:
         """Initialize UserRepository."""
-        super().__init__(Users, Users.id)
+        super().__init__(Users, Users.uid)
 
     async def getByUsernameOrEmail(
         self,

@@ -2,8 +2,8 @@
 
 from src.db_v2.initialize import session_manager
 from src.auth.models.users import Users
+from src.auth.services.dtos import APIKeyInfo
 from src.auth.models.api_keys import ApiKeys, Permissions
-from src.auth.entities.auth_info import APIKeyInfo
 from src.auth.repositories.users import UserRepository
 from src.auth.repositories.api_keys import (
     ApiKeyRepository,
@@ -126,12 +126,12 @@ class ApiKeyService:
         ).hexdigest()
 
     async def createApiKey(
-        self, user_id: str, permissions: list[str]
+        self, user_uid: str, permissions: list[str]
     ) -> Result[str, InvalidPermissionError | UserNotFoundError]:
         """Create an API key for a user with specified permissions."""
         async with session_manager.get_session() as session:
             user = await self.user_repo.getByKey(
-                session, uuid.UUID(user_id), [Users.id]
+                session, uuid.UUID(user_uid), [Users.id]
             )
             if user is None:
                 return Err(UserNotFoundError())
@@ -156,14 +156,14 @@ class ApiKeyService:
             hashed_key = self._hash_api_key(formatted_key)
 
             new_api_key = ApiKeys(
-                id=api_key_id,
-                owner_id=uuid.UUID(user_id),
+                uid=api_key_id,
+                owner_id=user.id,
                 hashed_key=hashed_key,
                 expiration_date=datetime.now() + self.expiration,
             )
             await self.api_key_repo.add(session, new_api_key)
             await self.api_key_repo.addPermissionsToApiKey(
-                session, api_key_id, permissions
+                session, new_api_key.id, permissions
             )
             await session.commit()
             return Ok(formatted_key)

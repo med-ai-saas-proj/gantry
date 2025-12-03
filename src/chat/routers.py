@@ -1,15 +1,13 @@
 """This file contain definition of chat's routers."""
 
 from src.auth.depends.auth import get_current_user
-from src.shared.utils.logger import LOGGER
-from src.auth.entities.auth_info import AuthInfo as User
+from src.auth.services.dtos import AuthInfo as User
 
 from .dtos import ChatInput, ChatOutput
 
 from typing import Annotated
 
-from fastapi import Body, Query, Security, APIRouter
-from fastapi.responses import JSONResponse
+from fastapi import Body, Security, APIRouter
 
 
 model_router = APIRouter(prefix="/models")

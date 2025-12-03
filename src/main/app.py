@@ -1,7 +1,7 @@
 from src.shared.utils import request_id_utils
 from src.shared.consts import common_const, messages_const
-from src.shared.settings import AppSettings, getAppSetting
-from src.shared.utils.logger import BoundLogger, getLogger
+from src.shared.settings import getAppSetting
+from src.shared.utils.logger import getLogger
 from src.shared.dtos.error_output import (
     ProblemDetails,
 )
@@ -15,16 +15,18 @@ from .routers import api_router
 import time
 import uuid
 import traceback
-from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request
 from pydantic import ValidationError
 from scalar_fastapi import get_scalar_api_reference
+from sqlalchemy.orm import configure_mappers
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
+
+configure_mappers()
 
 app = FastAPI(
     title="Venera API",

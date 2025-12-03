@@ -1,3 +1,5 @@
+"""Alembic environment configuration file."""
+
 import src.db.postgres.consts as postgres_consts
 from alembic import context
 
@@ -20,7 +22,7 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 
-from src.auth.models.base import AuthBaseSQLModel
+from src.auth.models.base import AuthBaseSQLModel  # noqa: E402
 
 
 target_metadata = [AuthBaseSQLModel.metadata]

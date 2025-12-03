@@ -1,12 +1,13 @@
 """Authentication and authorization dependencies for FastAPI routes."""
 
-from ..factories import (
+from src.auth.services.dtos import AuthInfo, APIKeyInfo
+
+from ..services.factories import (
     UserService,
     ApiKeyService,
     getUserService,
     getAPIKeyService,
 )
-from ..entities.auth_info import AuthInfo, APIKeyInfo
 
 from typing import Annotated
 

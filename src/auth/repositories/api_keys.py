@@ -1,7 +1,8 @@
 """API key repository."""
 
 from src.db_v2.repository import Repository
-from src.auth.models.api_keys import ApiKeys, Permissions, ApiKeyPermissions
+from src.auth.models.api_keys import ApiKeys, ApiKeyPermissions
+from src.auth.models.permissions import Permissions
 
 import uuid
 
@@ -21,12 +22,12 @@ class ApiKeyRepository(Repository[ApiKeys, uuid.UUID]):
 
     def __init__(self):
         """Initialize ApiKeyRepository."""
-        super().__init__(ApiKeys, ApiKeys.id)
+        super().__init__(ApiKeys, ApiKeys.uid)
 
     async def addPermissionsToApiKey(
         self,
         session: AsyncSession,
-        api_key_id: uuid.UUID,
+        api_key_id: int,
         permissions: list[str],
     ):
         """Add permissions to API Key."""

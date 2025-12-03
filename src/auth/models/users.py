@@ -1,20 +1,26 @@
 """User entity."""
 
-from src.db_v2.utils import WithIDAndUUID, WithCreateUpdateTimestamp
+from src.db_v2.utils import (
+    WithAutoGenerateUUID,
+    WithAutoIncrementBigIntPK,
+    WithCreateUpdateTimestamp,
+)
 
 from .base import AuthBaseSQLModel
 
-import uuid
-from uuid import uuid4
-
-from sqlalchemy import UUID, String, Boolean
+from sqlalchemy import String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 
-class Users(WithCreateUpdateTimestamp, WithIDAndUUID, AuthBaseSQLModel):
+class Users(
+    WithCreateUpdateTimestamp,
+    WithAutoGenerateUUID,
+    WithAutoIncrementBigIntPK,
+    AuthBaseSQLModel,
+):
     """User entity."""
 
-    __tablename__ = "USERS"
+    __tablename__ = "Users"
 
     username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)

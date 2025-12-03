@@ -4,25 +4,25 @@ from src.shared.dtos.base import BaseDTO
 
 from typing import Literal, TypedDict
 
-from pydantic import Field, EmailStr, BaseModel, SecretStr
+from pydantic import Field, EmailStr, SecretStr
 
 
-class LoginInput(BaseDTO):
+class LoginRequest(BaseDTO):
     """Input DTO for user login."""
 
     grant_type: Literal["password"]
-    email: EmailStr
+    username: EmailStr
     password: SecretStr = Field(..., description="User's password")
 
 
-class RefreshAccessTokenInput(BaseDTO):
+class RefreshAccessTokenRequest(BaseDTO):
     """Input DTO for refreshing access token."""
 
     grant_type: Literal["refresh_token"]
     refresh_token: str
 
 
-class LoginOutputSuccess(TypedDict):
+class LoginSuccessResponse(TypedDict):
     """Output DTO for successful login."""
 
     access_token: str
@@ -32,7 +32,7 @@ class LoginOutputSuccess(TypedDict):
     refresh_token_expires_in: int
 
 
-class CreateAPIKeyInput(BaseDTO):
+class CreateAPIKeyRequest(BaseDTO):
     """Input DTO for creating an API key."""
 
     name: str | None
@@ -40,13 +40,13 @@ class CreateAPIKeyInput(BaseDTO):
     permissions: list[str]
 
 
-class CreateAPIKeyOutputSuccess(TypedDict):
+class CreateAPIKeySuccessResponse(TypedDict):
     """Output DTO for successful API key creation."""
 
     key: str
 
 
-class RefreshAccessTokenOutputSuccess(TypedDict):
+class RefreshAccessTokenSuccessResponse(TypedDict):
     """Output DTO for successful access token refresh."""
 
     access_token: str

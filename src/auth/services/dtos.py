@@ -1,3 +1,5 @@
+"""Data transfer objects for authentication services."""
+
 from typing import Literal, TypedDict, NotRequired
 
 
@@ -12,7 +14,7 @@ class JwtPayload(TypedDict):
 class AuthInfo(TypedDict):
     """Represents authentication information about a user."""
 
-    id: str
+    uid: str
     email: str
 
 

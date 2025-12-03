@@ -1,6 +1,12 @@
 """User service."""
 
 from src.db_v2.initialize import redis as redis_client, session_manager
+from src.auth.services.dtos import (
+    AuthInfo,
+    JwtPayload,
+    LoginTokenData,
+    RefreshTokenData,
+)
 from src.auth.repositories.users import UserRepository
 from src.shared.custom_types.error_exception import (
     RecoverableError,
@@ -8,19 +14,13 @@ from src.shared.custom_types.error_exception import (
 )
 
 from ..models.users import Users
-from ..entities.auth_info import (
-    AuthInfo,
-    JwtPayload,
-    LoginTokenData,
-    RefreshTokenData,
-)
 
 import uuid
 from typing import TypedDict, NotRequired
 from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
-from safe_result import Ok, Err, Result
+from safe_result import Ok, Err, Result, _err
 from passlib.context import CryptContext
 from structlog.stdlib import BoundLogger
 
@@ -114,16 +114,16 @@ def _getCurrentUserFromToken(
         payload = jwt.decode(token, secret_key, algorithms=[algorithm])
     except JWTError as e:
         return Err(InvalidAccessTokenError(e))
-    user_id = payload.get("sub")
+    user_uid = payload.get("sub")
     user_email = payload.get("email")
     if (
         user_email is None
-        or user_id is None
+        or user_uid is None
         or not isinstance(user_email, str)
-        or not isinstance(user_id, str)
+        or not isinstance(user_uid, str)
     ):
         return Err(InvalidAccessTokenError())
-    return Ok[AuthInfo]({"id": user_id, "email": user_email})
+    return Ok[AuthInfo]({"uid": user_uid, "email": user_email})
 
 
 class UserServiceConfig(TypedDict):
@@ -202,7 +202,9 @@ class UserService:
                 return Err(TooManyLoginAttemptsError())
 
             user = await self.user_repo.getByEmail(
-                session, email, [Users.id, Users.email, Users.hashed_password]
+                session,
+                email,
+                [Users.id, Users.uid, Users.email, Users.hashed_password],
             )
 
             if not user or not _verifyPassword(password, user.hashed_password):
@@ -215,26 +217,26 @@ class UserService:
 
             access_token_ = _createAccessToken(
                 data={
-                    "sub": str(user.id),
+                    "sub": str(user.uid),
                     "email": user.email,
                 },
                 secret_key=self.access_token_secret_key,
                 algorithm=self.access_token_algorithm,
                 expires_delta=self.access_token_expire,
             )
-            if access_token_.error is not None:
+            if _err(access_token_):
                 return access_token_
 
             refresh_token_ = _createAccessToken(
                 data={
-                    "sub": str(user.id),
+                    "sub": str(user.uid),
                     "email": user.email,
                 },
                 secret_key=self.refresh_token_secret_key,
                 algorithm=self.refresh_token_algorithm,
                 expires_delta=self.refresh_token_expire,
             )
-            if refresh_token_.error is not None:
+            if _err(refresh_token_):
                 return refresh_token_
 
             access_token = access_token_.unwrap()
@@ -242,7 +244,7 @@ class UserService:
 
             await redis_client.delete(redis_key_login_attempt)
             await redis_client.set(
-                self._redisKeyForRefreshToken(user.id, refresh_token),
+                self._redisKeyForRefreshToken(user.uid, refresh_token),
                 "",  # value is not important
                 ex=self.refresh_token_expire,
             )
@@ -291,19 +293,19 @@ class UserService:
             self.refresh_token_secret_key,
             self.refresh_token_algorithm,
         )
-        if auth_info_.error is not None:
+        if _err(auth_info_):
             return auth_info_
 
         auth_info = auth_info_.unwrap()
-        user_id = auth_info["id"]
-        redis_key = self._redisKeyForRefreshToken(user_id, refresh_token)
+        user_uid = auth_info["uid"]
+        redis_key = self._redisKeyForRefreshToken(user_uid, refresh_token)
         exists = await redis_client.exists(redis_key)
         if not exists:
             return Err(InvalidRefreshTokenError())
 
         access_token_ = _createAccessToken(
             data={
-                "sub": str(user_id),
+                "sub": str(user_uid),
                 "email": auth_info["email"],
             },
             secret_key=self.access_token_secret_key,
@@ -311,7 +313,7 @@ class UserService:
             expires_delta=self.access_token_expire,
         )
 
-        if access_token_.error is not None:
+        if _err(access_token_):
             return access_token_
 
         access_token = access_token_.unwrap()
@@ -326,6 +328,6 @@ class UserService:
 
     async def logout(self, auth_info: AuthInfo, refresh_token: str):
         """Invalidate the refresh token by deleting it from Redis."""
-        user_id = auth_info["id"]
-        redis_key = self._redisKeyForRefreshToken(user_id, refresh_token)
+        user_uid = auth_info["uid"]
+        redis_key = self._redisKeyForRefreshToken(user_uid, refresh_token)
         await redis_client.delete(redis_key)

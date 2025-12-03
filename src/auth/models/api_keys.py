@@ -3,53 +3,63 @@
 from __future__ import annotations
 
 from src.db_v2.utils import (
-    WithIDAndUUID,
+    WithUUID,
+    WithAutoIncrementBigIntPK,
     WithCreateUpdateTimestamp,
 )
 
 from .base import AuthBaseSQLModel
 from .users import Users
+from .permissions import Permissions
 
-import uuid
 import datetime
 
-from sqlalchemy import UUID, String, DateTime, ForeignKey
+from sqlalchemy import BIGINT, String, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 
-class ApiKeys(WithCreateUpdateTimestamp, WithIDAndUUID, AuthBaseSQLModel):
+API_KEY_TABLE_NAME = "ApiKeys"
+
+
+class ApiKeyPermissions(
+    AuthBaseSQLModel,
+):
+    """Association table between API Keys and Permissions."""
+
+    __tablename__ = "ApiKeyPermissions"
+
+    api_key_id: Mapped[int] = mapped_column(
+        BIGINT,
+        ForeignKey(f"{API_KEY_TABLE_NAME}.{WithAutoIncrementBigIntPK.ID_NAME}"),
+        primary_key=True,
+        index=True,
+    )
+
+    permission_name: Mapped[str] = mapped_column(
+        String, ForeignKey(Permissions.name), primary_key=True, index=True
+    )
+
+
+class ApiKeys(
+    WithCreateUpdateTimestamp,
+    WithUUID,
+    WithAutoIncrementBigIntPK,
+    AuthBaseSQLModel,
+):
     """API Key."""
 
-    __tablename__ = "ApiKeys"
+    __tablename__ = API_KEY_TABLE_NAME
 
-    owner_id: Mapped[uuid.UUID] = mapped_column(
-        UUID, ForeignKey(Users.id), nullable=False
+    owner_id: Mapped[int] = mapped_column(
+        BIGINT, ForeignKey(Users.id), nullable=False
     )
     hashed_key: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     expiration_date: Mapped[datetime.datetime] = mapped_column(
         DateTime, nullable=True
     )
 
+    owner: Mapped[Users] = relationship(Users, init=False)
 
-class Permissions(WithCreateUpdateTimestamp, WithIDAndUUID, AuthBaseSQLModel):
-    """Permission class."""
-
-    __tablename__ = "Permissions"
-
-    name: Mapped[str] = mapped_column(
-        String, primary_key=True, unique=True, nullable=False
-    )
-    description: Mapped[str] = mapped_column(String, nullable=True)
-
-
-class ApiKeyPermissions(WithCreateUpdateTimestamp, AuthBaseSQLModel):
-    """API Key and Permission relation entity."""
-
-    __tablename__ = "ApiKeyPermissions"
-
-    api_key_id: Mapped[uuid.UUID] = mapped_column(
-        UUID, ForeignKey(ApiKeys.id), primary_key=True
-    )
-    permission_name: Mapped[str] = mapped_column(
-        String, ForeignKey(Permissions.name), primary_key=True
+    permissions: Mapped[list[Permissions]] = relationship(
+        Permissions, secondary=ApiKeyPermissions.__table__, init=False
     )

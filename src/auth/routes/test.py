@@ -1,6 +1,6 @@
 """Test routes for api key authentication and authorization."""
 
-from src.auth.entities.auth_info import APIKeyInfo
+from src.auth.services.dtos import APIKeyInfo
 
 from ..depends.auth import required_permission
 

@@ -6,8 +6,8 @@ Content-Type: application/json
 
 {
   "grant_type": "password",
-  "email": "test@example.com",
-  "password": "123456"
+  "username": "test@test.com",
+  "password": "Thisisastrongpassword123"
 }
 
 

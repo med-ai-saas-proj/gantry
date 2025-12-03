@@ -1,15 +1,16 @@
 """Auth routes module."""
 
-from ..dtos import (
-    LoginInput,
+from src.auth.services.dtos import AuthInfo
+
+from .dtos import (
+    LoginRequest,
     LogoutRequest,
-    LoginOutputSuccess,
-    RefreshAccessTokenInput,
-    RefreshAccessTokenOutputSuccess,
+    LoginSuccessResponse,
+    RefreshAccessTokenRequest,
+    RefreshAccessTokenSuccessResponse,
 )
-from ..factories import UserService, getUserService
 from ..depends.auth import get_current_user
-from ..entities.auth_info import AuthInfo
+from ..services.factories import UserService, getUserService
 
 from typing import Annotated
 
@@ -23,17 +24,17 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @router.post(
     "/login",
     responses={
-        200: {"model": LoginOutputSuccess},
+        200: {"model": LoginSuccessResponse},
     },
 )
 async def login(
-    credential: Annotated[LoginInput, Body()],
+    credential: Annotated[LoginRequest, Body()],
     user_service: Annotated[UserService, Depends(getUserService)],
-) -> LoginOutputSuccess:
+) -> LoginSuccessResponse:
     """Login with email and password."""
     token = (
         await user_service.emailLogin(
-            str(credential.email), credential.password.get_secret_value()
+            str(credential.username), credential.password.get_secret_value()
         )
     ).unwrap()
 
@@ -49,13 +50,13 @@ async def login(
 @router.post(
     "/refresh-token",
     responses={
-        200: {"model": RefreshAccessTokenOutputSuccess},
+        200: {"model": RefreshAccessTokenSuccessResponse},
     },
 )
 async def refreshToken(
-    request: Annotated[RefreshAccessTokenInput, Body()],
+    request: Annotated[RefreshAccessTokenRequest, Body()],
     user_service: Annotated[UserService, Depends(getUserService)],
-) -> RefreshAccessTokenOutputSuccess:
+) -> RefreshAccessTokenSuccessResponse:
     """Refresh access token using a valid refresh token."""
     token = (
         await user_service.refreshAccessToken(
@@ -63,7 +64,7 @@ async def refreshToken(
         )
     ).unwrap()
 
-    return RefreshAccessTokenOutputSuccess(
+    return RefreshAccessTokenSuccessResponse(
         access_token=token["access_token"],
         token_type=token["token_type"],
         expires_in=token["expires_in"],
