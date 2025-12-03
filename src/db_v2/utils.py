@@ -1,14 +1,11 @@
 """Utilities for constructing SQLAlchemy models."""
 
-from src.db_v2.base import naming_convention
-
 from uuid import UUID as PythonUUID, uuid4
 from datetime import datetime
 
-from sqlalchemy import UUID, BIGINT, Column, DateTime, ForeignKey, func
+from sqlalchemy import UUID, BIGINT, DateTime, func
 from sqlalchemy.orm import (
     Mapped,
-    DeclarativeBase,
     MappedAsDataclass,
     mapped_column,
 )
