@@ -11,6 +11,7 @@ from sqlalchemy.orm import (
     DeclarativeBase,
     InstrumentedAttribute,
     load_only,
+    joinedload,
     selectinload,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -136,9 +137,9 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
         if load_relations:
             select_stmt = select_stmt.options(
                 *[
-                    selectinload(rel).load_only(*cols)
+                    joinedload(rel).load_only(*cols)
                     if cols
-                    else selectinload(rel)
+                    else joinedload(rel)
                     for rel, cols in load_relations.items()
                 ]
             )
@@ -151,4 +152,4 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
     ) -> Sequence[TEntity]:
         """Execute select statement and return multiple entities."""
         res = await session.execute(stmt)
-        return res.scalars().all()
+        return res.scalars().unique().all()
