@@ -42,8 +42,9 @@ app = FastAPI(
         500: {"model": ProblemDetails},
     },
 )
-cors = CORSMiddleware(
-    app,
+
+app.add_middleware(
+    CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
