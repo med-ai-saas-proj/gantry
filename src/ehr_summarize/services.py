@@ -2,7 +2,6 @@ from src.ehr import ehr_utils
 from src.ehr.dtos import InputEHR
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict
-from src.db.postgres.service import PostgresService
 
 from enum import Enum
 from typing import (
@@ -50,11 +49,9 @@ SSEContent = Union[StreamDelta, StreamDone]
 class EHRSummaryService:
     def __init__(
         self,
-        session_scope: Callable[..., _GeneratorContextManager],
         logger: BoundLogger,
         agent: Agent,
     ):
-        self.postgres_service = PostgresService(session_scope=session_scope)
         self.agent = agent
         self.logger = logger
 

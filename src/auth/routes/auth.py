@@ -7,9 +7,9 @@ from ..dtos import (
     RefreshAccessTokenInput,
     RefreshAccessTokenOutputSuccess,
 )
-from ..factories import UserService, getUserService
 from ..depends.auth import get_current_user
 from ..entities.auth_info import AuthInfo
+from ..services.factories import UserService, getUserService
 
 from typing import Annotated
 

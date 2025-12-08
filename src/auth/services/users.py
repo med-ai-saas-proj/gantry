@@ -1,6 +1,6 @@
 """User service."""
 
-from src.db_v2.initialize import redis as redis_client, session_manager
+from src.db.initialize import redis as redis_client, session_manager
 from src.auth.repositories.users import UserRepository
 from src.shared.custom_types.error_exception import (
     RecoverableError,

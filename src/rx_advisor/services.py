@@ -1,7 +1,6 @@
 from src.ehr.dtos import InputEHR, InputPrescription
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict, PrescriptionDict
-from src.db.postgres.service import PostgresService
 from src.shared.agents.shared_types import AnswerStruct
 from src.shared.custom_types.responses import SSEResponse
 
@@ -119,11 +118,11 @@ AQueue = asyncio.Queue[SSEContent]
 class RxAdvisorService:
     def __init__(
         self,
-        session_scope: Callable[..., _GeneratorContextManager],
+        # session_scope: Callable[..., _GeneratorContextManager],
         logger: BoundLogger,
-        agent: Agent[None, AnswerStruct],
+        agent: Agent[None, str],
     ):
-        self.postgres_service = PostgresService(session_scope=session_scope)
+        # self.postgres_service = PostgresService(session_scope=session_scope)
         self.agent = agent
         self.logger = logger
 

@@ -1,6 +1,6 @@
 """Initialize database connections and session manager."""
 
-from src.db_v2.session import AsyncSessionManager
+from src.db.session import AsyncSessionManager
 
 from .settings import getDBSettings
 

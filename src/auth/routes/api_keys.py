@@ -4,9 +4,9 @@ from ..dtos import (
     CreateAPIKeyInput,
     CreateAPIKeyOutputSuccess,
 )
-from ..factories import ApiKeyService, getAPIKeyService
 from ..depends.auth import get_current_user
 from ..services.users import AuthInfo
+from ..services.factories import ApiKeyService, getAPIKeyService
 
 from typing import Annotated
 

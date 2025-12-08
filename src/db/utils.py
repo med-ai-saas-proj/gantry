@@ -1,9 +1,11 @@
 """Utilities for constructing SQLAlchemy models."""
 
-from uuid import UUID as PythonUUID, uuid4
+from src.shared.utils.uuid_utils import uuid7
+
+from uuid import UUID as PythonUUID
 from datetime import datetime
 
-from sqlalchemy import Uuid, Integer, DateTime, func
+from sqlalchemy import Uuid, DateTime, BigInteger, func
 from sqlalchemy.orm import (
     Mapped,
     MappedAsDataclass,
@@ -11,16 +13,22 @@ from sqlalchemy.orm import (
 )
 
 
-class WithIDAndUUID(MappedAsDataclass, kw_only=True):
+class WithID(MappedAsDataclass, kw_only=True):
     """Add id (int) and uuid (UUID) column to table."""
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, sort_order=-999
+    )
+
+
+class WithUUID(MappedAsDataclass, kw_only=True):
     uuid: Mapped[PythonUUID] = mapped_column(
         Uuid,
         unique=True,
         index=True,
         nullable=False,
-        default_factory=uuid4,
+        default_factory=uuid7,
+        sort_order=-998,
     )
 
 

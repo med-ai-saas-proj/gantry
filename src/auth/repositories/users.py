@@ -1,6 +1,6 @@
 """User repository."""
 
-from src.db_v2.repository import ColumnList, Repository, RelationLoadMap
+from src.db.repository import ColumnList, Repository, RelationLoadMap
 from src.auth.models.users import Users
 
 import uuid

@@ -1,5 +1,3 @@
-from src.db.postgres.service import PostgresService
-
 import asyncio
 from typing import (
     Literal,
@@ -61,14 +59,12 @@ class DiscoverResult(TypedDict):
 class CrawlerService:
     def __init__(
         self,
-        session_scope: Callable[..., _GeneratorContextManager],
         logger: BoundLogger,
         google_search_api_key: str,
         google_search_cx: str,
         max_concurrent_crawler: int = 8,
     ):
         self.logger = logger
-        self.postgres_service = PostgresService(session_scope)
 
         self._rate_limiter = RateLimiter()
         self._crawler_semaphore = asyncio.Semaphore(max_concurrent_crawler)

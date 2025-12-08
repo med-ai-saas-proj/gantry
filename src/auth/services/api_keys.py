@@ -1,6 +1,6 @@
 """Service for managing API keys and their permissions."""
 
-from src.db_v2.initialize import session_manager
+from src.db.initialize import session_manager
 from src.auth.models.users import Users
 from src.auth.models.api_keys import ApiKeys, Permissions
 from src.auth.entities.auth_info import APIKeyInfo

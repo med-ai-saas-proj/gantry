@@ -4,6 +4,7 @@ from src.shared.agents.shared_types import AnswerStruct
 from src.shared.agents.shared_instruction import add_current_date
 
 from pydantic_ai import Agent
+from pydantic_ai.agent import AgentDepsT
 
 
 class Dep(ViewedUrlsMixin):
@@ -13,7 +14,7 @@ class Dep(ViewedUrlsMixin):
 AI_SEARCH_AGENT = Agent(
     model=llms.big_model,
     # output_type=AnswerStruct,
-    deps_type=Dep,
+    # deps_type=Dep,
     name="ai_search_agent",
     end_strategy="exhaustive",
     toolsets=[WEB_TOOLSET],

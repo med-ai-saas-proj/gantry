@@ -29,6 +29,7 @@ dependencies = [
     "redis>=7.0.1",
     "pydantic-settings>=2.11.0",
     "safe-result>=4.0.3",
+    "fastuuid==0.14.0",
 ]
 
 [tool.pyrefly]

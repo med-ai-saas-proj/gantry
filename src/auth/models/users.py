@@ -1,22 +1,21 @@
 """User entity."""
 
-from src.db_v2.utils import WithIDAndUUID, WithCreateUpdateTimestamp
+from src.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
 
 from .base import AuthBaseSQLModel
 
-import uuid
-from uuid import uuid4
-
-from sqlalchemy import UUID, String, Boolean
+from sqlalchemy import String, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 
 
-class Users(WithCreateUpdateTimestamp, WithIDAndUUID, AuthBaseSQLModel):
+class Users(WithCreateUpdateTimestamp, WithID, WithUUID, AuthBaseSQLModel):
     """User entity."""
 
-    __tablename__ = "USERS"
+    __tablename__ = "Users"
 
-    username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    hashed_password: Mapped[str] = mapped_column(String, nullable=False)
+    username: Mapped[str] = mapped_column(
+        String(64), unique=True, nullable=False
+    )
+    email: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    hashed_password: Mapped[str] = mapped_column(String(128), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

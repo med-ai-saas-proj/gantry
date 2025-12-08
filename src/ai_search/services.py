@@ -9,7 +9,6 @@ from src.chat.dtos import (
     ModelResponse_ContentType,
     StreamEvent_PartDelta_Output,
 )
-from src.db.postgres.service import PostgresService
 from src.shared.dtos.generation_output import (
     ResponseStatus,
     GenerationOutput,
@@ -164,12 +163,10 @@ async def aggregate_stream(
 class AISearchService:
     def __init__(
         self,
-        session_scope: Callable[..., _GeneratorContextManager],
         logger: BoundLogger,
         agent: Agent[Dep, str],
         # agent: Agent[Dep, AnswerStruct],
     ):
-        self.postgres_service = PostgresService(session_scope=session_scope)
         self.agent = agent
         self.logger = logger
 

@@ -1,5 +1,6 @@
 """Base entity for SQLAlchemy models."""
 
+from sqlalchemy import MetaData
 from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
 
 
@@ -15,4 +16,5 @@ naming_convention = {
 class BaseSQLModel(MappedAsDataclass, DeclarativeBase, kw_only=True):
     """This should be the base of all SQL model."""
 
+    metadata = MetaData(naming_convention=naming_convention)
     pass
