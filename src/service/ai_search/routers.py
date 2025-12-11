@@ -1,10 +1,10 @@
-from src.chat.dtos import ChatOutput, StreamEvent
-from src.auth.depends.auth import required_permission
 from src.shared.utils.logger import LOGGER
+from src.management.auth.depends.auth import required_permission
 from src.shared.custom_types.responses.sse import SSEResponse
 
 from .dtos import AiSearchInput
 from .initialize import AI_SEARCH_SERVICE
+from ..chat.dtos import ChatOutput, StreamEvent
 
 from typing import Annotated
 

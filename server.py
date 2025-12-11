@@ -1,6 +1,6 @@
 """This file is the entrypoint for debugging."""
 
-from src.main.app import cors as app  # type: ignore # noqa: F401
+from src.main.app import app  # type: ignore # noqa: F401
 
 import argparse
 

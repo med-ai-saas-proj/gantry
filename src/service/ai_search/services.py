@@ -1,4 +1,10 @@
-from src.chat.dtos import (
+from src.shared.dtos.generation_output import (
+    ResponseStatus,
+    GenerationOutput,
+)
+
+from .agents import Dep
+from ..chat.dtos import (
     ChatOutput,
     StreamEvent,
     ReferenceType,
@@ -9,12 +15,6 @@ from src.chat.dtos import (
     ModelResponse_ContentType,
     StreamEvent_PartDelta_Output,
 )
-from src.shared.dtos.generation_output import (
-    ResponseStatus,
-    GenerationOutput,
-)
-
-from .agents import Dep
 
 import json
 from typing import (

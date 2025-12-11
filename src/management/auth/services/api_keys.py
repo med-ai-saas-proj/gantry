@@ -1,17 +1,18 @@
 """Service for managing API keys and their permissions."""
 
-from src.db.initialize import session_manager
-from src.auth.models.users import Users
-from src.auth.models.api_keys import ApiKeys, Permissions
-from src.auth.entities.auth_info import APIKeyInfo
-from src.auth.repositories.users import UserRepository
-from src.auth.repositories.api_keys import (
-    ApiKeyRepository,
-    PermissionRepository,
-)
+from src.db.factories import AsyncSessionManager, getSessionManager
 from src.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
+)
+
+from ..models.users import Users
+from ..models.api_keys import ApiKeys, Permissions
+from ..entities.auth_info import APIKeyInfo
+from ..repositories.users import UserRepository
+from ..repositories.api_keys import (
+    ApiKeyRepository,
+    PermissionRepository,
 )
 
 import hmac
@@ -79,6 +80,7 @@ class ApiKeyService:
         user_repo: UserRepository,
         api_key_repo: ApiKeyRepository,
         permission_repo: PermissionRepository,
+        session_manager: AsyncSessionManager,
     ):
         """Initialize the ApiKeyService with configuration and logger."""
         self.logger = logger
@@ -97,6 +99,7 @@ class ApiKeyService:
         self.user_repo = user_repo
         self.api_key_repo = api_key_repo
         self.permission_repo = permission_repo
+        self.session_manager = session_manager
 
     def _create_api_key_secret(self) -> str:
         return secrets.token_urlsafe(self.api_key_secret_length)
@@ -129,7 +132,7 @@ class ApiKeyService:
         self, user_id: str, permissions: list[str]
     ) -> Result[str, InvalidPermissionError | UserNotFoundError]:
         """Create an API key for a user with specified permissions."""
-        async with session_manager.get_session() as session:
+        async with self.session_manager.get_session() as session:
             user = await self.user_repo.getByKey(
                 session, uuid.UUID(user_id), [Users.id]
             )
@@ -179,7 +182,7 @@ class ApiKeyService:
                 "At least one permission must be specified for verification"
             )
 
-        async with session_manager.get_session() as session:
+        async with self.session_manager.get_session() as session:
             key_parts_ = self.get_api_key_parts(api_key)
             if key_parts_.is_err():
                 return Err(InvalidAPIKey())

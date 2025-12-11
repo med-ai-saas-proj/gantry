@@ -1,15 +1,16 @@
 """Factories for authentication services."""
 
+from src.db.factories import getRedis, getSessionManager
 from src.shared.utils.logger import getLogger
-from src.auth.repositories.factories import (
-    getUserRepository,
-    getApiKeyRepository,
-    getPermissionRepository,
-)
 
 from .users import UserService
 from .api_keys import ApiKeyService
 from ..settings import getAuthSettings
+from ..repositories.factories import (
+    getUserRepository,
+    getApiKeyRepository,
+    getPermissionRepository,
+)
 
 from functools import lru_cache
 
@@ -31,6 +32,8 @@ def getUserService():
         },
         logger=getLogger(),
         user_repo=getUserRepository(),
+        session_manager=getSessionManager(),
+        redis_client=getRedis(),
     )
 
 
@@ -48,4 +51,5 @@ def getAPIKeyService():
         user_repo=getUserRepository(),
         api_key_repo=getApiKeyRepository(),
         permission_repo=getPermissionRepository(),
+        session_manager=getSessionManager(),
     )

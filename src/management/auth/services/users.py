@@ -1,7 +1,7 @@
 """User service."""
 
-from src.db.initialize import redis as redis_client, session_manager
-from src.auth.repositories.users import UserRepository
+from src.db.session import AsyncSessionManager
+from src.db.factories import getRedis, getSessionManager
 from src.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
@@ -14,6 +14,7 @@ from ..entities.auth_info import (
     LoginTokenData,
     RefreshTokenData,
 )
+from ..repositories.users import UserRepository
 
 import uuid
 from typing import TypedDict, NotRequired
@@ -21,6 +22,7 @@ from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
 from safe_result import Ok, Err, Result
+from redis.asyncio import Redis
 from passlib.context import CryptContext
 from structlog.stdlib import BoundLogger
 
@@ -147,6 +149,8 @@ class UserService:
         config: UserServiceConfig,
         logger: BoundLogger,
         user_repo: UserRepository,
+        session_manager: AsyncSessionManager,
+        redis_client: Redis,
     ):
         """Initialize UserService with configuration and logger."""
         self.logger = logger
@@ -165,12 +169,14 @@ class UserService:
             minutes=config.get("login_attempt_window_minutes", 15)
         )
         self.user_repo = user_repo
+        self.session_manager = session_manager
+        self.redis_client = redis_client
 
     async def emailRegister(
         self, username: str, email: str, password: str
     ) -> Result[Users, UserExistedError]:
         """Register a new user with email and password."""
-        async with session_manager.get_session() as session:
+        async with self.session_manager.get_session() as session:
             existed_user = await self.user_repo.getByUsernameOrEmail(
                 session, username, email, [Users.id]
             )
@@ -194,10 +200,10 @@ class UserService:
         InvalidCredentialError | JWTEncodeError | TooManyLoginAttemptsError,
     ]:
         """Login a user with email and password."""
-        async with session_manager.get_session() as session:
+        async with self.session_manager.get_session() as session:
             redis_key_login_attempt = self._redisKeyForLoginAttempt(email)
 
-            login_attempt = await redis_client.get(redis_key_login_attempt)
+            login_attempt = await self.redis_client.get(redis_key_login_attempt)
             if login_attempt and int(login_attempt) >= self.max_login_attempts:
                 return Err(TooManyLoginAttemptsError())
 
@@ -206,8 +212,8 @@ class UserService:
             )
 
             if not user or not _verifyPassword(password, user.hashed_password):
-                await redis_client.incr(redis_key_login_attempt, 1)
-                await redis_client.expire(
+                await self.redis_client.incr(redis_key_login_attempt, 1)
+                await self.redis_client.expire(
                     redis_key_login_attempt,
                     time=self.login_attempt_window,
                 )
@@ -240,8 +246,8 @@ class UserService:
             access_token = access_token_.unwrap()
             refresh_token = refresh_token_.unwrap()
 
-            await redis_client.delete(redis_key_login_attempt)
-            await redis_client.set(
+            await self.redis_client.delete(redis_key_login_attempt)
+            await self.redis_client.set(
                 self._redisKeyForRefreshToken(user.id, refresh_token),
                 "",  # value is not important
                 ex=self.refresh_token_expire,
@@ -297,7 +303,7 @@ class UserService:
         auth_info = auth_info_.unwrap()
         user_id = auth_info["id"]
         redis_key = self._redisKeyForRefreshToken(user_id, refresh_token)
-        exists = await redis_client.exists(redis_key)
+        exists = await self.redis_client.exists(redis_key)
         if not exists:
             return Err(InvalidRefreshTokenError())
 
@@ -328,4 +334,4 @@ class UserService:
         """Invalidate the refresh token by deleting it from Redis."""
         user_id = auth_info["id"]
         redis_key = self._redisKeyForRefreshToken(user_id, refresh_token)
-        await redis_client.delete(redis_key)
+        await self.redis_client.delete(redis_key)

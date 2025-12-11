@@ -1,7 +1,6 @@
 from src.ehr.dtos import InputEHR
-from src.auth.depends.auth import required_permission
 from src.shared.utils.logger import LOGGER
-from src.auth.entities.auth_info import AuthInfo as User
+from src.management.auth.depends.auth import required_permission
 from src.shared.custom_types.responses import SSEResponse
 
 from .initialize import EHR_SUMMARY_SERVICE

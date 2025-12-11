@@ -3,8 +3,8 @@
 Revision ID: ${up_revision}
 Revises: ${down_revision | comma,n}
 Create Date: ${create_date}
-Feature: 
-Reason: 
+Feature:
+Reason:
 
 """
 from alembic import op
@@ -27,9 +27,15 @@ script_directory = script_path.parent
 
 def upgrade() -> None:
     """Upgrade schema."""
-    ${upgrades if upgrades else "You are done"}
+    with open(script_directory / "${up_revision}_upgrade.sql") as f:
+        sql = f.read()
+    op.execute(sql)
+    ${upgrades if upgrades else "pass"}
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    ${downgrades if downgrades else "You are done"}
+    with open(script_directory / "${up_revision}_downgrade.sql") as f:
+        sql = f.read()
+    op.execute(sql)
+    ${downgrades if downgrades else "pass"}

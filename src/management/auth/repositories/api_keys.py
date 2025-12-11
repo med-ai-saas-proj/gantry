@@ -1,7 +1,8 @@
 """API key repository."""
 
 from src.db.repository import Repository
-from src.auth.models.api_keys import ApiKeys, Permissions, ApiKeyPermissions
+
+from ..models.api_keys import ApiKeys, Permissions, ApiKeyPermissions
 
 import uuid
 
