@@ -22,7 +22,7 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 
 type ColumnList = Sequence[InstrumentedAttribute] | None
-type RelationLoadMap = dict[InstrumentedAttribute, ColumnList] | None
+type RelationLoadMap = dict[InstrumentedAttribute, ColumnList | RelationLoadMap] | None
 
 
 class Repository[TEntity: DeclarativeBase, TKey](ABC):
