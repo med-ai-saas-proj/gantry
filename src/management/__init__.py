@@ -1,7 +1,10 @@
 from src.shared.settings import getAppSetting
 from src.shared.custom_types.error_exception import ProblemDetails
 
+from .api_keys import apikey_router
+
 from fastapi import FastAPI, APIRouter
+from scalar_fastapi import get_scalar_api_reference
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -29,6 +32,7 @@ management_app.add_middleware(
 v1_router = APIRouter(
     prefix="/v1", tags=["api", "management", "v1"], include_in_schema=True
 )
+v1_router.include_router(apikey_router)
 
 
 api_router = APIRouter(
@@ -37,3 +41,11 @@ api_router = APIRouter(
 api_router.include_router(v1_router)
 
 management_app.include_router(api_router)
+
+
+@management_app.get("/docs", include_in_schema=False)
+async def scalar_html():
+    return get_scalar_api_reference(
+        openapi_url=management_app.openapi_url,
+        title=management_app.title,
+    )

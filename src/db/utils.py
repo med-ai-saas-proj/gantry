@@ -17,7 +17,7 @@ class WithID(MappedAsDataclass, kw_only=True):
     """Add id (int) and uuid (UUID) column to table."""
 
     id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, sort_order=-999
+        BigInteger, primary_key=True, sort_order=-999, init=False
     )
 
 
@@ -29,6 +29,7 @@ class WithUUID(MappedAsDataclass, kw_only=True):
         nullable=False,
         default_factory=uuid7,
         sort_order=-998,
+        init=False,
     )
 
 
@@ -40,6 +41,7 @@ class WithCreateUpdateTimestamp(MappedAsDataclass, kw_only=True):
         # default=datetime.now(UTC).replace(tzinfo=None),
         server_default=func.now(),
         nullable=False,
+        init=False,
     )
 
     updated_at: Mapped[datetime] = mapped_column(
@@ -49,4 +51,5 @@ class WithCreateUpdateTimestamp(MappedAsDataclass, kw_only=True):
         onupdate=func.now(),
         # server_onupdate=func.now(),
         nullable=False,
+        init=False,
     )

@@ -1,4 +1,6 @@
 from alembic import context
+from src.db.base import BaseSQLModel
+from src.main.app import app
 from src.db.settings import getDBSettings
 
 import asyncio
@@ -22,7 +24,8 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = None
+_ = app
+target_metadata = [BaseSQLModel.metadata]
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -49,6 +52,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_schemas=True,
     )
 
     with context.begin_transaction():
@@ -56,7 +60,11 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        include_schemas=True,
+    )
 
     with context.begin_transaction():
         context.run_migrations()

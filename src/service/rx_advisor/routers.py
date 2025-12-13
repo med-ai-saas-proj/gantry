@@ -1,7 +1,7 @@
 from src.ehr.dtos import InputEHR, InputPrescription
 from src.shared.utils.logger import LOGGER
-from src.management.auth.depends.auth import required_permission
 from src.shared.custom_types.responses import SSEResponse
+from src.management.api_keys.dependencies import requiredPermission
 
 from .services import GeneratedAnalysis
 from .initialize import RX_ADVISOR_SERVICE
@@ -27,7 +27,7 @@ rx_advisor_router = APIRouter(prefix="/rx_advisor", tags=["Doctor Help"])
     },
 )
 async def rx_advisor(
-    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
+    user_id: Annotated[str, Security(requiredPermission(["placeholder"]))],
     ehr: InputEHR,
     prescription: InputPrescription,
     stream: bool = Body(False, embed=True),

@@ -1,16 +1,14 @@
 """Service for managing API keys and their permissions."""
 
-from src.db.factories import AsyncSessionManager, getSessionManager
+from src.db.factories import AsyncSessionManager
 from src.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
 )
 
-from ..models.users import Users
-from ..models.api_keys import ApiKeys, Permissions
-from ..entities.auth_info import APIKeyInfo
-from ..repositories.users import UserRepository
-from ..repositories.api_keys import (
+from .models import ApiKey, Permission
+from .entities import ApiKeyInfo
+from .repositories import (
     ApiKeyRepository,
     PermissionRepository,
 )
@@ -19,7 +17,6 @@ import hmac
 import uuid
 import secrets
 from typing import Callable, TypedDict, NotRequired
-from datetime import datetime, timedelta
 
 from safe_result import Ok, Err, Result
 from structlog.stdlib import BoundLogger
@@ -63,7 +60,7 @@ class ApiKeyServiceConfig(TypedDict):
 
     key_secret: str
     api_key_secret_length: NotRequired[int]
-    expiration_days: NotRequired[int]
+    # expiration_days: NotRequired[int]
     api_key_format: NotRequired[Callable[[str, str], str]]
     get_api_key_parts: NotRequired[
         Callable[[str], Result[tuple[str, str], InvalidAPIKey]]
@@ -77,7 +74,6 @@ class ApiKeyService:
         self,
         config: ApiKeyServiceConfig,
         logger: BoundLogger,
-        user_repo: UserRepository,
         api_key_repo: ApiKeyRepository,
         permission_repo: PermissionRepository,
         session_manager: AsyncSessionManager,
@@ -94,9 +90,8 @@ class ApiKeyService:
         )
 
         self.api_key_secret_length = config.get("api_key_secret_length", 32)
-        self.expiration = timedelta(days=config.get("expiration_days", 30))
+        # self.expiration = timedelta(days=config.get("expiration_days", 30))
 
-        self.user_repo = user_repo
         self.api_key_repo = api_key_repo
         self.permission_repo = permission_repo
         self.session_manager = session_manager
@@ -133,48 +128,31 @@ class ApiKeyService:
     ) -> Result[str, InvalidPermissionError | UserNotFoundError]:
         """Create an API key for a user with specified permissions."""
         async with self.session_manager.get_session() as session:
-            user = await self.user_repo.getByKey(
-                session, uuid.UUID(user_id), [Users.id]
-            )
-            if user is None:
-                return Err(UserNotFoundError())
-
-            permission_res = await self.permission_repo.getManyByKeys(
-                session, permissions, [Permissions.name]
-            )
-
-            existing_permissions: set[str] = {
-                perm.name for perm in permission_res
-            }
-            # self.logger.debug(
-            #     "Got perms", existing_permissions=existing_permissions
-            # )
-            not_existing_permissions = set(permissions) - existing_permissions
-            if not_existing_permissions:
-                return Err(InvalidPermissionError())
-            api_key_id = uuid.uuid4()
             api_key_secret = self._create_api_key_secret()
-            formatted_key = self.api_key_format(str(api_key_id), api_key_secret)
+            formatted_key = self.api_key_format(
+                str(uuid.uuid4()), api_key_secret
+            )
 
             hashed_key = self._hash_api_key(formatted_key)
+            permission_res = await self.permission_repo.getManyByKeys(
+                session, permissions, [Permission.name]
+            )
+            if len(permission_res) != len(permissions):
+                # existing_perms = set(perm.name for perm in permission_res)
+                # need_perms = set(permissions)
+                # invalid_perms = need_perms - existing_perms
+                return Err(InvalidPermissionError())
+            await self.api_key_repo.addApiKey(
+                session, user_id, hashed_key, list(permission_res)
+            )
 
-            new_api_key = ApiKeys(
-                id=api_key_id,
-                owner_id=uuid.UUID(user_id),
-                hashed_key=hashed_key,
-                expiration_date=datetime.now() + self.expiration,
-            )
-            await self.api_key_repo.add(session, new_api_key)
-            await self.api_key_repo.addPermissionsToApiKey(
-                session, api_key_id, permissions
-            )
             await session.commit()
             return Ok(formatted_key)
 
     async def verifyApiKey(
         self, api_key: str, required_permissions: list[str]
     ) -> Result[
-        APIKeyInfo, InvalidAPIKey | InsufficientPermission | UserNotFoundError
+        ApiKeyInfo, InvalidAPIKey | InsufficientPermission | UserNotFoundError
     ]:
         """Verify an API key and its permissions."""
         if len(required_permissions) == 0:
@@ -183,35 +161,18 @@ class ApiKeyService:
             )
 
         async with self.session_manager.get_session() as session:
-            key_parts_ = self.get_api_key_parts(api_key)
-            if key_parts_.is_err():
-                return Err(InvalidAPIKey())
+            hashed_key = self._hash_api_key(api_key)
 
-            key_id, _ = key_parts_.unwrap()
-
-            key = await self.api_key_repo.getByKey(
+            key = await self.api_key_repo.getByHashedKey(
                 session,
-                uuid.UUID(key_id),
-                [
-                    ApiKeys.owner_id,
-                    ApiKeys.hashed_key,
-                    ApiKeys.expiration_date,
-                ],
-                {ApiKeys.permissions: [Permissions.name]},
+                hashed_key,
             )
 
             if key is None:
                 return Err(InvalidAPIKey())
 
-            if key.expiration_date is None or key.owner_id is None:
+            if key.user_id is None:
                 return Err(UserNotFoundError())
-
-            if key.expiration_date < datetime.now():
-                return Err(InvalidAPIKey())
-
-            hashed_key = self._hash_api_key(api_key)
-            if not hmac.compare_digest(hashed_key, key.hashed_key):
-                return Err(InvalidAPIKey())
 
             existing_permissions = {perm.name for perm in key.permissions}
             missing_permissions = (
@@ -220,4 +181,4 @@ class ApiKeyService:
             if missing_permissions:
                 return Err(InsufficientPermission())
 
-            return Ok[APIKeyInfo]({"user_id": str(key.owner_id)})
+            return Ok[ApiKeyInfo]({"user_id": str(key.user_id)})

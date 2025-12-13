@@ -2,7 +2,7 @@
 
 import asyncio
 
-from keycloak import KeycloakOpenID
+from keycloak import KeycloakAdmin, KeycloakOpenID
 
 
 async def main():

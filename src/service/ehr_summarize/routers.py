@@ -1,7 +1,7 @@
 from src.ehr.dtos import InputEHR
 from src.shared.utils.logger import LOGGER
-from src.management.auth.depends.auth import required_permission
 from src.shared.custom_types.responses import SSEResponse
+from src.management.api_keys.dependencies import requiredPermission
 
 from .initialize import EHR_SUMMARY_SERVICE
 
@@ -30,7 +30,7 @@ class EHRSummary(TypedDict):
     },
 )
 async def summarize_ehr(
-    user_id: Annotated[str, Security(required_permission(["placeholder"]))],
+    user_id: Annotated[str, Security(requiredPermission(["placeholder"]))],
     ehr: InputEHR,
     stream: bool = Body(False, embed=True),
 ):

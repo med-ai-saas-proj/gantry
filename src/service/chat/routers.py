@@ -1,47 +1,45 @@
 """This file contain definition of chat's routers."""
 
 from src.shared.utils.logger import LOGGER
-from src.management.auth.depends.auth import get_current_user
-from src.management.auth.entities.auth_info import AuthInfo as User
+from src.management.auth.dependencies import UserInfo, getUserInfo
 
 from .dtos import ChatInput, ChatOutput
 
 from typing import Annotated
 
 from fastapi import Body, Query, Security, APIRouter
-from fastapi.responses import JSONResponse
 
 
 model_router = APIRouter(prefix="/models")
 
 
 @model_router.get(path="")
-def get_all_model(user: Annotated[User, Security(get_current_user)], input):
+def get_all_model(user: Annotated[UserInfo, Security(getUserInfo)], input):
     pass
 
 
 @model_router.get(path="/{model_name}")
 def get_model(
-    user: Annotated[User, Security(get_current_user)], model_name: str
+    user: Annotated[UserInfo, Security(getUserInfo)], model_name: str
 ):
     pass
 
 
 @model_router.post(path="")
-def create_model(user: Annotated[User, Security(get_current_user)], input):
+def create_model(user: Annotated[UserInfo, Security(getUserInfo)], input):
     pass
 
 
 @model_router.put(path="{model_name}")
 def update_model(
-    user: Annotated[User, Security(get_current_user)], model_name: str
+    user: Annotated[UserInfo, Security(getUserInfo)], model_name: str
 ):
     pass
 
 
 @model_router.delete(path="/{model_name}")
 def delete_model(
-    user: Annotated[User, Security(get_current_user)], model_name: str
+    user: Annotated[UserInfo, Security(getUserInfo)], model_name: str
 ):
     pass
 
@@ -51,7 +49,7 @@ chat_router = APIRouter(prefix="/chat")
 
 @chat_router.post("", response_model=ChatOutput)
 def chat(
-    user: Annotated[User, Security(get_current_user)],
+    user: Annotated[UserInfo, Security(getUserInfo)],
     input: Annotated[ChatInput, Body()],
 ):
     pass
@@ -62,7 +60,7 @@ conversation_router = APIRouter(prefix="/conversation")
 
 @conversation_router.post("")
 def create_conversation(
-    user: Annotated[User, Security(get_current_user)],
+    user: Annotated[UserInfo, Security(getUserInfo)],
     input,
 ):
     return {"id": "conv-123981"}
@@ -70,7 +68,7 @@ def create_conversation(
 
 @conversation_router.get("/{conversation_id}")
 def get_conversation(
-    user: Annotated[User, Security(get_current_user)], conversation_id: str
+    user: Annotated[UserInfo, Security(getUserInfo)], conversation_id: str
 ):
     return {
         "id": "conv-1231",
@@ -82,7 +80,7 @@ def get_conversation(
 
 @conversation_router.put("/{conversation_id}")
 def replace_conversation_metadata(
-    user: Annotated[User, Security(get_current_user)],
+    user: Annotated[UserInfo, Security(getUserInfo)],
     conversation_id: str,
     metadata: Annotated[dict[str, str], Body(embed=True)],
 ):
@@ -91,7 +89,7 @@ def replace_conversation_metadata(
 
 @conversation_router.patch("/{conversation_id}")
 def merge_conversation_metadata(
-    user: Annotated[User, Security(get_current_user)],
+    user: Annotated[UserInfo, Security(getUserInfo)],
     conversation_id: str,
     new_metadata: Annotated[dict[str, str | None], Body(embed=True)],
 ):
@@ -101,7 +99,7 @@ def merge_conversation_metadata(
 
 @conversation_router.get("/{conversation_id}/messages")
 def get_messages(
-    user: Annotated[User, Security(get_current_user)],
+    user: Annotated[UserInfo, Security(getUserInfo)],
     conversation_id: str,
     limit,
     order,
@@ -116,6 +114,6 @@ def get_messages(
 
 @conversation_router.get(path="/attatchment/{attachment_id}")
 def get_attachment(
-    user: Annotated[User, Security(get_current_user)], attatchment_id: str
+    user: Annotated[UserInfo, Security(getUserInfo)], attatchment_id: str
 ):
     pass

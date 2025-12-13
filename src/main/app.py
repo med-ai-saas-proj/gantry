@@ -15,11 +15,13 @@ from src.shared.custom_types.error_exception import (
 import time
 import uuid
 import traceback
+from pydoc import doc
 
 from fastapi import FastAPI, Request
 from pydantic import ValidationError
 from opentelemetry import trace
 from scalar_fastapi import get_scalar_api_reference
+from sqlalchemy.orm import configure_mappers
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response, JSONResponse
@@ -34,6 +36,8 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
     OTLPSpanExporter,
 )
 
+
+# configure_mappers()
 
 app_settings = getAppSetting()
 
@@ -65,6 +69,8 @@ provider.add_span_processor(span_processor)
 
 app = FastAPI(
     title="Med AI SaaS",
+    openapi_url="/docs/openapi.json",
+    docs_url="/docs",
     responses={
         400: {"model": ProblemDetails},
         401: {"model": ProblemDetails},
@@ -247,14 +253,6 @@ async def global_middleware(
         raise
     finally:
         request_id_utils.reset()
-
-
-@app.get("/docs", include_in_schema=False)
-async def scalar_html():
-    return get_scalar_api_reference(
-        openapi_url=app.openapi_url,
-        title=app.title,
-    )
 
 
 app.mount("/service", service_app)

@@ -5,9 +5,9 @@ from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass
 
 
 naming_convention = {
-    "ix": "idx_%(column_0_N_label)s",
+    "ix": "%(table_name)s_%(column_0_N_name)s_idx",
     "uq": "%(table_name)s_%(column_0_N_name)s_uq",
-    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "ck": "%(table_name)s_%(constraint_name)s_ck",
     "fk": "%(table_name)s_%(column_0_name)s_fkey",
     "pk": "%(table_name)s_pkey",
 }

@@ -1,22 +1,16 @@
 from functools import lru_cache
 
-from pydantic import Field, SecretStr
+from pydantic import Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AuthSetting(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="auth_", case_sensitive=False)
-    access_token_secret: SecretStr
-    access_token_expire_minutes: int = Field(gt=0, default=30)
-    refresh_token_secret: SecretStr
-    refresh_token_expire_days: int = Field(gt=1, default=15)
-    api_key_secret: SecretStr
-    api_key_secret_length: int = Field(gt=16, default=32)
-    api_key_expire_days: int = Field(gt=1)
-    max_login_attempts: int = Field(gt=0, default=5)
-    login_attempt_window_minutes: int = Field(gt=0, default=15)
+    server_url: HttpUrl = Field(HttpUrl("http://localhost:8000/"))
+    client_id: str = Field("example_client")
+    realm_name: str = Field("example_realm")
 
 
 @lru_cache(1)
 def getAuthSettings() -> AuthSetting:
-    return AuthSetting()  # type: ignore
+    return AuthSetting()

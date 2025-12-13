@@ -1,6 +1,7 @@
 """Asynchronous database sessions management."""
 
 import contextlib
+from typing import final
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,8 @@ class AsyncSessionManager:
                 # manual commit in caller, because `return Error(...)`
                 # in code can't roll back (it not raises an exception)
                 # await session.commit()
-            except Exception:
+            except Exception as e:
                 await session.rollback()
-                raise
+                raise e
+            finally:
+                await session.rollback()
