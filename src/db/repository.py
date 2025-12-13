@@ -5,15 +5,20 @@ from typing import Sequence
 
 from sqlalchemy import (
     Select,
+    ColumnElement,
+    UnaryExpression,
+    func,
     select,
 )
 from sqlalchemy.orm import (
     DeclarativeBase,
     InstrumentedAttribute,
     load_only,
+    joinedload,
     selectinload,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 
 type ColumnList = Sequence[InstrumentedAttribute] | None
@@ -70,21 +75,29 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
         load_relations: RelationLoadMap = None,
         offset: int | None = None,
         limit: int | None = None,
-    ) -> Sequence[TEntity]:
+        filters: list[ColumnElement] | None = None,
+        sorting: UnaryExpression | None = None,
+    ) -> tuple[Sequence[TEntity], int]:
         """Get all entities of this type."""
-        stmt = select(self.model)
+        stmt = select(self.model,  func.count().over().label("total_count"))
         stmt = self.buildOptions(
             stmt,
             load_columns,
             load_relations,
         )
-        if offset is not None:
-            stmt.offset(offset)
-        if limit is not None:
-            stmt.limit(limit)
-        return await self.selectMany(
-            session,
+        stmt = self.buildFilterPagination(
             stmt,
+            filters,
+            offset,
+            limit,
+            sorting,
+        )
+        res = await session.execute(stmt)
+        rows = res.unique().all()
+
+        return (
+            [row[0] for row in rows],
+            rows[0].total_count if rows else 0,
         )
 
     async def add(self, session: AsyncSession, entity: TEntity) -> None:
@@ -120,14 +133,33 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
     async def selectOne(session: AsyncSession, stmt: Select) -> TEntity | None:
         """Execute select statement and return single entity or None."""
         res = await session.execute(stmt)
-        return res.scalars().first()
+        return res.unique().scalars().first()
+
+    @staticmethod
+    def buildFilterPagination(
+        stmt: Select,
+        filters: list[ColumnElement] | None = None,
+        offset: int | None = None,
+        limit: int | None = None,
+        sorting: UnaryExpression | None = None,
+    ) -> Select:
+        """Build SQLAlchemy statement with filters, pagination, and sorting."""
+        if filters is not None:
+            stmt = stmt.where(*filters)
+        if sorting is not None:
+            stmt = stmt.order_by(sorting)
+        if offset is not None:
+            stmt = stmt.offset(offset)
+        if limit is not None:
+            stmt = stmt.limit(limit)
+        return stmt
 
     @staticmethod
     def buildOptions(
         select_stmt: Select,
         load_columns: ColumnList = None,
         load_relations: RelationLoadMap = None,
-    ):
+    ) -> Select:
         """Build SQLAlchemy options for loading columns and relations."""
         if load_columns:
             select_stmt = select_stmt.options(
@@ -136,13 +168,44 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
         if load_relations:
             select_stmt = select_stmt.options(
                 *[
-                    selectinload(rel).load_only(*cols)
-                    if cols
-                    else selectinload(rel)
-                    for rel, cols in load_relations.items()
+                    (
+                        joinedload(rel).options(
+                            *Repository.recursiveBuildOptions(cols_or_map)
+                        )
+                        if isinstance(cols_or_map, dict)
+                        else (
+                            joinedload(rel).load_only(*cols_or_map)
+                            if cols_or_map
+                            else joinedload(rel)
+                        )
+                    )
+                    for rel, cols_or_map in load_relations.items()
                 ]
             )
         return select_stmt
+
+
+    @staticmethod
+    def recursiveBuildOptions(
+        load_relations: RelationLoadMap,
+    ) -> list[_AbstractLoad]:
+        """Recursively build SQLAlchemy options for loading relations."""
+        if not load_relations:
+            return []
+
+        res: list[_AbstractLoad] = []
+        for rel, cols_or_map in load_relations.items():
+            if isinstance(cols_or_map, dict):
+                nested_opts = Repository.recursiveBuildOptions(cols_or_map)
+                opt = joinedload(rel).options(*nested_opts)
+                res.append(opt)
+            else:
+                res.append(
+                    joinedload(rel).load_only(*cols_or_map)
+                    if cols_or_map
+                    else selectinload(rel)
+                )
+        return res
 
     @staticmethod
     async def selectMany(
@@ -151,4 +214,4 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
     ) -> Sequence[TEntity]:
         """Execute select statement and return multiple entities."""
         res = await session.execute(stmt)
-        return res.scalars().all()
+        return res.unique().scalars().all()

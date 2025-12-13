@@ -2,10 +2,7 @@
 
 from src.db.repository import Repository
 
-from .models import ApiKey, Permission, ApiKeyPermission
-
-import uuid
-from typing import Sequence
+from .models import ApiKey, Permission
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
