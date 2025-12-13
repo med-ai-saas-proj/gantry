@@ -39,7 +39,7 @@ class ApiKey(WithCreateUpdateTimestamp, WithID, ApiKeyBaseSQLModel):
     #     DateTime, nullable=True
     # )
     permissions: Mapped[list[Permission]] = relationship(
-        Permission, secondary="ApiKeyPermissions"
+        Permission, secondary=lambda: ApiKeyPermission.__table__
     )
 
 
