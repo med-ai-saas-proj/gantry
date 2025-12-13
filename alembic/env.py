@@ -1,6 +1,6 @@
 from alembic import context
 from src.db.base import BaseSQLModel
-from src.main.app import app
+from src.main.app import main_app
 from src.db.settings import getDBSettings
 
 import asyncio
@@ -24,7 +24,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-_ = app
+_ = main_app
 target_metadata = [BaseSQLModel.metadata]
 
 # other values from the config, defined by the needs of env.py,

@@ -4,7 +4,7 @@ from src.db.utils import (
     WithCreateUpdateTimestamp,
 )
 
-from sqlalchemy import Text, DateTime, BigInteger, ForeignKey
+from sqlalchemy import String, BigInteger, ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 
 
@@ -21,9 +21,9 @@ class Permission(WithCreateUpdateTimestamp, WithID, ApiKeyBaseSQLModel):
     __tablename__ = "Permissions"
 
     name: Mapped[str] = mapped_column(
-        Text, unique=True, nullable=False, index=True
+        String(1024), unique=True, nullable=False, index=True
     )
-    description: Mapped[str] = mapped_column(Text, nullable=True)
+    description: Mapped[str] = mapped_column(String(4096), nullable=False)
 
 
 class ApiKey(WithCreateUpdateTimestamp, WithID, ApiKeyBaseSQLModel):
@@ -31,10 +31,14 @@ class ApiKey(WithCreateUpdateTimestamp, WithID, ApiKeyBaseSQLModel):
 
     __tablename__ = "ApiKeys"
 
-    user_id: Mapped[str] = mapped_column(Text, nullable=False)
+    user_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    hint: Mapped[str] = mapped_column(String(128), nullable=False)
     hashed_key: Mapped[str] = mapped_column(
-        Text, index=True, unique=True, nullable=False
+        String(128), index=True, unique=True, nullable=False
     )
+    name: Mapped[str] = mapped_column(String(1024), nullable=False)
+    description: Mapped[str] = mapped_column(String(4096), nullable=False)
+
     # expiration_date: Mapped[datetime.datetime] = mapped_column(
     #     DateTime, nullable=True
     # )

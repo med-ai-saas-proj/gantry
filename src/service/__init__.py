@@ -15,6 +15,7 @@ __all__ = ["service_app"]
 service_app = FastAPI(
     title="Venera API platform",
     openapi_url="/docs/openapi.json",
+    docs_url=None,
     responses={
         400: {"model": ProblemDetails},
         401: {"model": ProblemDetails},
@@ -50,6 +51,6 @@ service_app.include_router(api_router)
 @service_app.get("/docs", include_in_schema=False)
 async def scalar_html():
     return get_scalar_api_reference(
-        openapi_url=service_app.openapi_url,
+        openapi_url="/service" + (service_app.openapi_url or ""),
         title=service_app.title,
     )

@@ -10,7 +10,6 @@ async def main():
         server_url="http://localhost:8080/",
         realm_name="dev-realm",
         client_id="backend-app",
-        client_secret_key="zYT1DhwT5xs97KcYqWaQvZF4kT6eor4y",
     )
     token = admin_client.token("test-user", "Thisisastrongpassword123")
     print(token)

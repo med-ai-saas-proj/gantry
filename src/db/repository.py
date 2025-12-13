@@ -22,7 +22,9 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 
 type ColumnList = Sequence[InstrumentedAttribute] | None
-type RelationLoadMap = dict[InstrumentedAttribute, ColumnList | RelationLoadMap] | None
+type RelationLoadMap = (
+    dict[InstrumentedAttribute, ColumnList | RelationLoadMap] | None
+)
 
 
 class Repository[TEntity: DeclarativeBase, TKey](ABC):
@@ -79,7 +81,7 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
         sorting: UnaryExpression | None = None,
     ) -> tuple[Sequence[TEntity], int]:
         """Get all entities of this type."""
-        stmt = select(self.model,  func.count().over().label("total_count"))
+        stmt = select(self.model, func.count().over().label("total_count"))
         stmt = self.buildOptions(
             stmt,
             load_columns,
@@ -183,7 +185,6 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
                 ]
             )
         return select_stmt
-
 
     @staticmethod
     def recursiveBuildOptions(

@@ -6,6 +6,7 @@ from src.shared.custom_types.error_exception import (
     UnrecoverableError,
 )
 
+from .dtos import CreateAPIKeyOutputSuccess
 from .models import ApiKey, Permission
 from .entities import ApiKeyInfo
 from .repositories import (
@@ -123,9 +124,14 @@ class ApiKeyService:
             self.key_secret.encode(), api_key.encode(), "sha256"
         ).hexdigest()
 
+    def generateHint(api_key: str) -> str:
+        return api_key[:5] + "..." + api_key[-4:]
+
     async def createApiKey(
-        self, user_id: str, permissions: list[str]
-    ) -> Result[str, InvalidPermissionError | UserNotFoundError]:
+        self, user_id: str, name: str, description: str, permissions: list[str]
+    ) -> Result[
+        CreateAPIKeyOutputSuccess, InvalidPermissionError | UserNotFoundError
+    ]:
         """Create an API key for a user with specified permissions."""
         async with self.session_manager.get_session() as session:
             api_key_secret = self._create_api_key_secret()
@@ -134,6 +140,7 @@ class ApiKeyService:
             )
 
             hashed_key = self._hash_api_key(formatted_key)
+            hint = ApiKeyService.generateHint(formatted_key)
             permission_res = await self.permission_repo.getManyByKeys(
                 session, permissions, [Permission.name]
             )
@@ -143,11 +150,19 @@ class ApiKeyService:
                 # invalid_perms = need_perms - existing_perms
                 return Err(InvalidPermissionError())
             await self.api_key_repo.addApiKey(
-                session, user_id, hashed_key, list(permission_res)
+                session,
+                user_id,
+                hashed_key,
+                hint,
+                name,
+                description,
+                list(permission_res),
             )
 
             await session.commit()
-            return Ok(formatted_key)
+            return Ok[CreateAPIKeyOutputSuccess](
+                {"key": formatted_key, "hint": hint}
+            )
 
     async def verifyApiKey(
         self, api_key: str, required_permissions: list[str]

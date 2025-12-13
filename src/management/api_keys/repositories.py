@@ -35,9 +35,17 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         session: AsyncSession,
         user_id: str,
         hashed_key: str,
+        hint: str,
+        name: str,
+        description: str,
         permissions: list[Permission],
     ):
         api_key = ApiKey(
-            user_id=user_id, hashed_key=hashed_key, permissions=permissions
+            user_id=user_id,
+            hashed_key=hashed_key,
+            hint=hint,
+            name=name,
+            description=description,
+            permissions=permissions,
         )
         session.add(api_key)

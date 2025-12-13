@@ -13,6 +13,7 @@ __all__ = ["management_app"]
 management_app = FastAPI(
     title="Venera API platform",
     openapi_url="/docs/openapi.json",
+    docs_url=None,
     responses={
         400: {"model": ProblemDetails},
         401: {"model": ProblemDetails},
@@ -29,15 +30,11 @@ management_app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 
-v1_router = APIRouter(
-    prefix="/v1", tags=["api", "management", "v1"], include_in_schema=True
-)
+v1_router = APIRouter(prefix="/v1", tags=["v1"], include_in_schema=True)
 v1_router.include_router(apikey_router)
 
 
-api_router = APIRouter(
-    prefix="/api", tags=["api", "management"], include_in_schema=True
-)
+api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
 api_router.include_router(v1_router)
 
 management_app.include_router(api_router)
@@ -46,6 +43,6 @@ management_app.include_router(api_router)
 @management_app.get("/docs", include_in_schema=False)
 async def scalar_html():
     return get_scalar_api_reference(
-        openapi_url=management_app.openapi_url,
+        openapi_url="/management" + (management_app.openapi_url or ""),
         title=management_app.title,
     )
