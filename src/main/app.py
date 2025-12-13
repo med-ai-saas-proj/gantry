@@ -37,7 +37,7 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
 )
 
 
-# configure_mappers()
+configure_mappers()
 
 app_settings = getAppSetting()
 
