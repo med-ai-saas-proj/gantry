@@ -1,6 +1,5 @@
 """This file contain definition of chat's routers."""
 
-from src.auth.depends.auth import required_permission
 from src.shared.utils.logger import LOGGER
 from src.management.auth.dependencies import UserInfo, getUserInfo
 from src.shared.custom_types.responses.sse import SSEResponse
