@@ -1,13 +1,17 @@
 """This file contain definition of chat's routers."""
 
+from src.auth.depends.auth import required_permission
 from src.shared.utils.logger import LOGGER
 from src.management.auth.dependencies import UserInfo, getUserInfo
+from src.shared.custom_types.responses.sse import SSEResponse
 
 from .dtos import ChatInput, ChatOutput
+from .factories import ChatService, getChatService
 
 from typing import Annotated
 
-from fastapi import Body, Query, Security, APIRouter
+from fastapi import Body, Depends, Security, APIRouter
+from fastapi.responses import JSONResponse
 
 
 model_router = APIRouter(prefix="/models")
@@ -52,7 +56,15 @@ def chat(
     user: Annotated[UserInfo, Security(getUserInfo)],
     input: Annotated[ChatInput, Body()],
 ):
-    pass
+    """Just the good old chatbot."""
+    LOGGER.debug("user", user_id=user_id)
+    if input.stream:
+        return SSEResponse(
+            chat_service.chat_stream(user_id, input.input),
+        )
+    else:
+        output = await chat_service.chat(user_id, input.input)
+        return JSONResponse(output)
 
 
 conversation_router = APIRouter(prefix="/conversation")
