@@ -51,7 +51,7 @@ chat_router = APIRouter(prefix="/chat")
 
 
 @chat_router.post("", response_model=ChatOutput)
-def chat(
+async def chat(
     user: Annotated[UserInfo, Security(getUserInfo)],
     input: Annotated[ChatInput, Body()],
 ):
