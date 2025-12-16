@@ -1,4 +1,6 @@
-from typing import Literal, TypedDict, NotRequired
+from typing import Literal, Optional, TypedDict, NotRequired
+
+from pydantic import Field, BaseModel
 
 
 class JwtPayload(TypedDict):
@@ -7,9 +9,12 @@ class JwtPayload(TypedDict):
     exp: NotRequired[int]
 
 
-class AuthInfo(TypedDict):
-    id: str
-    email: str
+class AuthInfo(BaseModel):
+    id: Optional[str] = Field(
+        None, description="User ID (subject claim from token)"
+    )
+    email: Optional[str] = Field(None, description="User email")
+    username: Optional[str] = Field(None, description="Username")
 
 
 class TokenInfo(TypedDict):

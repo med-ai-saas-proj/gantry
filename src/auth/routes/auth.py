@@ -12,6 +12,7 @@ from ..entities.auth_info import AuthInfo
 from typing import Annotated
 
 from fastapi import Body, Depends, APIRouter
+from pydantic import BaseModel
 from fastapi.params import Security
 
 
@@ -76,3 +77,21 @@ async def logout_user(
     auth_info: Annotated[AuthInfo, Security(get_current_user)],
 ):
     await user_service.logout(auth_info, request.refresh_token)
+
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    username: str
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_info(
+    current_user: Annotated[AuthInfo, Security(get_current_user)],
+) -> UserResponse:
+    """Get current authenticated user information from the JWT token"""
+    return UserResponse(
+        id=current_user.id,
+        email=current_user.email,
+        username=current_user.username,
+    )

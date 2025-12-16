@@ -1,10 +1,14 @@
 from src.shared.utils.logger import getLogger
 
-from .settings import getAuthSettings
+from .settings import AuthSetting, getAuthSettings
 from .services.users import UserService
 from .services.api_keys import ApiKeyService
+from .services.keycloak import KeycloakService
 
+from typing import Annotated
 from functools import lru_cache
+
+from fastapi import Depends
 
 
 @lru_cache(1)
@@ -36,3 +40,9 @@ def getAPIKeyService():
         },
         logger=getLogger(),
     )
+
+
+def getKeycloakService(
+    settings: Annotated[AuthSetting, Depends(getAuthSettings)],
+) -> KeycloakService:
+    return KeycloakService(settings)

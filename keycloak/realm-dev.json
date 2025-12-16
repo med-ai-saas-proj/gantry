@@ -1,0 +1,225 @@
+{
+  "realm": "venera",
+  "enabled": true,
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": true,
+  "verifyEmail": false,
+  "resetPasswordAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyInitialCounter": 0,
+  "otpPolicyDigits": 6,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyPeriod": 30,
+  "otpSupportedApplications": [
+    "FreeOTP",
+    "Google Authenticator"
+  ],
+  "sslRequired": "external",
+  "smtpServer": {
+    "host": "mailhog",
+    "port": "1025",
+    "from": "noreply@online-auction.com",
+    "auth": false,
+    "starttls": false,
+    "user": "",
+    "password": ""
+  },
+  "users": [
+    {
+      "username": "user",
+      "enabled": true,
+      "email": "user@example.com",
+      "firstName": "Demo",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "123456"
+        }
+      ],
+      "realmRoles": [
+        "user"
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "venera-frontend",
+      "name": "Venera Frontend",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "clientAuthenticatorType": "client-secret",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:3000/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3000",
+        "+"
+      ],
+      "attributes": {
+        "use.refresh.tokens": "true",
+        "access.token.lifespan": "300",
+        "refresh.token.max.reuse": "0",
+        "access.token.format.default": "jwt",
+        "oidc.token.channel.logout.session.supported": "true",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.url": ""
+      },
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone"
+      ],
+      "fullScopeAllowed": true,
+      "protocolMappers": [
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "venera-frontend",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "id",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "sub",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "email",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "email",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "given name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "firstName",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "given_name",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "family name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "lastName",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "family_name",
+            "jsonType.label": "String"
+          }
+        },
+        {
+          "name": "preferred username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "user.attribute": "username",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "openid",
+      "protocol": "openid-connect",
+      "description": "OpenID Connect requested scopes",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      }
+    },
+    {
+      "name": "profile",
+      "protocol": "openid-connect",
+      "description": "OpenID Connect profile scope",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "profile",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-profile-mapper",
+          "consentRequired": false,
+          "config": {
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "email",
+      "protocol": "openid-connect",
+      "description": "OpenID Connect email scope",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      }
+    },
+    {
+      "name": "address",
+      "protocol": "openid-connect",
+      "description": "OpenID Connect address scope"
+    },
+    {
+      "name": "phone",
+      "protocol": "openid-connect",
+      "description": "OpenID Connect phone scope"
+    }
+  ]
+}

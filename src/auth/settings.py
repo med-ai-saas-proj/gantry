@@ -16,6 +16,11 @@ class AuthSetting(BaseSettings):
     max_login_attempts: int = Field(gt=0, default=5)
     login_attempt_window_minutes: int = Field(gt=0, default=15)
 
+    keycloak_enabled: bool = Field(default=True)
+    keycloak_server_url: str = Field(..., description="http://localhost:8080")
+    keycloak_realm: str = Field(..., description="venera")
+    keycloak_client_id: str = Field(..., description="venera-frontend")
+
 
 @lru_cache(1)
 def getAuthSettings() -> AuthSetting:

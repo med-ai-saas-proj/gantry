@@ -1,3 +1,4 @@
+from ..consts import messages_const
 from ..settings import getAppSetting
 from ..dtos.error_output import ProblemDetails
 
@@ -8,7 +9,7 @@ from typing import ClassVar
 class RecoverableError(Exception):
     status: ClassVar[int] = 500
     title: ClassVar[str]
-    code: ClassVar[str]
+    code: ClassVar[str | None] = None
     detail: ClassVar[str | None] = None
     _stack_frames: list[str] | None
     _from: Exception | None
@@ -23,11 +24,17 @@ class RecoverableError(Exception):
         self._from = from_exception
 
     def format(self) -> ProblemDetails:
-        res: ProblemDetails = {"status": self.status, "title": self.title}
-        if self.code:
-            res.update({"code": self.code})
-        if self.detail:
-            res.update({"detail": self.detail})
+        title = getattr(self, "title", messages_const.INTERNAL_SERVER_ERROR)
+        res: ProblemDetails = {"status": self.status, "title": title}
+
+        code = getattr(self, "code", None)
+        if code:
+            res.update({"code": code})
+
+        detail = getattr(self, "detail", None)
+        if detail:
+            res.update({"detail": detail})
+
         return res
 
 
