@@ -79,9 +79,9 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
         limit: int | None = None,
         filters: list[ColumnElement] | None = None,
         sorting: UnaryExpression | None = None,
-    ) -> tuple[Sequence[TEntity], int]:
+    ) -> Sequence[TEntity]:
         """Get all entities of this type."""
-        stmt = select(self.model, func.count().over().label("total_count"))
+        stmt = select(self.model)
         stmt = self.buildOptions(
             stmt,
             load_columns,
@@ -94,13 +94,7 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
             limit,
             sorting,
         )
-        res = await session.execute(stmt)
-        rows = res.unique().all()
-
-        return (
-            [row[0] for row in rows],
-            rows[0].total_count if rows else 0,
-        )
+        return await self.selectMany(session, stmt)
 
     async def add(self, session: AsyncSession, entity: TEntity) -> None:
         """Add a new entity to the session."""
