@@ -13,14 +13,14 @@ api_key_header = APIKeyHeader(
 )
 
 
-def requiredPermission(permission: list[str]):
+def requiredPermissions(permissions: list[str]):
     """Dependency to verify the API key and create required permissions."""
 
     async def get_api_key(
         api_key: Annotated[str, Security(api_key_header)],
         api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     ) -> ApiKeyInfo:
-        user_info = await api_key_service.verifyApiKey(api_key, permission)
+        user_info = await api_key_service.verifyApiKey(api_key, permissions)
         return user_info.unwrap()
 
     return get_api_key

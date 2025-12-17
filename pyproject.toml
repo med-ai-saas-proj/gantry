@@ -28,7 +28,6 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.60b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.60b0",
     "opentelemetry-sdk>=1.39.0",
-    "python-keycloak>=5.8.1",
 ]
 
 [tool.pyrefly]
