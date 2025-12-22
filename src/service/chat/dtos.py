@@ -7,7 +7,7 @@ from src.shared.custom_types.responses.sse import SSEContent as BaseStreamEvent
 from enum import Enum
 from typing import Any, Literal, Sequence, Annotated, TypedDict, NotRequired
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 
 class MultiModalContentType(str, Enum):
@@ -19,7 +19,7 @@ class MultiModalContentType(str, Enum):
     document_url = "document_url"
 
 
-class FileURL(TypedDict):
+class FileURL(BaseModel):
     """Contain file url."""
 
     url: Annotated[str, Field(description="The file's url, can be base64")]

@@ -6,7 +6,12 @@ from src.shared.dtos.generation_output import (
 )
 
 from .dtos import (
+    AudioURL as InputAudioURL,
+    ImageURL as InputImageURL,
+    VideoURL as InputVideoURL,
+    UserInput,
     ChatOutput,
+    DocumentURL as InputDocumentURL,
     StreamEvent,
     ReferenceType,
     StreamEventType,
@@ -28,7 +33,14 @@ from contextlib import _GeneratorContextManager
 
 from pydantic_ai import Agent
 from structlog.stdlib import BoundLogger
-from pydantic_ai.messages import ModelRequest, ModelResponse
+from pydantic_ai.messages import (
+    AudioUrl,
+    ImageUrl,
+    VideoUrl,
+    DocumentUrl,
+    ModelRequest,
+    ModelResponse,
+)
 
 
 def _create_new_part(event: StreamEvent) -> ModelResponseContent:
@@ -175,14 +187,18 @@ class ChatService:
     def _store_ehr_and_result(
         self,
         user_id: str,
-        query: str,
+        query: UserInput,
         result: ChatOutput,
     ):
         pass
 
     async def chat_stream(
-        self, user_id: str, query: str
+        self, user_id: str, query: UserInput
     ) -> AsyncGenerator[StreamEvent]:
+        model_input: (
+            str | Sequence[ImageUrl | AudioUrl | VideoUrl | DocumentUrl]
+        ) = self._inputMapper(query)
+
         i = 0
         yield {
             "event": StreamEventType.conversation_start,
@@ -190,7 +206,7 @@ class ChatService:
                 "conversation_id": "thisisaplaceholder",
             },
         }
-        async for event in self.agent.run_stream_events(query):
+        async for event in self.agent.run_stream_events(model_input):
             self.logger.debug("Got new event", new_event=event)
             match event.event_kind:
                 case "part_start":
@@ -349,8 +365,35 @@ class ChatService:
                 case _:
                     pass
 
-    async def chat(self, user_id: str, query: str) -> ChatOutput:
-        run = await self.agent.run(query)
+    def _inputMapper(
+        self, query: UserInput
+    ) -> str | Sequence[ImageUrl | AudioUrl | VideoUrl | DocumentUrl]:
+        model_input: (
+            str | list[ImageUrl | AudioUrl | VideoUrl | DocumentUrl]
+        ) = ""
+        if isinstance(query, str):
+            model_input = query
+        elif isinstance(query, Sequence):
+            model_input = []
+            for message in query:
+                if isinstance(message, InputImageURL):
+                    model_input.append(ImageUrl(url=message.url))
+                elif isinstance(message, InputAudioURL):
+                    model_input.append(AudioUrl(url=message.url))
+                elif isinstance(message, InputVideoURL):
+                    model_input.append(VideoUrl(url=message.url))
+                elif isinstance(message, InputDocumentURL):
+                    model_input.append(DocumentUrl(url=message.url))
+                else:
+                    raise ValueError("Not supported type of user input")
+        return model_input
+
+    async def chat(self, user_id: str, query: UserInput) -> ChatOutput:
+        model_input: (
+            str | Sequence[ImageUrl | AudioUrl | VideoUrl | DocumentUrl]
+        ) = self._inputMapper(query)
+
+        run = await self.agent.run(model_input)
         usage = run.usage()
         messages = _convert_to_ours(run.new_messages(), self.logger)
 

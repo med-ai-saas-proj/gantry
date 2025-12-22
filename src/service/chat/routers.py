@@ -61,10 +61,10 @@ async def chat(
     LOGGER.debug("user", user_id=user_id)
     if input.stream:
         return SSEResponse(
-            chat_service.chat_stream(user_id, str(input.input)),
+            chat_service.chat_stream(user_id, input.input),
         )
     else:
-        output = await chat_service.chat(user_id, str(input.input))
+        output = await chat_service.chat(user_id, input.input)
         return JSONResponse(output)
 
 
