@@ -14,6 +14,8 @@ class AppStage(StrEnum):
 class AppSettings(BaseSettings):
     stage: AppStage = Field(AppStage.DEV)
     debug: bool = Field(False)
+    otlp_endpoint: str = Field("localhost:4317")
+    allowed_origins: str = Field("*")
 
 
 @lru_cache(1)

@@ -1,3 +1,3 @@
 #! /bin/bash
-uv run ruff check --fix "$@"
-uv run ruff format "$@"
+uv run ruff check --fix --select I -q "$@"
+uv run ruff format -q "$@"

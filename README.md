@@ -21,11 +21,13 @@ AI related APIs for medical applications
 
 1. Check out [Getting API key](#getting-api-keys)
 1. Check out [Setup env file](#setup-env-file)
+1. Start DBs and other services: `docker compose -f compose.dev.yaml up`
 1. Install dependency, setup libraries: `scripts/setup-dev.sh`
-1. Start DBs: `docker compose -f compose.dev.yaml up`
 1. Migrate DB: `UV_ENV_FILE=.env uv run alembic upgrade head`
-1. Register test account and api key: `./scripts/setup-test-account.sh`
+1. Setup keycloak: `./script/setup-keycloak.py`
 1. Start Server: `./scripts/dev.sh`
+
+**NOTE**: You need the frontend to create api for now
 
 ### Some useful scripts
 

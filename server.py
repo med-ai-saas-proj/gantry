@@ -1,15 +1,12 @@
 """This file is the entrypoint for debugging."""
 
-from src.main.app import cors as app  # type: ignore # noqa: F401
+from src.main.app import main_app
 
 import argparse
 
 import uvicorn
-from dotenv import load_dotenv
 from uvicorn.config import LOGGING_CONFIG
 
-
-load_dotenv(".env")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
@@ -22,7 +19,7 @@ if __name__ == "__main__":
         "%(asctime)s [%(name)s] %(levelprefix)s %(message)s"
     )
     uvicorn.run(
-        app,
+        main_app,
         host="0.0.0.0",
         port=int(args["port"]),
         workers=int(args["workers"]),

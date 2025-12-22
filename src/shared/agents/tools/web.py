@@ -1,6 +1,6 @@
-from src.crawler.services import SearchTimeRange
-from src.crawler.initialize import CRAWLER_SERVICE
 from src.shared.utils.logger import LOGGER
+from src.service.crawler.services import SearchTimeRange
+from src.service.crawler.initialize import CRAWLER_SERVICE
 
 from typing import Optional, TypedDict
 

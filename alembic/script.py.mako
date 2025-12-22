@@ -3,8 +3,8 @@
 Revision ID: ${up_revision}
 Revises: ${down_revision | comma,n}
 Create Date: ${create_date}
-Feature: 
-Reason: 
+Feature:
+Reason:
 
 """
 from alembic import op
@@ -25,17 +25,32 @@ depends_on: Union[str, Sequence[str], None] = ${repr(depends_on)}
 script_path = Path(__file__).resolve()
 script_directory = script_path.parent
 
+def executeScript(script: str):
+    statements = script.split(";")
+    for statement in statements:
+        stmt = statement.strip()
+        if stmt not in ["BEGIN", "END", "COMMIT"]:
+            op.execute(stmt + ";")
+
 def upgrade() -> None:
     """Upgrade schema."""
-    with open(script_directory / "${up_revision}_upgrade.sql") as f:
-        sql = f.read()
-    op.execute(sql)
-    ${upgrades if upgrades else "pass"}
+    path = script_directory / "${up_revision}_upgrade.sql"
+    if path.exists():
+        with open(path) as f:
+            sql = f.read()
+        executeScript(sql)
+    else:
+        open(path, "w")
+        ${upgrades if upgrades else "pass"}
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    with open(script_directory / "${up_revision}_downgrade.sql") as f:
-        sql = f.read()
-    op.execute(sql)
-    ${downgrades if downgrades else "pass"}
+    path = script_directory / "${up_revision}_downgrade.sql"
+    if path.exists():
+        with open(path) as f:
+            sql = f.read()
+        executeScript(sql)
+    else:
+        open(path, "w")
+        ${downgrades if downgrades else "pass"}

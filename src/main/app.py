@@ -1,7 +1,9 @@
+from src.service import service_app
+from src.management import management_app
 from src.shared.utils import request_id_utils
-from src.shared.consts import common_const, messages_const
-from src.shared.settings import AppSettings, getAppSetting
-from src.shared.utils.logger import BoundLogger, getLogger
+from src.shared.consts import common_const
+from src.shared.settings import AppStage, getAppSetting
+from src.shared.utils.logger import getLogger
 from src.shared.dtos.error_output import (
     ProblemDetails,
 )
@@ -10,29 +12,63 @@ from src.shared.custom_types.error_exception import (
     UnrecoverableError,
 )
 
-from .routers import api_router
+from . import exception_handlers
 
 import time
 import uuid
 import traceback
-from typing import Annotated
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from pydantic import ValidationError
-from scalar_fastapi import get_scalar_api_reference
+from opentelemetry import trace
+from sqlalchemy.orm import configure_mappers
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from fastapi.staticfiles import StaticFiles
-from starlette.responses import Response, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+)
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+    OTLPSpanExporter,
+)
 
 
-app = FastAPI(
-    title="Venera API",
-    description="Welcome to API documentation",
-    # root_path="/api/v1",
-    docs_url=None,  # "/docs" if env.DEBUG else None,
+configure_mappers()
+
+app_settings = getAppSetting()
+
+# 1. Define a Resource (identifies the service)
+# This is crucial for your backend to identify which service the data belongs to.
+resource = Resource.create(
+    {
+        "service.name": "main-server",
+        "service.version": "0.0.1",
+    }
+)
+
+# 2. Setup the Tracer Provider
+provider = TracerProvider(resource=resource)
+trace.set_tracer_provider(provider)
+
+# 3. Setup the Exporter (OTLP is standard)
+# OTLP Exporter sends data to a Collector or compatible backend
+otlp_exporter = OTLPSpanExporter(
+    # Set your collector/backend URL here (default is usually 'http://localhost:4317')
+    endpoint=app_settings.otlp_endpoint,
+    insecure=app_settings.stage
+    == AppStage.DEV,  # Use for unencrypted local testing
+)
+
+# 4. Setup the Span Processor (Batches spans before exporting)
+span_processor = BatchSpanProcessor(otlp_exporter)
+provider.add_span_processor(span_processor)
+
+main_app = FastAPI(
+    title="Med AI SaaS",
     openapi_url="/docs/openapi.json",
-    redoc_url=None,  # "/docs" if env.DEBUG else None,
+    docs_url="/docs",
     responses={
         400: {"model": ProblemDetails},
         401: {"model": ProblemDetails},
@@ -40,138 +76,9 @@ app = FastAPI(
         500: {"model": ProblemDetails},
     },
 )
-cors = CORSMiddleware(
-    app,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
-@app.exception_handler(RecoverableError)
-async def recoverableErrorHandler(
-    req: Request, e: RecoverableError
-) -> JSONResponse:
-    if getAppSetting().debug:
-        assert e._stack_frames is not None
-        getLogger().error(
-            "Error from",
-            exception="".join(traceback.format_exception_only(e)),
-            original_exception="".join(
-                traceback.format_exception_only(e._from)
-            ),
-            stack="".join(e._stack_frames),
-        )
-    return JSONResponse(e.format(), status_code=e.status)
-
-
-@app.exception_handler(UnrecoverableError)
-async def unrecoverableErrorHandler(
-    req: Request,
-    exception: UnrecoverableError,
-):
-    logger = getLogger()
-    app_settings = getAppSetting()
-
-    logger.error(
-        "Got an unrecoverable error, you should definitely check your code out",
-        exception="".join(traceback.format_exception_only(exception)),
-        stack="".join(exception._stack_frames),
-    )
-    if app_settings.debug:
-        return Response("".join(exception._stack_frames), status_code=500)
-    return Response(messages_const.INTERNAL_SERVER_ERROR, status_code=500)
-
-
-async def fastapi_exception_handler(
-    request: Request,
-    exception: RequestValidationError | ResponseValidationError,
-):
-    errors = exception.errors()
-    """
-    Error look like this:
-    {
-        "loc": ["body", "price"],
-        "msg": "value is not a valid float",
-        "type": "type_error.float"
-    }
-    """
-
-    exception_response: ProblemDetails = {
-        "status": 400,
-        "title": messages_const.BAD_REQUEST,
-        "errors": [
-            {
-                "detail": error.get("msg"),
-                "header": error.get("type"),
-                "pointer": "/".join(error.get("loc", [])),
-            }
-            for error in errors
-        ],
-    }
-    if getAppSetting().debug:
-        exception_response["type"] = "fast_api_exception_handler"
-    return JSONResponse(
-        status_code=400,
-        content=exception_response,
-    )
-
-
-app.exception_handler(RequestValidationError)(fastapi_exception_handler)
-app.exception_handler(ResponseValidationError)(fastapi_exception_handler)
-
-
-@app.exception_handler(ValidationError)
-async def pydantic_exception_handler(
-    request: Request, exception: ValidationError
-):
-    errors = exception.errors()
-    exception_response: ProblemDetails = {
-        "status": 400,
-        "title": messages_const.BAD_REQUEST,
-        "errors": [
-            {
-                "header": error["type"],
-                "detail": error["msg"],
-                "parameter": ".".join(map(str, error["loc"])),
-                "pointer": error.get("url", ""),
-            }
-            for error in errors
-        ],
-    }
-    if getAppSetting().debug:
-        exception_response["type"] = "pydantic_exception_handler"
-        getLogger().error(
-            "...", traceback="".join(traceback.format_exception(exception))
-        )
-    return JSONResponse(
-        status_code=400,
-        content=exception_response,
-    )
-
-
-@app.exception_handler(Exception)
-async def internal_exception_handler(
-    request: Request,
-    exception: Exception,
-):
-    logger = getLogger()
-    app_settings = getAppSetting()
-
-    logger.error(
-        "Got a weird exception here, you should definitely check your code out!",
-        traceback=traceback.format_exception(exception),
-    )
-    if app_settings.debug:
-        return Response(
-            status_code=500,
-            content="".join(traceback.format_exception(exception)),
-        )
-    return Response(messages_const.INTERNAL_SERVER_ERROR, status_code=500)
-
-
-@app.middleware("http")
+@main_app.middleware("http")
 async def global_middleware(
     request: Request,
     call_next,
@@ -217,15 +124,24 @@ async def global_middleware(
         request_id_utils.reset()
 
 
-app.include_router(router=api_router)
+main_app.mount("/service", service_app, "service")
+main_app.mount("/management", management_app, "management")
+
+main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
 
 
-@app.get("/docs", include_in_schema=False)
-async def scalar_html():
-    return get_scalar_api_reference(
-        openapi_url=app.openapi_url,
-        title=app.title,
-    )
+apps = [main_app, service_app, management_app]
 
+handler_map = {
+    RecoverableError: exception_handlers.recoverableErrorHandler,
+    UnrecoverableError: exception_handlers.recoverableErrorHandler,
+    RequestValidationError: exception_handlers.fastapi_exception_handler,
+    ResponseValidationError: exception_handlers.fastapi_exception_handler,
+    ValidationError: exception_handlers.pydantic_exception_handler,
+    Exception: exception_handlers.internal_exception_handler,
+}
 
-app.mount("/", StaticFiles(directory="statics", html=True), name="static")
+for app in apps:
+    for exc, handler in handler_map.items():
+        app.exception_handler(exc)(handler)
+    FastAPIInstrumentor.instrument_app(app)
