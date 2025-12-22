@@ -2,18 +2,17 @@ from src.ehr import ehr_utils
 from src.ehr.dtos import InputEHR
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict
+from src.shared.agents.agent_manager import AgentManagerService
+from src.service.ehr_summarize.agents import EHR_SUMMARY_AGENT_NAME
 
 from enum import Enum
 from typing import (
     Union,
     Literal,
-    Callable,
     TypedDict,
     AsyncGenerator,
 )
-from contextlib import _GeneratorContextManager
 
-from pydantic_ai import Agent
 from structlog.stdlib import BoundLogger
 
 
@@ -50,9 +49,9 @@ class EHRSummaryService:
     def __init__(
         self,
         logger: BoundLogger,
-        agent: Agent,
+        agent_manager: AgentManagerService
     ):
-        self.agent = agent
+        self.agent_manager = agent_manager
         self.logger = logger
 
     def _store_ehr_and_result(
@@ -70,10 +69,11 @@ class EHRSummaryService:
         self, user_id: str, ehr: InputEHR
     ) -> AsyncGenerator[SSEContent]:
         ehr_dict = EHRDict.from_input_ehr(ehr)
+        agent = self.agent_manager.get_agent(EHR_SUMMARY_AGENT_NAME)
         result = {"result": ""}
         try:
             prompt = self._ehr_to_prompt(ehr_dict)
-            async with self.agent.run_stream(prompt) as run:
+            async with agent.run_stream(prompt) as run:
                 async for output in run.stream_text(delta=True):
                     # yield StreamDelta(event=Event.delta, data={"d": output})
                     yield {"event": Event.delta, "data": {"d": output}}

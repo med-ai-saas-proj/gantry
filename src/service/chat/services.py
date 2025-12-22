@@ -1,5 +1,7 @@
 """This file contain definition of chat's services."""
 
+from src.service.chat.agents import CHAT_AGENT_NAME
+from src.shared.agents.agent_manager import AgentManagerService
 from src.shared.dtos.generation_output import (
     ResponseStatus,
     GenerationOutput,
@@ -24,14 +26,11 @@ from .dtos import (
 
 import json
 from typing import (
-    Callable,
     Sequence,
     AsyncGenerator,
     cast,
 )
-from contextlib import _GeneratorContextManager
 
-from pydantic_ai import Agent
 from structlog.stdlib import BoundLogger
 from pydantic_ai.messages import (
     AudioUrl,
@@ -176,12 +175,10 @@ async def aggregate_stream(
 class ChatService:
     def __init__(
         self,
-        session_scope,
         logger: BoundLogger,
-        agent: Agent[None, str],
-        # agent: Agent[Dep, AnswerStruct],
+        agent_manager: AgentManagerService,
     ):
-        self.agent = agent
+        self.agent_manager = agent_manager
         self.logger = logger
 
     def _store_ehr_and_result(
@@ -199,6 +196,8 @@ class ChatService:
             str | Sequence[ImageUrl | AudioUrl | VideoUrl | DocumentUrl]
         ) = self._inputMapper(query)
 
+        agent = self.agent_manager.get_agent(CHAT_AGENT_NAME)
+
         i = 0
         yield {
             "event": StreamEventType.conversation_start,
@@ -206,7 +205,7 @@ class ChatService:
                 "conversation_id": "thisisaplaceholder",
             },
         }
-        async for event in self.agent.run_stream_events(model_input):
+        async for event in agent.run_stream_events(model_input):
             self.logger.debug("Got new event", new_event=event)
             match event.event_kind:
                 case "part_start":
@@ -393,7 +392,9 @@ class ChatService:
             str | Sequence[ImageUrl | AudioUrl | VideoUrl | DocumentUrl]
         ) = self._inputMapper(query)
 
-        run = await self.agent.run(model_input)
+        agent = self.agent_manager.get_agent(CHAT_AGENT_NAME)
+
+        run = await agent.run(model_input)
         usage = run.usage()
         messages = _convert_to_ours(run.new_messages(), self.logger)
 
