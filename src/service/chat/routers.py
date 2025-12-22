@@ -54,15 +54,17 @@ chat_router = APIRouter(prefix="/chat")
 async def chat(
     user: Annotated[UserInfo, Security(getUserInfo)],
     input: Annotated[ChatInput, Body()],
+    chat_service: Annotated[ChatService, Depends(getChatService)],
 ):
     """Just the good old chatbot."""
+    user_id = user["id"]
     LOGGER.debug("user", user_id=user_id)
     if input.stream:
         return SSEResponse(
-            chat_service.chat_stream(user_id, input.input),
+            chat_service.chat_stream(user_id, str(input.input)),
         )
     else:
-        output = await chat_service.chat(user_id, input.input)
+        output = await chat_service.chat(user_id, str(input.input))
         return JSONResponse(output)
 
 
