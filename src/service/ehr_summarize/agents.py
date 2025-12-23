@@ -1,4 +1,5 @@
 """Setup the EHR Summary Agent."""
+
 from src.shared import llms
 from src.shared.agents.factories import getAgentManager
 from src.shared.agents.agent_manager import AgentConstructorContext
@@ -89,8 +90,9 @@ Một câu duy nhất tóm tắt danh tính bệnh nhân và lý do chính nhậ
 * [Hội chẩn, xét nghiệm, hoặc các vấn đề xuất viện đang chờ]
 * [ví dụ: "Chờ kết quả siêu âm tim chính thức."]
 * [ví dụ: "Tái khám Tim mạch sau 2 tuần."]
-* [ví dụ: "Dự kiến xuất viện vào ngày mai nếu ổn định."]"""
+* [ví dụ: "Dự kiến xuất viện vào ngày mai nếu ổn định."]""",
 )
+
 
 def ehr_summary_agent_constructor(ctx: AgentConstructorContext) -> Agent:
     """Constructs an EHR Summary Agent."""
@@ -108,6 +110,5 @@ def ehr_summary_agent_constructor(ctx: AgentConstructorContext) -> Agent:
 
 
 agent_manager.register_agent(
-    EHR_SUMMARY_AGENT_NAME,
-    ehr_summary_agent_constructor
+    EHR_SUMMARY_AGENT_NAME, ehr_summary_agent_constructor
 )

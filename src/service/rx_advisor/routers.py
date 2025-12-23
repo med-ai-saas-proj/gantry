@@ -4,21 +4,18 @@ from src.service.rx_advisor.factories import getRxAdvisorService
 from src.shared.custom_types.responses import SSEResponse
 from src.management.api_keys.dependencies import requiredPermissions
 
-from .services import RxAdvisorService, GeneratedAnalysis
+from .services import ModelInput, RxAdvisorService
 
 from typing import Annotated
 
-from fastapi import Body, Depends, Security, APIRouter
-from fastapi.responses import JSONResponse
+from fastapi import Depends, Security, APIRouter
 
 
 rx_advisor_router = APIRouter(prefix="/rx_advisor", tags=["Doctor Help"])
 
 
-
 @rx_advisor_router.post(
-    "",
-    response_model=GeneratedAnalysis,
+    "/",
     responses={
         200: {
             "content": {
@@ -28,21 +25,17 @@ rx_advisor_router = APIRouter(prefix="/rx_advisor", tags=["Doctor Help"])
     },
 )
 async def rx_advisor(
-    user_id: Annotated[str, Security(requiredPermissions(["placeholder"]))],
+    # user_id: Annotated[str, Security(requiredPermissions(["placeholder"]))],
     ehr: InputEHR,
     prescription: InputPrescription,
-    rx_advisor_service: Annotated[RxAdvisorService, Depends(getRxAdvisorService)],
-    stream: bool = Body(False, embed=True),
+    rx_advisor_service: Annotated[
+        RxAdvisorService, Depends(getRxAdvisorService)
+    ],
 ):
+    user_id = "testuser"
     LOGGER.debug("user", user_id=user_id)
-    if stream:
-        return SSEResponse(
-            rx_advisor_service.generate_advice_stream(
-                user_id, ehr, prescription
-            ),
-        )
-    else:
-        analysis = await rx_advisor_service.generate_advice(
-            user_id, ehr, prescription
-        )
-        return JSONResponse(analysis)
+    return SSEResponse(
+        rx_advisor_service.generate_agent_response(
+            user_id, ModelInput(ehr=ehr, prescription=prescription)
+        ),
+    )

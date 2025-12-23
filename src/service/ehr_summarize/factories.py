@@ -8,5 +8,4 @@ from functools import lru_cache
 
 @lru_cache(1)
 def getEhrSummaryService() -> EHRSummaryService:
-    agent_manager = getAgentManager()
-    return EHRSummaryService(LOGGER, agent_manager)
+    return EHRSummaryService(LOGGER, getAgentManager())

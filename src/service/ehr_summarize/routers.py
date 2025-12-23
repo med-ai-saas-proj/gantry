@@ -32,16 +32,12 @@ class EHRSummary(TypedDict):
 async def summarize_ehr(
     user_id: Annotated[str, Security(requiredPermissions(["placeholder"]))],
     ehr: InputEHR,
-    ehr_service: Annotated[
-        EHRSummaryService, Depends(getEhrSummaryService)
-    ],
+    ehr_service: Annotated[EHRSummaryService, Depends(getEhrSummaryService)],
     stream: bool = Body(False, embed=True),
 ):
     LOGGER.debug("user", user_id=user_id)
     if stream:
-        return SSEResponse(
-            ehr_service.summarize_ehr_stream(user_id, ehr)
-        )
+        return SSEResponse(ehr_service.summarize_ehr_stream(user_id, ehr))
     else:
         summary = await ehr_service.summarize_ehr(user_id, ehr)
         return JSONResponse({"summary": summary})

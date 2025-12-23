@@ -1,4 +1,5 @@
 """Web browsing tools for agents."""
+
 from src.shared.utils.logger import LOGGER
 from src.shared.agents.factories import getAgentManager
 from src.service.crawler.services import SearchTimeRange
@@ -14,6 +15,7 @@ from pydantic_ai.toolsets import FunctionToolset
 
 
 crawler_service = getCrawlerService()
+
 
 class ViewedUrlsMixin(TypedDict):
     viewed_urls: list[str]
@@ -49,11 +51,10 @@ async def web_search(
     except Exception as e:
         return {"error": str(e)}
 
-def make_web_search_tool(
-    name: str,
-    doc_string: str
-):
+
+def make_web_search_tool(name: str, doc_string: str):
     """Creates a web search tool with the given name and documentation string."""
+
     async def tool(
         ctx: RunContext[ViewedUrlsMixin | None],
         query: str,
@@ -65,11 +66,10 @@ def make_web_search_tool(
     tool.__doc__ = doc_string
     return tool
 
-def make_visit_web_page_tool(
-    name: str,
-    doc_string: str
-):
+
+def make_visit_web_page_tool(name: str, doc_string: str):
     """Creates a visit web page tool with the given name and documentation string."""
+
     async def tool(
         ctx: RunContext,
         url: str,
@@ -81,6 +81,7 @@ def make_visit_web_page_tool(
     tool.__doc__ = doc_string
     return tool
 
+
 WEB_TOOLSET_NAME = "web_tool"
 
 WEB_SEARCH_TOOL_PROMPT_ID = "toolset_web_search_tool_prompt"
@@ -90,7 +91,7 @@ agent_manager = getAgentManager()
 
 agent_manager.register_prompt(
     WEB_SEARCH_TOOL_PROMPT_ID,
-"""Perform a search through many medical sites for a query and return top search results with titles, url and snippet. Use this tool to access up-to-date information from the web or when responding to the user requires information about their location. Some examples of when to use the this tool include:
+    """Perform a search through many medical sites for a query and return top search results with titles, url and snippet. Use this tool to access up-to-date information from the web or when responding to the user requires information about their location. Some examples of when to use the this tool include:
 
 - Local Information: weather, local businesses, events.
 - Freshness: if up-to-date information on a topic could change or enhance the answer.
@@ -104,38 +105,37 @@ Args:
     date_restrict (:obj:`TimeRange`, optional): Restrict the results to the last few days, week, month or year. Must contain the following key:
         - unit (str): one of day, week, month, year
         - num (int): the number of unit to restrict
-"""
+""",
 )
 
 agent_manager.register_prompt(
     VISIT_WEB_PAGE_TOOL_PROMPT_ID,
-"""Visit a webpage at the given url and reads its content.
+    """Visit a webpage at the given url and reads its content.
 
 Use this to browse webpages.
 
 Args:
     url (str): Url of the webpage to visit
     query (str, optional): Optional search query to provide context for the visit. When provided, the crawler may prioritize or extract content related to this query. Defaults to None.
-"""
+""",
 )
 
-def web_toolset_constructor(
-    ctx: ToolsetConstructorContext
-) -> FunctionToolset:
+
+def web_toolset_constructor(ctx: ToolsetConstructorContext) -> FunctionToolset:
     web_search_prompt = ctx.use_prompt(WEB_SEARCH_TOOL_PROMPT_ID)
     visit_web_page_prompt = ctx.use_prompt(VISIT_WEB_PAGE_TOOL_PROMPT_ID)
-    return FunctionToolset(tools=[
-        make_web_search_tool(
-            name="web_search_tool",
-            doc_string=web_search_prompt,
-        ),
-        make_visit_web_page_tool(
-            name="visit_web_page_tool",
-            doc_string=visit_web_page_prompt,
-        )
-    ])
+    return FunctionToolset(
+        tools=[
+            make_web_search_tool(
+                name="web_search_tool",
+                doc_string=web_search_prompt,
+            ),
+            make_visit_web_page_tool(
+                name="visit_web_page_tool",
+                doc_string=visit_web_page_prompt,
+            ),
+        ]
+    )
 
-agent_manager.register_toolset(
-    WEB_TOOLSET_NAME,
-    web_toolset_constructor
-)
+
+agent_manager.register_toolset(WEB_TOOLSET_NAME, web_toolset_constructor)

@@ -10,6 +10,7 @@ from pydantic_ai import Agent
 class Dep(ViewedUrlsMixin):
     pass
 
+
 AI_SEARCH_AGENT_NAME = "ai_search_agent"
 AI_SEARCH_AGENT_PROMPT_ID = "ai_search_agent_prompt"
 
@@ -87,13 +88,11 @@ agent_manager.register_prompt(
       * **Acknowledge Ambiguity:** If a query is unclear or too broad, ask for clarification to narrow the search parameters. For example, "Could you please specify the patient population (e.g., pediatric, adult, immunocompromised) you are interested in?"
       * **Disclaimer:** Every response must end with the following disclaimer:
         > ***Disclaimer:*** *This information is for reference purposes only and is not a substitute for professional clinical judgment. Please consult relevant clinical guidelines and apply your professional expertise when making patient care decisions.*
-    """
+    """,
 )
 
 
-def ai_search_agent_constructor(
-    ctx: AgentConstructorContext
-):
+def ai_search_agent_constructor(ctx: AgentConstructorContext):
     """Constructs the AI Search Agent."""
     prompt = ctx.use_prompt(AI_SEARCH_AGENT_PROMPT_ID)
     web_toolset = ctx.use_toolset(WEB_TOOLSET_NAME)

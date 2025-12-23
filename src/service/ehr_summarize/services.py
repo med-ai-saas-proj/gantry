@@ -46,11 +46,7 @@ SSEContent = Union[StreamDelta, StreamDone]
 
 
 class EHRSummaryService:
-    def __init__(
-        self,
-        logger: BoundLogger,
-        agent_manager: AgentManagerService
-    ):
+    def __init__(self, logger: BoundLogger, agent_manager: AgentManagerService):
         self.agent_manager = agent_manager
         self.logger = logger
 

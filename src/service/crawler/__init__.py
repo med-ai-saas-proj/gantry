@@ -5,4 +5,3 @@ from .services import (
     DiscoverResult,
     SearchTimeRange,
 )
-from .initialize import CRAWLER_SERVICE
