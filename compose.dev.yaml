@@ -41,6 +41,7 @@ services:
     restart: unless-stopped
     volumes:
       - keycloak_data:/opt/keycloak/data
+      - ./statics/keycloak-themes:/opt/keycloak/themes
 
   jaeger:
     image: jaegertracing/jaeger:2.13.0
