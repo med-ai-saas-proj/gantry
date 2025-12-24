@@ -124,17 +124,17 @@ class AgentService[InputType: BaseModel, AgentResultType: BaseModel](ABC):
         self.logger = logger
 
     @abstractmethod
-    async def initialize_agent(self) -> Agent[Any, AgentResultType]:
+    async def initializeAgent(self) -> Agent[Any, AgentResultType]:
         """Initializes and returns an agent instance."""
         pass
 
     @abstractmethod
-    async def preprocess_input(self, input: InputType) -> str:
+    async def preprocessInput(self, input: InputType) -> str:
         """Preprocesses the input before passing it to the agent."""
         pass
 
     @abstractmethod
-    async def store_result(
+    async def storeResult(
         self,
         user_id: str,
         input: InputType,
@@ -198,7 +198,7 @@ class AgentService[InputType: BaseModel, AgentResultType: BaseModel](ABC):
     ):
         """Generates the agent response stream and puts events into the queue."""
         agent_result: AgentResultType | None = None
-        processed_input = await self.preprocess_input(input)
+        processed_input = await self.preprocessInput(input)
         result = {}
         try:
             async with agent.run_stream(
@@ -231,10 +231,10 @@ class AgentService[InputType: BaseModel, AgentResultType: BaseModel](ABC):
             raise
         finally:
             self.logger.debug("Result", result=result)
-            await self.store_result(user_id, input, agent_result)
+            await self.storeResult(user_id, input, agent_result)
             queue.shutdown()
 
-    async def generate_agent_response(
+    async def generateAgentResponse(
         self,
         user_id: str,
         input: InputType,
@@ -242,7 +242,7 @@ class AgentService[InputType: BaseModel, AgentResultType: BaseModel](ABC):
         """Generates agent responses as an async iterable of SSEContent."""
         queue: AQueue = asyncio.Queue()
 
-        agent = await self.initialize_agent()
+        agent = await self.initializeAgent()
 
         task = asyncio.create_task(
             self._generateStream(user_id, queue, agent, input)

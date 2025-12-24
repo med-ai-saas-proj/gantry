@@ -4,5 +4,6 @@ from functools import lru_cache
 
 
 @lru_cache(1)
-def getAgentManager():
+def getAgentManager() -> AgentManagerService:
+    """Get AgentManagerService singleton."""
     return AgentManagerService()

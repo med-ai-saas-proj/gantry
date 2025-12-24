@@ -35,10 +35,10 @@ class RxAdvisorService(AgentService[ModelInput, AnswerStruct]):
         """Initialize RxAdvisorService."""
         super().__init__(logger, agent_manager)
 
-    async def initialize_agent(self) -> Agent[Any, AnswerStruct]:
+    async def initializeAgent(self) -> Agent[Any, AnswerStruct]:
         return self.agent_manager.get_agent(RX_ADVISOR_AGENT_NAME)
 
-    async def preprocess_input(self, input: ModelInput) -> str:
+    async def preprocessInput(self, input: ModelInput) -> str:
         ehr = input.ehr
         prescription = input.prescription
         ehr_dict = EHRDict.from_input_ehr(ehr)
@@ -50,7 +50,7 @@ class RxAdvisorService(AgentService[ModelInput, AnswerStruct]):
         )
         return prompt
 
-    async def store_result(
+    async def storeResult(
         self, user_id: str, input: ModelInput, result: AnswerStruct | None
     ):
         pass

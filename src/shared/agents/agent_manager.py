@@ -76,6 +76,18 @@ class AgentManagerService:
         self.toolset_instances = {}
         self.toolset_used_by_agents = {}
 
+    def initialize(self) -> None:
+        """Build all registered agents and toolsets."""
+        for toolset_id, constructor in self.toolset_constructors.items():
+            self.toolset_instances[toolset_id] = constructor(
+                ToolsetConstructorContext(self, toolset_id)
+            )
+        for agent_id, constructor in self.agent_constructors.items():
+            self.agent_instances[agent_id] = constructor(
+                AgentConstructorContext(self, agent_id)
+            )
+
+
     def register_agent(
         self, agent_id: str, agent_constructor: AgentConstructor
     ) -> None:
@@ -83,13 +95,12 @@ class AgentManagerService:
         if agent_id in self.agent_constructors:
             raise ValueError(f"Agent ID {agent_id} already registered")
         self.agent_constructors[agent_id] = agent_constructor
-        self.agent_instances[agent_id] = agent_constructor(
-            AgentConstructorContext(self, agent_id)
-        )
+
 
     def get_agent(self, agent_id):
         """Get an agent by its ID."""
         return self.agent_instances[agent_id]
+
 
     def register_toolset(
         self, tool_id: str, toolset_constructor: ToolsetConstructor
@@ -100,9 +111,7 @@ class AgentManagerService:
 
         self.toolset_used_by_agents[tool_id] = set()
         self.toolset_constructors[tool_id] = toolset_constructor
-        self.toolset_instances[tool_id] = toolset_constructor(
-            ToolsetConstructorContext(self, tool_id)
-        )
+
 
     def use_toolset(self, tool_id: str, agent_id: str) -> AbstractToolset:
         """Get the toolset used by a specific agent."""

@@ -1,7 +1,7 @@
 from src.shared.utils.logger import LOGGER
 
 from .services import RxAdvisorService
-from ...shared.agents.factories import getAgentManager
+from ...shared.agents.agent_manager_factories import getAgentManager
 
 from functools import lru_cache
 
