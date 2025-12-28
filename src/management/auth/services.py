@@ -1,4 +1,3 @@
-# src/auth/services/keycloak.py
 from src.shared.consts import messages_const
 from src.shared.custom_types.error_exception import RecoverableError
 
@@ -15,6 +14,8 @@ from safe_result import Ok, Err, Result
 class UnauthorizedError(RecoverableError):
     status = 401
     title = messages_const.UNAUTHORIZED
+    code = "unauthorized"
+    detail = "Unauthorized access"
 
 
 class KeycloakService:
@@ -41,12 +42,11 @@ class KeycloakService:
                 token,
                 signing_key.key,
                 algorithms=["RS256"],
-                audience=self.client_id,
                 issuer=self.issuer,
                 options={
                     "verify_exp": True,
                     "verify_iss": True,
-                    "verify_aud": True,
+                    "verify_aud": False,
                 },
             )
 
@@ -70,11 +70,29 @@ class KeycloakService:
                     )
                 )
             )
+        roles = []
+        try:
+            resource_access = claims.get("resource_access", {})
+            client_roles = resource_access.get(self.client_id, {}).get(
+                "roles", []
+            )
+            roles.extend(client_roles)
+
+            if not roles:
+                realm_roles = claims.get("realm_access", {}).get("roles", [])
+                roles.extend(realm_roles)
+
+            if not roles and "account" in resource_access:
+                roles.extend(resource_access["account"].get("roles", []))
+
+        except Exception:
+            pass
+
         auth_info: UserInfo = {
             "id": claims["sub"],
             "username": claims.get("preferred_username"),
             "email": claims.get("email"),
-            "roles": claims["resource_access"]["api"]["roles"],
+            "roles": roles,
         }
 
         return Ok(auth_info)
