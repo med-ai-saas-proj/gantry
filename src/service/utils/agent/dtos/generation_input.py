@@ -1,4 +1,4 @@
-from .base import BaseDTO
+from src.shared.dtos.base import BaseDTO
 
 from enum import Enum
 from typing import Annotated

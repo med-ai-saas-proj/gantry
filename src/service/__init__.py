@@ -1,5 +1,6 @@
 from src.shared.custom_types.error_exception import ProblemDetails
 
+from .ocr import ocr_router
 from .chat import chat_router
 from .ai_search import ai_search_router
 from .rx_advisor import rx_advisor_router
@@ -32,17 +33,14 @@ service_app.add_middleware(
     allow_headers=["Content-Type", "X-Api-Key"],
 )
 
-v1_router = APIRouter(
-    prefix="/v1", tags=["api", "service", "v1"], include_in_schema=True
-)
+v1_router = APIRouter(prefix="/v1", tags=["service"], include_in_schema=True)
 v1_router.include_router(ehr_summarize_router)
 v1_router.include_router(rx_advisor_router)
 v1_router.include_router(ai_search_router)
+v1_router.include_router(ocr_router)
 v1_router.include_router(chat_router)
 
-api_router = APIRouter(
-    prefix="/api", tags=["api", "service"], include_in_schema=True
-)
+api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
 api_router.include_router(v1_router)
 
 service_app.include_router(api_router)

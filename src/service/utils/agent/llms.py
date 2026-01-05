@@ -1,12 +1,14 @@
-from .consts import env_const
+import os
 
 from pydantic_ai.models.groq import GroqModel
 from pydantic_ai.providers.groq import GroqProvider
 
 
+GROQ_API_KEY = os.environ["GROQ_API_KEY"]
+
 big_model = GroqModel(
     "openai/gpt-oss-20b",
-    provider=GroqProvider(api_key=env_const.GROQ_API_KEY),
+    provider=GroqProvider(api_key=GROQ_API_KEY),
     settings={
         "max_tokens": 32000,
         "parallel_tool_calls": True,
@@ -18,7 +20,7 @@ big_model = GroqModel(
 
 medium_model = GroqModel(
     "openai/gpt-oss-20b",
-    provider=GroqProvider(api_key=env_const.GROQ_API_KEY),
+    provider=GroqProvider(api_key=GROQ_API_KEY),
     settings={
         "max_tokens": 32000,
         "parallel_tool_calls": True,
@@ -30,7 +32,7 @@ medium_model = GroqModel(
 
 small_model = GroqModel(
     "openai/gpt-oss-20b",
-    provider=GroqProvider(api_key=env_const.GROQ_API_KEY),
+    provider=GroqProvider(api_key=GROQ_API_KEY),
     settings={
         "max_tokens": 32000,
         "parallel_tool_calls": True,

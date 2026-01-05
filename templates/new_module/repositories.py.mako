@@ -1,9 +1,9 @@
 """This file contain definition of ${app_name}'s repositories."""
 
+from . import entities
+
 from src.db.postgres.repository import PostgresRepo
 from src.db.postgres.query_builder import PostgresQueryBuilder
-
-from . import entities
 
 
 class ExampleRepo(PostgresRepo[entities.Example]):
