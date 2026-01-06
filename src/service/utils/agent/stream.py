@@ -42,7 +42,7 @@ from pydantic_ai.messages import (
 
 
 def _create_new_part(event: StreamEvent) -> ModelResponseContent:
-    match event:
+    match event["data"]:
         case StreamEvent_PartType.output:
             return {
                 "type": ModelResponse_ContentType.text,
@@ -68,7 +68,9 @@ def _create_new_part(event: StreamEvent) -> ModelResponseContent:
                 "hinted_result": None,
             }
         case _:
-            raise RuntimeError("New type, check out create new part", __file__)
+            raise RuntimeError(
+                "New type, check out create new part", __file__, event
+            )
 
 
 async def aggregateStream(
@@ -241,14 +243,13 @@ async def convertAgentStream[T](
     agent_stream: AsyncIterator[AgentStreamEvent | AgentRunResultEvent[T]],
 ) -> AsyncGenerator[StreamEvent]:
     # i = 0
-    agent = Agent()
     yield {
         "event": StreamEventType.conversation_start,
         "data": {
             "conversation_id": "thisisaplaceholder",
         },
     }
-    async for event in agent.run_stream_events("testtesttest"):
+    async for event in agent_stream:
         # self.logger.debug("Got new event", new_event=event)
         match event.event_kind:
             case "part_start":

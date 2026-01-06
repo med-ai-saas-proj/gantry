@@ -13,5 +13,5 @@ lru_cache(1)
 
 def getEHRSummarizeService():
     return EHRSummarizeService(
-        getSessionManager, getLogger(), getEHRSummarizeService(small_model)
+        getSessionManager, getLogger(), getEhrSummarizeAgent(small_model)
     )

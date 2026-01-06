@@ -28,9 +28,10 @@ service_app = FastAPI(
 service_app.add_middleware(
     CORSMiddleware,
     allow_origins="*",
-    # allow_credentials=True,               # keep only if you really need cookies/auth
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Content-Type", "X-Api-Key"],
+    allow_credentials=True,  # keep only if you really need cookies/auth
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    # allow_headers=["Content-Type", "X-Api-Key"],
+    allow_headers=["*"],
 )
 
 v1_router = APIRouter(prefix="/v1", tags=["service"], include_in_schema=True)

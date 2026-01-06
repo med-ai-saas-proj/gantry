@@ -43,5 +43,5 @@ class ChatService:
             yield event
 
     async def chat(self, user_id: str, query: ModelInput) -> ChatOutput:
-        result = await aggregateStream(self.chat_stream(user_id, query))
+        result = await aggregateStream(self.chatStream(user_id, query))
         return result
