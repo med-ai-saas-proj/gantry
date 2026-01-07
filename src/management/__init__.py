@@ -43,6 +43,6 @@ management_app.include_router(api_router)
 @management_app.get("/docs", include_in_schema=False)
 async def scalar_html():
     return get_scalar_api_reference(
-        openapi_url="/management" + (management_app.openapi_url or ""),
+        openapi_url=management_app.openapi_url or "",
         title=management_app.title,
     )
