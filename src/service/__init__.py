@@ -50,6 +50,6 @@ service_app.include_router(api_router)
 @service_app.get("/docs", include_in_schema=False)
 async def scalar_html():
     return get_scalar_api_reference(
-        openapi_url=service_app.openapi_url or "",
+        openapi_url=(service_app.openapi_url or "").lstrip("/"),
         title=service_app.title,
     )
