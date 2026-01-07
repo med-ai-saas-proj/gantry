@@ -165,6 +165,8 @@ async def aggregateStream(
                     case _:
                         pass
             case StreamEventType.final_result:
+                if last_part is not None:
+                    model_response.append(last_part)
                 final_output = output["data"]
 
     assert final_output is not None, "Check ai search stream aggregation"
