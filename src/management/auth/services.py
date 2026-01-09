@@ -5,7 +5,7 @@ from src.shared.custom_types.error_exception import RecoverableError
 from .entities import UserInfo
 from .settings import AuthSetting
 
-from typing import Any, final
+from typing import Any, Callable, final
 
 import jwt
 from jwt import PyJWKClient
@@ -73,11 +73,20 @@ class KeycloakService:
                     )
                 )
             )
+
+        def tryNone[T](fn: Callable[[], T]) -> T | None:
+            try:
+                return fn()
+            except:
+                return None
+
         auth_info: UserInfo = {
             "id": claims["sub"],
             "username": claims.get("preferred_username"),
             "email": claims.get("email"),
-            "roles": claims["resource_access"]["account"]["roles"],
+            "roles": tryNone(
+                lambda: claims["resource_access"]["account"]["roles"]
+            ),
         }
 
         return Ok(auth_info)
