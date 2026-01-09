@@ -1,5 +1,6 @@
 from src.shared.utils.logger import LOGGER
 from src.management.auth.entities import UserInfo
+from src.management.api_keys.entities import ApiKeyInfo
 from src.shared.custom_types.responses import SSEResponse
 from src.management.api_keys.dependencies import requiredPermissions
 
@@ -29,13 +30,13 @@ rx_advisor_router = APIRouter(prefix="/rx_advisor", tags=["Doctor Help"])
     },
 )
 async def rx_advisor(
-    user: Annotated[UserInfo, Security(requiredPermissions(["placeholder"]))],
+    user: Annotated[ApiKeyInfo, Security(requiredPermissions(["placeholder"]))],
     input: RxAdvisorInput,
     rx_advisor_service: Annotated[
         RxAdvisorService, Depends(getRxAdvisorService)
     ],
 ):
-    user_id = user["id"]
+    user_id = user["user_id"]
     LOGGER.debug("user", user_id=user_id)
     if input.stream:
         return SSEResponse(

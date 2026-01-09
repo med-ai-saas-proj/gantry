@@ -1,4 +1,5 @@
 from src.shared.utils.logger import LOGGER
+from src.management.api_keys.entities import ApiKeyInfo
 from src.management.api_keys.dependencies import requiredPermissions
 from src.shared.custom_types.responses.sse import SSEResponse
 
@@ -29,11 +30,12 @@ ai_search_router = APIRouter(prefix="/ai_search", tags=["Doctor Help"])
     },
 )
 async def ai_search(
-    user_id: Annotated[str, Security(requiredPermissions(["placeholder"]))],
+    user: Annotated[ApiKeyInfo, Security(requiredPermissions(["placeholder"]))],
     input: AiSearchInput,
     ai_search_service: Annotated[AiSearchService, Depends(getAiSearchService)],
 ) -> SSEResponse | JSONResponse:
     """Use AI to search the internet and summarize the result."""
+    user_id = user["user_id"]
     LOGGER.debug("user", user_id=user_id)
     if input.stream:
         return SSEResponse(

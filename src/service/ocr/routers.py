@@ -1,5 +1,6 @@
 from src.ehr.custom_types import EHRFormat
 from src.shared.utils.logger import LOGGER
+from src.management.api_keys.entities import ApiKeyInfo
 from src.management.api_keys.dependencies import requiredPermissions
 from src.shared.custom_types.responses.sse import SSEResponse
 
@@ -32,7 +33,9 @@ ocr_router = APIRouter(prefix="/ocr", tags=["Doctor Help"])
     },
 )
 async def ocr(
-    user_id: Annotated[str, Security(requiredPermissions(["placeholder"]))],
+    user_id: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
     image: Annotated[UploadFile, File(title="Image to OCR.")],
     format: Annotated[EHRFormat, Query(title="Output format")],
 ) -> SSEResponse | JSONResponse:
