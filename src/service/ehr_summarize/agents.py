@@ -1,19 +1,17 @@
-"""Setup the EHR Summary Agent."""
 from src.shared import llms
-from src.shared.agents.factories import getAgentManager
-from src.shared.agents.agent_manager import AgentConstructorContext
 from src.shared.agents.shared_instruction import add_current_date
 
 from pydantic_ai import Agent
 
 
-agent_manager = getAgentManager()
+EHR_SUMMARY_AGENT = Agent(
+    model=llms.big_model,
+    end_strategy="exhaustive",
+    name="ehr_summary_agent",
+    instructions=[
+        add_current_date,
+        """You are a highly skilled clinical summarization assistant. Your user is a busy physician (MD/DO) who needs a rapid, accurate, and clinically relevant overview of a patient's Electronic Health Record (EHR).
 
-EHR_SUMMARY_AGENT_NAME = "ehr_summary_agent"
-EHR_SUMMARY_AGENT_PROMPT_ID = "ehr_summary_agent_prompt"
-agent_manager.register_prompt(
-    EHR_SUMMARY_AGENT_PROMPT_ID,
-    """You are a highly skilled clinical summarization assistant. Your user is a busy physician (MD/DO) who needs a rapid, accurate, and clinically relevant overview of a patient's Electronic Health Record (EHR).
 Your task is to receive a large, potentially unstructured block of text from a patient's EHR and synthesize it into a concise, scannable summary. The goal is to prepare the physician for a clinical encounter (e.g., a hospital round, an office visit).
 
 **PERFORMANCE GUIDELINES:**
@@ -89,25 +87,6 @@ Một câu duy nhất tóm tắt danh tính bệnh nhân và lý do chính nhậ
 * [Hội chẩn, xét nghiệm, hoặc các vấn đề xuất viện đang chờ]
 * [ví dụ: "Chờ kết quả siêu âm tim chính thức."]
 * [ví dụ: "Tái khám Tim mạch sau 2 tuần."]
-* [ví dụ: "Dự kiến xuất viện vào ngày mai nếu ổn định."]"""
-)
-
-def ehr_summary_agent_constructor(ctx: AgentConstructorContext) -> Agent:
-    """Constructs an EHR Summary Agent."""
-    prompt = ctx.use_prompt(EHR_SUMMARY_AGENT_PROMPT_ID)
-
-    return Agent(
-        model=llms.big_model,
-        end_strategy="exhaustive",
-        name=EHR_SUMMARY_AGENT_NAME,
-        instructions=[
-            add_current_date,
-            prompt,
-        ],
-    )
-
-
-agent_manager.register_agent(
-    EHR_SUMMARY_AGENT_NAME,
-    ehr_summary_agent_constructor
+* [ví dụ: "Dự kiến xuất viện vào ngày mai nếu ổn định."]""",
+    ],
 )

@@ -1,8 +1,8 @@
 from src.ehr.dtos import InputEHR, InputPrescription
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict, PrescriptionDict
-from src.service.rx_advisor.agents import RX_ADVISOR_AGENT_NAME
-from src.shared.agents.agent_manager import AgentManagerService
+from src.shared.agents.shared_types import AnswerStruct
+from src.shared.custom_types.responses import SSEResponse
 
 import asyncio
 from enum import Enum
@@ -10,11 +10,13 @@ from typing import (
     Any,
     Union,
     Literal,
+    Callable,
     Optional,
     TypedDict,
     AsyncIterable,
 )
 from functools import partial
+from contextlib import _GeneratorContextManager
 
 from pydantic import ValidationError
 from pydantic_ai import Agent, RunContext
@@ -22,8 +24,11 @@ from structlog.stdlib import BoundLogger
 from pydantic_ai.messages import (
     TextPartDelta,
     PartDeltaEvent,
+    PartStartEvent,
     AgentStreamEvent,
+    FinalResultEvent,
     ThinkingPartDelta,
+    ToolCallPartDelta,
     FunctionToolCallEvent,
     FunctionToolResultEvent,
 )
@@ -113,10 +118,12 @@ AQueue = asyncio.Queue[SSEContent]
 class RxAdvisorService:
     def __init__(
         self,
+        # session_scope: Callable[..., _GeneratorContextManager],
         logger: BoundLogger,
-        agent_manager: AgentManagerService,
+        agent: Agent[None, str],
     ):
-        self.agent_manager = agent_manager
+        # self.postgres_service = PostgresService(session_scope=session_scope)
+        self.agent = agent
         self.logger = logger
 
     def _store_ehr_and_result(
@@ -197,9 +204,8 @@ New Prescription:
             prescription
         )
         agent_result = ""
-        agent = self.agent_manager.get_agent(RX_ADVISOR_AGENT_NAME)
         try:
-            async with agent.run_stream(
+            async with self.agent.run_stream(
                 self._process_ehr_and_prescription_to_prompt(
                     ehr_dict, prescription_dict
                 ),

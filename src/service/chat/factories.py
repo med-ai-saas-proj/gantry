@@ -1,6 +1,8 @@
+from src.shared.llms import small_model
+from src.db.factories import getSessionManager
 from src.shared.utils.logger import getLogger
-from src.shared.agents.factories import getAgentManager
 
+from .agents import create_agent
 from .services import ChatService
 
 from functools import lru_cache
@@ -8,7 +10,6 @@ from functools import lru_cache
 
 @lru_cache(1)
 def getChatService():
-    """Get ChatService singleton."""
-    agent_manager = getAgentManager()
-
-    return ChatService(getLogger(), agent_manager)
+    return ChatService(
+        getSessionManager(), getLogger(), create_agent(small_model)
+    )

@@ -1,10 +1,9 @@
-from src.shared.agents.agent_manager import AgentManagerService
 from src.shared.dtos.generation_output import (
     ResponseStatus,
     GenerationOutput,
 )
 
-from .agents import AI_SEARCH_AGENT_NAME
+from .agents import Dep
 from ..chat.dtos import (
     ChatOutput,
     StreamEvent,
@@ -19,11 +18,14 @@ from ..chat.dtos import (
 
 import json
 from typing import (
+    Callable,
     Sequence,
     AsyncGenerator,
     cast,
 )
+from contextlib import _GeneratorContextManager
 
+from pydantic_ai import Agent
 from structlog.stdlib import BoundLogger
 from pydantic_ai.messages import ModelRequest, ModelResponse
 
@@ -162,10 +164,11 @@ class AISearchService:
     def __init__(
         self,
         logger: BoundLogger,
-        agent_manager: AgentManagerService
+        agent: Agent[Dep, str],
+        # agent: Agent[Dep, AnswerStruct],
     ):
+        self.agent = agent
         self.logger = logger
-        self.agent_manager = agent_manager
 
     def _store_ehr_and_result(
         self,
@@ -178,8 +181,6 @@ class AISearchService:
     async def ai_search_stream(
         self, user_id: str, query: str
     ) -> AsyncGenerator[StreamEvent]:
-        agent = self.agent_manager.get_agent(AI_SEARCH_AGENT_NAME)
-
         i = 0
         yield {
             "event": StreamEventType.conversation_start,
@@ -187,7 +188,7 @@ class AISearchService:
                 "conversation_id": "thisisaplaceholder",
             },
         }
-        async for event in agent.run_stream_events(
+        async for event in self.agent.run_stream_events(
             query, deps={"viewed_urls": []}
         ):
             self.logger.debug("Got new event", new_event=event)
@@ -349,9 +350,7 @@ class AISearchService:
                     pass
 
     async def ai_search(self, user_id: str, query: str) -> ChatOutput:
-        agent = self.agent_manager.get_agent(AI_SEARCH_AGENT_NAME)
-
-        run = await agent.run(query, deps={"viewed_urls": []})
+        run = await self.agent.run(query, deps={"viewed_urls": []})
         usage = run.usage()
         messages = _convert_to_ours(run.new_messages(), self.logger)
 
