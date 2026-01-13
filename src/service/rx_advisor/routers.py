@@ -35,7 +35,7 @@ async def rx_advisor(
     user_id = "testuser"
     LOGGER.debug("user", user_id=user_id)
     return SSEResponse(
-        rx_advisor_service.generateAgentResponse(
+        rx_advisor_service.generate_agent_response(
             user_id, ModelInput(ehr=ehr, prescription=prescription)
         ),
     )

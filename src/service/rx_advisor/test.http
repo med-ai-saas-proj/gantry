@@ -4,6 +4,7 @@ Accept: text/event-stream
 Content-Type: application/json
 Authorization: Bearer TEST_DOCTOR_TOKEN
 
+
 {
   "ehr": {
      "type": "custom_json",

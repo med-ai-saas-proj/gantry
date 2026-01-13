@@ -1,6 +1,4 @@
 from src.shared.custom_types.error_exception import ProblemDetails
-from src.shared.agents.agent_manager_factories import getAgentManager
-from src.shared.agents.prompt_manager_factories import getPromptManager
 
 from .chat import chat_router
 from .ai_search import ai_search_router
@@ -9,7 +7,6 @@ from .ehr_summarize import ehr_summarize_router
 
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
-from structlog.stdlib import BoundLogger
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -57,17 +54,3 @@ async def scalar_html():
         openapi_url="/service" + (service_app.openapi_url or ""),
         title=service_app.title,
     )
-
-
-async def service_start_event(logger: BoundLogger):
-    logger.info("Service starting...")
-
-    logger.info("Registering prompts...")
-    prompt_manager = getPromptManager()
-    # register prompts async from db, files, etc.
-    await prompt_manager.registerPrompt()
-
-    logger.info("Initializing agents...")
-    agentManager = getAgentManager()
-    agentManager.initialize()
-    logger.info("Service started.")

@@ -1,5 +1,5 @@
 from src.shared.utils.logger import getLogger
-from src.shared.agents.agent_manager_factories import getAgentManager
+from src.shared.agents.factories import getAgentManager
 
 from .services import ChatService
 

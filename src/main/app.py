@@ -1,4 +1,4 @@
-from src.service import service_app, service_start_event
+from src.service import service_app
 from src.management import management_app
 from src.shared.utils import request_id_utils
 from src.shared.consts import common_const
@@ -17,7 +17,6 @@ from . import exception_handlers
 import time
 import uuid
 import traceback
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from pydantic import ValidationError
@@ -66,19 +65,10 @@ otlp_exporter = OTLPSpanExporter(
 span_processor = BatchSpanProcessor(otlp_exporter)
 provider.add_span_processor(span_processor)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    logger = getLogger()
-    logger.info("Starting main_app...")
-    await service_start_event(logger)
-    yield
-    logger.info("Shutting down main_app...")
-
 main_app = FastAPI(
     title="Med AI SaaS",
     openapi_url="/docs/openapi.json",
     docs_url="/docs",
-    lifespan=lifespan,
     responses={
         400: {"model": ProblemDetails},
         401: {"model": ProblemDetails},
