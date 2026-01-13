@@ -9,4 +9,6 @@ from functools import lru_cache
 @lru_cache(1)
 def getChatService():
     """Get ChatService singleton."""
-    return ChatService(getLogger(), getAgentManager())
+    agent_manager = getAgentManager()
+
+    return ChatService(getLogger(), agent_manager)

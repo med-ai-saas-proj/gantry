@@ -1,5 +1,4 @@
 """Toolset for interacting with the openFDA API to retrieve drug information."""
-
 from src.shared.utils.logger import LOGGER
 from src.shared.agents.factories import getAgentManager
 from src.shared.agents.agent_manager import ToolsetConstructorContext
@@ -13,7 +12,6 @@ from pydantic_ai.toolsets import FunctionToolset
 
 
 OPEN_FDA_ENDPOINT = "https://api.fda.gov/drug/label.json"
-
 
 class ToolOutput(TypedDict):
     url: NotRequired[str]
@@ -291,9 +289,7 @@ def search_openfda(
 
 
 OPEN_FDA_TOOLSET_NAME = "open_fda_toolset"
-OPEN_FDA_TOOLSET_GET_DRUG_PRESCRIPTION_INFO_PROMPT_ID = (
-    "toolset_get_drug_prescription_info_prompt"
-)
+OPEN_FDA_TOOLSET_GET_DRUG_PRESCRIPTION_INFO_PROMPT_ID = "toolset_get_drug_prescription_info_prompt"
 OPEN_FDA_TOOLSET_GET_POPULATION_SPECIFIC_DRUG_INFO_PROMPT_ID = (
     "toolset_get_population_specific_drug_info_prompt"
 )
@@ -304,13 +300,13 @@ OPEN_FDA_TOOLSET_GET_DRUG_SAFETY_AND_INTERACTION_INFO_PROMPT_ID = (
 agent_manager = getAgentManager()
 agent_manager.register_prompt(
     OPEN_FDA_TOOLSET_GET_DRUG_PRESCRIPTION_INFO_PROMPT_ID,
-    """Retrieves essential prescription information for a given drug.
-    Given a drug name, this function returns drug's description, patient information, boxed warnings, approved uses, and dosage guidelines.)""",
+"""Retrieves essential prescription information for a given drug.
+    Given a drug name, this function returns drug's description, patient information, boxed warnings, approved uses, and dosage guidelines.)"""
 )
 agent_manager.register_prompt(
     OPEN_FDA_TOOLSET_GET_POPULATION_SPECIFIC_DRUG_INFO_PROMPT_ID,
-    """Retrieves drug safety and usage information for specific populations.
-    Given a drug name, this function returns detailed guidance on its use during pregnancy, while nursing, and for pediatric and geriatric populations.""",
+"""Retrieves drug safety and usage information for specific populations.
+    Given a drug name, this function returns detailed guidance on its use during pregnancy, while nursing, and for pediatric and geriatric populations."""
 )
 
 agent_manager.register_prompt(
@@ -319,20 +315,13 @@ agent_manager.register_prompt(
         Given a drug name, this function returns details about overdose risks, contraindications, warnings, potential adverse reactions, and known drug interactions.""",
 )
 
-
 def openFdaToolsetConstructor(
     ctx: ToolsetConstructorContext,
 ) -> FunctionToolset:
     """Constructs the OpenFDA toolset with defined tools for drug information retrieval."""
-    get_drug_info_prompt = ctx.use_prompt(
-        OPEN_FDA_TOOLSET_GET_DRUG_PRESCRIPTION_INFO_PROMPT_ID
-    )
-    get_population_specific_drug_info_prompt = ctx.use_prompt(
-        OPEN_FDA_TOOLSET_GET_POPULATION_SPECIFIC_DRUG_INFO_PROMPT_ID
-    )
-    get_drug_safety_and_interaction_info_prompt = ctx.use_prompt(
-        OPEN_FDA_TOOLSET_GET_DRUG_SAFETY_AND_INTERACTION_INFO_PROMPT_ID
-    )
+    get_drug_info_prompt = ctx.use_prompt(OPEN_FDA_TOOLSET_GET_DRUG_PRESCRIPTION_INFO_PROMPT_ID)
+    get_population_specific_drug_info_prompt = ctx.use_prompt(OPEN_FDA_TOOLSET_GET_POPULATION_SPECIFIC_DRUG_INFO_PROMPT_ID)
+    get_drug_safety_and_interaction_info_prompt = ctx.use_prompt(OPEN_FDA_TOOLSET_GET_DRUG_SAFETY_AND_INTERACTION_INFO_PROMPT_ID)
 
     return FunctionToolset(
         tools=[
@@ -354,5 +343,7 @@ def openFdaToolsetConstructor(
         ]
     )
 
-
-agent_manager.register_toolset(OPEN_FDA_TOOLSET_NAME, openFdaToolsetConstructor)
+agent_manager.register_toolset(
+    OPEN_FDA_TOOLSET_NAME,
+    openFdaToolsetConstructor
+)

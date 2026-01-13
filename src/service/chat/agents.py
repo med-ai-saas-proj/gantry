@@ -13,9 +13,9 @@ CHAT_AGENT_PROMPT_ID = "chat_agent_prompt"
 
 agent_manager = getAgentManager()
 agent_manager.register_prompt(
-    CHAT_AGENT_PROMPT_ID, "You are a friendly chatbot"
+    CHAT_AGENT_PROMPT_ID,
+    "You are a friendly chatbot"
 )
-
 
 def chat_agent_constructor(ctx: AgentConstructorContext):
     """Construct chat agent."""
@@ -25,7 +25,6 @@ def chat_agent_constructor(ctx: AgentConstructorContext):
         model=llms.small_model,
         instructions=[add_current_date, prompt],
     )
-
 
 agent_manager.register_agent(
     CHAT_AGENT_NAME,

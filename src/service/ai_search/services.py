@@ -159,7 +159,11 @@ async def aggregate_stream(
 
 
 class AISearchService:
-    def __init__(self, logger: BoundLogger, agent_manager: AgentManagerService):
+    def __init__(
+        self,
+        logger: BoundLogger,
+        agent_manager: AgentManagerService
+    ):
         self.logger = logger
         self.agent_manager = agent_manager
 

@@ -1,57 +1,130 @@
-"""Service for Rx Advisor agent."""
-
 from src.ehr.dtos import InputEHR, InputPrescription
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict, PrescriptionDict
 from src.service.rx_advisor.agents import RX_ADVISOR_AGENT_NAME
-from src.shared.agents.shared_types import AnswerStruct
 from src.shared.agents.agent_manager import AgentManagerService
-from src.shared.agents.agent_service import AgentService
 
+import asyncio
+from enum import Enum
 from typing import (
     Any,
+    Union,
+    Literal,
+    Optional,
+    TypedDict,
+    AsyncIterable,
+)
+from functools import partial
+
+from pydantic import ValidationError
+from pydantic_ai import Agent, RunContext
+from structlog.stdlib import BoundLogger
+from pydantic_ai.messages import (
+    TextPartDelta,
+    PartDeltaEvent,
+    AgentStreamEvent,
+    ThinkingPartDelta,
+    FunctionToolCallEvent,
+    FunctionToolResultEvent,
 )
 
-from pydantic import BaseModel
-from pydantic_ai import Agent
-from structlog.stdlib import BoundLogger
+
+class Event(str, Enum):
+    delta = "delta"
+    done = "done"
+    tool_call = "tool_call"
+    tool_done = "tool_done"
+    think_delta = "think_delta"
 
 
-class ModelInput(BaseModel):
-    """Input model for Rx Advisor agent."""
-
-    ehr: InputEHR
-    prescription: InputPrescription
+class Delta(TypedDict):
+    d: str
 
 
-class RxAdvisorService(AgentService[ModelInput, AnswerStruct]):
-    """Service for Rx Advisor agent."""
+class Done(TypedDict):
+    d: Literal[""]
 
+
+class ThinkDelta(TypedDict):
+    t_d: Optional[str]
+
+
+class ToolCall(TypedDict):
+    tool_call_id: str
+    tool_name: str
+    args: dict[str, Any]
+
+
+class ToolResult(TypedDict):
+    tool_call_id: str
+    result: Union[str, list, dict]
+
+
+DataType = Union[ToolCall, ToolResult, Delta, ThinkDelta]
+# SSEContent = SSEResponse.Content[Event, DataType]
+
+
+class StreamDelta(TypedDict):
+    event: Literal[Event.delta]
+    data: Delta
+
+
+class StreamDone(TypedDict):
+    event: Literal[Event.done]
+    data: Done
+
+
+class StreamThinkDelta(TypedDict):
+    event: Literal[Event.think_delta]
+    data: ThinkDelta
+
+
+class StreamToolCall(TypedDict):
+    event: Literal[Event.tool_call]
+    data: ToolCall
+
+
+class StreamToolResult(TypedDict):
+    event: Literal[Event.tool_done]
+    data: ToolResult
+
+
+SSEContent = Union[
+    StreamDelta, StreamThinkDelta, StreamToolCall, StreamToolResult, StreamDone
+]
+
+
+class UsedTool(TypedDict):
+    tool_call_id: str
+    tool_name: str
+    args: dict[str, Any]
+    result: Union[str, list, dict]
+
+
+class GeneratedAnalysis(TypedDict):
+    analysis: str
+    reasoning: Optional[str]
+    used_tools: list[UsedTool]
+
+
+AQueue = asyncio.Queue[SSEContent]
+
+
+class RxAdvisorService:
     def __init__(
         self,
         logger: BoundLogger,
         agent_manager: AgentManagerService,
     ):
-        """Initialize RxAdvisorService."""
-        super().__init__(logger, agent_manager)
+        self.agent_manager = agent_manager
+        self.logger = logger
 
-    async def initialize_agent(self) -> Agent[Any, AnswerStruct]:
-        return self.agent_manager.get_agent(RX_ADVISOR_AGENT_NAME)
-
-    async def preprocess_input(self, input: ModelInput) -> str:
-        ehr = input.ehr
-        prescription = input.prescription
-        ehr_dict = EHRDict.from_input_ehr(ehr)
-        prescription_dict = PrescriptionDict.from_input_prescription(
-            prescription
-        )
-        prompt = self._process_ehr_and_prescription_to_prompt(
-            ehr_dict, prescription_dict
-        )
-        return prompt
-
-    async def store_result(
-        self, user_id: str, input: ModelInput, result: AnswerStruct | None
+    def _store_ehr_and_result(
+        self,
+        user_id: str,
+        ehr: EHRDict,
+        prescription: PrescriptionDict,
+        result: dict,
     ):
         pass
 
@@ -72,3 +145,149 @@ class RxAdvisorService(AgentService[ModelInput, AnswerStruct]):
 
 New Prescription:
 {processed_prescription}"""
+
+    async def event_stream_handler(
+        self,
+        ctx: RunContext,
+        event_stream: AsyncIterable[AgentStreamEvent],
+        queue: AQueue,
+    ):
+        async for event in event_stream:
+            to_put: Optional[SSEContent] = None
+            if isinstance(event, PartDeltaEvent):
+                if isinstance(event.delta, TextPartDelta):
+                    to_put = {
+                        "event": Event.delta,
+                        "data": {"d": event.delta.content_delta},
+                    }
+                elif isinstance(event.delta, ThinkingPartDelta):
+                    to_put = {
+                        "event": Event.think_delta,
+                        "data": {"t_d": event.delta.content_delta},
+                    }
+            elif isinstance(event, FunctionToolCallEvent):
+                to_put = {
+                    "event": Event.tool_call,
+                    "data": {
+                        "tool_call_id": event.tool_call_id,
+                        "tool_name": event.part.tool_name,
+                        "args": event.part.args_as_dict(),
+                    },
+                }
+            elif isinstance(event, FunctionToolResultEvent):
+                to_put = {
+                    "event": Event.tool_done,
+                    "data": {
+                        "tool_call_id": event.tool_call_id,
+                        "result": event.result.content,
+                    },
+                }
+            if to_put is not None:
+                await queue.put(to_put)
+
+    async def _generate_advice_stream(
+        self,
+        user_id: str,
+        ehr: InputEHR,
+        prescription: InputPrescription,
+        queue: AQueue,
+    ):
+        ehr_dict = EHRDict.from_input_ehr(ehr)
+        prescription_dict = PrescriptionDict.from_input_prescription(
+            prescription
+        )
+        agent_result = ""
+        agent = self.agent_manager.get_agent(RX_ADVISOR_AGENT_NAME)
+        try:
+            async with agent.run_stream(
+                self._process_ehr_and_prescription_to_prompt(
+                    ehr_dict, prescription_dict
+                ),
+                event_stream_handler=partial(
+                    self.event_stream_handler, queue=queue
+                ),
+            ) as run:
+                async for output, end in run.stream_responses():
+                    try:
+                        validated_output = await run.validate_response_output(
+                            output,
+                            allow_partial=not end,
+                        )
+                    except ValidationError:
+                        continue
+                    answer = validated_output["answer"]
+                    new_response = answer[len(agent_result) :]
+                    await queue.put(
+                        {"event": Event.delta, "data": {"d": new_response}}
+                    )
+                    # yield new_response
+                    agent_result = answer
+                await queue.put({"event": Event.done, "data": {"d": ""}})
+        except Exception as e:
+            self.logger.error(__file__, error=e)
+            result = {"result": agent_result, "error": str(e)}
+            raise e
+        finally:
+            result = {"result": agent_result}
+            self.logger.debug("Result", result=result)
+            self._store_ehr_and_result(
+                user_id, ehr_dict, prescription_dict, result
+            )
+            queue.shutdown()
+
+    async def generate_advice_stream(
+        self,
+        user_id: str,
+        ehr: InputEHR,
+        prescription: InputPrescription,
+    ):
+        queue = AQueue()
+        generate_advice_task = asyncio.ensure_future(
+            self._generate_advice_stream(user_id, ehr, prescription, queue)
+        )
+        while True:
+            try:
+                it = await queue.get()
+                yield it
+                if it["event"] == Event.done:
+                    break
+            except:
+                break
+            queue.task_done()
+
+        # await queue.join()
+
+    async def generate_advice(
+        self, user_id: str, ehr: InputEHR, prescription: InputPrescription
+    ) -> GeneratedAnalysis:
+        # Why does this instead of run_sync?
+        # Anthropic said: non-streaming Messages API requests are not expected to exceed a 10 minute timeout
+        # https://docs.anthropic.com/en/api/errors#long-requests
+        res = ""
+        thought = ""
+        used_tools: dict[str, UsedTool] = {}
+        # async queue.get():
+        async for output in self.generate_advice_stream(
+            user_id, ehr, prescription
+        ):
+            match output["event"]:
+                case Event.done:
+                    break
+                case Event.delta:
+                    res += output["data"]["d"]
+                case Event.think_delta:
+                    thought += output["data"]["t_d"] or ""
+                case Event.tool_call:
+                    used_tools[output["data"]["tool_call_id"]] = {
+                        **output["data"],
+                        "result": {},
+                    }
+                case Event.tool_done:
+                    used_tools[output["data"]["tool_call_id"]]["result"] = (
+                        output["data"]["result"]
+                    )
+        return {
+            "analysis": res,
+            "used_tools": list(used_tools.values()),
+            "reasoning": thought if thought else None,
+        }

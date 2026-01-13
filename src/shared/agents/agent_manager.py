@@ -1,5 +1,4 @@
 """Module for managing agents in the system."""
-
 from typing import Any, Callable
 
 from pydantic_ai import Agent, AbstractToolset
@@ -7,7 +6,6 @@ from pydantic_ai import Agent, AbstractToolset
 
 class AgentConstructorContext:
     """Context for constructing agents."""
-
     manager: "AgentManagerService"
     agent_id: str
 
@@ -22,14 +20,10 @@ class AgentConstructorContext:
 
     def use_prompt(self, prompt_id: str) -> str:
         """Get the prompt by its ID."""
-        return self.manager.use_prompt_for_agent(
-            prompt_id, agent_id=self.agent_id
-        )
-
+        return self.manager.use_prompt_for_agent(prompt_id, agent_id=self.agent_id)
 
 class ToolsetConstructorContext:
     """Context for constructing toolsets."""
-
     manager: "AgentManagerService"
     toolset_id: str
 
@@ -40,10 +34,7 @@ class ToolsetConstructorContext:
 
     def use_prompt(self, prompt_id: str) -> str:
         """Get the prompt by its ID."""
-        return self.manager.use_prompt_for_tool(
-            prompt_id, toolset_id=self.toolset_id
-        )
-
+        return self.manager.use_prompt_for_tool(prompt_id, toolset_id=self.toolset_id)
 
 type AgentConstructor = Callable[[AgentConstructorContext], Agent[Any, Any]]
 type ToolsetConstructor = Callable[[ToolsetConstructorContext], AbstractToolset]
@@ -51,7 +42,6 @@ type ToolsetConstructor = Callable[[ToolsetConstructorContext], AbstractToolset]
 
 class AgentManagerService:
     """Service for managing agents."""
-
     agent_instances: dict[str, Agent[Any, Any]]
     agent_constructors: dict[str, AgentConstructor]
 
@@ -62,6 +52,7 @@ class AgentManagerService:
     prompts: dict[str, str]
     prompt_used_by_agents: dict[str, set[str]]
     prompt_used_by_tools: dict[str, set[str]]
+
 
     def __init__(self):
         """Initialize AgentManagementService."""
@@ -76,9 +67,9 @@ class AgentManagerService:
         self.toolset_instances = {}
         self.toolset_used_by_agents = {}
 
-    def register_agent(
-        self, agent_id: str, agent_constructor: AgentConstructor
-    ) -> None:
+    def register_agent(self,
+                       agent_id: str,
+                       agent_constructor: AgentConstructor) -> None:
         """Register a new agent."""
         if agent_id in self.agent_constructors:
             raise ValueError(f"Agent ID {agent_id} already registered")
@@ -91,9 +82,9 @@ class AgentManagerService:
         """Get an agent by its ID."""
         return self.agent_instances[agent_id]
 
-    def register_toolset(
-        self, tool_id: str, toolset_constructor: ToolsetConstructor
-    ) -> None:
+    def register_toolset(self,
+                         tool_id: str,
+                         toolset_constructor: ToolsetConstructor) -> None:
         """Register a new toolset."""
         if tool_id in self.toolset_constructors:
             raise ValueError(f"Toolset ID {tool_id} already registered")
@@ -136,9 +127,9 @@ class AgentManagerService:
             agent_to_refresh.add(agent_id)
 
         for toolset_id in toolset_to_refresh:
-            self.toolset_instances[toolset_id] = self.toolset_constructors[
-                toolset_id
-            ](ToolsetConstructorContext(self, toolset_id))
+            self.toolset_instances[toolset_id] = self.toolset_constructors[toolset_id](
+                ToolsetConstructorContext(self, toolset_id)
+            )
         for agent_id in agent_to_refresh:
             self.agent_instances[agent_id] = self.agent_constructors[agent_id](
                 AgentConstructorContext(self, agent_id)

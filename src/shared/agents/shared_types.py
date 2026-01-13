@@ -1,5 +1,5 @@
-from pydantic import BaseModel
+from typing import TypedDict
 
 
-class AnswerStruct(BaseModel):
+class AnswerStruct(TypedDict):
     answer: str

@@ -9,4 +9,5 @@ from functools import lru_cache
 @lru_cache(1)
 def getAISearchService() -> AISearchService:
     """Get AI Search Service singleton."""
-    return AISearchService(LOGGER, getAgentManager())
+    agent_manager = getAgentManager()
+    return AISearchService(LOGGER, agent_manager)
