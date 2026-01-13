@@ -3,11 +3,16 @@ import os
 from pydantic_ai.models.groq import GroqModel
 from pydantic_ai.providers.groq import GroqProvider
 
+from src.service.utils.agent.model_service import ModelService
 
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 
-big_model = GroqModel(
-    "openai/gpt-oss-20b",
+GROQ_BIG_MODEL = "openai/gpt-oss-20b"
+GROQ_MEDIUM_MODEL = "openai/gpt-oss-20b"
+GROQ_SMALL_MODEL = "openai/gpt-oss-20b"
+
+groq_big_model = GroqModel(
+    GROQ_BIG_MODEL,
     provider=GroqProvider(api_key=GROQ_API_KEY),
     settings={
         "max_tokens": 32000,
@@ -18,8 +23,8 @@ big_model = GroqModel(
     },
 )
 
-medium_model = GroqModel(
-    "openai/gpt-oss-20b",
+groq_medium_model = GroqModel(
+    GROQ_MEDIUM_MODEL,
     provider=GroqProvider(api_key=GROQ_API_KEY),
     settings={
         "max_tokens": 32000,
@@ -30,8 +35,8 @@ medium_model = GroqModel(
     },
 )
 
-small_model = GroqModel(
-    "openai/gpt-oss-20b",
+groq_small_model = GroqModel(
+    GROQ_SMALL_MODEL,
     provider=GroqProvider(api_key=GROQ_API_KEY),
     settings={
         "max_tokens": 32000,
@@ -42,6 +47,12 @@ small_model = GroqModel(
     },
 )
 
+model_service = ModelService()
+model_service.add_model(GROQ_BIG_MODEL, groq_big_model)
+
+model_service.add_model(GROQ_MEDIUM_MODEL, groq_medium_model)
+
+model_service.add_model(GROQ_SMALL_MODEL, groq_small_model)
 
 # from pydantic_ai.models.anthropic import AnthropicModel
 # from pydantic_ai.providers.anthropic import AnthropicProvider

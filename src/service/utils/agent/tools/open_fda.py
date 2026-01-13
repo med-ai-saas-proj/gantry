@@ -1,10 +1,12 @@
 from src.shared.utils.logger import LOGGER
+from src.service.utils.agent.factories import getPromptService
+from src.service.utils.agent.agent_deps import AgentDeps
 
 import re
 from typing import Any, Literal, Optional, TypedDict, NotRequired
 
 import requests
-from pydantic_ai import RunContext
+from pydantic_ai import Tool, RunContext
 from pydantic_ai.toolsets import FunctionToolset
 
 
@@ -42,9 +44,9 @@ get_drug_safety_and_interaction_info_return_fields = [
 ]
 
 
-def make_fda_tool(return_fields: list[str], name: str, doc_string: str):
+def make_fda_tool(return_fields: list[str], name: str):
     def get_drug_info(
-        ctx: RunContext, drug_name: str, limit: int = 5
+        ctx: RunContext[AgentDeps], drug_name: str, limit: int = 5
     ) -> ToolOutput:
         try:
             LOGGER.debug("Calling tool", name=name, drug_name=drug_name)
@@ -65,40 +67,77 @@ def make_fda_tool(return_fields: list[str], name: str, doc_string: str):
             LOGGER.error("Fail to search openfda", error=str(e))
             return {"error": "Server error"}
 
-    get_drug_info.__name__ = name
-    get_drug_info.__doc__ = (
-        doc_string
-        + f"""
-Return a list of dictionary contain the following: {", ".join(return_fields)}
-
-Args:
-    drug_name (str): Name of the drug to search for
-    limit (int, optional): The number of record to return. Default to 5 
-"""
+    tool = Tool[AgentDeps](
+        function=get_drug_info,
+        name=name,
+        prepare=prompt_service.get_tool_instruction(name),
     )
 
-    return get_drug_info
+    return tool
+
+
+def getToolSchemaDescription(return_fields: list[str]) -> str:
+    return f"""Return a list of dictionary contain the following: {", ".join(return_fields)}
+
+Args:
+drug_name (str): Name of the drug to search for
+limit (int, optional): The number of record to return. Default to 5 """
+
+
+GET_DRUG_PRESCRIPTION_INFO_TOOL_NAME = "get_drug_prescription_info"
+GET_POPULATION_SPECIFIC_DRUG_INFO_TOOL_NAME = (
+    "get_population_specific_drug_info"
+)
+GET_DRUG_SAFETY_AND_INTERACTION_INFO_TOOL_NAME = (
+    "get_drug_safety_and_interaction_info"
+)
+
+prompt_service = getPromptService()
+prompt_service.add_prompt(
+    GET_DRUG_PRESCRIPTION_INFO_TOOL_NAME,
+    f"""
+Retrieves essential prescription information for a given drug.
+Given a drug name, this function returns drug's description, patient information, boxed warnings, approved uses, and dosage guidelines.)
+
+{getToolSchemaDescription(get_drug_prescription_info_return_fields)}""",
+)
+
+prompt_service.add_prompt(
+    GET_POPULATION_SPECIFIC_DRUG_INFO_TOOL_NAME,
+    f"""
+Retrieves drug safety and usage information for specific populations.
+Given a drug name, this function returns detailed guidance on its use during pregnancy, while nursing, and for pediatric and geriatric populations.
+
+{getToolSchemaDescription(get_population_specific_drug_info_return_fields)}""",
+)
+
+prompt_service.add_prompt(
+    GET_DRUG_SAFETY_AND_INTERACTION_INFO_TOOL_NAME,
+    f"""
+Retrieves safety-related information and drug interactions for a specified drug.
+Given a drug name, this function returns details about overdose risks, contraindications, warnings, potential adverse reactions, and known drug interactions.
+
+{
+        getToolSchemaDescription(
+            get_drug_safety_and_interaction_info_return_fields
+        )
+    }""",
+)
 
 
 OPEN_FDA_TOOLSET = FunctionToolset(
     tools=[
         make_fda_tool(
             get_drug_prescription_info_return_fields,
-            "get_drug_prescription_info",
-            """Retrieves essential prescription information for a given drug.
-Given a drug name, this function returns drug's description, patient information, boxed warnings, approved uses, and dosage guidelines.)""",
+            GET_DRUG_PRESCRIPTION_INFO_TOOL_NAME,
         ),
         make_fda_tool(
             get_population_specific_drug_info_return_fields,
-            "get_population_specific_drug_info",
-            """Retrieves drug safety and usage information for specific populations.
-Given a drug name, this function returns detailed guidance on its use during pregnancy, while nursing, and for pediatric and geriatric populations.""",
+            GET_POPULATION_SPECIFIC_DRUG_INFO_TOOL_NAME,
         ),
         make_fda_tool(
             get_drug_safety_and_interaction_info_return_fields,
-            "get_drug_safety_and_interaction_info",
-            """Retrieves safety-related information and drug interactions for a specified drug.
-Given a drug name, this function returns details about overdose risks, contraindications, warnings, potential adverse reactions, and known drug interactions.""",
+            GET_DRUG_SAFETY_AND_INTERACTION_INFO_TOOL_NAME,
         ),
     ]
 )
@@ -123,13 +162,15 @@ def extract_nested_fields(
             try:
                 for key in keys:
                     value = value[key]
-                if (
-                    key != "openfda"
-                    and key != "generic_name"
-                    and key != "brand_name"
-                ):
-                    if len(keywords) > 0:
-                        value = extract_sentences_with_keywords(value, keywords)
+                    if (
+                        key != "openfda"
+                        and key != "generic_name"
+                        and key != "brand_name"
+                    ):
+                        if len(keywords) > 0:
+                            value = extract_sentences_with_keywords(
+                                value, keywords
+                            )
                 extracted_record[field] = value
             except KeyError:
                 extracted_record[field] = None

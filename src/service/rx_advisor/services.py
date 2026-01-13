@@ -1,8 +1,10 @@
 from src.ehr.dtos import InputEHR, InputPrescription
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict, PrescriptionDict
+from src.service.utils.agent.agent_deps import AgentDeps
 from src.service.utils.agent.dtos.model import ChatOutput
 
+from .agents import constructRxAdvisorAgentDeps
 from ..utils.agent.stream import aggregateStream, convertAgentStream
 
 from pydantic_ai import Agent
@@ -10,14 +12,14 @@ from structlog.stdlib import BoundLogger
 
 
 class RxAdvisorService:
+    """Service to provide prescription advice based on EHR and new prescriptions."""
+
     def __init__(
         self,
         session_manager,
-        # session_scope: Callable[..., _GeneratorContextManager],
         logger: BoundLogger,
-        agent: Agent[None, str],
+        agent: Agent[AgentDeps, str],
     ):
-        # self.postgres_service = PostgresService(session_scope=session_scope)
         self.agent = agent
         self.logger = logger
 
@@ -61,7 +63,12 @@ New Prescription:
             )
         ]
         async for event in convertAgentStream(
-            self.agent.run_stream_events(model_input)
+            self.agent.run_stream_events(
+                model_input,
+                deps=constructRxAdvisorAgentDeps(
+                    {"user_id": user_id}  # todo update later
+                ),
+            )
         ):
             yield event
 

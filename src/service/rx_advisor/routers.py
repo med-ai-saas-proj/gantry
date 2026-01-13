@@ -1,5 +1,4 @@
 from src.shared.utils.logger import LOGGER
-from src.management.auth.entities import UserInfo
 from src.management.api_keys.entities import ApiKeyInfo
 from src.shared.custom_types.responses import SSEResponse
 from src.management.api_keys.dependencies import requiredPermissions
@@ -11,7 +10,7 @@ from ..utils.agent.dtos.model import ChatOutput, StreamEvent
 
 from typing import Annotated
 
-from fastapi import Body, Depends, Security, APIRouter
+from fastapi import Depends, Security, APIRouter
 from fastapi.responses import JSONResponse
 
 
