@@ -4,8 +4,9 @@ from src.shared.utils.logger import LOGGER
 from src.management.auth.dependencies import UserInfo, getUserInfo
 from src.shared.custom_types.responses.sse import SSEResponse
 
-from .dtos import ChatInput, ChatOutput
+from .dtos import ChatInput
 from .factories import ChatService, getChatService
+from ..utils.agent.dtos.model import ChatOutput, StreamEvent
 
 from typing import Annotated
 
@@ -50,7 +51,7 @@ def delete_model(
 chat_router = APIRouter(prefix="/chat")
 
 
-@chat_router.post("", response_model=ChatOutput)
+@chat_router.post("", response_model=ChatOutput | StreamEvent)
 async def chat(
     user: Annotated[UserInfo, Security(getUserInfo)],
     input: Annotated[ChatInput, Body()],
@@ -61,7 +62,7 @@ async def chat(
     LOGGER.debug("user", user_id=user_id)
     if input.stream:
         return SSEResponse(
-            chat_service.chat_stream(user_id, input.input),
+            chat_service.chatStream(user_id, input.input),
         )
     else:
         output = await chat_service.chat(user_id, input.input)

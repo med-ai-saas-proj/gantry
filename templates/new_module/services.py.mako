@@ -1,13 +1,12 @@
 """This file contain definition of ${app_name}'s services."""
 
-from src.db.postgres.service import PostgresService
-
 from . import repositories
 
 from typing import Callable
 from contextlib import _GeneratorContextManager
 
 from structlog.stdlib import BoundLogger
+from src.db.postgres.service import PostgresService
 
 
 class ExampleServices:

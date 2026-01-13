@@ -1,4 +1,4 @@
-from src.shared.dtos.generation_input import GenerationInput
+from ..utils.agent.dtos.generation_input import GenerationInput
 
 from typing import Optional, Annotated, TypedDict
 

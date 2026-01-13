@@ -78,6 +78,11 @@ main_app = FastAPI(
 )
 
 
+@main_app.get("/ready")
+async def ready():
+    return Response(status_code=200)
+
+
 @main_app.middleware("http")
 async def global_middleware(
     request: Request,
