@@ -4,13 +4,15 @@ from ..utils.agent.agent_deps import AgentDeps
 from ...management.api_keys.entities import ApiKeyInfo
 from ..utils.agent.shared_instruction import add_current_date
 
+from functools import lru_cache
+
 from pydantic_ai import Agent
 
 
 prompt_service = getPromptService()
 model_service = getModelService()
 
-
+@lru_cache(1)
 def getEhrSummarizeAgent(llm_id: str) -> Agent[AgentDeps, str]:
     return Agent[AgentDeps, str](
         model=model_service.get_model(llm_id),

@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from src.service.ai_search.consts import AI_SEARCH_AGENT_ID
 from src.service.utils.agent.agent_deps import AgentDeps
 
@@ -11,7 +13,7 @@ from pydantic_ai import Agent
 model_service = getModelService()
 prompt_service = getPromptService()
 
-
+@lru_cache(1)
 def getAiSearchAgent(llm_id: str) -> Agent[AgentDeps, str]:
     return Agent[AgentDeps, str](
         model=model_service.get_model(llm_id),

@@ -13,6 +13,8 @@ from typing import Annotated
 from fastapi import Body, Depends, Security, APIRouter
 from fastapi.responses import JSONResponse
 
+from ...management.api_keys.dependencies import requiredPermissions
+from ...management.api_keys.entities import ApiKeyInfo
 
 model_router = APIRouter(prefix="/models")
 
@@ -53,12 +55,12 @@ chat_router = APIRouter(prefix="/chat")
 
 @chat_router.post("", response_model=ChatOutput | StreamEvent)
 async def chat(
-    user: Annotated[UserInfo, Security(getUserInfo)],
+    user: Annotated[ApiKeyInfo, Security(requiredPermissions(["placeholder"]))],
     input: Annotated[ChatInput, Body()],
     chat_service: Annotated[ChatService, Depends(getChatService)],
 ):
     """Just the good old chatbot."""
-    user_id = user["id"]
+    user_id = user["user_id"]
     LOGGER.debug("user", user_id=user_id)
     if input.stream:
         return SSEResponse(

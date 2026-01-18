@@ -24,6 +24,8 @@ class PromptService:
         self, session_manager: AsyncSessionManager, logger: BoundLogger
     ):
         self.prompts = {}
+        self.session_manager = session_manager
+        self.logger = logger
 
     def add_prompt(self, name: str, prompt: str):
         """Adds or updates a prompt by name."""
@@ -36,6 +38,9 @@ class PromptService:
 
     def get_agent_instruction(self, ctx: RunContext[AgentDepsT]) -> str:
         """Returns the instruction prompt for the agent based on its ID."""
+        self.logger.info(
+            "Getting agent instruction", agent_id=ctx.deps.agent_id
+        )
         return self.prompts.get(ctx.deps.agent_id, "Default Instruction")
 
     def get_tool_instruction[DepsT](self, tool_id) -> ToolPrepareFunc[DepsT]:
@@ -44,6 +49,9 @@ class PromptService:
         async def wrapper(
             ctx: RunContext[DepsT], tool_def: ToolDefinition
         ) -> ToolDefinition | None:
+            self.logger.info(
+                "Getting tool instruction", tool_id=tool_id
+            )
             prompt = self.prompts.get(f"{tool_id}", "Default Tool Instruction")
             tool_def.description = prompt
             return tool_def

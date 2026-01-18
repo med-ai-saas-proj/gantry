@@ -1,11 +1,11 @@
 from src.service.utils.agent.factories import getPromptService
 from src.shared.custom_types.error_exception import ProblemDetails
 
-from .ocr import ocr_router
-from .chat import chat_router
-from .ai_search import ai_search_router
-from .rx_advisor import rx_advisor_router
-from .ehr_summarize import ehr_summarize_router
+from .ocr.routers import ocr_router
+from .chat.routers import chat_router
+from .ai_search.routers import ai_search_router
+from .rx_advisor.routers import rx_advisor_router
+from .ehr_summarize.routers import ehr_summarize_router
 
 from contextlib import asynccontextmanager
 

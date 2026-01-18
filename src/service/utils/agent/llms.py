@@ -3,6 +3,7 @@ import os
 from pydantic_ai.models.groq import GroqModel
 from pydantic_ai.providers.groq import GroqProvider
 
+from src.service.utils.agent.factories import getModelService
 from src.service.utils.agent.model_service import ModelService
 
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
@@ -47,7 +48,7 @@ groq_small_model = GroqModel(
     },
 )
 
-model_service = ModelService()
+model_service = getModelService()
 model_service.add_model(GROQ_BIG_MODEL, groq_big_model)
 
 model_service.add_model(GROQ_MEDIUM_MODEL, groq_medium_model)
