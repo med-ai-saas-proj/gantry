@@ -1,0 +1,105 @@
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    container_name: postgres-pgvector
+    env_file:
+      - .env.postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: sh -c "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
+
+  redis:
+    image: redis:8-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    command: sh -c "redis-server --requirepass $$REDIS_PASSWORD"
+    env_file:
+      - .env.redis
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.7
+    container_name: keycloak
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    ports:
+      - "8080:8080"
+    command: start-dev --import-realm --http-access-log-enabled=true
+    restart: unless-stopped
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./asset/dev-realm.json:/opt/keycloak/data/import/dev-realm.json:ro
+      - ./asset/keycloak-themes:/opt/keycloak/themes
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1G
+        reservations:
+          cpus: "1"
+          memory: 512M
+
+  jaeger:
+    image: jaegertracing/jaeger:2.13.0
+    container_name: jaeger
+    ports:
+      - "6831:6831/udp" # UDP port for tracing data (Jaeger agent)
+      - "16686:16686" # Web UI
+      - "4317:4317"
+      - "4318:4318"
+      - "5778:5778"
+      - "9411:9411"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
+  dev-container:
+    image: ubuntu:24.04
+    container-name: dev-container
+    ports:
+      - "8000:8000"
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 512M
+        reservations:
+          cpus: "1"
+          memory: 64M
+
+volumes:
+  postgres_data:
+  redis_data:
+  keycloak_data:
