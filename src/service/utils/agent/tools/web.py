@@ -3,6 +3,10 @@ from src.service.crawler.services import SearchTimeRange
 from src.service.crawler.initialize import CRAWLER_SERVICE
 from src.service.utils.agent.factories import getPromptService
 from src.service.utils.agent.agent_deps import AgentDeps
+from src.service.utils.agent.tools.consts import (
+    WEB_SEARCH_TOOL_NAME,
+    VISIT_WEB_PAGE_TOOL_NAME,
+)
 
 from typing import Any, Optional
 from dataclasses import dataclass
@@ -74,12 +78,9 @@ async def web_search(
 prompt_service = getPromptService()
 
 
-WEB_SEARCH_TOOL_ID = "web_search"
-VISIT_WEB_PAGE_TOOL_ID = "visit_web_page"
-
 # TODO: load from db/config file later
 prompt_service.add_prompt(
-    WEB_SEARCH_TOOL_ID,
+    WEB_SEARCH_TOOL_NAME,
     """Perform a search through many medical sites for a query and return top search results with titles, url and snippet. Use this tool to access up-to-date information from the web or when responding to the user requires information about their location. Some examples of when to use the this tool include:
 
     - Local Information: weather, local businesses, events.
@@ -97,7 +98,7 @@ prompt_service.add_prompt(
 )
 
 prompt_service.add_prompt(
-    VISIT_WEB_PAGE_TOOL_ID,
+    VISIT_WEB_PAGE_TOOL_NAME,
     """Visit a webpage at the given url and reads its content.
 
     Use this to browse webpages.
@@ -109,14 +110,14 @@ prompt_service.add_prompt(
 
 web_search_tool = Tool(
     function=web_search,
-    name=WEB_SEARCH_TOOL_ID,
-    prepare=prompt_service.get_tool_instruction(WEB_SEARCH_TOOL_ID),
+    name=WEB_SEARCH_TOOL_NAME,
+    prepare=prompt_service.get_tool_instruction(WEB_SEARCH_TOOL_NAME),
 )
 
 visit_web_page_tool = Tool(
     function=visit_web_page,
-    name=VISIT_WEB_PAGE_TOOL_ID,
-    prepare=prompt_service.get_tool_instruction(VISIT_WEB_PAGE_TOOL_ID),
+    name=VISIT_WEB_PAGE_TOOL_NAME,
+    prepare=prompt_service.get_tool_instruction(VISIT_WEB_PAGE_TOOL_NAME),
 )
 
 WEB_TOOLSET = FunctionToolset(tools=[web_search_tool, visit_web_page_tool])

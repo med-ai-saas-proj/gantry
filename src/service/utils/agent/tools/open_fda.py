@@ -1,6 +1,11 @@
 from src.shared.utils.logger import LOGGER
 from src.service.utils.agent.factories import getPromptService
 from src.service.utils.agent.agent_deps import AgentDeps
+from src.service.utils.agent.tools.consts import (
+    GET_DRUG_PRESCRIPTION_INFO_TOOL_NAME,
+    GET_POPULATION_SPECIFIC_DRUG_INFO_TOOL_NAME,
+    GET_DRUG_SAFETY_AND_INTERACTION_INFO_TOOL_NAME,
+)
 
 import re
 from typing import Any, Literal, Optional, TypedDict, NotRequired
@@ -83,14 +88,6 @@ Args:
 drug_name (str): Name of the drug to search for
 limit (int, optional): The number of record to return. Default to 5 """
 
-
-GET_DRUG_PRESCRIPTION_INFO_TOOL_NAME = "get_drug_prescription_info"
-GET_POPULATION_SPECIFIC_DRUG_INFO_TOOL_NAME = (
-    "get_population_specific_drug_info"
-)
-GET_DRUG_SAFETY_AND_INTERACTION_INFO_TOOL_NAME = (
-    "get_drug_safety_and_interaction_info"
-)
 
 prompt_service = getPromptService()
 prompt_service.add_prompt(

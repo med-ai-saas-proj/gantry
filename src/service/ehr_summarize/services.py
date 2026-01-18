@@ -2,11 +2,12 @@ from src.ehr import ehr_utils
 from src.ehr.dtos import InputEHR
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict
+from src.service.utils.agent.agent_deps import AgentDeps
 
+from .agents import constructEhrSummarizeAgentDeps
 from ..utils.agent.stream import (
     aggregateStream,
     convertAgentStream,
-    userInputToPydanticAI,
 )
 from ..utils.agent.dtos.model import ChatOutput, StreamEvent
 
@@ -21,7 +22,7 @@ class EHRSummarizeService:
         self,
         session_scope,
         logger: BoundLogger,
-        agent: Agent[None, str],
+        agent: Agent[AgentDeps, str],
         # agent: Agent[Dep, AnswerStruct],
     ):
         self.agent = agent
@@ -39,7 +40,12 @@ class EHRSummarizeService:
         model_input = [self._ehr_to_prompt(EHRDict.from_input_ehr(ehr))]
 
         async for event in convertAgentStream(
-            self.agent.run_stream_events(model_input)
+            self.agent.run_stream_events(
+                model_input,
+                deps=constructEhrSummarizeAgentDeps(
+                    {"user_id": user_id}  # todo update later
+                ),
+            )
         ):
             yield event
 

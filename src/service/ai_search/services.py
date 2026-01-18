@@ -1,5 +1,8 @@
 """This file contain definition of chat's services."""
 
+from src.service.utils.agent.agent_deps import AgentDeps
+
+from .agents import constructAiSearchAgentDeps
 from ..utils.agent.stream import (
     aggregateStream,
     convertAgentStream,
@@ -18,7 +21,7 @@ class AiSearchService:
         self,
         session_scope,
         logger: BoundLogger,
-        agent: Agent[None, str],
+        agent: Agent[AgentDeps, str],
         # agent: Agent[Dep, AnswerStruct],
     ):
         self.agent = agent
@@ -38,7 +41,14 @@ class AiSearchService:
         model_input = userInputToPydanticAI(query)
 
         async for event in convertAgentStream(
-            self.agent.run_stream_events(model_input)
+            self.agent.run_stream_events(
+                model_input,
+                deps=constructAiSearchAgentDeps(
+                    {
+                        "user_id": user_id  # todo update later
+                    }
+                ),
+            )
         ):
             yield event
 
