@@ -132,7 +132,7 @@ async def global_middleware(
 main_app.mount("/service", service_app, "service")
 main_app.mount("/management", management_app, "management")
 
-main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
+# main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
 
 
 apps = [main_app, service_app, management_app]
