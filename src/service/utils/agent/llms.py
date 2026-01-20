@@ -22,6 +22,7 @@ class AvailableModels(str, Enum):
     BigModel = "BigModel"
     MediumModel = "MediumModel"
     SmallModel = "SmallModel"
+    OcrModel = "OcrModel"
 
 
 class ModelsSettings(BaseSettings):
