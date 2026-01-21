@@ -7,8 +7,6 @@ from .ai_search.routers import ai_search_router
 from .rx_advisor.routers import rx_advisor_router
 from .ehr_summarize.routers import ehr_summarize_router
 
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,22 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 __all__ = ["service_app"]
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup code here
-    prompt_service = getPromptService()
-    await prompt_service.load_prompts()
-    model_service = getModelsService()
-    await model_service.load_model_config()
-    yield
-    # Shutdown code here
-
-
 service_app = FastAPI(
     title="Venera API platform",
     openapi_url="/docs/openapi.json",
     docs_url=None,
-    lifespan=lifespan,
     responses={
         400: {"model": ProblemDetails},
         401: {"model": ProblemDetails},

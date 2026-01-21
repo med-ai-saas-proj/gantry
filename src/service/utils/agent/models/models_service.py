@@ -64,14 +64,14 @@ class ModelsService:
                     config,
                 )
             case ModelProvider.GROQ:
-                if not self.models_settings.grog_api_key:
+                if not self.models_settings.groq_api_key:
                     raise ValueError("Groq API key is not configured")
                 return (
                     GroqModel(
                         model_name=config.model_name,
                         settings=config.model_settings,
                         provider=GroqProvider(
-                            api_key=self.models_settings.grog_api_key
+                            api_key=self.models_settings.groq_api_key
                         ),
                     ),
                     config,
@@ -88,6 +88,9 @@ class ModelsService:
     async def load_model_config(self):
         """Loads model configurations from db."""
         # TODO: Load from DB
+        self.logger.debug(
+            "Loading model config from database"
+        )
         self.set_model_config(
             "GROQ_SMALL_MODEL",
             ModelConfig(

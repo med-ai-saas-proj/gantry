@@ -59,6 +59,9 @@ class PromptService:
     async def load_prompts(self):
         """Load prompts from the database into the service."""
         # TODO: Implement database loading logic here
+        self.logger.debug(
+            "Loading prompts from database"
+        )
         self.add_prompt(
             RX_ADVISOR_AGENT_ID,
             """You are **Rx-Advisor**, an AI clinical support agent designed to assist qualified medical professionals. Your sole function is to analyze a patient's Electronic Health Record (EHR) and a proposed new prescription to identify and flag potential risks. You must operate with the highest degree of precision and caution.
