@@ -14,7 +14,7 @@ from pydantic_ai.providers import infer_provider_class
 class ModelConfig(TypedDict):
     name: str
     api_key: NotRequired[SecretStr]
-    base_url: NotRequired[str]
+    args: NotRequired[dict[str, Any]]
     settings: NotRequired[ModelSettings]
 
 
@@ -42,7 +42,7 @@ def createModel(config: ModelConfig) -> Model:
             api_key=(config["api_key"].get_secret_value())
             if "api_key" in config
             else None,
-            base_url=config.get("base_url"),
+            **config.get("args", {}),
         ),
     )
     model._settings = config.get("settings")
@@ -55,7 +55,7 @@ available_models: dict[AvailableModels, Model] = {
     for name, config in models_settings.configs.items()
 }
 
-print(models_settings.configs[AvailableModels.SmallModel]["api_key"])
+print(available_models)
 
 
 class ModelNotFoundError(UnrecoverableError):

@@ -14,7 +14,6 @@ from typing import Annotated
 
 from fastapi import File, Query, Security, APIRouter, UploadFile
 from fastapi.responses import JSONResponse
-from typing_extensions import Literal
 
 
 ocr_router = APIRouter(prefix="/ocr", tags=["Doctor Help"])
