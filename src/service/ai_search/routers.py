@@ -1,14 +1,16 @@
 from src.shared.utils.logger import LOGGER
+from src.management.api_keys.entities import ApiKeyInfo
 from src.management.api_keys.dependencies import requiredPermissions
 from src.shared.custom_types.responses.sse import SSEResponse
 
 from .dtos import AiSearchInput
-from .initialize import AI_SEARCH_SERVICE
-from ..chat.dtos import ChatOutput, StreamEvent
+from .services import AiSearchService
+from .factories import getAiSearchService
+from ..utils.agent.dtos.model import ChatOutput, StreamEvent
 
 from typing import Annotated
 
-from fastapi import Security, APIRouter
+from fastapi import Depends, Security, APIRouter
 from fastapi.responses import JSONResponse
 
 
@@ -28,15 +30,17 @@ ai_search_router = APIRouter(prefix="/ai_search", tags=["Doctor Help"])
     },
 )
 async def ai_search(
-    user_id: Annotated[str, Security(requiredPermissions(["placeholder"]))],
+    user: Annotated[ApiKeyInfo, Security(requiredPermissions(["placeholder"]))],
     input: AiSearchInput,
+    ai_search_service: Annotated[AiSearchService, Depends(getAiSearchService)],
 ) -> SSEResponse | JSONResponse:
     """Use AI to search the internet and summarize the result."""
+    user_id = user["user_id"]
     LOGGER.debug("user", user_id=user_id)
     if input.stream:
         return SSEResponse(
-            AI_SEARCH_SERVICE.ai_search_stream(user_id, input.query),
+            ai_search_service.aiSearchStream(user_id, input.query),
         )
     else:
-        output = await AI_SEARCH_SERVICE.ai_search(user_id, input.query)
+        output = await ai_search_service.aiSearch(user_id, input.query)
         return JSONResponse(output)

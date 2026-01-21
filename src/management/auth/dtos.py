@@ -4,7 +4,7 @@ from src.shared.dtos.base import BaseDTO
 
 from typing import Literal, TypedDict
 
-from pydantic import Field, EmailStr, BaseModel, SecretStr
+from pydantic import Field, EmailStr, SecretStr
 
 
 class LoginInput(BaseDTO):

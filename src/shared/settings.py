@@ -1,7 +1,7 @@
 from enum import StrEnum
 from functools import lru_cache
 
-from pydantic import Field, RedisDsn, PostgresDsn
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +12,7 @@ class AppStage(StrEnum):
 
 
 class AppSettings(BaseSettings):
+    model_config = SettingsConfigDict(case_sensitive=False)
     stage: AppStage = Field(AppStage.DEV)
     debug: bool = Field(False)
     otlp_endpoint: str = Field("localhost:4317")

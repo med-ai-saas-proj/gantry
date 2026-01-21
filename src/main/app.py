@@ -78,6 +78,11 @@ main_app = FastAPI(
 )
 
 
+@main_app.get("/ready")
+async def ready():
+    return Response(status_code=200)
+
+
 @main_app.middleware("http")
 async def global_middleware(
     request: Request,
@@ -127,7 +132,7 @@ async def global_middleware(
 main_app.mount("/service", service_app, "service")
 main_app.mount("/management", management_app, "management")
 
-main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
+# main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
 
 
 apps = [main_app, service_app, management_app]

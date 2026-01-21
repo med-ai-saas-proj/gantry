@@ -1,26 +1,25 @@
-from src.ehr.dtos import InputEHR
 from src.shared.utils.logger import LOGGER
+from src.management.api_keys.entities import ApiKeyInfo
 from src.shared.custom_types.responses import SSEResponse
+from src.service.ehr_summarize.factories import getEHRSummarizeService
 from src.management.api_keys.dependencies import requiredPermissions
 
-from .initialize import EHR_SUMMARY_SERVICE
+from .dtos import EHRSummarizeInput
+from .factories import EHRSummarizeService
+from ..utils.agent.dtos.model import ChatOutput, StreamEvent
 
-from typing import Annotated, TypedDict
+from typing import Annotated
 
-from fastapi import Body, Security, APIRouter
+from fastapi import Depends, Security, APIRouter
 from fastapi.responses import JSONResponse
 
 
 ehr_summarize_router = APIRouter(tags=["Doctor Help"])
 
 
-class EHRSummary(TypedDict):
-    summary: str
-
-
 @ehr_summarize_router.post(
     "/ehr_summarize",
-    response_model=EHRSummary,
+    response_model=ChatOutput | StreamEvent,
     responses={
         200: {
             "content": {
@@ -30,15 +29,21 @@ class EHRSummary(TypedDict):
     },
 )
 async def summarize_ehr(
-    user_id: Annotated[str, Security(requiredPermissions(["placeholder"]))],
-    ehr: InputEHR,
-    stream: bool = Body(False, embed=True),
+    user: Annotated[ApiKeyInfo, Security(requiredPermissions(["placeholder"]))],
+    input: EHRSummarizeInput,
+    ehr_summarize_service: Annotated[
+        EHRSummarizeService, Depends(getEHRSummarizeService)
+    ],
 ):
-    LOGGER.debug("user", user_id=user_id)
-    if stream:
+    LOGGER.debug("user", user_id=user["user_id"])
+    if input.stream:
         return SSEResponse(
-            EHR_SUMMARY_SERVICE.summarize_ehr_stream(user_id, ehr)
+            ehr_summarize_service.summarizeStream(
+                user["user_id"], input.input_ehr
+            )
         )
     else:
-        summary = await EHR_SUMMARY_SERVICE.summarize_ehr(user_id, ehr)
-        return JSONResponse({"summary": summary})
+        summary = await ehr_summarize_service.summarize(
+            user["user_id"], input.input_ehr
+        )
+        return JSONResponse(summary)
