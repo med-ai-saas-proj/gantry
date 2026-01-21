@@ -1,4 +1,3 @@
-# src/auth/services/keycloak.py
 from src.shared.consts import messages_const
 from src.shared.custom_types.error_exception import RecoverableError
 

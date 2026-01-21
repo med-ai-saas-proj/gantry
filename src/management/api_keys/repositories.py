@@ -30,6 +30,14 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         )
         return await self.selectOne(session, stmt)
 
+    async def getByUserId(self, session: AsyncSession, user_id: str):
+        """Get all API keys for a specific user."""
+        stmt = select(ApiKey).where(ApiKey.user_id == user_id)
+        stmt = self.buildOptions(
+            stmt, load_relations={ApiKey.permissions: None}
+        )
+        return await self.selectMany(session, stmt)
+
     async def addApiKey(
         self,
         session: AsyncSession,
