@@ -1,8 +1,11 @@
+"""EHR Summarize Agent construction and dependencies."""
+
 from .consts import EHR_SUMMARIZE_AGENT_ID
-from ..utils.agent.factories import getModelService, getPromptService
+from ..utils.agent.factories import getPromptService
 from ..utils.agent.agent_deps import AgentDeps
 from ...management.api_keys.entities import ApiKeyInfo
 from ..utils.agent.shared_instruction import add_current_date
+from ..utils.agent.models.model_config import ModelConfig
 
 from functools import lru_cache
 
@@ -10,12 +13,12 @@ from pydantic_ai import Agent
 
 
 prompt_service = getPromptService()
-model_service = getModelService()
+
 
 @lru_cache(1)
-def getEhrSummarizeAgent(llm_id: str) -> Agent[AgentDeps, str]:
+def getEhrSummarizeAgent() -> Agent[AgentDeps, str]:
+    """Construct EHR Summarize Agent."""
     return Agent[AgentDeps, str](
-        model=model_service.get_model(llm_id),
         end_strategy="exhaustive",
         name=EHR_SUMMARIZE_AGENT_ID,
         instructions=[
@@ -27,9 +30,11 @@ def getEhrSummarizeAgent(llm_id: str) -> Agent[AgentDeps, str]:
 
 
 def constructEhrSummarizeAgentDeps(
-    api_key_info: ApiKeyInfo,
+    api_key_info: ApiKeyInfo, model_config: ModelConfig
 ) -> AgentDeps:
+    """Construct EHR Summarize Agent dependencies."""
     return AgentDeps(
         agent_id=EHR_SUMMARIZE_AGENT_ID,
         api_key_info=api_key_info,
+        model_config=model_config,
     )

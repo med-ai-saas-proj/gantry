@@ -1,4 +1,4 @@
-from src.service.utils.agent.factories import getPromptService
+from src.service.utils.agent.factories import getModelsService, getPromptService
 from src.shared.custom_types.error_exception import ProblemDetails
 
 from .ocr.routers import ocr_router
@@ -22,6 +22,8 @@ async def lifespan(app: FastAPI):
     # Startup code here
     prompt_service = getPromptService()
     await prompt_service.load_prompts()
+    model_service = getModelsService()
+    await model_service.load_model_config()
     yield
     # Shutdown code here
 

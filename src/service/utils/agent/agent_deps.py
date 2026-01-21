@@ -1,6 +1,7 @@
-from dataclasses import dataclass
-
 from src.management.api_keys.entities import ApiKeyInfo
+from src.service.utils.agent.models.model_config import ModelConfig
+
+from dataclasses import dataclass
 
 
 @dataclass
@@ -9,3 +10,4 @@ class AgentDeps:
 
     agent_id: str
     api_key_info: ApiKeyInfo
+    model_config: ModelConfig

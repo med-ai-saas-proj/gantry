@@ -1,10 +1,13 @@
+"""Rx Advisor Agent construction and dependencies."""
+
 from .consts import RX_ADVISOR_AGENT_ID
-from ..utils.agent.factories import getModelService, getPromptService
+from ..utils.agent.factories import getPromptService
 from ..utils.agent.tools.web import WEB_TOOLSET
 from ..utils.agent.agent_deps import AgentDeps
 from ..utils.agent.tools.open_fda import OPEN_FDA_TOOLSET
 from ...management.api_keys.entities import ApiKeyInfo
 from ..utils.agent.shared_instruction import add_current_date
+from ..utils.agent.models.model_config import ModelConfig
 
 from functools import lru_cache
 
@@ -12,13 +15,12 @@ from pydantic_ai import Agent
 
 
 prompt_service = getPromptService()
-model_service = getModelService()
 
 
 @lru_cache(1)
-def getRxAdvisorAgent(llm_id: str) -> Agent[AgentDeps, str]:
+def getRxAdvisorAgent() -> Agent[AgentDeps, str]:
+    """Construct Rx Advisor Agent."""
     return Agent[AgentDeps, str](
-        model=model_service.get_model(llm_id),
         # output_type=AnswerStruct,
         name=RX_ADVISOR_AGENT_ID,
         end_strategy="exhaustive",
@@ -32,9 +34,11 @@ def getRxAdvisorAgent(llm_id: str) -> Agent[AgentDeps, str]:
 
 
 def constructRxAdvisorAgentDeps(
-    api_key_info: ApiKeyInfo,
+    api_key_info: ApiKeyInfo, model_config: ModelConfig
 ) -> AgentDeps:
+    """Construct Rx Advisor Agent dependencies."""
     return AgentDeps(
         agent_id=RX_ADVISOR_AGENT_ID,
         api_key_info=api_key_info,
+        model_config=model_config,
     )

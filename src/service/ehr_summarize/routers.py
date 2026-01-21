@@ -29,21 +29,23 @@ ehr_summarize_router = APIRouter(tags=["Doctor Help"])
     },
 )
 async def summarize_ehr(
-    user: Annotated[ApiKeyInfo, Security(requiredPermissions(["placeholder"]))],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
     input: EHRSummarizeInput,
     ehr_summarize_service: Annotated[
         EHRSummarizeService, Depends(getEHRSummarizeService)
     ],
 ):
-    LOGGER.debug("user", user_id=user["user_id"])
+    LOGGER.debug("api_key_info", api_key_info=api_key_info)
     if input.stream:
         return SSEResponse(
             ehr_summarize_service.summarizeStream(
-                user["user_id"], input.input_ehr
+                api_key_info, input.model, input.input_ehr
             )
         )
     else:
         summary = await ehr_summarize_service.summarize(
-            user["user_id"], input.input_ehr
+            api_key_info, input.model, input.input_ehr
         )
         return JSONResponse(summary)

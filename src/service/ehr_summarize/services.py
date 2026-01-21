@@ -1,15 +1,19 @@
+"""EHR Summarization Service."""
+
 from src.ehr import ehr_utils
 from src.ehr.dtos import InputEHR
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict
-from src.service.utils.agent.agent_deps import AgentDeps
 
 from .agents import constructEhrSummarizeAgentDeps
 from ..utils.agent.stream import (
     aggregateStream,
     convertAgentStream,
 )
+from ..utils.agent.agent_deps import AgentDeps
 from ..utils.agent.dtos.model import ChatOutput, StreamEvent
+from ...management.api_keys.entities import ApiKeyInfo
+from ..utils.agent.models.models_service import ModelsService
 
 from typing import AsyncGenerator
 
@@ -20,13 +24,15 @@ from structlog.stdlib import BoundLogger
 class EHRSummarizeService:
     def __init__(
         self,
-        session_scope,
+        session_manager,
         logger: BoundLogger,
         agent: Agent[AgentDeps, str],
         # agent: Agent[Dep, AnswerStruct],
+        models_service: ModelsService,
     ):
         self.agent = agent
         self.logger = logger
+        self.models_service = models_service
 
     def _ehr_to_prompt(self, ehr: EHRDict):
         processed_ehr = ehr_utils.prune_and_preprocess_input_ehr(ehr)
@@ -35,20 +41,24 @@ class EHRSummarizeService:
         return ehr_str
 
     async def summarizeStream(
-        self, user_id: str, ehr: InputEHR
+        self, api_key_info: ApiKeyInfo, model_id: str, ehr: InputEHR
     ) -> AsyncGenerator[StreamEvent]:
+        model, model_config = self.models_service.get_model(model_id)
         model_input = [self._ehr_to_prompt(EHRDict.from_input_ehr(ehr))]
 
         async for event in convertAgentStream(
             self.agent.run_stream_events(
                 model_input,
-                deps=constructEhrSummarizeAgentDeps(
-                    {"user_id": user_id}  # todo update later
-                ),
+                model=model,
+                deps=constructEhrSummarizeAgentDeps(api_key_info, model_config),
             )
         ):
             yield event
 
-    async def summarize(self, user_id: str, ehr: InputEHR) -> ChatOutput:
-        result = await aggregateStream(self.summarizeStream(user_id, ehr))
+    async def summarize(
+        self, api_key_info: ApiKeyInfo, model_id: str, ehr: InputEHR
+    ) -> ChatOutput:
+        result = await aggregateStream(
+            self.summarizeStream(api_key_info, model_id, ehr)
+        )
         return result

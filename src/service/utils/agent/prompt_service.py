@@ -49,9 +49,7 @@ class PromptService:
         async def wrapper(
             ctx: RunContext[DepsT], tool_def: ToolDefinition
         ) -> ToolDefinition | None:
-            self.logger.info(
-                "Getting tool instruction", tool_id=tool_id
-            )
+            self.logger.info("Getting tool instruction", tool_id=tool_id)
             prompt = self.prompts.get(f"{tool_id}", "Default Tool Instruction")
             tool_def.description = prompt
             return tool_def

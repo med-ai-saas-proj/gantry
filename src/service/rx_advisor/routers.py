@@ -29,22 +29,23 @@ rx_advisor_router = APIRouter(prefix="/rx_advisor", tags=["Doctor Help"])
     },
 )
 async def rx_advisor(
-    user: Annotated[ApiKeyInfo, Security(requiredPermissions(["placeholder"]))],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
     input: RxAdvisorInput,
     rx_advisor_service: Annotated[
         RxAdvisorService, Depends(getRxAdvisorService)
     ],
 ):
-    user_id = user["user_id"]
-    LOGGER.debug("user", user_id=user_id)
+    LOGGER.debug("api_key_info", api_key_info=api_key_info)
     if input.stream:
         return SSEResponse(
             rx_advisor_service.generateAdviceStream(
-                user_id, input.ehr, input.prescription
+                api_key_info, input.model, input.ehr, input.prescription
             ),
         )
     else:
         analysis = await rx_advisor_service.generateAdvice(
-            user_id, input.ehr, input.prescription
+            api_key_info, input.model, input.ehr, input.prescription
         )
         return JSONResponse(analysis)

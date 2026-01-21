@@ -1,6 +1,4 @@
-"""This file contain definition of chat's services."""
-
-from src.service.utils.agent.agent_deps import AgentDeps
+"""AI Search Service."""
 
 from .agents import constructAiSearchAgentDeps
 from ..utils.agent.stream import (
@@ -8,7 +6,10 @@ from ..utils.agent.stream import (
     convertAgentStream,
     userInputToPydanticAI,
 )
+from ..utils.agent.agent_deps import AgentDeps
 from ..utils.agent.dtos.model import ChatOutput, ModelInput, StreamEvent
+from ...management.api_keys.entities import ApiKeyInfo
+from ..utils.agent.models.models_service import ModelsService
 
 from typing import AsyncGenerator
 
@@ -23,9 +24,11 @@ class AiSearchService:
         logger: BoundLogger,
         agent: Agent[AgentDeps, str],
         # agent: Agent[Dep, AnswerStruct],
+        models_service: ModelsService,
     ):
         self.agent = agent
         self.logger = logger
+        self.models_service = models_service
 
     def _store_ehr_and_result(
         self,
@@ -36,22 +39,25 @@ class AiSearchService:
         pass
 
     async def aiSearchStream(
-        self, user_id: str, query: ModelInput
+        self, api_key_info: ApiKeyInfo, model_id: str, query: ModelInput
     ) -> AsyncGenerator[StreamEvent]:
+        model, model_config = self.models_service.get_model(model_id)
+
         model_input = userInputToPydanticAI(query)
 
         async for event in convertAgentStream(
             self.agent.run_stream_events(
                 model_input,
-                deps=constructAiSearchAgentDeps(
-                    {
-                        "user_id": user_id  # todo update later
-                    }
-                ),
+                model=model,
+                deps=constructAiSearchAgentDeps(api_key_info, model_config),
             )
         ):
             yield event
 
-    async def aiSearch(self, user_id: str, query: ModelInput) -> ChatOutput:
-        result = await aggregateStream(self.aiSearchStream(user_id, query))
+    async def aiSearch(
+        self, api_key_info: ApiKeyInfo, model_id: str, query: ModelInput
+    ) -> ChatOutput:
+        result = await aggregateStream(
+            self.aiSearchStream(api_key_info, model_id, query)
+        )
         return result

@@ -1,16 +1,19 @@
 from src.db.factories import getSessionManager
 from src.shared.utils.logger import getLogger
-from src.service.utils.agent.model_service import ModelService
 from src.service.utils.agent.prompt_service import PromptService
+from src.service.utils.agent.models.settings import getModelsSettings
+from src.service.utils.agent.models.models_service import ModelsService
 
 from functools import lru_cache
 
 
 @lru_cache(1)
 def getPromptService():
+    """Returns a cached instance of the PromptService."""
     return PromptService(getSessionManager(), getLogger())
 
 
 @lru_cache(1)
-def getModelService():
-    return ModelService()
+def getModelsService():
+    """Returns a cached instance of the ModelsService."""
+    return ModelsService(getModelsSettings(), getSessionManager(), getLogger())
