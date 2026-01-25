@@ -4,7 +4,7 @@ from src.db.repository import Repository
 
 from .models import ApiKey, Permission
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -14,6 +14,66 @@ class PermissionRepository(Repository[Permission, str]):
     def __init__(self):
         """Initialize PermissionRepository."""
         super().__init__(Permission, Permission.name)
+
+    async def getAllPermissions(
+        self, session: AsyncSession, skip: int = 0, limit: int = 100
+    ) -> list[Permission]:
+        """Get all permissions with pagination."""
+        stmt = (
+            select(Permission)
+            .offset(skip)
+            .limit(limit)
+            .order_by(Permission.name)
+        )
+        return await self.selectMany(session, stmt)
+
+    async def countPermissions(self, session: AsyncSession) -> int:
+        """Count total number of permissions."""
+        stmt = select(func.count()).select_from(Permission)
+        result = await session.execute(stmt)
+        return result.scalar() or 0
+
+    async def getPermissionById(
+        self, session: AsyncSession, permission_id: int
+    ) -> Permission | None:
+        """Get permission by ID."""
+        stmt = (
+            select(Permission)
+            .where(Permission.id == permission_id)
+            .limit(1)
+        )
+        return await self.selectOne(session, stmt)
+
+    async def getPermissionByName(
+        self, session: AsyncSession, name: str
+    ) -> Permission | None:
+        """Get permission by name."""
+        stmt = select(Permission).where(Permission.name == name).limit(1)
+        return await self.selectOne(session, stmt)
+
+    async def createPermission(
+        self, session: AsyncSession, name: str, description: str
+    ) -> Permission:
+        """Create a new permission."""
+        permission = Permission(name=name, description=description)
+        session.add(permission)
+        await session.flush()
+        return permission
+
+    async def updatePermission(
+        self, session: AsyncSession, permission: Permission, description: str
+    ) -> Permission:
+        """Update a permission's description."""
+        permission.description = description
+        await session.flush()
+        await session.refresh(permission)
+        return permission
+
+    async def deletePermission(
+        self, session: AsyncSession, permission: Permission
+    ) -> None:
+        """Delete a permission."""
+        await self.delete(session, permission)
 
 
 class ApiKeyRepository(Repository[ApiKey, int]):

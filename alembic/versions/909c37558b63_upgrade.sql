@@ -25,7 +25,16 @@ CREATE TABLE IF NOT EXISTS "ApiKey"."Permissions" (
     CONSTRAINT "Permissions_pkey" PRIMARY KEY (id)
 );
 
-INSERT INTO "ApiKey"."Permissions" (name, description) VALUES ('placeholder', 'This is a place holder');
+-- Seed common permissions for all services
+INSERT INTO "ApiKey"."Permissions" (name, description) VALUES 
+    ('aisearch', 'Access to AI-powered search service'),
+    ('ocr', 'Access to OCR (Optical Character Recognition) service'),
+    ('chat', 'Access to chat service'),
+    ('ehr_summarize', 'Access to EHR summarization service'),
+    ('rx_advisor', 'Access to prescription advisor service'),
+    ('crawler', 'Access to web crawler service'),
+    ('ehr', 'Access to Electronic Health Records service'),
+    ('admin', 'Full administrative access to all resources');
 
 CREATE UNIQUE INDEX "Permissions_name_idx" ON "ApiKey"."Permissions" (name);
 

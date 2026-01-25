@@ -2,6 +2,7 @@ from src.db.factories import getSessionManager
 from src.shared.utils.logger import getLogger
 
 from .services import ApiKeyService
+from .permission_service import PermissionService
 from .settings import getApiKeysSettings
 from .repositories import ApiKeyRepository, PermissionRepository
 
@@ -19,6 +20,16 @@ def getApiKeyService():
         },
         logger=getLogger(),
         api_key_repo=ApiKeyRepository(),
+        permission_repo=PermissionRepository(),
+        session_manager=getSessionManager(),
+    )
+
+
+@lru_cache(1)
+def getPermissionService():
+    """Get singleton PermissionService instance."""
+    return PermissionService(
+        logger=getLogger(),
         permission_repo=PermissionRepository(),
         session_manager=getSessionManager(),
     )
