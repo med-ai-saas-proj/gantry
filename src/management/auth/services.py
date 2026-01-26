@@ -79,13 +79,40 @@ class KeycloakService:
             except:
                 return None
 
+        # Extract roles from multiple sources in JWT
+        roles: list[str] = []
+        
+        # Realm roles (from realm_access.roles)
+        realm_roles = tryNone(
+            lambda: claims.get("realm_access", {}).get("roles", [])
+        )
+        if realm_roles:
+            roles.extend(realm_roles)
+        
+        # Client roles (from resource_access.{client_id}.roles)
+        # Get roles from the management client
+        client_roles = tryNone(
+            lambda: claims.get("resource_access", {})
+                          .get(self.client_id, {})
+                          .get("roles", [])
+        )
+        if client_roles:
+            roles.extend(client_roles)
+        
+        # Also check account client roles for backwards compatibility
+        account_roles = tryNone(
+            lambda: claims.get("resource_access", {})
+                          .get("account", {})
+                          .get("roles", [])
+        )
+        if account_roles:
+            roles.extend(account_roles)
+
         auth_info: UserInfo = {
             "id": claims["sub"],
             "username": claims.get("preferred_username"),
             "email": claims.get("email"),
-            "roles": tryNone(
-                lambda: claims["resource_access"]["account"]["roles"]
-            ),
+            "roles": roles if roles else None,
         }
 
         return Ok(auth_info)
