@@ -3,6 +3,7 @@ from src.db.utils import (
     WithID,
     WithCreateUpdateTimestamp,
 )
+from src.management.projects.models import Project
 
 from sqlalchemy import String, BigInteger, ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
@@ -44,6 +45,10 @@ class ApiKey(WithCreateUpdateTimestamp, WithID, ApiKeyBaseSQLModel):
     # )
     permissions: Mapped[list[Permission]] = relationship(
         Permission, secondary=lambda: ApiKeyPermission.__table__
+    )
+
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(Project.id), nullable=False, index=True
     )
 
 

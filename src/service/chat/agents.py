@@ -3,9 +3,9 @@
 from .consts import CHAT_AGENT_ID
 from ..utils.agent.factories import getPromptService
 from ..utils.agent.agent_deps import AgentDeps
+from ..utils.models.model_config import ModelConfig
 from ...management.api_keys.entities import ApiKeyInfo
 from ..utils.agent.shared_instruction import add_current_date
-from ..utils.agent.models.model_config import ModelConfig
 
 from functools import lru_cache
 

@@ -88,9 +88,7 @@ class ModelsService:
     async def load_model_config(self):
         """Loads model configurations from db."""
         # TODO: Load from DB
-        self.logger.debug(
-            "Loading model config from database"
-        )
+        self.logger.debug("Loading model config from database")
         self.set_model_config(
             "GROQ_SMALL_MODEL",
             ModelConfig(

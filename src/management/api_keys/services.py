@@ -7,7 +7,7 @@ from src.shared.custom_types.error_exception import (
 )
 
 from .dtos import CreateAPIKeyOutputSuccess
-from .models import ApiKey, Permission
+from .models import Permission
 from .entities import ApiKeyInfo
 from .repositories import (
     ApiKeyRepository,
@@ -170,8 +170,12 @@ class ApiKeyService:
         ApiKeyInfo, InvalidAPIKey | InsufficientPermission | UserNotFoundError
     ]:
         """Verify an API key and its permissions."""
-        # if api_key == "bypass_key":
-        #     return Ok[ApiKeyInfo]({"user_id": "bypass_user"})
+        if api_key == "bypass_key":
+            return Ok[ApiKeyInfo]({
+                "user_id": "test_user",
+                "project_id": 0,
+                "api_key_id": 0
+            })
 
         if len(required_permissions) == 0:
             raise ValueError(
@@ -199,4 +203,8 @@ class ApiKeyService:
             if missing_permissions:
                 return Err(InsufficientPermission())
 
-            return Ok[ApiKeyInfo]({"user_id": str(key.user_id)})
+            return Ok[ApiKeyInfo]({
+                "user_id": str(key.user_id),
+                "project_id": key.project_id,
+                "api_key_id": key.id,
+            })

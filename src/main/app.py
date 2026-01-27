@@ -80,6 +80,7 @@ async def lifespan(app: FastAPI):
     # Shutdown code here
     await service_shutdown(app)
 
+
 main_app = FastAPI(
     title="Med AI SaaS",
     openapi_url="/docs/openapi.json",
@@ -90,7 +91,7 @@ main_app = FastAPI(
         422: {"model": ProblemDetails},
         500: {"model": ProblemDetails},
     },
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 

@@ -9,7 +9,7 @@ from ..utils.agent.stream import aggregateStream, convertAgentStream
 from ..utils.agent.agent_deps import AgentDeps
 from ..utils.agent.dtos.model import ChatOutput
 from ...management.api_keys.entities import ApiKeyInfo
-from ..utils.agent.models.models_service import ModelsService
+from ..utils.models.models_service import ModelsService
 
 from pydantic_ai import Agent
 from structlog.stdlib import BoundLogger

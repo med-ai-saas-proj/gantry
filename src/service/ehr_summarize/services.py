@@ -13,7 +13,7 @@ from ..utils.agent.stream import (
 from ..utils.agent.agent_deps import AgentDeps
 from ..utils.agent.dtos.model import ChatOutput, StreamEvent
 from ...management.api_keys.entities import ApiKeyInfo
-from ..utils.agent.models.models_service import ModelsService
+from ..utils.models.models_service import ModelsService
 
 from typing import AsyncGenerator
 

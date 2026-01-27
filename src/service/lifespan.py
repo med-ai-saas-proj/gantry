@@ -1,4 +1,5 @@
-from src.service import getModelsService, getPromptService
+
+from src.service.utils.agent.factories import getModelsService, getPromptService
 
 from fastapi import FastAPI
 
@@ -9,6 +10,7 @@ async def startup(app: FastAPI):
     await prompt_service.load_prompts()
     model_service = getModelsService()
     await model_service.load_model_config()
+
 
 async def shutdown(app: FastAPI):
     # Cleanup code here

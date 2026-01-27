@@ -32,10 +32,13 @@ async def chat(
 
     if input.stream:
         return SSEResponse(
-            chat_service.chatStream(api_key_info, input.model, input.input),
+            chat_service.chatStream(api_key_info, input.model,
+                                    input.input,
+                                    input.conversation_id),
         )
     else:
-        output = await chat_service.chat(api_key_info, input.model, input.input)
+        output = await chat_service.chat(api_key_info, input.model,
+                                         input.input, input.conversation_id)
         return JSONResponse(output)
 
 

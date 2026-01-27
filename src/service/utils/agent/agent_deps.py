@@ -1,5 +1,5 @@
 from src.management.api_keys.entities import ApiKeyInfo
-from src.service.utils.agent.models.model_config import ModelConfig
+from src.service.utils.models.model_config import ModelConfig
 
 from dataclasses import dataclass
 

@@ -1,8 +1,8 @@
 from src.db.factories import getSessionManager
 from src.shared.utils.logger import getLogger
+from src.service.utils.models.settings import getModelsSettings
 from src.service.utils.agent.prompt_service import PromptService
-from src.service.utils.agent.models.settings import getModelsSettings
-from src.service.utils.agent.models.models_service import ModelsService
+from src.service.utils.models.models_service import ModelsService
 
 from functools import lru_cache
 

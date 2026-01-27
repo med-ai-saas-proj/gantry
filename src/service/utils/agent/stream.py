@@ -1,3 +1,6 @@
+from src.management.api_keys.entities import ApiKeyInfo
+from src.service.utils.conversation.services import ConversationService
+
 from .dtos.model import (
     AudioURL as InputAudioURL,
     ImageURL as InputImageURL,
@@ -243,12 +246,16 @@ def pydanticAIToOurs(msgs: Sequence[ModelRequest | ModelResponse]):
 
 async def convertAgentStream[T](
     agent_stream: AsyncIterator[AgentStreamEvent | AgentRunResultEvent[T]],
+    conversation_id: int | None,
+    conversation_uid: str,
+    api_key_info: ApiKeyInfo,
+    conversation_service: ConversationService
 ) -> AsyncGenerator[StreamEvent]:
     # i = 0
     yield {
         "event": StreamEventType.conversation_start,
         "data": {
-            "conversation_id": "thisisaplaceholder",
+            "conversation_id": conversation_uid,
         },
     }
     async for event in agent_stream:
@@ -335,6 +342,8 @@ async def convertAgentStream[T](
                         pass
                     case _:
                         pass
+            case 'part_end':
+                pass
             case "function_tool_call":
                 yield {
                     "event": StreamEventType.part_delta,
@@ -390,8 +399,8 @@ async def convertAgentStream[T](
                 result: StreamEvent_FinalResult = {
                     "event": StreamEventType.final_result,
                     "data": {
-                        "conversation_id": "thisisaplaceholder",
-                        "id": "thisisaplaceholder",
+                        "conversation_id": conversation_uid,
+                        "id": event.result.run_id,
                         "status": ResponseStatus.completed,
                         "output": None,
                         "usage": {
@@ -406,6 +415,11 @@ async def convertAgentStream[T](
                 result_["output"] = pydanticAIToOurs(
                     event.result.new_messages()
                 )
-                # self._store_ehr_and_result(user_id, query, result_)
+                await conversation_service.store_conversation(
+                    conversation_id,
+                    conversation_uid,
+                    api_key_info["project_id"],
+                    event.result.new_messages()
+                )
             case _:
                 pass

@@ -1,9 +1,9 @@
 from src.db.factories import getSessionManager
 from src.shared.utils.logger import getLogger
 
-from .. import getModelsService
 from .agents import getAiSearchAgent
 from .services import AiSearchService
+from ..utils.agent.factories import getModelsService
 
 from functools import lru_cache
 
