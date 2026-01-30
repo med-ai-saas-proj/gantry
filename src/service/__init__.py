@@ -41,10 +41,11 @@ v1_router.include_router(ai_search_router)
 v1_router.include_router(ocr_router)
 v1_router.include_router(chat_router)
 
-api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
-api_router.include_router(v1_router)
+# api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
+# api_router.include_router(v1_router)
 
-service_app.include_router(api_router)
+# service_app.include_router(api_router)
+service_app.include_router(v1_router)
 
 
 @service_app.get("/docs", include_in_schema=False)

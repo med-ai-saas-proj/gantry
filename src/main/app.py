@@ -23,7 +23,6 @@ from pydantic import ValidationError
 from opentelemetry import trace
 from sqlalchemy.orm import configure_mappers
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
-from fastapi.staticfiles import StaticFiles
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace.export import (

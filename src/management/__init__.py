@@ -34,10 +34,11 @@ v1_router = APIRouter(prefix="/v1", tags=["v1"], include_in_schema=True)
 v1_router.include_router(apikey_router)
 
 
-api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
-api_router.include_router(v1_router)
+# api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
+# api_router.include_router(v1_router)
 
-management_app.include_router(api_router)
+# management_app.include_router(api_router)
+management_app.include_router(v1_router)
 
 
 @management_app.get("/docs", include_in_schema=False)

@@ -98,6 +98,9 @@ services:
         reservations:
           cpus: "1"
           memory: 64M
+    workdir: /app
+    volumes:
+      - .:/app
 
 volumes:
   postgres_data:
