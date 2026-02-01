@@ -15,6 +15,7 @@ import uuid
 from typing import AsyncGenerator
 
 from pydantic_ai import Agent
+from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 
 
@@ -26,12 +27,14 @@ class ChatService:
         agent: Agent[AgentDeps, str],
         # agent: Agent[Dep, AnswerStruct],
         models_service: ModelsService,
-        conversion_service: ConversationService
+        conversion_service: ConversationService,
+        redis: Redis,
     ):
         self.agent = agent
         self.logger = logger
         self.models_service = models_service
         self.conversation_service = conversion_service
+        self.redis = redis
 
     def _store_ehr_and_result(
         self,
@@ -57,26 +60,30 @@ class ChatService:
         else:
             conversation_uid = str(uuid.uuid4())
 
-        print("conversation_id", conversation_id)
         mess_history = await self.conversation_service.get_conversation_message(
             conversation_id,
             conversation_uid
         ) if conversation_id else []
 
         model_input = userInputToPydanticAI(query)
-        async for event in convertAgentStream(
-            self.agent.run_stream_events(
-                model_input,
-                model=model,
-                message_history=mess_history,
-                deps=constructChatAgentDeps(api_key_info, model_config),
-            ),
-            conversation_id=conversation_id,
-            conversation_uid=conversation_uid,
-            api_key_info=api_key_info,
-            conversation_service=self.conversation_service,
+        print("conversation_id", conversation_id)
+        async with self.redis.lock(
+            f"conversation:{conversation_uid}",
+            blocking=False
         ):
-            yield event
+            async for event in convertAgentStream(
+                self.agent.run_stream_events(
+                    model_input,
+                    model=model,
+                    message_history=mess_history,
+                    deps=constructChatAgentDeps(api_key_info, model_config),
+                ),
+                conversation_id=conversation_id,
+                conversation_uid=conversation_uid,
+                api_key_info=api_key_info,
+                conversation_service=self.conversation_service,
+            ):
+                yield event
 
     async def chat(
         self,

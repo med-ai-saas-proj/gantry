@@ -1,4 +1,4 @@
-from src.db.factories import getSessionManager
+from src.db.factories import getRedis, getSessionManager
 from src.shared.utils.logger import getLogger
 
 from .agents import getChatAgent
@@ -13,6 +13,10 @@ from functools import lru_cache
 def getChatService():
     """Returns a cached instance of the ChatService."""
     return ChatService(
-        getSessionManager(), getLogger(), getChatAgent(), getModelsService(),
-        getConversationService()
+        getSessionManager(),
+        getLogger(),
+        getChatAgent(),
+        getModelsService(),
+        getConversationService(),
+        getRedis()
     )
