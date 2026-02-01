@@ -54,7 +54,22 @@ services:
       - "9411:9411"
     restart: unless-stopped
 
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: rustfs
+    ports:
+      - "8081:8080"   # RustFS default HTTP port
+      - "9000:9000"   # RustFS default API/metadata port
+      - "9001:9001"   # RustFS  dashboard Web UI port
+    volumes:
+      - rustfs_data:/data
+    environment:
+      RUSTFS_ROOT: /data
+      RUSTFS_LOG_LEVEL: info
+    restart: unless-stopped
+
 volumes:
+  rustfs_data:
   postgres_data:
   redis_data:
   keycloak_data:

@@ -1,4 +1,3 @@
-from src.service.utils.agent.factories import getModelsService, getPromptService
 from src.shared.custom_types.error_exception import ProblemDetails
 
 from .ocr.routers import ocr_router
@@ -6,6 +5,7 @@ from .chat.routers import chat_router
 from .ai_search.routers import ai_search_router
 from .rx_advisor.routers import rx_advisor_router
 from .ehr_summarize.routers import ehr_summarize_router
+from .utils.file_storage.routers import file_storage_router
 
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
@@ -42,6 +42,7 @@ v1_router.include_router(rx_advisor_router)
 v1_router.include_router(ai_search_router)
 v1_router.include_router(ocr_router)
 v1_router.include_router(chat_router)
+v1_router.include_router(file_storage_router)
 
 api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
 api_router.include_router(v1_router)
