@@ -153,25 +153,26 @@ class AuthService:
         self,
         user_info: UserInfo,
         role: ManagementRole
-    ) -> None:
+    ) -> Result[None, InsufficientPermissionsError]:
         """
-        Check if user has a specific role, raise exception if not.
+        Check if user has a specific role.
 
         Args:
             user_info: The authenticated user info
             role: The required role
 
-        Raises:
-            InsufficientPermissionsError: If user doesn't have the role
+        Returns:
+            Ok(None) if user has the role, Err otherwise
         """
         if not _has_role(user_info.get('roles'), role):
-            raise InsufficientPermissionsError([role.value])
+            return Err(InsufficientPermissionsError([role.value]))
+        return Ok(None)
 
     def checkAnyRole(
         self,
         user_info: UserInfo,
         roles: list[ManagementRole]
-    ) -> None:
+    ) -> Result[None, InsufficientPermissionsError]:
         """
         Check if user has any of the specified roles.
 
@@ -179,18 +180,19 @@ class AuthService:
             user_info: The authenticated user info
             roles: List of roles (user needs at least one)
 
-        Raises:
-            InsufficientPermissionsError: If user doesn't have any role
+        Returns:
+            Ok(None) if user has any role, Err otherwise
         """
         if not _has_any_role(user_info.get('roles'), roles):
             role_values = [r.value for r in roles]
-            raise InsufficientPermissionsError(role_values)
+            return Err(InsufficientPermissionsError(role_values))
+        return Ok(None)
 
     def checkAllRoles(
         self,
         user_info: UserInfo,
         roles: list[ManagementRole]
-    ) -> None:
+    ) -> Result[None, InsufficientPermissionsError]:
         """
         Check if user has all of the specified roles.
 
@@ -198,9 +200,10 @@ class AuthService:
             user_info: The authenticated user info
             roles: List of roles (user needs all)
 
-        Raises:
-            InsufficientPermissionsError: If user doesn't have all roles
+        Returns:
+            Ok(None) if user has all roles, Err otherwise
         """
         if not _has_all_roles(user_info.get('roles'), roles):
             role_values = [r.value for r in roles]
-            raise InsufficientPermissionsError(role_values)
+            return Err(InsufficientPermissionsError(role_values))
+        return Ok(None)

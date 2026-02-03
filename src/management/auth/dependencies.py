@@ -61,7 +61,7 @@ def requireRole(role: ManagementRole):
         auth_service: Annotated[AuthService, Depends(getAuthService)],
     ) -> UserInfo:
         user_info = auth_service.verifyToken(token).unwrap()
-        auth_service.checkRole(user_info, role)
+        auth_service.checkRole(user_info, role).unwrap()
         return user_info
 
     return dependency
@@ -90,7 +90,7 @@ def requireAnyRole(roles: list[ManagementRole]):
         auth_service: Annotated[AuthService, Depends(getAuthService)],
     ) -> UserInfo:
         user_info = auth_service.verifyToken(token).unwrap()
-        auth_service.checkAnyRole(user_info, roles)
+        auth_service.checkAnyRole(user_info, roles).unwrap()
         return user_info
 
     return dependency
@@ -119,7 +119,7 @@ def requireAllRoles(roles: list[ManagementRole]):
         auth_service: Annotated[AuthService, Depends(getAuthService)],
     ) -> UserInfo:
         user_info = auth_service.verifyToken(token).unwrap()
-        auth_service.checkAllRoles(user_info, roles)
+        auth_service.checkAllRoles(user_info, roles).unwrap()
         return user_info
 
     return dependency

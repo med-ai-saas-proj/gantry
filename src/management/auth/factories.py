@@ -11,7 +11,7 @@ def getAuthService() -> AuthService:
     """Get singleton AuthService instance."""
     settings = getAuthSettings()
     return AuthService(
-        server_url=settings.server_url.encoded_string,
+        server_url=settings.server_url.encoded_string(),
         realm=settings.realm_name,
         client_id=settings.client_id,
     )
