@@ -1,16 +1,12 @@
 from src.db.base import BaseSQLModel
 from src.db.utils import (
     WithID,
-    WithUUID,
     WithClientUUID,
     WithCreateUpdateTimestamp,
 )
+from src.service.utils.conversation.types import MessagePart
 
-from typing import Any, TypedDict
-from datetime import datetime
-
-from sqlalchemy import Text, String, DateTime
-from redis.retry import T
+from sqlalchemy import Text, String
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -31,24 +27,24 @@ class Conversation(
     title: Mapped[str | None] = mapped_column(String(128), nullable=True)
     project_id: Mapped[int] = mapped_column(nullable=False, index=True)
 
-
-class MessagePart(TypedDict):
-    """Represents a part of a message in a conversation."""
-
-    part_kind: str
-    timestamp: str | None
-    content: Any
-    tool_name: str | None
-    tool_call_id: str | None
-    metadata: Any | None
-
-    provider_details: Any | None
-    id: str | None
-
-    provider_name: str | None
-    signature: str | None
-
-    args: Any
+#
+# class MessagePart(TypedDict):
+#     """Represents a part of a message in a conversation."""
+#
+#     part_kind: str
+#     timestamp: Optional[str]
+#     content: Any
+#     tool_name: Optional[str]
+#     tool_call_id: Optional[str]
+#     metadata: Any | None
+#
+#     provider_details: Any | None
+#     id: str | None
+#
+#     provider_name: str | None
+#     signature: str | None
+#
+#     args: Any
 
 class Message(WithCreateUpdateTimestamp, WithID, ConversationBaseSQLModel):
     """Represents a message in a conversation."""

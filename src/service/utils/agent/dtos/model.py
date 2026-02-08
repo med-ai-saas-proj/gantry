@@ -1,4 +1,5 @@
 """This file contain definition of chat's data transfer objects."""
+import uuid
 
 from src.shared.custom_types.responses.sse import SSEContent as BaseStreamEvent
 
@@ -51,8 +52,15 @@ class DocumentURL(FileURL):
     mime_type: str
 
 
+class FileLink(BaseModel):
+    """Contain file link."""
+
+    type: Literal["file_link"]
+    file_id: Annotated[uuid.UUID, Field(description="The file's id")]
+
+
 type MultiModalContent = Annotated[
-    ImageURL | AudioURL | VideoURL | DocumentURL,
+    ImageURL | AudioURL | VideoURL | DocumentURL | FileLink,
     Field(discriminator="type", description="Multi modal content type"),
 ]
 type ModelInputPart = str | MultiModalContent

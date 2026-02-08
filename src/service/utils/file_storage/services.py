@@ -1,9 +1,9 @@
 from src.db.session import AsyncSessionManager
-from src.service.utils.file_storage.utils import detect_file_type
-from src.service.utils.file_storage.models import File
-from src.service.utils.file_storage.entities import FileRecord
-from src.service.utils.file_storage.settings import ObjectStorageSettings
-from src.service.utils.file_storage.repositories import FileRepository
+
+from .types import FileRecord
+from .models import File, FileType
+from .settings import ObjectStorageSettings
+from .repositories import FileRepository
 
 import uuid
 import asyncio
@@ -44,7 +44,7 @@ class FileStorageService:
         self,
         file_name: str,
         file_size: int,
-        file_object: BinaryIO,
+        file_object: BinaryIO | bytes,
         mime_type: str = "application/octet-stream",
     ) -> None:
         self.storage_backend.put_object(
@@ -58,20 +58,24 @@ class FileStorageService:
     async def upload_file(
         self,
         file_name: str,
-        file_data: BinaryIO,
+        file_data: BinaryIO | bytes,
         file_size: int,
+        mime_type: str,
+        ext: str,
+        file_type: FileType = FileType.GENERAL,
     ):
-        mine_type, ext = detect_file_type(file_data)
+        """Upload a file and store its metadata."""
         file_key = str(uuid.uuid4())
         file_path = (
-            f"/uploads/{file_key}.{ext}" if ext else f"/uploads/{file_key}"
+            f"uploads/{file_key}.{ext}" if ext else f"/uploads/{file_key}"
         )
         async with self.session_manager.get_session() as session:
             file_record = File(
                 original_filename=file_name,
                 filepath=file_path,
-                filetype=mine_type,
+                mime_type=mime_type,
                 size_in_bytes=file_size,
+                file_type=file_type,
             )
             session.add(file_record)
             await session.flush()
@@ -81,8 +85,9 @@ class FileStorageService:
                 file_path,
                 file_size,
                 file_data,
-                mine_type,
+                mime_type,
             )
+            await session.commit()
             return file_record_uid
 
     def _load_file_content(
@@ -95,7 +100,7 @@ class FileStorageService:
         )
         return res["Body"].read()
 
-    async def get_file(self, file_uuid: str) -> bytes:
+    async def get_file(self, file_uuid:  uuid.UUID) -> bytes:
         """Retrieve file content by UUID."""
         file_record = await self.get_file_metadata(file_uuid)
         file_content = await asyncio.to_thread(
@@ -104,7 +109,7 @@ class FileStorageService:
         )
         return file_content
 
-    async def get_file_url(self, file_uuid: str) -> str:
+    async def get_file_url(self, file_uuid:  uuid.UUID) -> str:
         """Generate a presigned URL for the file by UUID."""
         file_record = await self.get_file_metadata(file_uuid)
         url = self.storage_backend.generate_presigned_url(
@@ -117,7 +122,20 @@ class FileStorageService:
         )
         return url
 
-    async def get_file_metadata(self, file_uuid: str) -> FileRecord:
+    async def get_file_metadata_and_url(self, file_uuid:  uuid.UUID) -> tuple[str, FileRecord]:
+        """Generate a presigned URL for the file by UUID."""
+        file_record = await self.get_file_metadata(file_uuid)
+        url = self.storage_backend.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={
+                "Bucket": self.file_storage_settings.s3_bucket_name,
+                "Key": file_record["storage_path"],
+            },
+            ExpiresIn=self.file_storage_settings.s3_presigned_url_expiry_seconds,
+        )
+        return url, file_record
+
+    async def get_file_metadata(self, file_uuid: uuid.UUID) -> FileRecord:
         """Retrieve file metadata by UUID."""
         async with self.session_manager.get_session() as session:
             file_record = await self.file_repo.getByUUID(session, file_uuid)
@@ -130,7 +148,8 @@ class FileStorageService:
                 "id": str(file_record.uuid),
                 "filename": file_record.original_filename,
                 "storage_path": file_record.filepath,
-                "content_type": file_record.filetype,
+                "mime_type": file_record.mime_type,
+                "file_type": file_record.file_type,
                 "size": file_record.size_in_bytes,
                 "created_at": file_record.created_at,
             }

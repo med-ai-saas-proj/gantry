@@ -14,7 +14,7 @@ class FileMetadataResponseDTO(BaseModel):
 
     id: str
     filename: str
-    content_type: str
+    mime_type: str
     size: int
     storage_path: str
     created_at: datetime

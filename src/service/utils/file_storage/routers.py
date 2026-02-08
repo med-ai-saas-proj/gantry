@@ -1,27 +1,33 @@
-from src.service.utils.file_storage.dtos import (
+from .dtos import (
     FileUploadResponseDTO,
     FileMetadataResponseDTO,
 )
-from src.service.utils.file_storage.entities import FileRecord
-from src.service.utils.file_storage.services import FileStorageService
-from src.service.utils.file_storage.factories import getFileStorageService
+from .types import FileRecord
+from .utils import detect_file_type
+from .models import FileType
+from .services import FileStorageService
+from .factories import getFileStorageService
 
+import uuid
 from typing import Annotated
 
-from fastapi import Depends, APIRouter, UploadFile, HTTPException
+from fastapi import Path, Depends, APIRouter, UploadFile, HTTPException
 
 
 file_storage_router = APIRouter(prefix="/file-storage", tags=["file-storage"])
 
 
 @file_storage_router.post(
-    "/upload",
+    "/{file_type}/upload",
     summary="Upload a file to the file storage service.",
     description="Endpoint to upload a file to the file storage service.",
     response_model=FileUploadResponseDTO,
 )
 async def upload_file(
     file: UploadFile,
+    file_type: Annotated[FileType, Path(
+        ..., description="The type of the file being uploaded."
+    )],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
@@ -30,8 +36,10 @@ async def upload_file(
     if file.size is None or file.size == 0:
         raise HTTPException(status_code=400, detail="File is empty.")
 
+    mime_type, ext = detect_file_type(file.file)
     file_id = await file_storage_service.upload_file(
-        file.filename or "unknown", file.file, file.size
+        file.filename or "unknown", file.file, file.size, mime_type, ext,
+        file_type
     )
     return FileUploadResponseDTO(
         file_id=str(file_id),
@@ -51,14 +59,17 @@ async def get_file_metadata(
     ],
 ):
     """Get file metadata by file ID."""
-    file_metadata: FileRecord = await file_storage_service.get_file_metadata(
-        file_id
-    )
+    try:
+        file_metadata: FileRecord = await file_storage_service.get_file_metadata(
+            uuid.UUID(file_id)
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found.")
     return FileMetadataResponseDTO(
         id=str(file_metadata["id"]),
         filename=file_metadata["filename"],
         storage_path=file_metadata["storage_path"],
-        content_type=file_metadata["content_type"],
+        mime_type=file_metadata["mime_type"],
         size=file_metadata["size"],
         created_at=file_metadata["created_at"],
     )
@@ -77,5 +88,10 @@ async def get_file_presigned_url(
     ],
 ):
     """Get presigned URL for file download."""
-    presigned_url: str = await file_storage_service.get_file_url(file_id)
+    try:
+        presigned_url: str = await file_storage_service.get_file_url(
+            uuid.UUID(file_id)
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found.")
     return presigned_url

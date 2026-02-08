@@ -1,4 +1,6 @@
 """Chat service."""
+import asyncio
+
 from .agents import constructChatAgentDeps
 from ..utils.agent.stream import (
     aggregateStream,
@@ -65,7 +67,7 @@ class ChatService:
             conversation_uid
         ) if conversation_id else []
 
-        model_input = userInputToPydanticAI(query)
+        model_input = await userInputToPydanticAI(query)
         print("conversation_id", conversation_id)
         async with self.redis.lock(
             f"conversation:{conversation_uid}",
