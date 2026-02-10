@@ -21,7 +21,7 @@ from .dtos.model import (
     StreamEvent_PartType,
     StreamEvent_FinalResult,
     ModelResponse_ContentType,
-    StreamEvent_PartDelta_Output,
+    StreamEvent_PartDelta_Text,
 )
 from .dtos.generation_output import (
     ResponseStatus,
@@ -185,7 +185,9 @@ async def aggregateStream(
     final_output_["output"] = model_response
     return final_output_
 
+
 file_service = getFileStorageService()
+
 
 def extractFileContentFromUrl(url: str) -> bytes | None:
     """Extract file content from data URL."""
@@ -198,10 +200,8 @@ def extractFileContentFromUrl(url: str) -> bytes | None:
             return base64.b64decode(content)
     return None
 
-async def uploadFile(
-    file_data: bytes,
-    file_type: FileType
-) -> uuid.UUID:
+
+async def uploadFile(file_data: bytes, file_type: FileType) -> uuid.UUID:
     """Upload file and return file ID."""
     mine_type, ext = detect_file_type(file_data)
     return await file_service.upload_file(
@@ -211,6 +211,7 @@ async def uploadFile(
         mime_type=mine_type,
         ext=ext,
     )
+
 
 async def userInputToPydanticAI(query: ModelInput) -> Sequence[UserContent]:
     model_input: list[UserContent] = []
@@ -224,77 +225,90 @@ async def userInputToPydanticAI(query: ModelInput) -> Sequence[UserContent]:
             elif isinstance(message, InputImageURL):
                 file_data = extractFileContentFromUrl(message.url)
                 if file_data:
-                    file_id = await uploadFile(
-                        file_data, FileType.IMAGE
-                    )
+                    file_id = await uploadFile(file_data, FileType.IMAGE)
                     file_url = await file_service.get_file_url(file_id)
-                    model_input.append(ImageUrl(url=file_url, vendor_metadata={
-                        "file_id": file_id
-                    }))
+                    model_input.append(
+                        ImageUrl(
+                            url=file_url, vendor_metadata={"file_id": file_id}
+                        )
+                    )
                 else:
                     # If not data URL, assume it's a direct URL
                     model_input.append(ImageUrl(url=message.url))
             elif isinstance(message, InputAudioURL):
                 file_data = extractFileContentFromUrl(message.url)
                 if file_data:
-                    file_id = await uploadFile(
-                        file_data, FileType.AUDIO
-                    )
+                    file_id = await uploadFile(file_data, FileType.AUDIO)
                     file_url = await file_service.get_file_url(file_id)
-                    model_input.append(AudioUrl(url=file_url, vendor_metadata={
-                        "file_id": file_id
-                    }))
+                    model_input.append(
+                        AudioUrl(
+                            url=file_url, vendor_metadata={"file_id": file_id}
+                        )
+                    )
                 else:
                     # If not data URL, assume it's a direct URL
                     model_input.append(AudioUrl(url=message.url))
             elif isinstance(message, InputVideoURL):
                 file_data = extractFileContentFromUrl(message.url)
                 if file_data:
-                    file_id = await uploadFile(
-                        file_data, FileType.VIDEO
-                    )
+                    file_id = await uploadFile(file_data, FileType.VIDEO)
                     file_url = await file_service.get_file_url(file_id)
-                    model_input.append(VideoUrl(url=file_url, vendor_metadata={
-                        "file_id": file_id
-                    }))
+                    model_input.append(
+                        VideoUrl(
+                            url=file_url, vendor_metadata={"file_id": file_id}
+                        )
+                    )
                 else:
                     # If not data URL, assume it's a direct URL
                     model_input.append(VideoUrl(url=message.url))
             elif isinstance(message, InputDocumentURL):
                 file_data = extractFileContentFromUrl(message.url)
                 if file_data:
-                    file_id = await uploadFile(
-                        file_data, FileType.DOCUMENT
-                    )
+                    file_id = await uploadFile(file_data, FileType.DOCUMENT)
                     file_url = await file_service.get_file_url(file_id)
-                    model_input.append(DocumentUrl(url=file_url, vendor_metadata={
-                        "file_id": file_id
-                    }))
+                    model_input.append(
+                        DocumentUrl(
+                            url=file_url, vendor_metadata={"file_id": file_id}
+                        )
+                    )
                 else:
                     # If not data URL, assume it's a direct URL
                     model_input.append(DocumentUrl(url=message.url))
             elif isinstance(message, FileLink):
-                file_url, metadata = await file_service.get_file_metadata_and_url(message.file_id)
-                if metadata['file_type'] == FileType.IMAGE:
-                    model_input.append(ImageUrl(url=file_url,
-                       vendor_metadata={
-                            "file_id": message.file_id
-                        }))
-                elif metadata['file_type'] == FileType.AUDIO:
-                    model_input.append(AudioUrl(url=file_url,
-                       vendor_metadata={
-                            "file_id": message.file_id
-                        }))
-                elif metadata['file_type'] == FileType.VIDEO:
-                    model_input.append(VideoUrl(url=file_url,
-                       vendor_metadata={
-                            "file_id": message.file_id
-                        }))
+                (
+                    file_url,
+                    metadata,
+                ) = await file_service.get_file_metadata_and_url(
+                    message.file_id
+                )
+                if metadata["file_type"] == FileType.IMAGE:
+                    model_input.append(
+                        ImageUrl(
+                            url=file_url,
+                            vendor_metadata={"file_id": message.file_id},
+                        )
+                    )
+                elif metadata["file_type"] == FileType.AUDIO:
+                    model_input.append(
+                        AudioUrl(
+                            url=file_url,
+                            vendor_metadata={"file_id": message.file_id},
+                        )
+                    )
+                elif metadata["file_type"] == FileType.VIDEO:
+                    model_input.append(
+                        VideoUrl(
+                            url=file_url,
+                            vendor_metadata={"file_id": message.file_id},
+                        )
+                    )
                 else:
-                    model_input.append(DocumentUrl(url=file_url,
-                       vendor_metadata={
-                            "file_id": message.file_id
-                        }))
+                    model_input.append(
+                        DocumentUrl(
+                            url=file_url,
+                            vendor_metadata={"file_id": message.file_id},
+                        )
+                    )
             else:
                 raise ValueError("Not supported type of user input")
     return model_input
@@ -351,7 +365,7 @@ async def convertAgentStream[T](
     conversation_id: int | None,
     conversation_uid: str,
     api_key_info: ApiKeyInfo,
-    conversation_service: ConversationService
+    conversation_service: ConversationService,
 ) -> AsyncGenerator[StreamEvent]:
     # i = 0
     yield {
@@ -415,7 +429,7 @@ async def convertAgentStream[T](
                 delta = event.delta
                 match delta.part_delta_kind:
                     case "text":
-                        data: StreamEvent_PartDelta_Output = {
+                        data: StreamEvent_PartDelta_Text = {
                             "type": StreamEvent_PartType.output,
                             "delta": delta.content_delta,
                         }
@@ -445,7 +459,7 @@ async def convertAgentStream[T](
                         pass
                     case _:
                         pass
-            case 'part_end':
+            case "part_end":
                 pass
             case "function_tool_call":
                 yield {
@@ -522,7 +536,7 @@ async def convertAgentStream[T](
                     conversation_id,
                     conversation_uid,
                     api_key_info["project_id"],
-                    event.result.new_messages()
+                    event.result.new_messages(),
                 )
             case _:
                 pass

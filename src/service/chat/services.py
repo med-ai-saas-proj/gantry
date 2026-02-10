@@ -1,19 +1,15 @@
 """Chat service."""
-import asyncio
 
 from .agents import constructChatAgentDeps
 from ..utils.agent.stream import (
     aggregateStream,
-    convertAgentStream,
-    userInputToPydanticAI,
 )
 from ..utils.agent.agent_deps import AgentDeps
 from ..utils.agent.dtos.model import ChatOutput, ModelInput, StreamEvent
-from ..utils.conversation.services import ConversationService
 from ..utils.models.models_service import ModelsService
 from ...management.api_keys.entities import ApiKeyInfo
+from ..utils.conversation.conversation_manager import ConversationManager
 
-import uuid
 from typing import AsyncGenerator
 
 from pydantic_ai import Agent
@@ -29,13 +25,13 @@ class ChatService:
         agent: Agent[AgentDeps, str],
         # agent: Agent[Dep, AnswerStruct],
         models_service: ModelsService,
-        conversion_service: ConversationService,
+        conversion_manager: ConversationManager,
         redis: Redis,
     ):
         self.agent = agent
         self.logger = logger
         self.models_service = models_service
-        self.conversation_service = conversion_service
+        self.conversion_manager = conversion_manager
         self.redis = redis
 
     def _store_ehr_and_result(
@@ -51,39 +47,21 @@ class ChatService:
         api_key_info: ApiKeyInfo,
         model_id: str,
         query: ModelInput,
-        conversation_uid: str | None = None
+        conversation_uid: str | None = None,
     ) -> AsyncGenerator[StreamEvent]:
         model, model_config = self.models_service.get_model(model_id)
-        conversation_id: int | None = None
-        if conversation_uid:
-            conversation_id = await self.conversation_service.get_conversation_id(
-                conversation_uid, api_key_info
-            )
-        else:
-            conversation_uid = str(uuid.uuid4())
-
-        mess_history = await self.conversation_service.get_conversation_message(
-            conversation_id,
-            conversation_uid
-        ) if conversation_id else []
-
-        model_input = await userInputToPydanticAI(query)
-        print("conversation_id", conversation_id)
-        async with self.redis.lock(
-            f"conversation:{conversation_uid}",
-            blocking=False
-        ):
-            async for event in convertAgentStream(
+        async with self.conversion_manager.startConversion(
+            conversation_uid,
+            api_key_info,
+        ) as conversation:
+            model_input = await conversation.userInputToPydanticAI(query)
+            async for event in conversation.stream_handler.convertAgentStream(
                 self.agent.run_stream_events(
                     model_input,
                     model=model,
-                    message_history=mess_history,
+                    message_history=conversation.mess_history,
                     deps=constructChatAgentDeps(api_key_info, model_config),
-                ),
-                conversation_id=conversation_id,
-                conversation_uid=conversation_uid,
-                api_key_info=api_key_info,
-                conversation_service=self.conversation_service,
+                )
             ):
                 yield event
 

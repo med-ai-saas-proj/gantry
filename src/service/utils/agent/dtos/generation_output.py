@@ -1,5 +1,6 @@
 from enum import Enum
-from typing import Union, Literal, Annotated, TypedDict, NotRequired
+from typing import Annotated, TypedDict, NotRequired
+from dataclasses import dataclass
 
 from pydantic import Field
 
@@ -36,7 +37,8 @@ class ResponseStatus(str, Enum):
     error = "error"
 
 
-class GenerationOutput[T](TypedDict):
+@dataclass
+class GenerationOutput[T]:
     """The root of all LLM related API."""
 
     id: Annotated[
@@ -49,13 +51,11 @@ class GenerationOutput[T](TypedDict):
         str, Field(description="ID of the current conversation")
     ]
     status: Annotated[ResponseStatus, Field(description="Response's status")]
-    error: NotRequired[
-        Annotated[
-            Error,
-            Field(
-                description=("Error details when the response failed"),
-            ),
-        ]
+    error: Annotated[
+        Error | None,
+        Field(
+            description=("Error details when the response failed"),
+        ),
     ]
     output: Annotated[
         T,

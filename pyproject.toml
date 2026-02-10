@@ -30,6 +30,8 @@ dependencies = [
     "opentelemetry-sdk>=1.39.0",
     "filetype>=1.2.0",
     "boto3>=1.40.61",
+    "aioredlock>=0.7.3",
+    "setuptools>=82.0.0",
 ]
 
 [tool.pyrefly]

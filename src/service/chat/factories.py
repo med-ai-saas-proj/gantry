@@ -4,7 +4,9 @@ from src.shared.utils.logger import getLogger
 from .agents import getChatAgent
 from .services import ChatService
 from ..utils.agent.factories import getModelsService
-from ..utils.conversation.factories import getConversationService
+from ..utils.conversation.factories import (
+    getConversationManager,
+)
 
 from functools import lru_cache
 
@@ -17,6 +19,6 @@ def getChatService():
         getLogger(),
         getChatAgent(),
         getModelsService(),
-        getConversationService(),
-        getRedis()
+        getConversationManager(),
+        getRedis(),
     )
