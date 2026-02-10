@@ -25,9 +25,9 @@ file_storage_router = APIRouter(prefix="/file-storage", tags=["file-storage"])
 )
 async def upload_file(
     file: UploadFile,
-    file_type: Annotated[FileType, Path(
-        ..., description="The type of the file being uploaded."
-    )],
+    file_type: Annotated[
+        FileType, Path(..., description="The type of the file being uploaded.")
+    ],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
@@ -38,8 +38,12 @@ async def upload_file(
 
     mime_type, ext = detect_file_type(file.file)
     file_id = await file_storage_service.upload_file(
-        file.filename or "unknown", file.file, file.size, mime_type, ext,
-        file_type
+        file.filename or "unknown",
+        file.file,
+        file.size,
+        mime_type,
+        ext,
+        file_type,
     )
     return FileUploadResponseDTO(
         file_id=str(file_id),
@@ -60,8 +64,8 @@ async def get_file_metadata(
 ):
     """Get file metadata by file ID."""
     try:
-        file_metadata: FileRecord = await file_storage_service.get_file_metadata(
-            uuid.UUID(file_id)
+        file_metadata: FileRecord = (
+            await file_storage_service.get_file_metadata(uuid.UUID(file_id))
         )
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="File not found.")

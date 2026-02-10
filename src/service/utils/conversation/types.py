@@ -7,47 +7,68 @@ from pydantic_core import ErrorDetails
 
 class SerializedTextContentPart(TypedDict):
     """Serialized representation of a message part."""
+
     type: Literal["text"]
     data: str
 
+
 class SerializedFileContentPart(TypedDict):
     """Serialized representation of a file message part."""
+
     type: Literal["file"]
     file_id: str
 
+
 class SerializedFileUrlContentPart(TypedDict):
     """Serialized representation of a file URL message part."""
+
     type: Literal["file_url"]
     url: str
     file_type: FileType
 
-SerializedContentPart = SerializedTextContentPart | SerializedFileContentPart | SerializedFileUrlContentPart
+
+SerializedContentPart = (
+    SerializedTextContentPart
+    | SerializedFileContentPart
+    | SerializedFileUrlContentPart
+)
+
 
 class SerializedSequenceContentPart(TypedDict):
     """Serialized representation of a sequence of content parts."""
+
     type: Literal["sequence"]
     data: list[SerializedContentPart]
 
+
 SerializedContent = SerializedContentPart | SerializedSequenceContentPart
+
 
 class SerializedMessagePart(TypedDict):
     """Serialized representation of a message."""
+
     part_kind: str
+
 
 class SerializedRequestUserPromptMessagePart(SerializedMessagePart):
     """Serialized representation of a user prompt message part."""
+
     content: SerializedContent
     timestamp: str
 
+
 class SerializedRequestRetryPromptMessagePart(SerializedMessagePart):
     """Serialized representation of a retry prompt message part."""
+
     content: str | list[ErrorDetails]
     tool_name: str | None
     tool_call_id: str
     timestamp: str
 
+
 class SerializedRequestToolReturnMessagePart(SerializedMessagePart):
     """Serialized representation of a tool return message part."""
+
     content: Any
     tool_name: str
     tool_call_id: str
@@ -60,17 +81,20 @@ class SerializedResponseMessagePart(SerializedMessagePart):
 
     id: str | None
 
+
 class SerializedResponseTextMessagePart(SerializedResponseMessagePart):
     """Serialized representation of a text response message part."""
 
     content: str
     provider_details: dict[str, Any] | None
 
+
 class SerializedResponseThinkingMessagePart(SerializedResponseTextMessagePart):
     """Serialized representation of a thinking response message part."""
 
     provider_name: str | None
     signature: str | None
+
 
 class SerializedResponseToolCallMessagePart(SerializedResponseMessagePart):
     """Serialized representation of a tool call response message part."""
@@ -80,10 +104,14 @@ class SerializedResponseToolCallMessagePart(SerializedResponseMessagePart):
     args: Any
     provider_details: dict[str, Any] | None
 
-class SerializedResponseBuiltInToolCallMessagePart(SerializedResponseToolCallMessagePart):
+
+class SerializedResponseBuiltInToolCallMessagePart(
+    SerializedResponseToolCallMessagePart
+):
     """Serialized representation of a built-in tool call response message part."""
 
     provider_name: str | None
+
 
 class SerializedResponseBuiltInToolResultMessagePart(SerializedMessagePart):
     """Serialized representation of a built-in tool result response message part."""
@@ -96,12 +124,14 @@ class SerializedResponseBuiltInToolResultMessagePart(SerializedMessagePart):
     provider_name: str | None
     provider_details: dict[str, Any] | None
 
-MessagePart = (SerializedRequestUserPromptMessagePart
-               | SerializedRequestRetryPromptMessagePart
-               | SerializedRequestToolReturnMessagePart
-               | SerializedResponseTextMessagePart
-               | SerializedResponseThinkingMessagePart
-               | SerializedResponseToolCallMessagePart
-                | SerializedResponseBuiltInToolCallMessagePart
-               | SerializedResponseBuiltInToolResultMessagePart
-               )
+
+MessagePart = (
+    SerializedRequestUserPromptMessagePart
+    | SerializedRequestRetryPromptMessagePart
+    | SerializedRequestToolReturnMessagePart
+    | SerializedResponseTextMessagePart
+    | SerializedResponseThinkingMessagePart
+    | SerializedResponseToolCallMessagePart
+    | SerializedResponseBuiltInToolCallMessagePart
+    | SerializedResponseBuiltInToolResultMessagePart
+)

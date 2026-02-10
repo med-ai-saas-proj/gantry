@@ -13,8 +13,10 @@ class FileStorageBaseSQLModel(BaseSQLModel):
     __abstract__ = True
     __table_args__ = {"schema": "FileStorage"}
 
+
 class FileType(enum.Enum):
     """Enum-like class for file types."""
+
     IMAGE = "image"
     DOCUMENT = "document"
     AUDIO = "audio"

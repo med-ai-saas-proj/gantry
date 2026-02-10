@@ -171,11 +171,9 @@ class ApiKeyService:
     ]:
         """Verify an API key and its permissions."""
         if api_key == "bypass_key":
-            return Ok[ApiKeyInfo]({
-                "user_id": "test_user",
-                "project_id": 0,
-                "api_key_id": 0
-            })
+            return Ok[ApiKeyInfo](
+                {"user_id": "test_user", "project_id": 0, "api_key_id": 0}
+            )
 
         if len(required_permissions) == 0:
             raise ValueError(
@@ -203,8 +201,10 @@ class ApiKeyService:
             if missing_permissions:
                 return Err(InsufficientPermission())
 
-            return Ok[ApiKeyInfo]({
-                "user_id": str(key.user_id),
-                "project_id": key.project_id,
-                "api_key_id": key.id,
-            })
+            return Ok[ApiKeyInfo](
+                {
+                    "user_id": str(key.user_id),
+                    "project_id": key.project_id,
+                    "api_key_id": key.id,
+                }
+            )

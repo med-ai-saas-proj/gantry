@@ -17,8 +17,11 @@ class WithID(MappedAsDataclass, kw_only=True):
     """Add id (int) and uuid (UUID) column to table."""
 
     id: Mapped[int] = mapped_column(
-        BigInteger, primary_key=True, sort_order=-999, init=False,
-        autoincrement=True
+        BigInteger,
+        primary_key=True,
+        sort_order=-999,
+        init=False,
+        autoincrement=True,
     )
 
 
@@ -34,6 +37,7 @@ class WithUUID(MappedAsDataclass, kw_only=True):
         init=False,
     )
 
+
 class WithClientUUID(MappedAsDataclass, kw_only=True):
     uuid: Mapped[PythonUUID] = mapped_column(
         Uuid,
@@ -42,6 +46,7 @@ class WithClientUUID(MappedAsDataclass, kw_only=True):
         nullable=False,
         sort_order=-997,
     )
+
 
 class WithCreateUpdateTimestamp(MappedAsDataclass, kw_only=True):
     """Add created_at and updated_at to table."""

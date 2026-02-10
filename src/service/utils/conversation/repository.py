@@ -12,26 +12,22 @@ class ConversationRepository(Repository[Conversation, int]):
     def __init__(self):
         super().__init__(Conversation, Conversation.id)
 
-    async def get_conversation_id(self,
-                                  session: AsyncSession,
-                                  conversation_uuid: uuid.UUID,
-                                  project_id: int
-                                  ) -> int | None:
-        stmt = (
-            select(Conversation)
-            .where(
-                Conversation.uuid == conversation_uuid,
-                Conversation.project_id == project_id
-            )
+    async def get_conversation_id(
+        self,
+        session: AsyncSession,
+        conversation_uuid: uuid.UUID,
+        project_id: int,
+    ) -> int | None:
+        stmt = select(Conversation).where(
+            Conversation.uuid == conversation_uuid,
+            Conversation.project_id == project_id,
         )
         res = await session.execute(stmt)
         conversation = res.scalar_one_or_none()
         return conversation.id if conversation else None
 
     async def get_messages_by_conversation_id(
-        self,
-        session: AsyncSession,
-        conversation_id: int
+        self, session: AsyncSession, conversation_id: int
     ) -> Sequence[Message]:
         stmt = (
             select(Message)

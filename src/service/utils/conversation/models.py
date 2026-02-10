@@ -27,6 +27,7 @@ class Conversation(
     title: Mapped[str | None] = mapped_column(String(128), nullable=True)
     project_id: Mapped[int] = mapped_column(nullable=False, index=True)
 
+
 #
 # class MessagePart(TypedDict):
 #     """Represents a part of a message in a conversation."""
@@ -45,6 +46,7 @@ class Conversation(
 #     signature: str | None
 #
 #     args: Any
+
 
 class Message(WithCreateUpdateTimestamp, WithID, ConversationBaseSQLModel):
     """Represents a message in a conversation."""

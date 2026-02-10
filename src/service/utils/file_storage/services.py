@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 
 class FileStorageService:
     if TYPE_CHECKING:
+
         def __init__(
             self,
             storage_backend: S3Client,
@@ -28,6 +29,7 @@ class FileStorageService:
             self.file_storage_settings = file_storage_settings
             self.file_repo = file_repo
     else:
+
         def __init__(
             self,
             storage_backend,
@@ -100,7 +102,7 @@ class FileStorageService:
         )
         return res["Body"].read()
 
-    async def get_file(self, file_uuid:  uuid.UUID) -> bytes:
+    async def get_file(self, file_uuid: uuid.UUID) -> bytes:
         """Retrieve file content by UUID."""
         file_record = await self.get_file_metadata(file_uuid)
         file_content = await asyncio.to_thread(
@@ -109,7 +111,7 @@ class FileStorageService:
         )
         return file_content
 
-    async def get_file_url(self, file_uuid:  uuid.UUID) -> str:
+    async def get_file_url(self, file_uuid: uuid.UUID) -> str:
         """Generate a presigned URL for the file by UUID."""
         file_record = await self.get_file_metadata(file_uuid)
         url = self.storage_backend.generate_presigned_url(
@@ -122,7 +124,9 @@ class FileStorageService:
         )
         return url
 
-    async def get_file_metadata_and_url(self, file_uuid:  uuid.UUID) -> tuple[str, FileRecord]:
+    async def get_file_metadata_and_url(
+        self, file_uuid: uuid.UUID
+    ) -> tuple[str, FileRecord]:
         """Generate a presigned URL for the file by UUID."""
         file_record = await self.get_file_metadata(file_uuid)
         url = self.storage_backend.generate_presigned_url(
