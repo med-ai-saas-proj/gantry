@@ -1,20 +1,21 @@
 """Authentication and authorization module for management API."""
 
-from .entities import UserInfo
 from .roles import ManagementRole, get_effective_roles
+from .entities import UserInfo
 from .services import (
     AuthService,
-    UnauthorizedError,
     ForbiddenError,
+    UnauthorizedError,
     InsufficientPermissionsError,
 )
+from .factories import getAuthService
 from .dependencies import (
     getUserInfo,
     requireRole,
     requireAnyRole,
     requireAllRoles,
 )
-from .factories import getAuthService
+
 
 __all__ = [
     # Entities
