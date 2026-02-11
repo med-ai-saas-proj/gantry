@@ -8,7 +8,7 @@ from .model_config import ModelConfig, ModelProvider
 from structlog.stdlib import BoundLogger
 from pydantic_ai.models import Model
 from pydantic_ai.models.groq import GroqModel
-from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIModel, OpenAIChatModel
 from pydantic_ai.providers.groq import GroqProvider
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.providers.openai import OpenAIProvider
@@ -45,7 +45,8 @@ class ModelsService:
                         model_name=config.model_name,
                         settings=config.model_settings,
                         provider=OpenAIProvider(
-                            api_key=self.models_settings.openai_api_key
+                            api_key=self.models_settings.openai_api_key,
+                            base_url=self.models_settings.openai_base_url,
                         ),
                     ),
                     config,
@@ -100,6 +101,17 @@ class ModelsService:
                     "extra_body": {
                         "reasoning_effort": "low",
                     },
+                },
+            ),
+        )
+        self.set_model_config(
+            "DEEP_SEEK_3_2",
+            ModelConfig(
+                model_provider=ModelProvider.OPENAI,
+                model_name="DeepSeek-V3.2",
+                model_settings={
+                    "max_tokens": 16000,
+                    "parallel_tool_calls": True,
                 },
             ),
         )

@@ -9,6 +9,7 @@ from .services import FileStorageService
 from .factories import getFileStorageService
 
 import uuid
+import mimetypes
 from typing import Annotated
 
 from fastapi import Path, Depends, APIRouter, UploadFile, HTTPException
@@ -36,7 +37,15 @@ async def upload_file(
     if file.size is None or file.size == 0:
         raise HTTPException(status_code=400, detail="File is empty.")
 
-    mime_type, ext = detect_file_type(file.file)
+    original_mime_type = file.content_type
+    if original_mime_type is None or original_mime_type == "":
+        mime_type, ext = detect_file_type(file.file)
+    else:
+        mime_type = original_mime_type
+        ext = mimetypes.guess_extension(mime_type)
+        if ext is not None:
+            ext = ext.lstrip(".")  # Remove leading dot
+
     file_id = await file_storage_service.upload_file(
         file.filename or "unknown",
         file.file,

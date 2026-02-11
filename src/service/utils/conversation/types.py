@@ -1,3 +1,5 @@
+import uuid
+
 from src.service.utils.file_storage.models import FileType
 
 from typing import Any, Literal, Sequence, TypedDict
@@ -135,3 +137,11 @@ MessagePart = (
     | SerializedResponseBuiltInToolCallMessagePart
     | SerializedResponseBuiltInToolResultMessagePart
 )
+
+
+class FileUploadInfo(TypedDict):
+    file_id: uuid.UUID
+    file_data: bytes
+    file_type: FileType
+    mime_type: str
+    is_uploaded: bool

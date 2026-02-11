@@ -1,19 +1,7 @@
-from src.db.factories import getRedis, getRedisLockManager
 from src.management.api_keys.entities import ApiKeyInfo
-from src.service.utils.file_storage.utils import (
-    detect_file_type,
-)
-from src.service.utils.file_storage.models import FileType
 from src.service.utils.conversation.services import ConversationService
-from src.service.utils.file_storage.services import FileStorageService
 
 from .dtos.model import (
-    AudioURL as InputAudioURL,
-    FileLink,
-    ImageURL as InputImageURL,
-    VideoURL as InputVideoURL,
-    ModelInput,
-    DocumentURL as InputDocumentURL,
     StreamEvent,
     StreamEvent_PartType,
     StreamEvent_PartDelta,
@@ -25,7 +13,6 @@ from .dtos.generation_output import (
     ResponseStatus,
     GenerationOutput,
 )
-from ..file_storage.factories import getFileStorageService
 
 import json
 import asyncio
@@ -41,28 +28,23 @@ from pydantic_ai.messages import (
 )
 
 
-file_service = getFileStorageService()
-
-
 class StreamHandler:
     new_messages: list[ModelMessage] | None
 
     def __init__(
         self,
-        file_service: FileStorageService,
         conversation_id: int | None,
         conversation_uid: str,
         api_key_info: ApiKeyInfo,
         conversation_service: ConversationService,
     ):
-        self.file_service = file_service
         self.conversation_id = conversation_id
         self.conversation_uid = conversation_uid
         self.api_key_info = api_key_info
         self.conversation_service = conversation_service
         self.new_messages = None
 
-    async def convertAgentStream[T](
+    async def convertSSEStream[T](
         self,
         agent_stream: AsyncIterator[AgentStreamEvent | AgentRunResultEvent[T]],
     ) -> AsyncGenerator[StreamEvent]:
@@ -73,7 +55,7 @@ class StreamHandler:
 
         async for event in agent_stream:
             # self.logger.debug("Got new event", new_event=event)
-            await asyncio.sleep(2)  # Simulate async operation
+            # await asyncio.sleep(2)  # Simulate async operation
             match event.event_kind:
                 case "part_start":
                     part = event.part

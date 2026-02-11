@@ -4,6 +4,7 @@ from src.service.utils.file_storage.services import FileStorageService
 
 from .types import (
     MessagePart,
+    FileUploadInfo,
     SerializedContent,
     SerializedContentPart,
     SerializedSequenceContentPart,
@@ -29,6 +30,7 @@ from typing import Sequence, cast
 from datetime import datetime
 
 from pydantic_ai import (
+    FileUrl,
     AudioUrl,
     ImageUrl,
     TextPart,
@@ -39,10 +41,12 @@ from pydantic_ai import (
     ModelRequest,
     ThinkingPart,
     ToolCallPart,
+    BinaryContent,
     ModelResponse,
     ToolReturnPart,
     UserPromptPart,
     RetryPromptPart,
+    MultiModalContent,
     BuiltinToolCallPart,
     BuiltinToolReturnPart,
 )
@@ -97,7 +101,7 @@ class ConversationService:
             if content.vendor_metadata and content.vendor_metadata["file_id"]:
                 return {
                     "type": "file",
-                    "file_id": content.vendor_metadata["file_id"],
+                    "file_id": str(content.vendor_metadata["file_id"]),
                 }
             else:
                 return {
@@ -113,6 +117,16 @@ class ConversationService:
                     and FileType.VIDEO
                     or FileType.GENERAL,
                 }
+        elif isinstance(content, BinaryContent):
+            if content.vendor_metadata and content.vendor_metadata["file_id"]:
+                return {
+                    "type": "file",
+                    "file_id": str(content.vendor_metadata["file_id"]),
+                }
+            else:
+                raise ValueError(
+                    "BinaryContent missing file_id in vendor_metadata"
+                )
         else:
             raise ValueError("Unsupported content type")
 
@@ -126,7 +140,9 @@ class ConversationService:
             parts = []
             for item in content["data"]:
                 if isinstance(item, dict):
-                    deserialized_item = self.deserialize_part_content(item)
+                    deserialized_item = await self.deserialize_part_content(
+                        item
+                    )
                     if isinstance(deserialized_item, list):
                         parts.extend(deserialized_item)
                     else:
@@ -145,6 +161,7 @@ class ConversationService:
                 return [
                     VideoUrl(
                         url=file_url,
+                        media_type=metadata["mime_type"],
                         vendor_metadata={"file_id": content["file_id"]},
                     )
                 ]
@@ -152,6 +169,7 @@ class ConversationService:
                 return [
                     ImageUrl(
                         url=file_url,
+                        media_type=metadata["mime_type"],
                         vendor_metadata={"file_id": content["file_id"]},
                     )
                 ]
@@ -159,6 +177,7 @@ class ConversationService:
                 return [
                     AudioUrl(
                         url=file_url,
+                        media_type=metadata["mime_type"],
                         vendor_metadata={"file_id": content["file_id"]},
                     )
                 ]
@@ -166,6 +185,7 @@ class ConversationService:
                 return [
                     DocumentUrl(
                         url=file_url,
+                        media_type=metadata["mime_type"],
                         vendor_metadata={"file_id": content["file_id"]},
                     )
                 ]

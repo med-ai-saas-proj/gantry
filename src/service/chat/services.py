@@ -55,7 +55,7 @@ class ChatService:
             api_key_info,
         ) as conversation:
             model_input = await conversation.userInputToPydanticAI(query)
-            async for event in conversation.stream_handler.convertAgentStream(
+            async for event in conversation.stream_handler.convertSSEStream(
                 self.agent.run_stream_events(
                     model_input,
                     model=model,

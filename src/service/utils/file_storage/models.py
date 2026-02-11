@@ -1,5 +1,9 @@
 from src.db.base import BaseSQLModel
-from src.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
+from src.db.utils import (
+    WithID,
+    WithClientUUID,
+    WithCreateUpdateTimestamp,
+)
 
 import enum
 
@@ -25,7 +29,7 @@ class FileType(enum.Enum):
 
 
 class File(
-    WithCreateUpdateTimestamp, WithID, WithUUID, FileStorageBaseSQLModel
+    WithCreateUpdateTimestamp, WithID, WithClientUUID, FileStorageBaseSQLModel
 ):
     """Represents a file associated with messages in conversations."""
 

@@ -63,16 +63,17 @@ class FileStorageService:
         file_data: BinaryIO | bytes,
         file_size: int,
         mime_type: str,
-        ext: str,
+        ext: str | None = None,
         file_type: FileType = FileType.GENERAL,
+        file_id: uuid.UUID | None = None,
     ):
         """Upload a file and store its metadata."""
-        file_key = str(uuid.uuid4())
-        file_path = (
-            f"uploads/{file_key}.{ext}" if ext else f"/uploads/{file_key}"
-        )
+        if file_id is None:
+            file_id = uuid.uuid4()
+        file_path = f"uploads/{file_id}.{ext}" if ext else f"/uploads/{file_id}"
         async with self.session_manager.get_session() as session:
             file_record = File(
+                uuid=file_id,
                 original_filename=file_name,
                 filepath=file_path,
                 mime_type=mime_type,
@@ -81,7 +82,6 @@ class FileStorageService:
             )
             session.add(file_record)
             await session.flush()
-            file_record_uid = file_record.uuid
             await asyncio.to_thread(
                 self._upload_file,
                 file_path,
@@ -90,7 +90,7 @@ class FileStorageService:
                 mime_type,
             )
             await session.commit()
-            return file_record_uid
+            return file_id
 
     def _load_file_content(
         self,
