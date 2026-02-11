@@ -1,7 +1,8 @@
 """This file contain definition of chat's routers."""
 
+from src.management.auth import UserInfo, getUserInfo
+from src.management.api_keys import requiredPermissions
 from src.shared.utils.logger import LOGGER
-from src.management.auth.dependencies import UserInfo, getUserInfo
 from src.shared.custom_types.responses.sse import SSEResponse
 
 from .dtos import ChatInput
@@ -53,7 +54,7 @@ chat_router = APIRouter(prefix="/chat")
 
 @chat_router.post("", response_model=ChatOutput | StreamEvent)
 async def chat(
-    user: Annotated[UserInfo, Security(getUserInfo)],
+    user: Annotated[UserInfo, Security(requiredPermissions(["placeholder"]))],
     input: Annotated[ChatInput, Body()],
     chat_service: Annotated[ChatService, Depends(getChatService)],
 ):
