@@ -18,3 +18,17 @@ class FileMetadataResponseDTO(BaseModel):
     size: int
     storage_path: str
     created_at: datetime
+
+
+class FilePresignedURLResponseDTO(BaseModel):
+    """DTO for file presigned URL response."""
+
+    url: str
+
+
+class FileMetadataWithPresignedURLResponseDTO(
+    FileMetadataResponseDTO, FilePresignedURLResponseDTO
+):
+    """DTO for file metadata with URL response."""
+
+    pass

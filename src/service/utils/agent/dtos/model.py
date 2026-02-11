@@ -49,7 +49,7 @@ class DocumentURL(FileURL):
     """Document part, can be PDF, text file, word, ..."""
 
     type: Literal[MultiModalContentType.document_url]
-    mime_type: str
+    mime_type: str | None
 
 
 class FileLink(BaseModel):

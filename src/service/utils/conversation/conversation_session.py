@@ -100,6 +100,7 @@ class ConversationSession:
     async def userInputToPydanticAI(
         self, input: ModelInput
     ) -> Sequence[UserContent]:
+        """Convert user input to Pydantic AI UserContent format and handle file uploads."""
         model_input: list[UserContent] = []
         if isinstance(input, str):
             model_input = [input]
@@ -176,7 +177,11 @@ class ConversationSession:
                         model_input.append(content)
                     except ValueError:
                         # If not data URL, assume it's a direct URL
-                        model_input.append(DocumentUrl(url=message.url))
+                        model_input.append(
+                            DocumentUrl(
+                                url=message.url, media_type=message.mime_type
+                            )
+                        )
                 elif isinstance(message, FileLink):
                     (
                         file_url,
