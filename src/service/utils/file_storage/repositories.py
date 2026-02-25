@@ -1,5 +1,5 @@
 from src.db.repository import Repository
-from src.service.utils.file_storage.models import File
+from src.service.utils.file_storage.models import File, FileStatus
 
 import uuid
 
@@ -15,5 +15,10 @@ class FileRepository(Repository):
 
     async def getByUUID(self, session, file_uuid: uuid.UUID) -> File | None:
         """Get file by UUID."""
-        stmt = select(File).where(File.uuid == file_uuid).limit(1)
+        stmt = select(File).where((File.uuid == file_uuid) & (File.status == FileStatus.AVAILABLE)).limit(1)
+        return await self.selectOne(session, stmt)
+
+    async def getUploadingByUUID(self, session, file_uuid: uuid.UUID) -> File | None:
+        """Get uploading file by UUID."""
+        stmt = select(File).where((File.uuid == file_uuid) & (File.status == FileStatus.UPLOADING)).limit(1)
         return await self.selectOne(session, stmt)

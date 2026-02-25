@@ -187,7 +187,7 @@ class ConversationService:
                 return [
                     ImageUrl(
                         url=file_url,
-                        media_type=mine_type,
+                        media_type=mime_type,
                         vendor_metadata={"file_id": file_id},
                     )
                 ]
@@ -505,8 +505,8 @@ class ConversationService:
         project_id: int,
         msgs: Sequence[ModelMessage],
     ) -> None:
-        async with self.session_manager.get_session() as session:
-            if conversation_id is None:
+        if conversation_id is None:
+            async with self.session_manager.get_session() as session:
                 conversation = Conversation(
                     title=None,
                     uuid=uuid.UUID(conversation_uid),
@@ -515,12 +515,13 @@ class ConversationService:
                 session.add(conversation)
                 await session.flush()
                 conversation_id = conversation.id
-            serialized_msgs = [
-                self.serialize_conversation_messages(
-                    conversation_id=conversation_id, msg=msg
-                )
-                for msg in msgs
-            ]
-            # await cast(Awaitable[int], self.redis_client.rpush(conversation_uid, json.dumps(to_jsonable_python(msgs))))
+        serialized_msgs = [
+            self.serialize_conversation_messages(
+                conversation_id=conversation_id, msg=msg
+            )
+            for msg in msgs
+        ]
+        # await cast(Awaitable[int], self.redis_client.rpush(conversation_uid, json.dumps(to_jsonable_python(msgs))))
+        async with self.session_manager.get_session() as session:
             session.add_all(serialized_msgs)
             await session.commit()

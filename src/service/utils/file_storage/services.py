@@ -2,13 +2,13 @@ from src.db.session import AsyncSessionManager
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import FileRecord
-from .models import File, FileType
+from .models import File, FileType, FileStatus
 from .settings import ObjectStorageSettings
 from .repositories import FileRepository
 
 import uuid
 import asyncio
-from typing import TYPE_CHECKING, BinaryIO
+from typing import TYPE_CHECKING, BinaryIO, cast
 
 from safe_result import Ok, Err, Result
 
@@ -91,14 +91,18 @@ class FileStorageService:
                 file_type=file_type,
             )
             session.add(file_record)
-            await session.flush()
-            await asyncio.to_thread(
-                self._upload_file,
-                file_path,
-                file_size,
-                file_data,
-                mime_type,
-            )
+            await session.commit()
+        await asyncio.to_thread(
+            self._upload_file,
+            file_path,
+            file_size,
+            file_data,
+            mime_type,
+        )
+        async with self.session_manager.get_session() as session:
+            file_record = await self.file_repo.getUploadingByUUID(session, file_record.uuid)
+            file_record = cast(File, file_record)
+            file_record.status = FileStatus.AVAILABLE
             await session.commit()
             return file_id
 

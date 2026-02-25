@@ -27,7 +27,13 @@ class FileType(enum.Enum):
     VIDEO = "video"
     GENERAL = "general"
 
+class FileStatus(enum.Enum):
+    """Enum-like class for file statuses."""
 
+    UPLOADING = "uploading"
+    AVAILABLE = "available"
+    DELETED = "deleted"
+    
 class File(
     WithCreateUpdateTimestamp, WithID, WithClientUUID, FileStorageBaseSQLModel
 ):
@@ -41,4 +47,7 @@ class File(
     size_in_bytes: Mapped[int] = mapped_column(nullable=False)
     file_type: Mapped[FileType] = mapped_column(
         Enum(FileType), nullable=False, default=FileType.GENERAL
+    )
+    status: Mapped[FileStatus] = mapped_column(
+        Enum(FileStatus), nullable=False, default=FileStatus.UPLOADING, init=False
     )
