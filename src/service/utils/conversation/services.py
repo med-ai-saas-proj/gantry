@@ -1,7 +1,10 @@
+import json
+
 from src.db.session import AsyncSessionManager
 from src.management.api_keys.entities import ApiKeyInfo
 from src.service.utils.file_storage.services import FileStorageService
 from src.shared.custom_types.error_exception import RecoverableError
+from dataclasses import asdict
 
 from .types import (
     MessagePart,
@@ -30,7 +33,7 @@ from ..file_storage.models import FileType
 import uuid
 import asyncio
 from typing import Sequence, Awaitable, cast
-from datetime import datetime
+from datetime import datetime, date
 
 from pydantic_ai import (
     AudioUrl,
@@ -473,16 +476,16 @@ class ConversationService:
     async def get_conversation_message(
         self, conversation_id: int, conversation_uid: str
     ) -> Sequence[ModelMessage]:
-        # cached_msgs = await cast(Awaitable[list[str]], self.redis_client.lrange(conversation_uid, 0, -1))
-        # if cached_msgs:
-        #     serialized_msgs = [Message.parse_raw(msg) for msg in cached_msgs]
-        # else:
-        async with self.session_manager.get_session() as session:
-            serialized_msgs = (
-                await self.conversation_repo.get_messages_by_conversation_id(
-                    session, conversation_id
+        cached_msgs = await cast(Awaitable[list[str]], self.redis_client.lrange(conversation_uid, 0, -1))
+        if cached_msgs:
+            serialized_msgs = [Message.parse_raw(json.loads(msg)) for msg in cached_msgs]
+        else:
+            async with self.session_manager.get_session() as session:
+                serialized_msgs = (
+                    await self.conversation_repo.get_messages_by_conversation_id(
+                        session, conversation_id
+                    )
                 )
-            )
         tasks = [
             self.deserialize_conversation_messages(msg)
             for msg in serialized_msgs
@@ -521,7 +524,20 @@ class ConversationService:
             )
             for msg in msgs
         ]
-        # await cast(Awaitable[int], self.redis_client.rpush(conversation_uid, json.dumps(to_jsonable_python(msgs))))
+
+        def json_serial(obj):
+            if isinstance(obj, (datetime, date)):
+                return obj.isoformat()
+            raise TypeError(f"Type {type(obj)} not serializable")
+
+        await cast(Awaitable[int], self.redis_client.rpush(
+            conversation_uid,
+            json.dumps(
+                [asdict(msg) for msg in serialized_msgs]
+                , default=json_serial
+            ))
+        )
+
         async with self.session_manager.get_session() as session:
             session.add_all(serialized_msgs)
             await session.commit()

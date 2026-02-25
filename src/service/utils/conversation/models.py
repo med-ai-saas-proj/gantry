@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from src.db.base import BaseSQLModel
 from src.db.utils import (
     WithID,
@@ -63,3 +65,19 @@ class Message(WithCreateUpdateTimestamp, WithID, ConversationBaseSQLModel):
         nullable=True,
     )
     run_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    @classmethod
+    def parse_raw(cls, raw: dict) -> "Message":
+        mess = Message(
+            conversation_id=raw["conversation_id"],
+            kind=raw["kind"],
+            parts=raw["parts"],
+            model_name=raw.get("model_name"),
+            timestamp=raw.get("timestamp"),
+            run_id=raw.get("run_id"),
+        )
+        mess.id = raw.get("id")
+        mess.created_at = datetime.fromisoformat(raw.get("created_at"))
+        mess.updated_at = datetime.fromisoformat(raw.get("updated_at"))
+        return mess
+
