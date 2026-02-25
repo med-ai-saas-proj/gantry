@@ -1,4 +1,3 @@
-import mimetypes
 from typing import BinaryIO
 
 from filetype import filetype

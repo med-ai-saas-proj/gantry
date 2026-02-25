@@ -1,12 +1,15 @@
 from src.db.session import AsyncSessionManager
 from src.management.api_keys.entities import ApiKeyInfo
 from src.service.utils.file_storage.services import FileStorageService
+from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import (
     MessagePart,
-    FileUploadInfo,
     SerializedContent,
     SerializedContentPart,
+    SerializedFileContentPart,
+    SerializedTextContentPart,
+    SerializedFileUrlContentPart,
     SerializedSequenceContentPart,
     SerializedResponseTextMessagePart,
     SerializedResponseThinkingMessagePart,
@@ -26,11 +29,10 @@ from ..file_storage.models import FileType
 
 import uuid
 import asyncio
-from typing import Sequence, cast
+from typing import Sequence, Awaitable, cast
 from datetime import datetime
 
 from pydantic_ai import (
-    FileUrl,
     AudioUrl,
     ImageUrl,
     TextPart,
@@ -46,11 +48,20 @@ from pydantic_ai import (
     ToolReturnPart,
     UserPromptPart,
     RetryPromptPart,
-    MultiModalContent,
     BuiltinToolCallPart,
     BuiltinToolReturnPart,
 )
+from safe_result import Ok, Err, Result
 from redis.asyncio import Redis
+
+
+class ConversationNotFoundError(RecoverableError):
+    """Raised when a conversation is not found."""
+
+    status = 404
+    code = "conversation_not_found"
+    title = "Conversation not found"
+    detail = "The specified conversation does not exist or is not accessible with the provided API key"
 
 
 class ConversationService:
@@ -69,15 +80,15 @@ class ConversationService:
 
     async def get_conversation_id(
         self, conversation_uid: str, api_key_info: ApiKeyInfo
-    ) -> int:
+    ) -> Result[int, ConversationNotFoundError]:
         """Get conversation ID by its UID and project ID."""
         async with self.session_manager.get_session() as session:
             conversation_id = await self.conversation_repo.get_conversation_id(
                 session, uuid.UUID(conversation_uid), api_key_info["project_id"]
             )
             if conversation_id is None:
-                raise ValueError("Conversation not found")
-            return conversation_id
+                return Err(ConversationNotFoundError())
+            return Ok(conversation_id)
 
     def serialize_sequence_content(
         self, contents: Sequence[UserContent]
@@ -85,12 +96,16 @@ class ConversationService:
         """Serialize a sequence of contents into a storable format."""
         return {
             "type": "sequence",
-            "data": [self.serialize_part_content(item) for item in contents],
+            "data": [
+                result
+                for item in contents
+                if (result := self.serialize_part_content(item)) is not None
+            ],
         }
 
     def serialize_part_content(
         self, content: str | UserContent
-    ) -> SerializedContentPart:
+    ) -> SerializedContentPart | None:
         """Serialize content into a storable format."""
         if isinstance(content, str):
             return {
@@ -107,15 +122,13 @@ class ConversationService:
                 return {
                     "type": "file_url",
                     "url": content.url,  # assume url holds file id if vendor_metadata is missing
-                    "file_type": isinstance(content, ImageUrl)
-                    and FileType.IMAGE
-                    or isinstance(content, AudioUrl)
-                    and FileType.AUDIO
-                    or isinstance(content, DocumentUrl)
-                    and FileType.DOCUMENT
-                    or isinstance(content, VideoUrl)
-                    and FileType.VIDEO
-                    or FileType.GENERAL,
+                    "file_type": FileType.IMAGE
+                    if isinstance(content, ImageUrl)
+                    else FileType.AUDIO
+                    if isinstance(content, AudioUrl)
+                    else FileType.VIDEO
+                    if isinstance(content, VideoUrl)
+                    else FileType.DOCUMENT,
                 }
         elif isinstance(content, BinaryContent):
             if content.vendor_metadata and content.vendor_metadata["file_id"]:
@@ -124,81 +137,91 @@ class ConversationService:
                     "file_id": str(content.vendor_metadata["file_id"]),
                 }
             else:
+                # should not happen as BinaryContent must have file_id in vendor_metadata, but handle just in case
                 raise ValueError(
                     "BinaryContent missing file_id in vendor_metadata"
                 )
         else:
-            raise ValueError("Unsupported content type")
+            # maybe CachePoint
+            return None
 
     async def deserialize_part_content(
         self, content: SerializedContent
     ) -> str | list[UserContent]:
         """Deserialize content from its serialized form."""
         if content["type"] == "text":
-            return cast(str, content["data"])
+            content = cast(SerializedTextContentPart, content)
+            return content["data"]
         elif content["type"] == "sequence":
+            content = cast(SerializedSequenceContentPart, content)
             parts = []
             for item in content["data"]:
-                if isinstance(item, dict):
-                    deserialized_item = await self.deserialize_part_content(
-                        item
-                    )
-                    if isinstance(deserialized_item, list):
-                        parts.extend(deserialized_item)
-                    else:
-                        parts.append(deserialized_item)
+                deserialized_item = await self.deserialize_part_content(item)
+                if isinstance(deserialized_item, list):
+                    parts.extend(deserialized_item)
                 else:
-                    parts.append(item)
+                    parts.append(deserialized_item)
             return parts
         elif content["type"] == "file":
+            content = cast(SerializedFileContentPart, content)
+            file_id = content["file_id"]
             (
                 file_url,
                 metadata,
-            ) = await self.file_service.get_file_metadata_and_url(
-                uuid.UUID(content["file_id"])
-            )
-            if metadata["file_type"] == FileType.VIDEO:
+            ) = (
+                await self.file_service.get_file_metadata_and_url(
+                    uuid.UUID(file_id)
+                )
+            ).unwrap()
+            file_type = metadata["file_type"]
+            mime_type = metadata["mime_type"]
+            if file_type == FileType.VIDEO:
                 return [
                     VideoUrl(
                         url=file_url,
-                        media_type=metadata["mime_type"],
-                        vendor_metadata={"file_id": content["file_id"]},
+                        media_type=mime_type,
+                        vendor_metadata={"file_id": file_id},
                     )
                 ]
-            elif metadata["file_type"] == FileType.IMAGE:
+            elif file_type == FileType.IMAGE:
                 return [
                     ImageUrl(
                         url=file_url,
-                        media_type=metadata["mime_type"],
-                        vendor_metadata={"file_id": content["file_id"]},
+                        media_type=mine_type,
+                        vendor_metadata={"file_id": file_id},
                     )
                 ]
-            elif metadata["file_type"] == FileType.AUDIO:
+            elif file_type == FileType.AUDIO:
                 return [
                     AudioUrl(
                         url=file_url,
-                        media_type=metadata["mime_type"],
-                        vendor_metadata={"file_id": content["file_id"]},
+                        media_type=mime_type,
+                        vendor_metadata={"file_id": file_id},
                     )
                 ]
             else:
                 return [
                     DocumentUrl(
                         url=file_url,
-                        media_type=metadata["mime_type"],
-                        vendor_metadata={"file_id": content["file_id"]},
+                        media_type=mime_type,
+                        vendor_metadata={"file_id": file_id},
                     )
                 ]
         elif content["type"] == "file_url":
-            if content["file_type"] == FileType.VIDEO:
-                return [VideoUrl(url=content["url"])]
-            elif content["file_type"] == FileType.IMAGE:
-                return [ImageUrl(url=content["url"])]
-            elif content["file_type"] == FileType.AUDIO:
-                return [AudioUrl(url=content["url"])]
+            content = cast(SerializedFileUrlContentPart, content)
+            url = content["url"]
+            file_type = content["file_type"]
+            if file_type == FileType.VIDEO:
+                return [VideoUrl(url=url)]
+            elif file_type == FileType.IMAGE:
+                return [ImageUrl(url=url)]
+            elif file_type == FileType.AUDIO:
+                return [AudioUrl(url=url)]
             else:
-                return [DocumentUrl(url=content["url"])]
-        raise ValueError("Unsupported content type")
+                return [DocumentUrl(url=url)]
+        else:
+            # should not happen as we only have text and file content types, but handle just in case
+            raise ValueError("Unsupported content type")
 
     def serialize_conversation_messages(
         self, conversation_id: int, msg: ModelMessage
@@ -210,15 +233,19 @@ class ConversationService:
                 if part.part_kind == "system-prompt":
                     continue
                 elif part.part_kind == "user-prompt":
-                    parts.append(
-                        {
-                            "part_kind": part.part_kind,
-                            "content": self.serialize_part_content(part.content)
-                            if not isinstance(part.content, Sequence)
-                            else self.serialize_sequence_content(part.content),
-                            "timestamp": part.timestamp.isoformat(),
-                        }
+                    content = (
+                        self.serialize_part_content(part.content)
+                        if not isinstance(part.content, Sequence)
+                        else self.serialize_sequence_content(part.content)
                     )
+                    if content is not None:
+                        parts.append(
+                            {
+                                "part_kind": part.part_kind,
+                                "content": content,
+                                "timestamp": part.timestamp.isoformat(),
+                            }
+                        )
                 elif part.part_kind == "retry-prompt":
                     parts.append(
                         {
@@ -448,32 +475,28 @@ class ConversationService:
     ) -> Sequence[ModelMessage]:
         # cached_msgs = await cast(Awaitable[list[str]], self.redis_client.lrange(conversation_uid, 0, -1))
         # if cached_msgs:
-        #     model_msgs = []
-        #     for msg in cached_msgs:
-        #         msgs = ModelMessagesTypeAdapter.validate_json(msg)
-        #         model_msgs.extend(msgs)
-        #     return model_msgs
-
+        #     serialized_msgs = [Message.parse_raw(msg) for msg in cached_msgs]
+        # else:
         async with self.session_manager.get_session() as session:
             serialized_msgs = (
                 await self.conversation_repo.get_messages_by_conversation_id(
                     session, conversation_id
                 )
             )
-            tasks = [
-                self.deserialize_conversation_messages(msg)
-                for msg in serialized_msgs
-            ]
-            msgs = await asyncio.gather(*tasks)
-            for msg in msgs:
-                print(
-                    "Deserialized message:",
-                    msg.kind,
-                    msg.timestamp,
-                    msg.run_id,
-                    msg.parts,
-                )
-            return msgs
+        tasks = [
+            self.deserialize_conversation_messages(msg)
+            for msg in serialized_msgs
+        ]
+        msgs = await asyncio.gather(*tasks)
+        for msg in msgs:
+            print(
+                "Deserialized message:",
+                msg.kind,
+                msg.timestamp,
+                msg.run_id,
+                msg.parts,
+            )
+        return msgs
 
     async def store_conversation(
         self,

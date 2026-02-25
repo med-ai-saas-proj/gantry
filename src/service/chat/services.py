@@ -54,7 +54,9 @@ class ChatService:
             conversation_uid,
             api_key_info,
         ) as conversation:
-            model_input = await conversation.userInputToPydanticAI(query)
+            model_input = (
+                await conversation.userInputToPydanticAI(query)
+            ).unwrap()
             async for event in conversation.stream_handler.convertSSEStream(
                 self.agent.run_stream_events(
                     model_input,
@@ -63,7 +65,11 @@ class ChatService:
                     deps=constructChatAgentDeps(api_key_info, model_config),
                 )
             ):
-                yield event
+                try:
+                    yield event
+                except Exception as e:
+                    # current version pydantic ai not supported cancel
+                    print("Error yielding event", e)
 
     async def chat(
         self,

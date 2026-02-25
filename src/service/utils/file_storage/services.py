@@ -1,4 +1,5 @@
 from src.db.session import AsyncSessionManager
+from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import FileRecord
 from .models import File, FileType
@@ -8,6 +9,15 @@ from .repositories import FileRepository
 import uuid
 import asyncio
 from typing import TYPE_CHECKING, BinaryIO
+
+from safe_result import Ok, Err, Result
+
+
+class FileNotFoundInSystemError(RecoverableError):
+    status = 404
+    code = "file_not_found"
+    title = "File not found"
+    detail = "The requested file was not found in storage."
 
 
 if TYPE_CHECKING:
@@ -102,18 +112,28 @@ class FileStorageService:
         )
         return res["Body"].read()
 
-    async def get_file(self, file_uuid: uuid.UUID) -> bytes:
+    async def get_file(
+        self, file_uuid: uuid.UUID
+    ) -> Result[bytes, FileNotFoundInSystemError]:
         """Retrieve file content by UUID."""
-        file_record = await self.get_file_metadata(file_uuid)
+        res = await self.get_file_metadata(file_uuid)
+        if isinstance(res, Err):
+            return res
+        file_record = res.unwrap()
         file_content = await asyncio.to_thread(
             self._load_file_content,
             file_record["storage_path"],
         )
-        return file_content
+        return Ok(file_content)
 
-    async def get_file_url(self, file_uuid: uuid.UUID) -> str:
+    async def get_file_url(
+        self, file_uuid: uuid.UUID
+    ) -> Result[str, FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID."""
-        file_record = await self.get_file_metadata(file_uuid)
+        res = await self.get_file_metadata(file_uuid)
+        if isinstance(res, Err):
+            return res
+        file_record = res.unwrap()
         url = self.storage_backend.generate_presigned_url(
             ClientMethod="get_object",
             Params={
@@ -122,13 +142,16 @@ class FileStorageService:
             },
             ExpiresIn=self.file_storage_settings.s3_presigned_url_expiry_seconds,
         )
-        return url
+        return Ok(url)
 
     async def get_file_metadata_and_url(
         self, file_uuid: uuid.UUID
-    ) -> tuple[str, FileRecord]:
+    ) -> Result[tuple[str, FileRecord], FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID."""
-        file_record = await self.get_file_metadata(file_uuid)
+        res = await self.get_file_metadata(file_uuid)
+        if isinstance(res, Err):
+            return res
+        file_record = res.unwrap()
         url = self.storage_backend.generate_presigned_url(
             ClientMethod="get_object",
             Params={
@@ -137,23 +160,25 @@ class FileStorageService:
             },
             ExpiresIn=self.file_storage_settings.s3_presigned_url_expiry_seconds,
         )
-        return url, file_record
+        return Ok((url, file_record))
 
-    async def get_file_metadata(self, file_uuid: uuid.UUID) -> FileRecord:
+    async def get_file_metadata(
+        self, file_uuid: uuid.UUID
+    ) -> Result[FileRecord, FileNotFoundInSystemError]:
         """Retrieve file metadata by UUID."""
         async with self.session_manager.get_session() as session:
             file_record = await self.file_repo.getByUUID(session, file_uuid)
             if not file_record:
-                raise FileNotFoundError(
-                    f"File with UUID {file_uuid} not found."
-                )
+                return Err(FileNotFoundInSystemError())
 
-            return {
-                "id": str(file_record.uuid),
-                "filename": file_record.original_filename,
-                "storage_path": file_record.filepath,
-                "mime_type": file_record.mime_type,
-                "file_type": file_record.file_type,
-                "size": file_record.size_in_bytes,
-                "created_at": file_record.created_at,
-            }
+            return Ok[FileRecord](
+                {
+                    "id": str(file_record.uuid),
+                    "filename": file_record.original_filename,
+                    "storage_path": file_record.filepath,
+                    "mime_type": file_record.mime_type,
+                    "file_type": file_record.file_type,
+                    "size": file_record.size_in_bytes,
+                    "created_at": file_record.created_at,
+                }
+            )

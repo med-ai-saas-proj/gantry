@@ -1,6 +1,3 @@
-from src.management.api_keys.entities import ApiKeyInfo
-from src.service.utils.conversation.services import ConversationService
-
 from .dtos.model import (
     StreamEvent,
     StreamEvent_PartType,
@@ -15,7 +12,6 @@ from .dtos.generation_output import (
 )
 
 import json
-import asyncio
 from typing import (
     AsyncIterator,
     AsyncGenerator,
@@ -29,19 +25,17 @@ from pydantic_ai.messages import (
 
 
 class StreamHandler:
+    """Handles the conversion of agent stream events to SSE streaming and capturing new messages to database after the stream is done."""
+
     new_messages: list[ModelMessage] | None
 
     def __init__(
         self,
         conversation_id: int | None,
         conversation_uid: str,
-        api_key_info: ApiKeyInfo,
-        conversation_service: ConversationService,
     ):
         self.conversation_id = conversation_id
         self.conversation_uid = conversation_uid
-        self.api_key_info = api_key_info
-        self.conversation_service = conversation_service
         self.new_messages = None
 
     async def convertSSEStream[T](

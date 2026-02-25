@@ -73,7 +73,7 @@ async def fastapi_exception_handler(
             {
                 "detail": error.get("msg"),
                 "header": error.get("type"),
-                "pointer": "/".join(error.get("loc", [])),
+                "pointer": "/".join(map(str, error["loc"])),
             }
             for error in errors
         ],

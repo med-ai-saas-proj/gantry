@@ -42,12 +42,12 @@ class ConversationManager:
                 await self.conversation_service.get_conversation_id(
                     conversation_uid, api_key_info
                 )
-            )
+            ).unwrap()
         else:
             conversation_uid = str(uuid.uuid4())
 
         async with await self.redis_lock_manager.lock(
-            f"conversation:{conversation_uid}", lock_timeout=10
+            f"conversation:{conversation_uid}"
         ) as lock:
             mess_history: Sequence[ModelMessage] = []
 
@@ -61,8 +61,6 @@ class ConversationManager:
             stream_handler = StreamHandler(
                 conversation_id=conversation_id,
                 conversation_uid=conversation_uid,
-                api_key_info=api_key_info,
-                conversation_service=self.conversation_service,
             )
 
             conversation_session = ConversationSession(

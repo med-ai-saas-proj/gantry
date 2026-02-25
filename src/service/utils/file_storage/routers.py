@@ -4,7 +4,6 @@ from .dtos import (
     FilePresignedURLResponseDTO,
     FileMetadataWithPresignedURLResponseDTO,
 )
-from .types import FileRecord
 from .utils import detect_file_type
 from .models import FileType
 from .services import FileStorageService
@@ -91,10 +90,7 @@ async def download_file(
     ],
 ):
     """Download a file by file ID."""
-    try:
-        presigned_url: str = await file_storage_service.get_file_url(file_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="File not found.")
+    presigned_url = (await file_storage_service.get_file_url(file_id)).unwrap()
     return RedirectResponse(url=presigned_url)
 
 
@@ -111,13 +107,10 @@ async def get_file_url_and_metadata(
     ],
 ):
     """Get file URL and metadata by file ID."""
-    try:
-        (
-            presigned_url,
-            file_metadata,
-        ) = await file_storage_service.get_file_metadata_and_url(file_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="File not found.")
+    (
+        presigned_url,
+        file_metadata,
+    ) = (await file_storage_service.get_file_metadata_and_url(file_id)).unwrap()
     return {
         "url": presigned_url,
         "metadata": FileMetadataWithPresignedURLResponseDTO(
@@ -145,12 +138,9 @@ async def get_file_metadata(
     ],
 ):
     """Get file metadata by file ID."""
-    try:
-        file_metadata: FileRecord = (
-            await file_storage_service.get_file_metadata(uuid.UUID(file_id))
-        )
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="File not found.")
+    file_metadata = (
+        await file_storage_service.get_file_metadata(uuid.UUID(file_id))
+    ).unwrap()
     return FileMetadataResponseDTO(
         id=str(file_metadata["id"]),
         filename=file_metadata["filename"],
@@ -174,10 +164,7 @@ async def get_file_presigned_url(
     ],
 ):
     """Get presigned URL for file download."""
-    try:
-        presigned_url: str = await file_storage_service.get_file_url(file_id)
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="File not found.")
+    presigned_url = (await file_storage_service.get_file_url(file_id)).unwrap()
     return FilePresignedURLResponseDTO(
         url=presigned_url,
     )
