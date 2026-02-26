@@ -151,7 +151,7 @@ class ConversationService:
 
     async def deserialize_part_content(
         self, content: SerializedContent
-    ) -> str | list[UserContent]:
+    ) -> str | list[UserContent] | None:
         """Deserialize content from its serialized form."""
         if content["type"] == "text":
             content = cast(SerializedTextContentPart, content)
@@ -161,22 +161,26 @@ class ConversationService:
             parts = []
             for item in content["data"]:
                 deserialized_item = await self.deserialize_part_content(item)
+                if deserialized_item is None:
+                    continue
                 if isinstance(deserialized_item, list):
                     parts.extend(deserialized_item)
                 else:
                     parts.append(deserialized_item)
+            if len(parts) == 0:
+                return None
             return parts
         elif content["type"] == "file":
             content = cast(SerializedFileContentPart, content)
             file_id = content["file_id"]
-            (
-                file_url,
-                metadata,
-            ) = (
+            res = (
                 await self.file_service.get_file_metadata_and_url(
                     uuid.UUID(file_id)
                 )
-            ).unwrap()
+            )
+            if isinstance(res, Err):
+                return None
+            file_url, metadata = res.unwrap()
             mime_type = metadata["mime_type"]
             if content['file_type'] == FileType.VIDEO:
                 return [
@@ -358,16 +362,16 @@ class ConversationService:
             for part in message.parts:
                 if part["part_kind"] == "user-prompt":
                     part = cast(SerializedRequestUserPromptMessagePart, part)
-                    parts.append(
-                        UserPromptPart(
-                            content=await self.deserialize_part_content(
-                                part["content"]
-                            ),
-                            timestamp=datetime.fromisoformat(
-                                part.get("timestamp")
-                            ),
+                    content = await self.deserialize_part_content(part["content"])
+                    if content is not None:
+                        parts.append(
+                            UserPromptPart(
+                                content=content,
+                                timestamp=datetime.fromisoformat(
+                                    part.get("timestamp")
+                                ),
+                            )
                         )
-                    )
                 elif part["part_kind"] == "retry-prompt":
                     part = cast(SerializedRequestRetryPromptMessagePart, part)
                     parts.append(
