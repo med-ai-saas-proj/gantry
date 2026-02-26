@@ -1,7 +1,6 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from huggingface_hub import get_session
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.factories import getSessionManager
@@ -10,10 +9,75 @@ from src.service.billing.dtos import (
     BillingChargeResponse,
     MonthlyBillSummary,
     ProjectBillingSummary,
+    CreateBillingSourceRequest,
+    BillingSourceResponse,
+    UpdateBillingSourceRequest,
+    AddCreditsRequest,
 )
-from src.service.billing.services import BillingService
+from src.service.billing.entities import BillingSourceStatus
+from src.service.billing.services import (
+    BillingService,
+    InsufficientCreditsError,
+    NoBillingSourceError,
+)
 
-router = APIRouter(prefix="/bill", tags=["Billing"])
+router = APIRouter(prefix="/billing", tags=["Billing"])
+
+
+# ============ Billing Sources ============
+
+
+@router.post("/sources", response_model=BillingSourceResponse, status_code=201)
+async def create_billing_source(
+    request: CreateBillingSourceRequest,
+    session: AsyncSession = Depends(getSessionManager().get_session),
+) -> BillingSourceResponse:
+    """Create a new billing source (credits or future 3rd party integration)."""
+    service = BillingService(session)
+    return await service.create_billing_source(request)
+
+
+@router.get("/sources", response_model=list[BillingSourceResponse])
+async def list_billing_sources(
+    organization_id: UUID,
+    project_id: UUID | None = None,
+    status: BillingSourceStatus | None = None,
+    session: AsyncSession = Depends(getSessionManager().get_session),
+) -> list[BillingSourceResponse]:
+    """List billing sources for an organization or project."""
+    service = BillingService(session)
+    return await service.list_billing_sources(organization_id, project_id, status)
+
+
+@router.patch("/sources/{source_id}", response_model=BillingSourceResponse)
+async def update_billing_source(
+    source_id: UUID,
+    request: UpdateBillingSourceRequest,
+    session: AsyncSession = Depends(getSessionManager().get_session),
+) -> BillingSourceResponse:
+    """Update a billing source."""
+    service = BillingService(session)
+    try:
+        return await service.update_billing_source(source_id, request)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/sources/{source_id}/credits", response_model=BillingSourceResponse)
+async def add_credits(
+    source_id: UUID,
+    request: AddCreditsRequest,
+    session: AsyncSession = Depends(getSessionManager().get_session),
+) -> BillingSourceResponse:
+    """Add credits to a billing source."""
+    service = BillingService(session)
+    try:
+        return await service.add_credits(source_id, request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============ Transactions ============
 
 
 @router.post("/charge", response_model=BillingChargeResponse)
@@ -23,10 +87,18 @@ async def charge_api_call(
 ) -> BillingChargeResponse:
     """
     Record a billing charge for an API call.
-    This endpoint should be called by internal services when completing an API request.
+    Automatically selects and charges the appropriate billing source.
     """
     service = BillingService(session)
-    return await service.charge(request)
+    try:
+        return await service.charge(request)
+    except NoBillingSourceError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except InsufficientCreditsError as e:
+        raise HTTPException(status_code=402, detail=str(e))  # 402 Payment Required
+
+
+# ============ Summaries ============
 
 
 @router.get("/project/{project_id}/current", response_model=ProjectBillingSummary)
