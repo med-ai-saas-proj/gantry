@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from src.db.base import BaseSQLModel
 from src.db.utils import (
     WithID,
@@ -7,6 +5,8 @@ from src.db.utils import (
     WithCreateUpdateTimestamp,
 )
 from src.service.utils.conversation.types import MessagePart
+
+from datetime import datetime
 
 from sqlalchemy import Text, String
 from sqlalchemy.orm import Mapped, mapped_column

@@ -19,13 +19,13 @@ from .types import (
     SerializedRequestRetryPromptMessagePart,
     SerializedResponseBuiltInToolCallMessagePart,
     SerializedResponseBuiltInToolResultMessagePart,
+    FileType,
 )
 from .models import (
     Message,
     Conversation,
 )
 from .repository import ConversationRepository
-from ..file_storage.models import FileType
 
 import json
 import uuid
@@ -115,22 +115,24 @@ class ConversationService:
                 "data": content,
             }
         elif isinstance(content, (ImageUrl, AudioUrl, DocumentUrl, VideoUrl)):
-            if content.vendor_metadata and content.vendor_metadata["file_id"]:
-                return {
-                    "type": "file",
-                    "file_id": str(content.vendor_metadata["file_id"]),
-                }
-            else:
-                return {
-                    "type": "file_url",
-                    "url": content.url,  # assume url holds file id if vendor_metadata is missing
-                    "file_type": FileType.IMAGE
+            file_type = (FileType.IMAGE
                     if isinstance(content, ImageUrl)
                     else FileType.AUDIO
                     if isinstance(content, AudioUrl)
                     else FileType.VIDEO
                     if isinstance(content, VideoUrl)
-                    else FileType.DOCUMENT,
+                    else FileType.DOCUMENT)
+            if content.vendor_metadata and content.vendor_metadata["file_id"]:
+                return {
+                    "type": "file",
+                    "file_id": str(content.vendor_metadata["file_id"]),
+                    "file_type": file_type,
+                }
+            else:
+                return {
+                    "type": "file_url",
+                    "url": content.url,  # assume url holds file id if vendor_metadata is missing
+                    "file_type": file_type
                 }
         elif isinstance(content, BinaryContent):
             if content.vendor_metadata and content.vendor_metadata["file_id"]:
@@ -175,9 +177,8 @@ class ConversationService:
                     uuid.UUID(file_id)
                 )
             ).unwrap()
-            file_type = metadata["file_type"]
             mime_type = metadata["mime_type"]
-            if file_type == FileType.VIDEO:
+            if content['file_type'] == FileType.VIDEO:
                 return [
                     VideoUrl(
                         url=file_url,
@@ -185,7 +186,7 @@ class ConversationService:
                         vendor_metadata={"file_id": file_id},
                     )
                 ]
-            elif file_type == FileType.IMAGE:
+            elif content['file_type'] == FileType.IMAGE:
                 return [
                     ImageUrl(
                         url=file_url,
@@ -193,7 +194,7 @@ class ConversationService:
                         vendor_metadata={"file_id": file_id},
                     )
                 ]
-            elif file_type == FileType.AUDIO:
+            elif content['file_type'] == FileType.AUDIO:
                 return [
                     AudioUrl(
                         url=file_url,

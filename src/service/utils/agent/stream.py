@@ -4,7 +4,6 @@ from src.management.api_keys.entities import ApiKeyInfo
 from src.service.utils.file_storage.utils import (
     detect_file_type,
 )
-from src.service.utils.file_storage.models import FileType
 from src.service.utils.conversation.services import ConversationService
 
 from .dtos.model import (
@@ -201,7 +200,7 @@ def extractFileContentFromUrl(url: str) -> bytes | None:
     return None
 
 
-async def uploadFile(file_data: bytes, file_type: FileType) -> uuid.UUID:
+async def uploadFile(file_data: bytes) -> uuid.UUID:
     """Upload file and return file ID."""
     mine_type, ext = detect_file_type(file_data)
     return await file_service.upload_file(

@@ -17,16 +17,6 @@ class FileStorageBaseSQLModel(BaseSQLModel):
     __abstract__ = True
     __table_args__ = {"schema": "FileStorage"}
 
-
-class FileType(enum.Enum):
-    """Enum-like class for file types."""
-
-    IMAGE = "image"
-    DOCUMENT = "document"
-    AUDIO = "audio"
-    VIDEO = "video"
-    GENERAL = "general"
-
 class FileStatus(enum.Enum):
     """Enum-like class for file statuses."""
 
@@ -45,9 +35,6 @@ class File(
     filepath: Mapped[str] = mapped_column(String(512), nullable=False)
     mime_type: Mapped[str] = mapped_column(String(64), nullable=False)
     size_in_bytes: Mapped[int] = mapped_column(nullable=False)
-    file_type: Mapped[FileType] = mapped_column(
-        Enum(FileType), nullable=False, default=FileType.GENERAL
-    )
     status: Mapped[FileStatus] = mapped_column(
         Enum(FileStatus), nullable=False, default=FileStatus.UPLOADING, init=False
     )

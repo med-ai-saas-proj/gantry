@@ -11,6 +11,8 @@ from dataclasses import dataclass
 
 from pydantic import Field, BaseModel
 
+from ...conversation.types import FileType
+
 
 class MultiModalContentType(str, Enum):
     """Content type."""
@@ -56,6 +58,7 @@ class FileLink(BaseModel):
     """Contain file link."""
 
     type: Literal["file_link"]
+    file_type: Annotated[FileType, Field(description="The file's type")]
     file_id: Annotated[uuid.UUID, Field(description="The file's id")]
 
 

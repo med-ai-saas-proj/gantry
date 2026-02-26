@@ -1,11 +1,18 @@
+import enum
 import uuid
 
-from src.service.utils.file_storage.models import FileType
 
 from typing import Any, Literal, Sequence, TypedDict
 
 from pydantic_core import ErrorDetails
 
+class FileType(enum.Enum):
+    """Enumeration of supported file types."""
+
+    IMAGE = "image"
+    VIDEO = "video"
+    AUDIO = "audio"
+    DOCUMENT = "document"
 
 class SerializedTextContentPart(TypedDict):
     """Serialized representation of a message part."""
@@ -19,6 +26,7 @@ class SerializedFileContentPart(TypedDict):
 
     type: Literal["file"]
     file_id: str
+    file_type: FileType
 
 
 class SerializedFileUrlContentPart(TypedDict):
@@ -142,6 +150,5 @@ MessagePart = (
 class FileUploadInfo(TypedDict):
     file_id: uuid.UUID
     file_data: bytes
-    file_type: FileType
     mime_type: str
     is_uploaded: bool

@@ -5,7 +5,6 @@ from .dtos import (
     FileMetadataWithPresignedURLResponseDTO,
 )
 from .utils import detect_file_type
-from .models import FileType
 from .services import FileStorageService
 from .factories import getFileStorageService
 
@@ -13,7 +12,7 @@ import uuid
 import mimetypes
 from typing import Annotated
 
-from fastapi import Path, Depends, APIRouter, UploadFile, HTTPException
+from fastapi import Depends, APIRouter, UploadFile, HTTPException
 from starlette.responses import RedirectResponse
 
 
@@ -21,16 +20,13 @@ file_storage_router = APIRouter(prefix="/file-storage", tags=["file-storage"])
 
 
 @file_storage_router.post(
-    "/{file_type}/upload",
+    "/upload",
     summary="Upload a file to the file storage service.",
     description="Endpoint to upload a file to the file storage service.",
     response_model=FileUploadResponseDTO,
 )
 async def upload_file(
     file: UploadFile,
-    file_type: Annotated[
-        FileType, Path(..., description="The type of the file being uploaded.")
-    ],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
@@ -57,7 +53,6 @@ async def upload_file(
         file.size,
         mime_type,
         ext,
-        file_type,
     )
     return FileUploadResponseDTO(
         file_id=str(file_id),

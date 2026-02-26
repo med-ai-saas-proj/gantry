@@ -2,7 +2,7 @@ from src.db.session import AsyncSessionManager
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import FileRecord
-from .models import File, FileType, FileStatus
+from .models import File, FileStatus
 from .settings import ObjectStorageSettings
 from .repositories import FileRepository
 
@@ -74,7 +74,6 @@ class FileStorageService:
         file_size: int,
         mime_type: str,
         ext: str | None = None,
-        file_type: FileType = FileType.GENERAL,
         file_id: uuid.UUID | None = None,
     ):
         """Upload a file and store its metadata."""
@@ -88,7 +87,6 @@ class FileStorageService:
                 filepath=file_path,
                 mime_type=mime_type,
                 size_in_bytes=file_size,
-                file_type=file_type,
             )
             session.add(file_record)
             await session.commit()
@@ -181,7 +179,6 @@ class FileStorageService:
                     "filename": file_record.original_filename,
                     "storage_path": file_record.filepath,
                     "mime_type": file_record.mime_type,
-                    "file_type": file_record.file_type,
                     "size": file_record.size_in_bytes,
                     "created_at": file_record.created_at,
                 }

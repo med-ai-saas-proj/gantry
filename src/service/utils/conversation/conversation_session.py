@@ -1,8 +1,7 @@
-from src.service.utils.file_storage.models import FileType
 from src.service.utils.agent.stream_handler import StreamHandler
 from src.shared.custom_types.error_exception import RecoverableError
 
-from .types import FileUploadInfo
+from .types import FileUploadInfo, FileType
 from ..agent.dtos.model import (
     AudioURL as InputAudioURL,
     FileLink,
@@ -108,7 +107,6 @@ class ConversationSession:
     async def addUploadFile(
         self,
         file_data: bytes,
-        file_type: FileType,
         mime_type: str,
     ) -> uuid.UUID:
         """Upload file and return file ID."""
@@ -116,7 +114,6 @@ class ConversationSession:
         file_info = FileUploadInfo(
             file_id=file_id,
             file_data=file_data,
-            file_type=file_type,
             mime_type=mime_type,
             is_uploaded=False,
         )
@@ -141,7 +138,7 @@ class ConversationSession:
                     if result.is_ok():
                         mime_type, file_data = result.unwrap()
                         file_id = await self.addUploadFile(
-                            file_data, FileType.IMAGE, mime_type
+                            file_data, mime_type
                         )
                         content = BinaryContent.from_data_uri(message.url)
                         content.vendor_metadata = {
@@ -158,7 +155,7 @@ class ConversationSession:
                     if res.is_ok():
                         mime_type, file_data = res.unwrap()
                         file_id = await self.addUploadFile(
-                            file_data, FileType.AUDIO, mime_type
+                            file_data, mime_type
                         )
                         content = BinaryContent.from_data_uri(message.url)
                         content.vendor_metadata = {
@@ -174,7 +171,7 @@ class ConversationSession:
                     if res.is_ok():
                         mime_type, file_data = res.unwrap()
                         file_id = await self.addUploadFile(
-                            file_data, FileType.VIDEO, mime_type
+                            file_data, mime_type
                         )
                         content = BinaryContent.from_data_uri(message.url)
                         content.vendor_metadata = {
@@ -190,7 +187,7 @@ class ConversationSession:
                     if res.is_ok():
                         mime_type, file_data = res.unwrap()
                         file_id = await self.addUploadFile(
-                            file_data, FileType.DOCUMENT, mime_type
+                            file_data, mime_type
                         )
                         content = BinaryContent.from_data_uri(message.url)
                         content.vendor_metadata = {
@@ -215,9 +212,8 @@ class ConversationSession:
                     print(
                         f"Fetched file URL: {file_url} with metadata: {metadata}"
                     )
-                    file_type = metadata["file_type"]
                     media_type = metadata["mime_type"]
-                    if file_type == FileType.IMAGE:
+                    if message.file_type == FileType.IMAGE:
                         model_input.append(
                             ImageUrl(
                                 url=file_url,
@@ -225,7 +221,7 @@ class ConversationSession:
                                 vendor_metadata={"file_id": message.file_id},
                             )
                         )
-                    elif file_type == FileType.AUDIO:
+                    elif message.file_type == FileType.AUDIO:
                         model_input.append(
                             AudioUrl(
                                 url=file_url,
@@ -233,7 +229,7 @@ class ConversationSession:
                                 vendor_metadata={"file_id": message.file_id},
                             )
                         )
-                    elif file_type == FileType.VIDEO:
+                    elif message.file_type == FileType.VIDEO:
                         model_input.append(
                             VideoUrl(
                                 url=file_url,
