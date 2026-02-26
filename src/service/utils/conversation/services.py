@@ -1,10 +1,7 @@
-import json
-
 from src.db.session import AsyncSessionManager
 from src.management.api_keys.entities import ApiKeyInfo
 from src.service.utils.file_storage.services import FileStorageService
 from src.shared.custom_types.error_exception import RecoverableError
-from dataclasses import asdict
 
 from .types import (
     MessagePart,
@@ -30,10 +27,12 @@ from .models import (
 from .repository import ConversationRepository
 from ..file_storage.models import FileType
 
+import json
 import uuid
 import asyncio
 from typing import Sequence, Awaitable, cast
-from datetime import datetime, date
+from datetime import date, datetime
+from dataclasses import asdict
 
 from pydantic_ai import (
     AudioUrl,
@@ -518,6 +517,7 @@ class ConversationService:
                 session.add(conversation)
                 await session.flush()
                 conversation_id = conversation.id
+                await session.commit()
         serialized_msgs = [
             self.serialize_conversation_messages(
                 conversation_id=conversation_id, msg=msg
@@ -529,6 +529,7 @@ class ConversationService:
             if isinstance(obj, (datetime, date)):
                 return obj.isoformat()
             raise TypeError(f"Type {type(obj)} not serializable")
+
 
         await cast(Awaitable[int], self.redis_client.rpush(
             conversation_uid,
