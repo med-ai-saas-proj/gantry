@@ -3,12 +3,11 @@ from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import FileType, FileUploadInfo
 from ..agent.dtos.model import (
-    AudioURL as InputAudioURL,
-    FileLink,
-    ImageURL as InputImageURL,
-    VideoURL as InputVideoURL,
+    AudioBase,
+    ImageBase,
+    VideoBase,
     ModelInput,
-    DocumentURL as InputDocumentURL,
+    DocumentBase,
 )
 from ..file_storage.services import (
     FileStorageService,
@@ -133,122 +132,134 @@ class ConversationSession:
             for message in input:
                 if isinstance(message, str):
                     model_input.append(message)
-                elif isinstance(message, InputImageURL):
-                    result = self.extractFileContentFromUrl(message.url)
-                    if result.is_ok():
-                        mime_type, file_data = result.unwrap()
-                        file_id = await self.addUploadFile(
-                            file_data, mime_type
+                elif isinstance(message, ImageBase):
+                    if message.url is not None:
+                        result = self.extractFileContentFromUrl(message.url)
+                        if result.is_ok():
+                            mime_type, file_data = result.unwrap()
+                            file_id = await self.addUploadFile(
+                                file_data, mime_type
+                            )
+                            content = BinaryContent.from_data_uri(message.url)
+                            content.vendor_metadata = {
+                                "file_id": file_id,
+                                "is_uploading": True,
+                                "file_type": FileType.IMAGE,
+                            }
+                        else:
+                            # If not data URL, assume it's a direct URL
+                            content = ImageUrl(url=message.url)
+                    else:
+                        _res = await self.file_service.get_file_metadata_and_url(
+                            message.file_id
                         )
-                        content = BinaryContent.from_data_uri(message.url)
-                        content.vendor_metadata = {
-                            "file_id": file_id,
-                            "is_uploading": True,
+                        if isinstance(_res, Err):
+                            return _res
+                        file_url, metadata = _res.unwrap()
+                        content = ImageUrl(
+                            url=file_url,
+                            vendor_metadata={
+                            "file_id": message.file_id,
                             "file_type": FileType.IMAGE,
-                        }
-                        model_input.append(content)
+                        })
+                    model_input.append(content)
+                elif isinstance(message, AudioBase):
+                    if message.url is not None:
+                        res = self.extractFileContentFromUrl(message.url)
+                        if res.is_ok():
+                            mime_type, file_data = res.unwrap()
+                            file_id = await self.addUploadFile(
+                                file_data, mime_type
+                            )
+                            content = BinaryContent.from_data_uri(message.url)
+                            content.vendor_metadata = {
+                                "file_id": file_id,
+                                "is_uploading": True,
+                                "file_type": FileType.AUDIO,
+                            }
+                        else:
+                            # If not data URL, assume it's a direct URL
+                            content = AudioUrl(url=message.url)
                     else:
-                        # If not data URL, assume it's a direct URL
-                        model_input.append(ImageUrl(url=message.url))
-
-                elif isinstance(message, InputAudioURL):
-                    res = self.extractFileContentFromUrl(message.url)
-                    if res.is_ok():
-                        mime_type, file_data = res.unwrap()
-                        file_id = await self.addUploadFile(
-                            file_data, mime_type
+                        _res = await self.file_service.get_file_metadata_and_url(
+                            message.file_id
                         )
-                        content = BinaryContent.from_data_uri(message.url)
-                        content.vendor_metadata = {
-                            "file_id": file_id,
-                            "is_uploading": True,
+                        if isinstance(_res, Err):
+                            return _res
+                        file_url, metadata = _res.unwrap()
+                        content = AudioUrl(
+                            url=file_url,
+                            vendor_metadata={
+                            "file_id": message.file_id,
                             "file_type": FileType.AUDIO,
-                        }
-                        model_input.append(content)
+                        })
+                    model_input.append(content)
+                elif isinstance(message, VideoBase):
+                    if message.url is not None:
+                        res = self.extractFileContentFromUrl(message.url)
+                        if res.is_ok():
+                            mime_type, file_data = res.unwrap()
+                            file_id = await self.addUploadFile(
+                                file_data, mime_type
+                            )
+                            content = BinaryContent.from_data_uri(message.url)
+                            content.vendor_metadata = {
+                                "file_id": file_id,
+                                "is_uploading": True,
+                                "file_type": FileType.VIDEO,
+                            }
+                        else:
+                            # If not data URL, assume it's a direct URL
+                            content = VideoUrl(url=message.url)
                     else:
-                        # If not data URL, assume it's a direct URL
-                        model_input.append(AudioUrl(url=message.url))
-                elif isinstance(message, InputVideoURL):
-                    res = self.extractFileContentFromUrl(message.url)
-                    if res.is_ok():
-                        mime_type, file_data = res.unwrap()
-                        file_id = await self.addUploadFile(
-                            file_data, mime_type
+                        _res = await self.file_service.get_file_metadata_and_url(
+                            message.file_id
                         )
-                        content = BinaryContent.from_data_uri(message.url)
-                        content.vendor_metadata = {
-                            "file_id": file_id,
-                            "is_uploading": True,
+                        if isinstance(_res, Err):
+                            return _res
+                        file_url, metadata = _res.unwrap()
+                        content = VideoUrl(
+                            url=file_url,
+                            vendor_metadata={
+                            "file_id": message.file_id,
                             "file_type": FileType.VIDEO,
-                        }
-                        model_input.append(content)
-                    else:
-                        # If not data URL, assume it's a direct URL
-                        model_input.append(VideoUrl(url=message.url))
-                elif isinstance(message, InputDocumentURL):
-                    res = self.extractFileContentFromUrl(message.url)
-                    if res.is_ok():
-                        mime_type, file_data = res.unwrap()
-                        file_id = await self.addUploadFile(
-                            file_data, mime_type
-                        )
-                        content = BinaryContent.from_data_uri(message.url)
-                        content.vendor_metadata = {
-                            "file_id": file_id,
-                            "is_uploading": True,
-                            "file_type": FileType.DOCUMENT,
-                        }
-                        model_input.append(content)
-                    else:
-                        # If not data URL, assume it's a direct URL
-                        model_input.append(
-                            DocumentUrl(
+                        })
+                    model_input.append(content)
+                elif isinstance(message, DocumentBase):
+                    if message.url is not None:
+                        res = self.extractFileContentFromUrl(message.url)
+                        if res.is_ok():
+                            mime_type, file_data = res.unwrap()
+                            file_id = await self.addUploadFile(
+                                file_data, mime_type
+                            )
+                            content = BinaryContent.from_data_uri(message.url)
+                            content.vendor_metadata = {
+                                "file_id": file_id,
+                                "is_uploading": True,
+                                "file_type": FileType.DOCUMENT,
+                            }
+                        else:
+                            # If not data URL, assume it's a direct URL
+                            content = DocumentUrl(
                                 url=message.url, media_type=message.mime_type
                             )
-                        )
-                elif isinstance(message, FileLink):
-                    _res = await self.file_service.get_file_metadata_and_url(
-                        message.file_id
-                    )
-                    if isinstance(_res, Err):
-                        return _res
-                    file_url, metadata = _res.unwrap()
-                    print(
-                        f"Fetched file URL: {file_url} with metadata: {metadata}"
-                    )
-                    media_type = metadata["mime_type"]
-                    if message.file_type == FileType.IMAGE:
-                        model_input.append(
-                            ImageUrl(
-                                url=file_url,
-                                media_type=media_type,
-                                vendor_metadata={"file_id": message.file_id},
-                            )
-                        )
-                    elif message.file_type == FileType.AUDIO:
-                        model_input.append(
-                            AudioUrl(
-                                url=file_url,
-                                media_type=media_type,
-                                vendor_metadata={"file_id": message.file_id},
-                            )
-                        )
-                    elif message.file_type == FileType.VIDEO:
-                        model_input.append(
-                            VideoUrl(
-                                url=file_url,
-                                media_type=media_type,
-                                vendor_metadata={"file_id": message.file_id},
-                            )
-                        )
                     else:
-                        model_input.append(
-                            DocumentUrl(
-                                url=file_url,
-                                media_type=media_type,
-                                vendor_metadata={"file_id": message.file_id},
-                            )
+                        _res = await self.file_service.get_file_metadata_and_url(
+                            message.file_id
                         )
+                        if isinstance(_res, Err):
+                            return _res
+                        file_url, metadata = _res.unwrap()
+                        content = DocumentUrl(
+                            url=file_url,
+                            media_type=metadata["mime_type"],
+                            vendor_metadata={
+                                "file_id": message.file_id,
+                                "file_type": FileType.DOCUMENT,
+                            },
+                        )
+                    model_input.append(content)
                 else:
                     pass
         return Ok(model_input)

@@ -135,11 +135,13 @@ class ConversationService:
                     "file_type": file_type
                 }
         elif isinstance(content, BinaryContent):
-            if content.vendor_metadata and content.vendor_metadata["file_id"]:
+            if (content.vendor_metadata
+                    and content.vendor_metadata["file_id"]
+                    and content.vendor_metadata.get("file_type")):
                 return {
                     "type": "file",
                     "file_id": str(content.vendor_metadata["file_id"]),
-                    "file_type": content.vendor_metadata.get("file_type", FileType.DOCUMENT),
+                    "file_type": content.vendor_metadata["file_type"],
                 }
             else:
                 # should not happen as BinaryContent must have file_id in vendor_metadata, but handle just in case

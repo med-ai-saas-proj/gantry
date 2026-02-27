@@ -6,64 +6,100 @@ from .generation_output import GenerationOutput
 
 import uuid
 from enum import Enum
-from typing import Any, Literal, Sequence, Annotated, TypedDict, NotRequired
+from typing import Literal, Sequence, Annotated, TypedDict
 from dataclasses import dataclass
 
 from pydantic import Field, BaseModel
-
-from ...conversation.types import FileType
 
 
 class MultiModalContentType(str, Enum):
     """Content type."""
 
-    image_url = "image_url"
-    audio_url = "audio_url"
-    video_url = "video_url"
-    document_url = "document_url"
+    image = "image"
+    audio = "audio"
+    video = "video"
+    document = "document"
 
 
 class FileURL(BaseModel):
     """Contain file url."""
 
     url: Annotated[str, Field(description="The file's url, can be base64")]
+    file_id: Annotated[None, Field()]
+
+class FileId(BaseModel):
+    """Contain file id."""
+
+    url: Annotated[None, Field()]
+    file_id: Annotated[uuid.UUID, Field(description="The file's id in storage system")]
 
 
-class ImageURL(FileURL):
+class ImageBase(BaseModel):
     """Image part."""
 
-    type: Literal[MultiModalContentType.image_url]
+    type: Literal[MultiModalContentType.image]
 
 
-class AudioURL(FileURL):
+class AudioBase(BaseModel):
     """Audio part."""
 
-    type: Literal[MultiModalContentType.audio_url]
+    type: Literal[MultiModalContentType.audio]
 
 
-class VideoURL(FileURL):
+class VideoBase(BaseModel):
     """Video part."""
 
-    type: Literal[MultiModalContentType.video_url]
+    type: Literal[MultiModalContentType.video]
 
 
-class DocumentURL(FileURL):
+class DocumentBase(BaseModel):
     """Document part, can be PDF, text file, word, ..."""
 
-    type: Literal[MultiModalContentType.document_url]
+    type: Literal[MultiModalContentType.document]
     mime_type: str | None
 
+class ImageURLInput(ImageBase, FileURL):
+    """Image part."""
+    pass
 
-class FileLink(BaseModel):
-    """Contain file link."""
+class AudioURLInput(AudioBase, FileURL):
+    """Audio part."""
+    pass
 
-    type: Literal["file_link"]
-    file_type: Annotated[FileType, Field(description="The file's type")]
-    file_id: Annotated[uuid.UUID, Field(description="The file's id")]
+class VideoURLInput(VideoBase, FileURL):
+    """Video part."""
+    pass
+
+class DocumentURLInput(DocumentBase, FileURL):
+    """Document part."""
+    pass
+
+class ImageIdInput(ImageBase, FileId):
+    """Image part."""
+    pass
+
+class AudioIdInput(AudioBase, FileId):
+    """Audio part."""
+    pass
+
+class VideoIdInput(VideoBase, FileId):
+    """Video part."""
+    pass
+
+class DocumentIdInput(DocumentBase, FileId):
+    """Document part, can be PDF, text file, word, ..."""
+    pass
 
 
 type MultiModalContent = Annotated[
-    ImageURL | AudioURL | VideoURL | DocumentURL | FileLink,
+    ImageURLInput
+    | AudioURLInput
+    | VideoURLInput
+    | DocumentURLInput
+    | ImageIdInput
+    | AudioIdInput
+    | VideoIdInput
+    | DocumentIdInput,
     Field(discriminator="type", description="Multi modal content type"),
 ]
 type ModelInputPart = str | MultiModalContent
