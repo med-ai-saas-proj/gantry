@@ -12,6 +12,7 @@ from .dtos.generation_output import (
 )
 
 import json
+import uuid
 from typing import (
     AsyncIterator,
     AsyncGenerator,
@@ -32,7 +33,7 @@ class StreamHandler:
     def __init__(
         self,
         conversation_id: int | None,
-        conversation_uid: str,
+        conversation_uid: uuid.UUID,
     ):
         self.conversation_id = conversation_id
         self.conversation_uid = conversation_uid
@@ -44,7 +45,7 @@ class StreamHandler:
     ) -> AsyncGenerator[StreamEvent]:
         # i = 0
         yield StreamEvent_ConversationStart(
-            conversation_id=self.conversation_uid
+            conversation_id=str(self.conversation_uid)
         )
 
         async for event in agent_stream:
@@ -143,7 +144,7 @@ class StreamHandler:
                     yield StreamEvent_FinalResult(
                         GenerationOutput(
                             id=event.result.run_id,
-                            conversation_id=self.conversation_uid,
+                            conversation_id=str(self.conversation_uid),
                             status=ResponseStatus.completed,
                             output=None,
                             error=None,

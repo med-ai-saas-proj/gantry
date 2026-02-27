@@ -33,18 +33,18 @@ class ConversationManager:
     @asynccontextmanager
     async def startConversion(
         self,
-        conversation_uid: str | None,
+        conversation_uid: uuid.UUID | None,
         api_key_info: ApiKeyInfo,
     ):
         conversation_id: int | None = None
-        if conversation_uid:
+        if conversation_uid is not None:
             conversation_id = (
                 await self.conversation_service.get_conversation_id(
-                    conversation_uid, api_key_info
+                    conversation_uid, api_key_info["project_id"]
                 )
             ).unwrap()
         else:
-            conversation_uid = str(uuid.uuid4())
+            conversation_uid = uuid.uuid4()
 
         async with await self.redis_lock_manager.lock(
             f"conversation:{conversation_uid}"
@@ -53,7 +53,7 @@ class ConversationManager:
 
             if conversation_id:
                 mess_history = (
-                    await self.conversation_service.get_conversation_message(
+                    await self.conversation_service.getAndDeserializeConversationMessage(
                         conversation_id, conversation_uid
                     )
                 )
@@ -86,7 +86,7 @@ class ConversationManager:
                 await file_upload_task
 
                 if new_message:
-                    await self.conversation_service.store_conversation(
+                    await self.conversation_service.serializeAndStoreConversation(
                         conversation_id,
                         conversation_uid,
                         api_key_info["project_id"],

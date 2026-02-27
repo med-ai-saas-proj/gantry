@@ -1,6 +1,4 @@
 from src.db.session import AsyncSessionManager
-from src.management.api_keys.entities import ApiKeyInfo
-from src.service.utils.file_storage.services import FileStorageService
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import (
@@ -8,9 +6,6 @@ from .types import (
     MessagePart,
     SerializedContent,
     SerializedContentPart,
-    SerializedFileContentPart,
-    SerializedTextContentPart,
-    SerializedFileUrlContentPart,
     SerializedSequenceContentPart,
     SerializedResponseTextMessagePart,
     SerializedResponseThinkingMessagePart,
@@ -26,6 +21,7 @@ from .models import (
     Conversation,
 )
 from .repository import ConversationRepository
+from ..file_storage.services import FileStorageService
 
 import json
 import uuid
@@ -81,12 +77,12 @@ class ConversationService:
         self.file_service = file_service
 
     async def get_conversation_id(
-        self, conversation_uid: str, api_key_info: ApiKeyInfo
+        self, conversation_uid: uuid.UUID, project_id: int
     ) -> Result[int, ConversationNotFoundError]:
         """Get conversation ID by its UID and project ID."""
         async with self.session_manager.get_session() as session:
             conversation_id = await self.conversation_repo.get_conversation_id(
-                session, uuid.UUID(conversation_uid), api_key_info["project_id"]
+                session, conversation_uid, project_id
             )
             if conversation_id is None:
                 return Err(ConversationNotFoundError())
@@ -157,10 +153,8 @@ class ConversationService:
     ) -> str | list[UserContent] | None:
         """Deserialize content from its serialized form."""
         if content["type"] == "text":
-            content = cast(SerializedTextContentPart, content)
             return content["data"]
         elif content["type"] == "sequence":
-            content = cast(SerializedSequenceContentPart, content)
             parts = []
             for item in content["data"]:
                 deserialized_item = await self.deserialize_part_content(item)
@@ -174,7 +168,6 @@ class ConversationService:
                 return None
             return parts
         elif content["type"] == "file":
-            content = cast(SerializedFileContentPart, content)
             file_id = content["file_id"]
             res = (
                 await self.file_service.get_file_metadata_and_url(
@@ -218,7 +211,6 @@ class ConversationService:
                     )
                 ]
         elif content["type"] == "file_url":
-            content = cast(SerializedFileUrlContentPart, content)
             url = content["url"]
             file_type = content["file_type"]
             if file_type == FileType.VIDEO:
@@ -480,19 +472,50 @@ class ConversationService:
             )
         raise ValueError("Unsupported message kind")
 
-    async def get_conversation_message(
-        self, conversation_id: int, conversation_uid: str
-    ) -> Sequence[ModelMessage]:
-        cached_msgs = await cast(Awaitable[list[str]], self.redis_client.lrange(conversation_uid, 0, -1))
+    async def getConversationMessageByUuid(
+        self,
+        conversation_uid: uuid.UUID,
+        project_id: int
+    )-> Result[Sequence[Message], ConversationNotFoundError]:
+        async with self.session_manager.get_session() as session:
+            conversation_id = await self.conversation_repo.get_conversation_id(
+                session, conversation_uid, project_id
+            )
+            if conversation_id is None:
+                return Err(ConversationNotFoundError())
+        messages = await self._getConversationMessage(conversation_id, conversation_uid)
+        for msg in messages:
+            print(
+                "Fetched message from DB:",
+                msg.kind,
+                msg.timestamp,
+                msg.run_id,
+                msg.parts,
+            )
+        return Ok(messages)
+
+    async def _getConversationMessage(self,
+                                      conversation_id: int,
+                                      conversation_uid: uuid.UUID
+                                      ) -> Sequence[Message]:
+        cached_msgs = await cast(Awaitable[list[str]],
+                                 self.redis_client.lrange(f"conversation_cache:{conversation_uid}", 0, -1))
         if cached_msgs:
-            serialized_msgs = [Message.parse_raw(json.loads(msg)) for msg in cached_msgs]
+            return [Message.parse_raw(json.loads(msg)) for msg in cached_msgs]
         else:
             async with self.session_manager.get_session() as session:
-                serialized_msgs = (
-                    await self.conversation_repo.get_messages_by_conversation_id(
+                msgs = await self.conversation_repo.get_messages_by_conversation_id(
                         session, conversation_id
                     )
-                )
+                session.expunge_all()
+                return msgs
+
+    async def getAndDeserializeConversationMessage(
+        self,
+        conversation_id: int,
+        conversation_uid: uuid.UUID,
+    ) -> Sequence[ModelMessage]:
+        serialized_msgs = await self._getConversationMessage(conversation_id, conversation_uid)
         tasks = [
             self.deserialize_conversation_messages(msg)
             for msg in serialized_msgs
@@ -508,44 +531,67 @@ class ConversationService:
             )
         return msgs
 
-    async def store_conversation(
+    async def serializeAndStoreConversation(
         self,
         conversation_id: int | None,
-        conversation_uid: str,
+        conversation_uid: uuid.UUID,
         project_id: int,
         msgs: Sequence[ModelMessage],
     ) -> None:
+        serialized_msgs = [
+            self.serialize_conversation_messages(conversation_id=-1, msg=msg)
+            for msg in msgs
+        ]
+        await self._storeConversationMessage(
+            conversation_id, conversation_uid, project_id, serialized_msgs
+        )
+
+    async def storeConversationMessageByUuid(
+        self,
+        conversation_uid: uuid.UUID,
+        project_id: int,
+        msgs: Sequence[Message],
+    ) -> None:
+        async with self.session_manager.get_session() as session:
+            conversation_id = await self.conversation_repo.get_conversation_id(
+                session, conversation_uid, project_id
+            )
+        await self._storeConversationMessage(
+            conversation_id, conversation_uid, project_id, msgs
+        )
+
+    async def _storeConversationMessage(
+        self,
+        conversation_id: int | None,
+        conversation_uid: uuid.UUID,
+        project_id: int,
+        serialized_msgs: Sequence[Message],
+    ):
         if conversation_id is None:
             async with self.session_manager.get_session() as session:
                 conversation = Conversation(
                     title=None,
-                    uuid=uuid.UUID(conversation_uid),
+                    uuid=conversation_uid,
                     project_id=project_id,
                 )
                 session.add(conversation)
                 await session.flush()
                 conversation_id = conversation.id
                 await session.commit()
-        serialized_msgs = [
-            self.serialize_conversation_messages(
-                conversation_id=conversation_id, msg=msg
-            )
-            for msg in msgs
-        ]
+
+        for msg in serialized_msgs:
+            msg.conversation_id = conversation_id
 
         def json_serial(obj):
             if isinstance(obj, (datetime, date)):
                 return obj.isoformat()
             raise TypeError(f"Type {type(obj)} not serializable")
 
-
         await cast(Awaitable[int], self.redis_client.rpush(
-            conversation_uid,
-            json.dumps(
-                [asdict(msg) for msg in serialized_msgs]
-                , default=json_serial
-            ))
-        )
+            f"conversation_cache:{conversation_uid}",
+            *[json.dumps(asdict(msg),
+                default = json_serial) for msg in serialized_msgs]
+        ))
 
         async with self.session_manager.get_session() as session:
             session.add_all(serialized_msgs)

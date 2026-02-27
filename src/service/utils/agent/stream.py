@@ -516,7 +516,7 @@ async def convertAgentStream[T](
                 result_["output"] = pydanticAIToOurs(
                     event.result.new_messages()
                 )
-                await conversation_service.store_conversation(
+                await conversation_service.serializeAndStoreConversation(
                     conversation_id,
                     conversation_uid,
                     api_key_info["project_id"],

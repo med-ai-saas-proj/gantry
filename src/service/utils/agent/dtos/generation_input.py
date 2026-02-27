@@ -1,3 +1,5 @@
+import uuid
+
 from src.shared.dtos.base import BaseDTO
 
 from enum import Enum
@@ -48,7 +50,7 @@ class GenerationInput(BaseDTO):
     """Input for endpoints that use LLM to generate responses."""
 
     conversation_id: Annotated[
-        str | None,
+        uuid.UUID | None,
         Field(
             description="The conversation that this response belongs to. "
             "Items from this conversation are prepended to input_items "

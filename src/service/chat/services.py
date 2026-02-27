@@ -1,4 +1,5 @@
 """Chat service."""
+import uuid
 
 from .agents import constructChatAgentDeps
 from ..utils.agent.stream import (
@@ -47,7 +48,7 @@ class ChatService:
         api_key_info: ApiKeyInfo,
         model_id: str,
         query: ModelInput,
-        conversation_uid: str | None = None,
+        conversation_uid: uuid.UUID | None = None,
     ) -> AsyncGenerator[StreamEvent]:
         model, model_config = self.models_service.get_model(model_id)
         async with self.conversion_manager.startConversion(
@@ -76,7 +77,7 @@ class ChatService:
         api_key_info: ApiKeyInfo,
         model_id: str,
         query: ModelInput,
-        conversation_uid: str | None = None,
+        conversation_uid: uuid.UUID | None = None,
     ) -> ChatOutput:
         result = await aggregateStream(
             self.chatStream(api_key_info, model_id, query, conversation_uid)

@@ -127,14 +127,14 @@ async def get_file_url_and_metadata(
     response_model=FileMetadataResponseDTO,
 )
 async def get_file_metadata(
-    file_id: str,
+    file_id: uuid.UUID,
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
 ):
     """Get file metadata by file ID."""
     file_metadata = (
-        await file_storage_service.get_file_metadata(uuid.UUID(file_id))
+        await file_storage_service.get_file_metadata(file_id)
     ).unwrap()
     return FileMetadataResponseDTO(
         id=str(file_metadata["id"]),

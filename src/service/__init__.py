@@ -5,6 +5,7 @@ from .chat.routers import chat_router
 from .ai_search.routers import ai_search_router
 from .rx_advisor.routers import rx_advisor_router
 from .ehr_summarize.routers import ehr_summarize_router
+from .utils.conversation.routers import conversation_router
 from .utils.file_storage.routers import file_storage_router
 
 from fastapi import FastAPI, APIRouter
@@ -43,6 +44,7 @@ v1_router.include_router(ai_search_router)
 v1_router.include_router(ocr_router)
 v1_router.include_router(chat_router)
 v1_router.include_router(file_storage_router)
+v1_router.include_router(conversation_router)
 
 api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
 api_router.include_router(v1_router)

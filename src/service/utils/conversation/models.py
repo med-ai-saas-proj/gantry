@@ -77,7 +77,7 @@ class Message(WithCreateUpdateTimestamp, WithID, ConversationBaseSQLModel):
             run_id=raw.get("run_id"),
         )
         mess.id = raw.get("id")
-        mess.created_at = datetime.fromisoformat(raw.get("created_at"))
-        mess.updated_at = datetime.fromisoformat(raw.get("updated_at"))
+        mess.created_at = datetime.fromisoformat(raw.get("created_at")) if raw.get("created_at") else None
+        mess.updated_at = datetime.fromisoformat(raw.get("updated_at")) if raw.get("updated_at") else None
         return mess
 
