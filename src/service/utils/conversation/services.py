@@ -493,21 +493,27 @@ class ConversationService:
                                       conversation_id: int,
                                       conversation_uid: uuid.UUID
                                       ) -> Sequence[Message]:
-        cached_msgs = await cast(Awaitable[list[str]],
-         self.redis_client.zrange(
-             f"conversation_cache:{conversation_uid}",
-             0, -1))
-
-        if cached_msgs:
-            return [Message.parse_raw(json.loads(msg)) for msg in cached_msgs]
-        else:
-            async with self.session_manager.get_session() as session:
-                msgs = await self.conversation_repo.get_messages_by_conversation_id(
-                        session, conversation_id
-                    )
-                session.expunge_all()
-            await self._addCacheConversationMessages(conversation_uid, msgs)
-            return msgs
+        cache_key = f"conversation_cache:{{{conversation_uid}}}"
+        ready_key = f"conversation_cache:{{{conversation_uid}}}:ready"
+        # atomic check if cache exists and is ready, if so get from cache, otherwise get from db and update cache
+        lua_script = """
+           if redis.call('EXISTS', KEYS[1]) == 1 then
+               return redis.call('ZRANGE', KEYS[2], 0, -1)
+           else
+               return nil
+           end
+           """
+        result = await cast(Awaitable[list[str] | None],
+                            self.redis_client.eval(lua_script, 2, ready_key, cache_key))
+        if result is not None:
+            return [Message.parse_raw(json.loads(msg)) for msg in result]
+        async with self.session_manager.get_session() as session:
+            msgs = await self.conversation_repo.get_messages_by_conversation_id(
+                session, conversation_id
+            )
+            session.expunge_all()
+        await self._addCacheConversationMessages(conversation_uid, msgs)
+        return msgs
 
     async def getAndDeserializeConversationMessage(
         self,
@@ -558,6 +564,7 @@ class ConversationService:
         project_id: int,
         serialized_msgs: Sequence[Message],
     ):
+        is_new_conversation = conversation_id is None
         if conversation_id is None:
             async with self.session_manager.get_session() as session:
                 conversation = Conversation(
@@ -577,25 +584,69 @@ class ConversationService:
             session.add_all(serialized_msgs)
             await session.flush()
             await session.commit()
-        await self._addCacheConversationMessages(conversation_uid, serialized_msgs)
+        if is_new_conversation:
+            await self._addCacheConversationMessages(conversation_uid, serialized_msgs)
+        else:
+            await self._tryAppendConversationMessages(conversation_uid, serialized_msgs)
+
+    async def _tryAppendConversationMessages(self,
+                                             conversation_uid: uuid.UUID,
+                                             msgs: Sequence[Message]):
+        cache_key = f"conversation_cache:{{{conversation_uid}}}"
+        ready_key = f"conversation_cache:{{{conversation_uid}}}:ready"
+        # atomic check if cache exists and is ready,
+        # if so append to cache, otherwise do nothing and let next read update the cache
+        # (avoid appending to cache when cache is not loaded
+        # to prevent cache have only new messages but miss old messages)
+        append_script = """
+        if redis.call('EXISTS', KEYS[1]) == 1 and
+           redis.call('EXISTS', KEYS[2]) == 1 then
+            for i = 1, #ARGV-1, 2 do
+                redis.call('ZADD', KEYS[2], ARGV[i], ARGV[i+1])
+            end
+            redis.call('EXPIRE', KEYS[1], ARGV[#ARGV])
+            redis.call('EXPIRE', KEYS[2], ARGV[#ARGV])
+            return 1
+        else
+            return 0
+        end
+        """
+        mappings: list[str | int] = []
+        for msg in msgs:
+            mappings.append(msg.id)
+            mappings.append(json.dumps(asdict(msg), default=_json_serial))
+        mappings.append(self.setting.cache_ttl)
+        res = await cast(Awaitable[int], self.redis_client.eval(
+            append_script,
+            2,
+            ready_key,
+            cache_key,
+            *mappings
+        ))
 
     async def _addCacheConversationMessages(self,
-         conversation_uid: uuid.UUID,
-         msgs: Sequence[Message]):
+                                            conversation_uid: uuid.UUID,
+                                            msgs: Sequence[Message]):
+        cache_key = f"conversation_cache:{{{conversation_uid}}}"
+        ready_key = f"conversation_cache:{{{conversation_uid}}}:ready"
         mappings = {
             json.dumps(asdict(msg), default=_json_serial): msg.id
             for msg in msgs
         }
-        async with self.redis_client.pipeline() as pipe:
+        async with self.redis_client.pipeline(
+            transaction=True,
+        ) as pipe:
             await cast(Awaitable[int],
-               pipe.zadd(
-                f"conversation_cache:{conversation_uid}",
-                mappings
-            ))
+               pipe.zadd(cache_key, mappings)
+           )
             await cast(Awaitable[None],
                pipe.expire(
-                f"conversation_cache:{conversation_uid}",
+                cache_key,
                 self.setting.cache_ttl
+            ))
+            await cast(Awaitable[None],
+               pipe.set(ready_key,"1",
+                ex=self.setting.cache_ttl
             ))
             await pipe.execute()
 
