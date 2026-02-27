@@ -1,3 +1,4 @@
+from src.service.utils.conversation.settings import getConversationSettings
 from src.db.factories import getRedis, getSessionManager, getRedisLockManager
 from src.service.utils.conversation.services import ConversationService
 from src.service.utils.file_storage.factories import getFileStorageService
@@ -17,6 +18,7 @@ def getConversationService():
         ConversationRepository(),
         getFileStorageService(),
         getRedis(),
+        getConversationSettings()
     )
 
 

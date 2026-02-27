@@ -20,6 +20,7 @@ from .models import (
     Message,
     Conversation,
 )
+from .settings import ConversationSettings
 from .repository import ConversationRepository
 from ..file_storage.services import FileStorageService
 
@@ -27,7 +28,7 @@ import json
 import uuid
 import asyncio
 from typing import Sequence, Awaitable, cast
-from datetime import date, datetime, UTC
+from datetime import UTC, date, datetime
 from dataclasses import asdict
 
 from pydantic_ai import (
@@ -69,12 +70,14 @@ class ConversationService:
         conversation_repo: ConversationRepository,
         file_service: FileStorageService,
         redis_client: Redis,
+        setting: ConversationSettings
     ) -> None:
         """Initialize ConversationService."""
         self.redis_client = redis_client
         self.session_manager = session_manager
         self.conversation_repo = conversation_repo
         self.file_service = file_service
+        self.setting = setting
 
     async def get_conversation_id(
         self, conversation_uid: uuid.UUID, project_id: int
@@ -394,7 +397,7 @@ class ConversationService:
                     )
             return ModelRequest(
                 parts=parts,
-                timestamp=datetime.fromisoformat(message.timestamp)
+                timestamp=message.timestamp
                 if message.timestamp
                 else None,
                 run_id=message.run_id,
@@ -467,7 +470,7 @@ class ConversationService:
             return ModelResponse(
                 parts=parts,
                 model_name=message.model_name,
-                timestamp=datetime.fromisoformat(cast(str, message.timestamp)),
+                timestamp= message.timestamp,
                 run_id=message.run_id,
             )
         raise ValueError("Unsupported message kind")
@@ -484,14 +487,6 @@ class ConversationService:
             if conversation_id is None:
                 return Err(ConversationNotFoundError())
         messages = await self._getConversationMessage(conversation_id, conversation_uid)
-        for msg in messages:
-            print(
-                "Fetched message from DB:",
-                msg.kind,
-                msg.timestamp,
-                msg.run_id,
-                msg.parts,
-            )
         return Ok(messages)
 
     async def _getConversationMessage(self,
@@ -508,7 +503,8 @@ class ConversationService:
                         session, conversation_id
                     )
                 session.expunge_all()
-                return msgs
+            await self._replaceCacheConversationMessages(conversation_uid, msgs)
+            return msgs
 
     async def getAndDeserializeConversationMessage(
         self,
@@ -521,14 +517,6 @@ class ConversationService:
             for msg in serialized_msgs
         ]
         msgs = await asyncio.gather(*tasks)
-        for msg in msgs:
-            print(
-                "Deserialized message:",
-                msg.kind,
-                msg.timestamp,
-                msg.run_id,
-                msg.parts,
-            )
         return msgs
 
     async def serializeAndStoreConversation(
@@ -582,17 +570,52 @@ class ConversationService:
         for msg in serialized_msgs:
             msg.conversation_id = conversation_id
 
-        def json_serial(obj):
-            if isinstance(obj, (datetime, date)):
-                return obj.isoformat()
-            raise TypeError(f"Type {type(obj)} not serializable")
-
-        await cast(Awaitable[int], self.redis_client.rpush(
-            f"conversation_cache:{conversation_uid}",
-            *[json.dumps(asdict(msg),
-                default = json_serial) for msg in serialized_msgs]
-        ))
-
         async with self.session_manager.get_session() as session:
             session.add_all(serialized_msgs)
+            await session.flush()
             await session.commit()
+        await self._addCacheConversationMessages(conversation_uid, serialized_msgs)
+
+    async def _replaceCacheConversationMessages(self,
+         conversation_uid: uuid.UUID,
+         msgs: Sequence[Message]):
+        async with self.redis_client.pipeline(
+            transaction=True
+        ) as pipe:
+            await cast(Awaitable[None],
+               pipe.delete(f"conversation_cache:{conversation_uid}"))
+            await cast(Awaitable[int],
+               pipe.rpush(
+                f"conversation_cache:{conversation_uid}",
+                *[json.dumps(asdict(msg),
+                    default=_json_serial) for msg in msgs]
+            ))
+            await cast(Awaitable[None],
+               pipe.expire(
+                f"conversation_cache:{conversation_uid}",
+                self.setting.cache_ttl
+            ))
+            await pipe.execute()
+
+    async def _addCacheConversationMessages(self,
+         conversation_uid: uuid.UUID,
+         msgs: Sequence[Message]):
+        async with self.redis_client.pipeline() as pipe:
+            await cast(Awaitable[int],
+               pipe.rpush(
+                f"conversation_cache:{conversation_uid}",
+                *[json.dumps(asdict(msg),
+                    default=_json_serial) for msg in msgs]
+            ))
+            await cast(Awaitable[None],
+               pipe.expire(
+                f"conversation_cache:{conversation_uid}",
+                self.setting.cache_ttl
+            ))
+            await pipe.execute()
+
+
+def _json_serial(obj):
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    raise TypeError(f"Type {type(obj)} not serializable")
