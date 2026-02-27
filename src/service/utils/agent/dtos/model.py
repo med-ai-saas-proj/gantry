@@ -9,7 +9,7 @@ from enum import Enum
 from typing import Literal, Sequence, Annotated, TypedDict
 from dataclasses import dataclass
 
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, RootModel
 
 
 class MultiModalContentType(str, Enum):
@@ -25,12 +25,9 @@ class FileURL(BaseModel):
     """Contain file url."""
 
     url: Annotated[str, Field(description="The file's url, can be base64")]
-    file_id: Annotated[None, Field()]
 
 class FileId(BaseModel):
     """Contain file id."""
-
-    url: Annotated[None, Field()]
     file_id: Annotated[uuid.UUID, Field(description="The file's id in storage system")]
 
 
@@ -56,7 +53,6 @@ class DocumentBase(BaseModel):
     """Document part, can be PDF, text file, word, ..."""
 
     type: Literal[MultiModalContentType.document]
-    mime_type: str | None
 
 class ImageURLInput(ImageBase, FileURL):
     """Image part."""
@@ -72,7 +68,7 @@ class VideoURLInput(VideoBase, FileURL):
 
 class DocumentURLInput(DocumentBase, FileURL):
     """Document part."""
-    pass
+    mime_type: str | None
 
 class ImageIdInput(ImageBase, FileId):
     """Image part."""
@@ -90,16 +86,20 @@ class DocumentIdInput(DocumentBase, FileId):
     """Document part, can be PDF, text file, word, ..."""
     pass
 
+class ImageInput(RootModel):
+    root: ImageURLInput | ImageIdInput
+
+class AudioInput(RootModel):
+    root: AudioURLInput | AudioIdInput
+
+class VideoInput(RootModel):
+    root: VideoURLInput | VideoIdInput
+
+class DocumentInput(RootModel):
+    root: DocumentURLInput | DocumentIdInput
 
 type MultiModalContent = Annotated[
-    ImageURLInput
-    | AudioURLInput
-    | VideoURLInput
-    | DocumentURLInput
-    | ImageIdInput
-    | AudioIdInput
-    | VideoIdInput
-    | DocumentIdInput,
+    ImageInput | AudioInput | VideoInput | DocumentInput,
     Field(discriminator="type", description="Multi modal content type"),
 ]
 type ModelInputPart = str | MultiModalContent

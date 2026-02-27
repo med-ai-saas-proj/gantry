@@ -7,13 +7,8 @@ from src.service.utils.file_storage.utils import (
 from src.service.utils.conversation.services import ConversationService
 
 from .dtos.model import (
-    AudioURL as InputAudioURL,
-    FileLink,
-    ImageURL as InputImageURL,
-    VideoURL as InputVideoURL,
     ChatOutput,
     ModelInput,
-    DocumentURL as InputDocumentURL,
     StreamEvent,
     StreamEventType,
     ModelResponseContent,
@@ -52,7 +47,7 @@ from pydantic_ai.messages import (
 
 
 def _create_new_part(event: StreamEvent) -> ModelResponseContent:
-    match event["data"]:
+    match event.data:
         case StreamEvent_PartType.output:
             return {
                 "type": ModelResponse_ContentType.text,
@@ -103,85 +98,75 @@ async def aggregateStream(
     last_part: ModelResponseContent | None = None
 
     async for output in stream:
-        match output["event"]:
+        match output.event:
             case StreamEventType.conversation_start:
                 pass
             case StreamEventType.part_start:
                 if (
                     last_part
-                    and last_part["type"] != event_part_map[output["data"]]
+                    and last_part["type"] != event_part_map[output.data]
                 ):
                     model_response.append(last_part)
                     last_part = _create_new_part(output)
                 if last_part is None:
                     last_part = _create_new_part(output)
             case StreamEventType.part_delta:
-                part_delta_data = output["data"]
+                part_delta_data = output.data
                 if (
                     last_part
                     and last_part["type"]
-                    != event_part_map[part_delta_data["type"]]
+                    != event_part_map[part_delta_data.type]
                 ):
                     model_response.append(last_part)
                     last_part = _create_new_part(output)
                 assert last_part is not None, (
                     "Check ai search stream aggregation"
                 )
-                match part_delta_data["type"]:
+                match part_delta_data.type:
                     case StreamEvent_PartType.output:
                         assert (
                             last_part["type"] == ModelResponse_ContentType.text
                         ), last_part["type"]
 
-                        last_part["content"] += part_delta_data["delta"] or ""
-                        if "citation" in part_delta_data:
+                        last_part["content"] += part_delta_data.delta or ""
+                        if part_delta_data.citation is not None:
                             last_part["citations"].append(
-                                part_delta_data["citation"]
+                                part_delta_data.citation
                             )
                     case StreamEvent_PartType.thinking:
                         assert (
                             last_part["type"]
                             == ModelResponse_ContentType.thinking
                         ), last_part["type"]
-                        if part_delta_data["delta"]:
+                        if part_delta_data.delta:
                             if last_part["content"] is None:
                                 last_part["content"] = ""
-                            last_part["content"] += part_delta_data["delta"]
+                            last_part["content"] += part_delta_data.delta
                     case StreamEvent_PartType.builtin_tool_call:
                         assert (
                             last_part["type"]
                             == ModelResponse_ContentType.builtin_tool_call
                         ), last_part["type"]
-                        last_part["tool_call_id"] = part_delta_data[
-                            "tool_call_id"
-                        ]
-                        last_part["hinted_tool_name"] = part_delta_data[
-                            "hinted_tool_name"
-                        ]
-                        last_part["hinted_args"] = part_delta_data[
-                            "hinted_args"
-                        ]
+                        last_part["tool_call_id"] = part_delta_data.tool_call_id
+                        last_part["hinted_tool_name"] = part_delta_data.hinted_tool_name
+                        last_part["hinted_args"] = part_delta_data.hinted_args
                     case StreamEvent_PartType.builtin_tool_result:
                         assert (
                             last_part["type"]
                             == ModelResponse_ContentType.builtin_tool_result
                         ), last_part["type"]
-                        last_part["tool_call_id"] = part_delta_data[
-                            "tool_call_id"
-                        ]
-                        last_part["hinted_result"] = part_delta_data[
-                            "hinted_result"
-                        ]
+                        last_part["tool_call_id"] = part_delta_data.tool_call_id
+                        last_part["hinted_result"] = part_delta_data.hinted_result
                     case _:
                         pass
             case StreamEventType.final_result:
                 if last_part is not None:
                     model_response.append(last_part)
-                final_output = output["data"]
+                final_output = output.data
 
     assert final_output is not None, "Check ai search stream aggregation"
     final_output_ = cast(ChatOutput, final_output)
-    final_output_["output"] = model_response
+    final_output_.output = model_response
     return final_output_
 
 
