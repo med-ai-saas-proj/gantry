@@ -9,6 +9,7 @@ class ConversationSettings(BaseSettings):
         "case_sensitive": False,
     }
     cache_ttl: int = 600 # in seconds
+    cache_limit: int = 50
 
 
 def getConversationSettings() -> ConversationSettings:

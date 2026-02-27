@@ -27,7 +27,7 @@ from ..file_storage.services import FileStorageService
 import json
 import uuid
 import asyncio
-from typing import Sequence, Awaitable, cast
+from typing import Literal, Sequence, Awaitable, cast
 from datetime import UTC, date, datetime
 from dataclasses import asdict
 
@@ -478,7 +478,10 @@ class ConversationService:
     async def getConversationMessageByUuid(
         self,
         conversation_uid: uuid.UUID,
-        project_id: int
+        project_id: int,
+        limit: int = 20,
+        last_cursor: int | None = None,
+        order_by: Literal["asc", "desc"] = "asc",
     )-> Result[Sequence[Message], ConversationNotFoundError]:
         async with self.session_manager.get_session() as session:
             conversation_id = await self.conversation_repo.get_conversation_id(
@@ -486,32 +489,70 @@ class ConversationService:
             )
             if conversation_id is None:
                 return Err(ConversationNotFoundError())
-        messages = await self._getConversationMessage(conversation_id, conversation_uid)
+        messages = await self._getConversationMessage(
+            conversation_id,
+            conversation_uid,
+            limit=limit,
+            last_cursor=last_cursor,
+            order_by=order_by
+        )
         return Ok(messages)
 
-    async def _getConversationMessage(self,
-                                      conversation_id: int,
-                                      conversation_uid: uuid.UUID
-                                      ) -> Sequence[Message]:
+    async def loadMessageFromDbByUuid(
+        self,
+        conversation_id: int,
+        limit: int = 20,
+        last_cursor: int | None = None,
+        order_by: Literal["asc", "desc"] = "asc",
+    ) -> Sequence[Message]:
+        async with self.session_manager.get_session() as session:
+            msgs = await self.conversation_repo.get_messages_by_conversation_id(
+                session,
+                conversation_id,
+                limit=limit,
+                last_cursor=last_cursor,
+                order_by=order_by
+            )
+            session.expunge_all()
+        return msgs
+
+    async def _getConversationMessage(
+        self,
+        conversation_id: int,
+        conversation_uid: uuid.UUID,
+        limit: int = 20,
+        last_cursor: int | None = None,
+        order_by: Literal["asc", "desc"] = "asc",
+    ) -> Sequence[Message]:
+        can_cache = last_cursor is None and order_by == "desc" and limit <= self.setting.cache_limit
+        if not can_cache:
+            return await self.loadMessageFromDbByUuid(
+                conversation_id,
+                limit=limit,
+                last_cursor=last_cursor,
+                order_by=order_by
+            )
+
         cache_key = f"conversation_cache:{{{conversation_uid}}}"
-        ready_key = f"conversation_cache:{{{conversation_uid}}}:ready"
         # atomic check if cache exists and is ready, if so get from cache, otherwise get from db and update cache
         lua_script = """
            if redis.call('EXISTS', KEYS[1]) == 1 then
-               return redis.call('ZRANGE', KEYS[2], 0, -1)
+                redis.call('EXPIRE', KEYS[1], ARGV[1])
+                return redis.call('ZREVRANGE', KEYS[1], 0, -1)
            else
                return nil
            end
            """
         result = await cast(Awaitable[list[str] | None],
-                            self.redis_client.eval(lua_script, 2, ready_key, cache_key))
+                            self.redis_client.eval(lua_script, 1,  cache_key, self.setting.cache_ttl))
         if result is not None:
             return [Message.parse_raw(json.loads(msg)) for msg in result]
-        async with self.session_manager.get_session() as session:
-            msgs = await self.conversation_repo.get_messages_by_conversation_id(
-                session, conversation_id
-            )
-            session.expunge_all()
+        msgs = await self.loadMessageFromDbByUuid(
+            conversation_id,
+            limit=self.setting.cache_limit,
+            last_cursor=last_cursor,
+            order_by=order_by
+        )
         await self._addCacheConversationMessages(conversation_uid, msgs)
         return msgs
 
@@ -519,14 +560,20 @@ class ConversationService:
         self,
         conversation_id: int,
         conversation_uid: uuid.UUID,
+        limit: int = 20,
     ) -> Sequence[ModelMessage]:
-        serialized_msgs = await self._getConversationMessage(conversation_id, conversation_uid)
+        serialized_msgs = await self._getConversationMessage(
+            conversation_id,
+            conversation_uid,
+            limit=limit,
+            order_by="desc",
+        )
         tasks = [
             self.deserialize_conversation_messages(msg)
             for msg in serialized_msgs
         ]
         msgs = await asyncio.gather(*tasks)
-        return msgs
+        return list(reversed(msgs))
 
     async def serializeAndStoreConversation(
         self,
@@ -593,19 +640,22 @@ class ConversationService:
                                              conversation_uid: uuid.UUID,
                                              msgs: Sequence[Message]):
         cache_key = f"conversation_cache:{{{conversation_uid}}}"
-        ready_key = f"conversation_cache:{{{conversation_uid}}}:ready"
         # atomic check if cache exists and is ready,
         # if so append to cache, otherwise do nothing and let next read update the cache
         # (avoid appending to cache when cache is not loaded
         # to prevent cache have only new messages but miss old messages)
         append_script = """
-        if redis.call('EXISTS', KEYS[1]) == 1 and
-           redis.call('EXISTS', KEYS[2]) == 1 then
-            for i = 1, #ARGV-1, 2 do
-                redis.call('ZADD', KEYS[2], ARGV[i], ARGV[i+1])
+        -- ARGV: seq_id1, msg1, seq_id2, msg2, ..., ttl, cache_limit
+        -- check if cache exists, if not exist then return 0
+        local ttl = tonumber(ARGV[#ARGV - 1])
+        local limit = tonumber(ARGV[#ARGV])
+        if redis.call('EXISTS', KEYS[1]) then
+            for i = 1, #ARGV-2, 2 do
+                redis.call('ZADD', KEYS[1], ARGV[i], ARGV[i+1])
             end
-            redis.call('EXPIRE', KEYS[1], ARGV[#ARGV])
-            redis.call('EXPIRE', KEYS[2], ARGV[#ARGV])
+            redis.call('EXPIRE', KEYS[1], ttl)
+            -- trim to cache limit
+            redis.call('ZREMRANGEBYRANK', KEYS[1], 0, -limit-1)
             return 1
         else
             return 0
@@ -613,41 +663,36 @@ class ConversationService:
         """
         mappings: list[str | int] = []
         for msg in msgs:
-            mappings.append(msg.id)
+            mappings.append(msg.seq_id)
             mappings.append(json.dumps(asdict(msg), default=_json_serial))
         mappings.append(self.setting.cache_ttl)
+        mappings.append(self.setting.cache_limit)
         res = await cast(Awaitable[int], self.redis_client.eval(
             append_script,
-            2,
-            ready_key,
+            1,
             cache_key,
-            *mappings
+            *mappings,
         ))
 
     async def _addCacheConversationMessages(self,
                                             conversation_uid: uuid.UUID,
                                             msgs: Sequence[Message]):
+        if len(msgs) == 0:
+            return
         cache_key = f"conversation_cache:{{{conversation_uid}}}"
-        ready_key = f"conversation_cache:{{{conversation_uid}}}:ready"
         mappings = {
-            json.dumps(asdict(msg), default=_json_serial): msg.id
+            json.dumps(asdict(msg), default=_json_serial): msg.seq_id
             for msg in msgs
         }
         async with self.redis_client.pipeline(
             transaction=True,
         ) as pipe:
-            await cast(Awaitable[int],
-               pipe.zadd(cache_key, mappings)
-           )
-            await cast(Awaitable[None],
-               pipe.expire(
+            await pipe.zadd(cache_key, mappings)
+            await pipe.zremrangebyrank(cache_key, 0, -self.setting.cache_limit - 1)
+            await pipe.expire(
                 cache_key,
                 self.setting.cache_ttl
-            ))
-            await cast(Awaitable[None],
-               pipe.set(ready_key,"1",
-                ex=self.setting.cache_ttl
-            ))
+            )
             await pipe.execute()
 
 

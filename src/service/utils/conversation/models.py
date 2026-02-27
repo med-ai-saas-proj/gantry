@@ -10,7 +10,7 @@ from src.service.utils.conversation.types import MessagePart
 
 from datetime import datetime
 
-from sqlalchemy import Text, String
+from sqlalchemy import String, ForeignKey, FetchedValue
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -56,7 +56,9 @@ class Message(WithID, ConversationBaseSQLModel):
     """Represents a message in a conversation."""
 
     __tablename__ = "Messages"
-    conversation_id: Mapped[int] = mapped_column(nullable=False)
+    conversation_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey(Conversation.id), index=True, nullable=False)
+    seq_id: Mapped[int] = mapped_column(BigInteger, index=True, nullable=False, init=False, server_default=FetchedValue())
     kind: Mapped[str] = mapped_column(String(32), nullable=True)
     parts: Mapped[list[MessagePart]] = mapped_column(JSONB, nullable=False)
 
@@ -75,6 +77,7 @@ class Message(WithID, ConversationBaseSQLModel):
             timestamp=raw["timestamp"],
             run_id=raw.get("run_id"),
         )
-        mess.id = raw.get("id")
+        mess.id = raw["id"]
+        mess.seq_id = raw["seq_id"]
         return mess
 

@@ -6,9 +6,9 @@ from src.service.utils.conversation.factories import getConversationService
 from .dtos import MessageResponse
 
 import uuid
-from typing import Sequence, Annotated
+from typing import Literal, Sequence, Annotated
 
-from fastapi import Depends, Security, APIRouter
+from fastapi import Query, Depends, Security, APIRouter
 
 
 conversation_router = APIRouter(
@@ -27,13 +27,19 @@ async def get_conversation(
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
     ],
-    conversation_service: Annotated[ConversationService, Depends(getConversationService)]
+    conversation_service: Annotated[ConversationService, Depends(getConversationService)],
+    last_cursor: Annotated[int | None, Query(gt=0)] = None,
+    limit: Annotated[int, Query( gt=0, le=100)] = 20,
+    order_by: Annotated[Literal["asc", "desc"], Query()] = "asc",
 ):
     """Get conversation details and messages by conversation UID."""
     messages = (
         await conversation_service.getConversationMessageByUuid(
             conversation_uid,
-            api_key_info["project_id"]
+            api_key_info["project_id"],
+            limit=limit,
+            last_cursor=last_cursor,
+            order_by=order_by,
         )
     ).unwrap()
     return [MessageResponse.from_orm(mess) for mess in messages]

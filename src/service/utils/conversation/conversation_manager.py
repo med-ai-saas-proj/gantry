@@ -35,6 +35,7 @@ class ConversationManager:
         self,
         conversation_uid: uuid.UUID | None,
         api_key_info: ApiKeyInfo,
+        message_context_window: int = 20,
     ):
         conversation_id: int | None = None
         if conversation_uid is not None:
@@ -54,7 +55,7 @@ class ConversationManager:
             if conversation_id:
                 mess_history = (
                     await self.conversation_service.getAndDeserializeConversationMessage(
-                        conversation_id, conversation_uid
+                        conversation_id, conversation_uid, message_context_window
                     )
                 )
 
