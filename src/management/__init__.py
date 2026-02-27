@@ -2,10 +2,14 @@ from src.shared.settings import getAppSetting
 from src.shared.custom_types.error_exception import ProblemDetails
 
 from .api_keys import apikey_router
+from .organization import org_router
+from .organization.factories import getOrgService
+from .organization.rate_limit_middleware import OrgRateLimitMiddleware
 
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 
 
 __all__ = ["management_app"]
@@ -29,15 +33,49 @@ management_app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
+management_app.add_middleware(OrgRateLimitMiddleware)
 
 v1_router = APIRouter(prefix="/v1", tags=["v1"], include_in_schema=True)
 v1_router.include_router(apikey_router)
+v1_router.include_router(org_router)
 
 # api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
 # api_router.include_router(v1_router)
 
 # management_app.include_router(api_router)
 management_app.include_router(v1_router)
+
+_org_deletion_worker: asyncio.Task | None = None
+
+
+async def _org_delete_worker_loop():
+    service = getOrgService()
+    while True:
+        try:
+            await service.process_due_deletions()
+        except Exception:
+            # Keep loop alive; errors are logged by global exception paths.
+            pass
+        await asyncio.sleep(60)
+
+
+@management_app.on_event("startup")
+async def _startup_org_worker():
+    global _org_deletion_worker
+    if _org_deletion_worker is None or _org_deletion_worker.done():
+        _org_deletion_worker = asyncio.create_task(_org_delete_worker_loop())
+
+
+@management_app.on_event("shutdown")
+async def _shutdown_org_worker():
+    global _org_deletion_worker
+    if _org_deletion_worker is not None:
+        _org_deletion_worker.cancel()
+        try:
+            await _org_deletion_worker
+        except Exception:
+            pass
+        _org_deletion_worker = None
 
 
 @management_app.get("/docs", include_in_schema=False)
