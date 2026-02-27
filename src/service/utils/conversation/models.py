@@ -1,3 +1,5 @@
+from sqlalchemy.sql.sqltypes import DateTime
+from sqlalchemy.sql.sqltypes import BigInteger
 from src.db.base import BaseSQLModel
 from src.db.utils import (
     WithID,
@@ -50,7 +52,7 @@ class Conversation(
 #     args: Any
 
 
-class Message(WithCreateUpdateTimestamp, WithID, ConversationBaseSQLModel):
+class Message(WithID, ConversationBaseSQLModel):
     """Represents a message in a conversation."""
 
     __tablename__ = "Messages"
@@ -60,10 +62,7 @@ class Message(WithCreateUpdateTimestamp, WithID, ConversationBaseSQLModel):
 
     # metadata fields
     model_name: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    timestamp: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime)
     run_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     @classmethod
@@ -73,11 +72,9 @@ class Message(WithCreateUpdateTimestamp, WithID, ConversationBaseSQLModel):
             kind=raw["kind"],
             parts=raw["parts"],
             model_name=raw.get("model_name"),
-            timestamp=raw.get("timestamp"),
+            timestamp=raw["timestamp"],
             run_id=raw.get("run_id"),
         )
         mess.id = raw.get("id")
-        mess.created_at = datetime.fromisoformat(raw.get("created_at")) if raw.get("created_at") else None
-        mess.updated_at = datetime.fromisoformat(raw.get("updated_at")) if raw.get("updated_at") else None
         return mess
 

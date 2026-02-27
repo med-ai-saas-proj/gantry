@@ -32,7 +32,7 @@ class ConversationRepository(Repository[Conversation, int]):
         stmt = (
             select(Message)
             .where(Message.conversation_id == conversation_id)
-            .order_by(Message.created_at.asc())
+            .order_by(Message.timestamp.asc())
         )
         res = await session.execute(stmt)
         return res.unique().scalars().all()

@@ -27,7 +27,7 @@ import json
 import uuid
 import asyncio
 from typing import Sequence, Awaitable, cast
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 from dataclasses import asdict
 
 from pydantic_ai import (
@@ -273,7 +273,7 @@ class ConversationService:
                 conversation_id=conversation_id,
                 kind=msg.kind,
                 parts=parts,
-                timestamp=msg.timestamp.isoformat() if msg.timestamp else None,
+                timestamp=msg.timestamp.astimezone(UTC).replace(tzinfo=None),
                 model_name=None,
                 run_id=msg.run_id,
             )
@@ -343,7 +343,7 @@ class ConversationService:
                 kind=msg.kind,
                 model_name=msg.model_name,
                 parts=parts,
-                timestamp=msg.timestamp.isoformat(),
+                timestamp=msg.timestamp.astimezone(UTC).replace(tzinfo=None),
                 run_id=msg.run_id,
             )
         raise ValueError("Unsupported message kind")
