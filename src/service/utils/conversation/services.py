@@ -162,7 +162,7 @@ class ConversationService:
         elif content["type"] == "sequence":
             parts = []
             for item in content["data"]:
-                deserialized_item = await self.deserialize_part_content(item)
+                deserialized_item = await self.deserialize_part_content(item, project_id)
                 if deserialized_item is None:
                     continue
                 if isinstance(deserialized_item, list):
@@ -354,7 +354,7 @@ class ConversationService:
         raise ValueError("Unsupported message kind")
 
     async def deserialize_conversation_messages(
-        self, message: Message
+        self, message: Message, project_id: int
     ) -> ModelMessage:
         """Deserialize a stored Message into a ModelMessage."""
         if message.kind == "request":
@@ -362,7 +362,7 @@ class ConversationService:
             for part in message.parts:
                 if part["part_kind"] == "user-prompt":
                     part = cast(SerializedRequestUserPromptMessagePart, part)
-                    content = await self.deserialize_part_content(part["content"])
+                    content = await self.deserialize_part_content(part["content"], project_id)
                     if content is not None:
                         parts.append(
                             UserPromptPart(
@@ -562,6 +562,7 @@ class ConversationService:
         self,
         conversation_id: int,
         conversation_uid: uuid.UUID,
+        project_id: int,
         limit: int = 20,
     ) -> Sequence[ModelMessage]:
         serialized_msgs = await self._getConversationMessage(
@@ -571,7 +572,7 @@ class ConversationService:
             order_by="desc",
         )
         tasks = [
-            self.deserialize_conversation_messages(msg)
+            self.deserialize_conversation_messages(msg, project_id=project_id)
             for msg in serialized_msgs
         ]
         msgs = await asyncio.gather(*tasks)
