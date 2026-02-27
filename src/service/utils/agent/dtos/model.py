@@ -102,8 +102,12 @@ type MultiModalContent = Annotated[
     ImageInput | AudioInput | VideoInput | DocumentInput,
     Field(discriminator="type", description="Multi modal content type"),
 ]
-type ModelInputPart = str | MultiModalContent
-type ModelInput = str | Sequence[ModelInputPart]
+type ModelInputPart = Annotated[str, Field(
+    ..., min_length=1
+)] | MultiModalContent
+type ModelInput = Annotated[str, Field(
+    ..., min_length=1
+)] | Sequence[ModelInputPart]
 
 
 class ReferenceType(str, Enum):
