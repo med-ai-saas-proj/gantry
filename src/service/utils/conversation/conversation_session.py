@@ -1,7 +1,7 @@
 from src.service.utils.agent.stream_handler import StreamHandler
 from src.shared.custom_types.error_exception import RecoverableError
 
-from .types import FileUploadInfo, FileType
+from .types import FileType, FileUploadInfo
 from ..agent.dtos.model import (
     AudioURL as InputAudioURL,
     FileLink,
@@ -144,6 +144,7 @@ class ConversationSession:
                         content.vendor_metadata = {
                             "file_id": file_id,
                             "is_uploading": True,
+                            "file_type": FileType.IMAGE,
                         }
                         model_input.append(content)
                     else:
@@ -161,6 +162,7 @@ class ConversationSession:
                         content.vendor_metadata = {
                             "file_id": file_id,
                             "is_uploading": True,
+                            "file_type": FileType.AUDIO,
                         }
                         model_input.append(content)
                     else:
@@ -177,6 +179,7 @@ class ConversationSession:
                         content.vendor_metadata = {
                             "file_id": file_id,
                             "is_uploading": True,
+                            "file_type": FileType.VIDEO,
                         }
                         model_input.append(content)
                     else:
@@ -193,6 +196,7 @@ class ConversationSession:
                         content.vendor_metadata = {
                             "file_id": file_id,
                             "is_uploading": True,
+                            "file_type": FileType.DOCUMENT,
                         }
                         model_input.append(content)
                     else:

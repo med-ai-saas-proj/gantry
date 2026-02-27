@@ -124,6 +124,5 @@ class ConversationManager:
             file_size=len(file_data),
             mime_type=mime_type,
             ext=ext,
-            file_type=file_info["file_type"],
             file_id=file_info["file_id"],
         )

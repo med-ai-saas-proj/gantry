@@ -4,6 +4,7 @@ from src.service.utils.file_storage.services import FileStorageService
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import (
+    FileType,
     MessagePart,
     SerializedContent,
     SerializedContentPart,
@@ -19,7 +20,6 @@ from .types import (
     SerializedRequestRetryPromptMessagePart,
     SerializedResponseBuiltInToolCallMessagePart,
     SerializedResponseBuiltInToolResultMessagePart,
-    FileType,
 )
 from .models import (
     Message,
@@ -139,6 +139,7 @@ class ConversationService:
                 return {
                     "type": "file",
                     "file_id": str(content.vendor_metadata["file_id"]),
+                    "file_type": content.vendor_metadata.get("file_type", FileType.DOCUMENT),
                 }
             else:
                 # should not happen as BinaryContent must have file_id in vendor_metadata, but handle just in case
