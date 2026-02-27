@@ -163,3 +163,19 @@ async def get_file_presigned_url(
     return FilePresignedURLResponseDTO(
         url=presigned_url,
     )
+
+@file_storage_router.delete(
+    "/{file_id}",
+    summary="Delete a file by file ID.",
+    description="Endpoint to delete a file from storage by its file ID.",
+    status_code=204,
+)
+async def delete_file(
+    file_id: uuid.UUID,
+    file_storage_service: Annotated[
+        FileStorageService, Depends(getFileStorageService)
+    ],
+):
+    """Delete a file by file ID."""
+    (await file_storage_service.delete_file(file_id)).unwrap()
+    return None

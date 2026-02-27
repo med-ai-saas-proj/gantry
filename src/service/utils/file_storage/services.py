@@ -170,7 +170,7 @@ class FileStorageService:
         """Retrieve file metadata by UUID."""
         async with self.session_manager.get_session() as session:
             file_record = await self.file_repo.getByUUID(session, file_uuid)
-            if not file_record:
+            if not file_record or file_record.status != FileStatus.AVAILABLE:
                 return Err(FileNotFoundInSystemError())
 
             return Ok[FileRecord](
@@ -183,3 +183,23 @@ class FileStorageService:
                     "created_at": file_record.created_at,
                 }
             )
+
+    async def delete_file(self, file_id: uuid.UUID) -> Result[None, FileNotFoundInSystemError]:
+        """Delete a file from storage and remove its metadata."""
+        async with self.session_manager.get_session() as session:
+            file_record = await self.file_repo.getByUUID(session, file_id)
+            if not file_record:
+                return Err(FileNotFoundInSystemError())
+            file_record .status = FileStatus.DELETED
+            await session.commit()
+        self.storage_backend.delete_object(
+            Bucket=self.file_storage_settings.s3_bucket_name,
+            Key=file_record.filepath,
+        )
+        async with self.session_manager.get_session() as session:
+            file_record = await self.file_repo.getByUUID(session, file_id)
+            if not file_record:
+                return Err(FileNotFoundInSystemError())
+            await session.delete(file_record)
+            await session.commit()
+        return Ok(None)
