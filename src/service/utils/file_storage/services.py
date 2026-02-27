@@ -206,9 +206,25 @@ class FileStorageService:
             Key=file_record.filepath,
         )
         async with self.session_manager.get_session() as session:
-            file_record = await self.file_repo.getByUUID(session, file_id)
+            file_record = await self.file_repo.getByUUID(session, file_id, project_id)
             if not file_record:
                 return Err(FileNotFoundInSystemError())
             await session.delete(file_record)
             await session.commit()
         return Ok(None)
+
+    async def list_files(self, project_id: int) -> list[FileRecord]:
+         """List all available files for a project."""
+         async with self.session_manager.get_session() as session:
+             file_records = await self.file_repo.getFileListByProjectID(session, project_id)
+             return [
+                 {
+                     "id": str(file_record.uuid),
+                     "filename": file_record.original_filename,
+                     "storage_path": file_record.filepath,
+                     "mime_type": file_record.mime_type,
+                     "size": file_record.size_in_bytes,
+                     "created_at": file_record.created_at,
+                 }
+                 for file_record in file_records
+             ]

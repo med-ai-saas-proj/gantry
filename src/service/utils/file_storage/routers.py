@@ -65,6 +65,34 @@ async def upload_file(
         file_id=str(file_id),
     )
 
+@file_storage_router.get(
+    "/",
+    summary="List files in the file storage service.",
+    description="Endpoint to list files in the file storage service.",
+    response_model=list[FileMetadataResponseDTO],
+)
+async def list_files(
+    file_storage_service: Annotated[
+        FileStorageService, Depends(getFileStorageService)
+    ],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
+):
+    """List files in the file storage service."""
+    files_metadata = await file_storage_service.list_files(api_key_info["project_id"])
+    return [
+        FileMetadataResponseDTO(
+            id=str(file_metadata["id"]),
+            filename=file_metadata["filename"],
+            storage_path=file_metadata["storage_path"],
+            mime_type=file_metadata["mime_type"],
+            size=file_metadata["size"],
+            created_at=file_metadata["created_at"],
+        )
+        for file_metadata in files_metadata
+    ]
+
 
 @file_storage_router.get(
     "/{file_id}/download",
@@ -182,8 +210,7 @@ async def get_file_presigned_url(
     ],
 ):
     """Get presigned URL for file download."""
-    presigned_url = (await file_storage_service.get_file_url(file_id
-                                                             and api_key_info["project_id"]
+    presigned_url = (await file_storage_service.get_file_url(file_id, api_key_info["project_id"]
                                                              )).unwrap()
     return FilePresignedURLResponseDTO(
         url=presigned_url,
