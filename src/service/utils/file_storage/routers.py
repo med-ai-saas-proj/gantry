@@ -1,3 +1,6 @@
+from src.management.api_keys.entities import ApiKeyInfo
+from src.management.api_keys.dependencies import requiredPermissions
+
 from .dtos import (
     FileUploadResponseDTO,
     FileMetadataResponseDTO,
@@ -12,7 +15,7 @@ import uuid
 import mimetypes
 from typing import Annotated
 
-from fastapi import Depends, APIRouter, UploadFile, HTTPException
+from fastapi import Depends, Security, APIRouter, UploadFile, HTTPException
 from starlette.responses import RedirectResponse
 
 
@@ -29,6 +32,9 @@ async def upload_file(
     file: UploadFile,
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
+    ],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
     ],
 ):
     """Upload a file to the file storage service."""
@@ -52,6 +58,7 @@ async def upload_file(
         file.file,
         file.size,
         mime_type,
+        api_key_info["project_id"],
         ext,
     )
     return FileUploadResponseDTO(
@@ -80,12 +87,16 @@ async def upload_file(
 )
 async def download_file(
     file_id: uuid.UUID,
+        api_key_info: Annotated[
+            ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
 ):
     """Download a file by file ID."""
-    presigned_url = (await file_storage_service.get_file_url(file_id)).unwrap()
+    presigned_url = (await file_storage_service.get_file_url(file_id, api_key_info["project_id"]
+                                                             )).unwrap()
     return RedirectResponse(url=presigned_url)
 
 
@@ -100,12 +111,17 @@ async def get_file_url_and_metadata(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
+
+        api_key_info: Annotated[
+            ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ],
 ):
     """Get file URL and metadata by file ID."""
     (
         presigned_url,
         file_metadata,
-    ) = (await file_storage_service.get_file_metadata_and_url(file_id)).unwrap()
+    ) = (await file_storage_service.get_file_metadata_and_url(file_id, api_key_info["project_id"]
+                                                              )).unwrap()
     return {
         "url": presigned_url,
         "metadata": FileMetadataWithPresignedURLResponseDTO(
@@ -131,10 +147,14 @@ async def get_file_metadata(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
+
+        api_key_info: Annotated[
+            ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ],
 ):
     """Get file metadata by file ID."""
     file_metadata = (
-        await file_storage_service.get_file_metadata(file_id)
+        await file_storage_service.get_file_metadata(file_id, api_key_info["project_id"])
     ).unwrap()
     return FileMetadataResponseDTO(
         id=str(file_metadata["id"]),
@@ -154,12 +174,17 @@ async def get_file_metadata(
 )
 async def get_file_presigned_url(
     file_id: uuid.UUID,
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
 ):
     """Get presigned URL for file download."""
-    presigned_url = (await file_storage_service.get_file_url(file_id)).unwrap()
+    presigned_url = (await file_storage_service.get_file_url(file_id
+                                                             and api_key_info["project_id"]
+                                                             )).unwrap()
     return FilePresignedURLResponseDTO(
         url=presigned_url,
     )
@@ -172,10 +197,15 @@ async def get_file_presigned_url(
 )
 async def delete_file(
     file_id: uuid.UUID,
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
 ):
     """Delete a file by file ID."""
-    (await file_storage_service.delete_file(file_id)).unwrap()
+    (await file_storage_service.delete_file(
+        file_id, api_key_info["project_id"]
+    )).unwrap()
     return None

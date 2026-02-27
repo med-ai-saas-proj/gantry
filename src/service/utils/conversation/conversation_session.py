@@ -75,12 +75,14 @@ class ConversationSession:
         stream_handler: StreamHandler,
         mess_history: Sequence[ModelMessage],
         file_service: FileStorageService,
+        project_id: int,
     ):
         self.stream_handler = stream_handler
         self.mess_history = mess_history
         self.file_service = file_service
         self.file_upload_map = {}
         self.file_upload_queue = asyncio.Queue()
+        self.project_id = project_id
 
     def getMessageHistory(self) -> Sequence[ModelMessage]:
         return self.mess_history
@@ -156,7 +158,7 @@ class ConversationSession:
                             content = ImageUrl(url=root_message.url)
                     else:
                         _res = await self.file_service.get_file_metadata_and_url(
-                            root_message.file_id
+                            root_message.file_id, self.project_id
                         )
                         if isinstance(_res, Err):
                             return _res
@@ -188,7 +190,7 @@ class ConversationSession:
                             content = AudioUrl(url=root_message.url)
                     else:
                         _res = await self.file_service.get_file_metadata_and_url(
-                            root_message.file_id
+                            root_message.file_id, self.project_id
                         )
                         if isinstance(_res, Err):
                             return _res
@@ -220,7 +222,7 @@ class ConversationSession:
                             content = VideoUrl(url=root_message.url)
                     else:
                         _res = await self.file_service.get_file_metadata_and_url(
-                            root_message.file_id
+                            root_message.file_id, self.project_id
                         )
                         if isinstance(_res, Err):
                             return _res
@@ -254,7 +256,7 @@ class ConversationSession:
                             )
                     else:
                         _res = await self.file_service.get_file_metadata_and_url(
-                            root_message.file_id
+                            root_message.file_id, self.project_id
                         )
                         if isinstance(_res, Err):
                             return _res

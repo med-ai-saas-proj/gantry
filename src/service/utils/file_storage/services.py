@@ -73,6 +73,7 @@ class FileStorageService:
         file_data: BinaryIO | bytes,
         file_size: int,
         mime_type: str,
+        project_id: int,
         ext: str | None = None,
         file_id: uuid.UUID | None = None,
     ):
@@ -82,6 +83,7 @@ class FileStorageService:
         file_path = f"uploads/{file_id}.{ext}" if ext else f"/uploads/{file_id}"
         async with self.session_manager.get_session() as session:
             file_record = File(
+                project_id=project_id,
                 uuid=file_id,
                 original_filename=file_name,
                 filepath=file_path,
@@ -115,10 +117,10 @@ class FileStorageService:
         return res["Body"].read()
 
     async def get_file(
-        self, file_uuid: uuid.UUID
+        self, file_uuid: uuid.UUID, project_id: int
     ) -> Result[bytes, FileNotFoundInSystemError]:
         """Retrieve file content by UUID."""
-        res = await self.get_file_metadata(file_uuid)
+        res = await self.get_file_metadata(file_uuid, project_id)
         if isinstance(res, Err):
             return res
         file_record = res.unwrap()
@@ -129,10 +131,10 @@ class FileStorageService:
         return Ok(file_content)
 
     async def get_file_url(
-        self, file_uuid: uuid.UUID
+        self, file_uuid: uuid.UUID, project_id: int
     ) -> Result[str, FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID."""
-        res = await self.get_file_metadata(file_uuid)
+        res = await self.get_file_metadata(file_uuid, project_id)
         if isinstance(res, Err):
             return res
         file_record = res.unwrap()
@@ -147,10 +149,10 @@ class FileStorageService:
         return Ok(url)
 
     async def get_file_metadata_and_url(
-        self, file_uuid: uuid.UUID
+        self, file_uuid: uuid.UUID, project_id: int
     ) -> Result[tuple[str, FileRecord], FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID."""
-        res = await self.get_file_metadata(file_uuid)
+        res = await self.get_file_metadata(file_uuid, project_id)
         if isinstance(res, Err):
             return res
         file_record = res.unwrap()
@@ -165,11 +167,12 @@ class FileStorageService:
         return Ok((url, file_record))
 
     async def get_file_metadata(
-        self, file_uuid: uuid.UUID
+        self,
+            file_uuid: uuid.UUID, project_id: int
     ) -> Result[FileRecord, FileNotFoundInSystemError]:
         """Retrieve file metadata by UUID."""
         async with self.session_manager.get_session() as session:
-            file_record = await self.file_repo.getByUUID(session, file_uuid)
+            file_record = await self.file_repo.getByUUID(session, file_uuid, project_id)
             if not file_record or file_record.status != FileStatus.AVAILABLE:
                 return Err(FileNotFoundInSystemError())
 
@@ -184,10 +187,16 @@ class FileStorageService:
                 }
             )
 
-    async def delete_file(self, file_id: uuid.UUID) -> Result[None, FileNotFoundInSystemError]:
+    async def delete_file(
+        self,
+      file_id: uuid.UUID,
+          project_id: int
+    ) -> Result[None, FileNotFoundInSystemError]:
         """Delete a file from storage and remove its metadata."""
         async with self.session_manager.get_session() as session:
-            file_record = await self.file_repo.getByUUID(session, file_id)
+            file_record = await self.file_repo.getByUUID(
+                session,
+                file_id, project_id)
             if not file_record:
                 return Err(FileNotFoundInSystemError())
             file_record .status = FileStatus.DELETED

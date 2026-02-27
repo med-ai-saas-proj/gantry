@@ -72,8 +72,9 @@ class ConversationManager:
 
             file_upload_task = asyncio.create_task(
                 self.fileUploadWorker(
-                    conversation_session.file_upload_map,
-                    conversation_session.file_upload_queue,
+                    project_id=api_key_info["project_id"],
+                    file_upload_map=conversation_session.file_upload_map,
+                    file_upload_queue=conversation_session.file_upload_queue,
                 )
             )
             try:
@@ -97,20 +98,24 @@ class ConversationManager:
 
     async def fileUploadWorker(
         self,
+        project_id: int,
         file_upload_map: dict[uuid.UUID, FileUploadInfo],
         file_upload_queue: asyncio.Queue[FileUploadInfo],
     ):
         while True:
             try:
                 file_info = await file_upload_queue.get()
-                await self.fileUpload(file_info)
+                await self.fileUpload(file_info, project_id)
                 file_upload_map[file_info["file_id"]]["is_uploaded"] = True
             except QueueShutDown:
                 break
             except Exception as e:
                 print(f"Error uploading file: {e}")
 
-    async def fileUpload(self, file_info: FileUploadInfo):
+    async def fileUpload(self,
+         file_info: FileUploadInfo,
+        project_id: int
+     ):
         file_data = file_info["file_data"]
         if file_info["mime_type"]:
             mime_type = file_info["mime_type"]
@@ -124,6 +129,7 @@ class ConversationManager:
             file_data=file_data,
             file_size=len(file_data),
             mime_type=mime_type,
+            project_id=project_id,
             ext=ext,
             file_id=file_info["file_id"],
         )

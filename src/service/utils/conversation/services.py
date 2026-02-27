@@ -152,7 +152,9 @@ class ConversationService:
             return None
 
     async def deserialize_part_content(
-        self, content: SerializedContent
+        self,
+        content: SerializedContent,
+        project_id: int
     ) -> str | list[UserContent] | None:
         """Deserialize content from its serialized form."""
         if content["type"] == "text":
@@ -174,7 +176,7 @@ class ConversationService:
             file_id = content["file_id"]
             res = (
                 await self.file_service.get_file_metadata_and_url(
-                    uuid.UUID(file_id)
+                    uuid.UUID(file_id),  project_id
                 )
             )
             if isinstance(res, Err):
