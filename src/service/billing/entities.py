@@ -36,7 +36,7 @@ class BillingSource(BaseModel):
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     organization_id: Mapped[UUID] = mapped_column(nullable=False, index=True)
-    project_id: Mapped[UUID] = mapped_column(
+    project_id: Mapped[UUID | None] = mapped_column(
         nullable=True, index=True
     )  # None = org-level
 

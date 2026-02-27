@@ -142,7 +142,7 @@ class BillingRepository:
         new_balance = source.credit_balance - amount
 
         # Update balance and status if depleted
-        updates = {"credit_balance": new_balance}
+        updates: dict[str, Any] = {"credit_balance": new_balance}
         if new_balance <= Decimal("0"):
             updates["status"] = BillingSourceStatus.DEPLETED
 
@@ -162,7 +162,7 @@ class BillingRepository:
 
         new_balance = source.credit_balance + amount
 
-        updates = {
+        updates: dict[str, Any] = {
             "credit_balance": new_balance,
             "initial_credits": (
                 source.initial_credits + amount if source.initial_credits else amount
