@@ -494,7 +494,10 @@ class ConversationService:
                                       conversation_uid: uuid.UUID
                                       ) -> Sequence[Message]:
         cached_msgs = await cast(Awaitable[list[str]],
-                                 self.redis_client.lrange(f"conversation_cache:{conversation_uid}", 0, -1))
+         self.redis_client.zrange(
+             f"conversation_cache:{conversation_uid}",
+             0, -1))
+
         if cached_msgs:
             return [Message.parse_raw(json.loads(msg)) for msg in cached_msgs]
         else:
@@ -503,7 +506,7 @@ class ConversationService:
                         session, conversation_id
                     )
                 session.expunge_all()
-            await self._replaceCacheConversationMessages(conversation_uid, msgs)
+            await self._addCacheConversationMessages(conversation_uid, msgs)
             return msgs
 
     async def getAndDeserializeConversationMessage(
@@ -576,36 +579,18 @@ class ConversationService:
             await session.commit()
         await self._addCacheConversationMessages(conversation_uid, serialized_msgs)
 
-    async def _replaceCacheConversationMessages(self,
-         conversation_uid: uuid.UUID,
-         msgs: Sequence[Message]):
-        async with self.redis_client.pipeline(
-            transaction=True
-        ) as pipe:
-            await cast(Awaitable[None],
-               pipe.delete(f"conversation_cache:{conversation_uid}"))
-            await cast(Awaitable[int],
-               pipe.rpush(
-                f"conversation_cache:{conversation_uid}",
-                *[json.dumps(asdict(msg),
-                    default=_json_serial) for msg in msgs]
-            ))
-            await cast(Awaitable[None],
-               pipe.expire(
-                f"conversation_cache:{conversation_uid}",
-                self.setting.cache_ttl
-            ))
-            await pipe.execute()
-
     async def _addCacheConversationMessages(self,
          conversation_uid: uuid.UUID,
          msgs: Sequence[Message]):
+        mappings = {
+            json.dumps(asdict(msg), default=_json_serial): msg.id
+            for msg in msgs
+        }
         async with self.redis_client.pipeline() as pipe:
             await cast(Awaitable[int],
-               pipe.rpush(
+               pipe.zadd(
                 f"conversation_cache:{conversation_uid}",
-                *[json.dumps(asdict(msg),
-                    default=_json_serial) for msg in msgs]
+                mappings
             ))
             await cast(Awaitable[None],
                pipe.expire(
