@@ -1,17 +1,23 @@
 import json
+from enum import Enum
 from typing import (
     Union,
+    TypeVar,
     Iterable,
+    TypeAlias,
+    TypedDict,
     AsyncIterable,
 )
-from dataclasses import dataclass, is_dataclass, asdict
 
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
 
-@dataclass
-class SSEContent[EventType, T]:
+EventType = TypeVar("EventType", Enum, str, None)
+T = TypeVar("T", dict, str, bytes)
+
+
+class SSEContent[EventType, T](TypedDict):
     event: EventType
     data: T
     # def __init__(self) -> None:
@@ -29,7 +35,7 @@ class SSEContent[EventType, T]:
     #     return self.data
 
 
-type SSEStream = Union[AsyncIterable[SSEContent], Iterable[SSEContent]]
+SSEStream: TypeAlias = Union[AsyncIterable[SSEContent], Iterable[SSEContent]]
 
 
 class SSEResponse(StreamingResponse):
@@ -71,14 +77,12 @@ class SSEResponse(StreamingResponse):
 
     @staticmethod
     def format_sse(content: SSEContent) -> bytes:
-        data = content.data
-        event = content.event
+        data = content["data"]
+        event = content["event"]
         if isinstance(data, bytes):
             result = b"data: " + data + b"\n\n"
         elif isinstance(data, str):
             result = f"data: {data}\n\n".encode()
-        elif is_dataclass(data) and not isinstance(data, type):
-            result = f"data: {json.dumps(asdict(data), ensure_ascii=False)}\n\n".encode()
         else:
             result = (
                 f"data: {json.dumps(data, ensure_ascii=False)}\n\n".encode()

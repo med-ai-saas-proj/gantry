@@ -6,8 +6,7 @@ from .generation_output import GenerationOutput
 
 import uuid
 from enum import Enum
-from typing import Literal, Sequence, Annotated, TypedDict
-from dataclasses import dataclass
+from typing import Literal, NotRequired, Sequence, Annotated, TypedDict
 
 from pydantic import Field, BaseModel, RootModel
 
@@ -118,8 +117,7 @@ class ReferenceType(str, Enum):
     inline_text = "inline_text"
 
 
-@dataclass
-class Citation:
+class Citation(TypedDict):
     """Citation of the generated messages."""
 
     start_index: Annotated[
@@ -272,78 +270,48 @@ class StreamEvent_PartType(str, Enum):
     builtin_tool_result = "builtin_tool_result"
 
 
-@dataclass
-class StreamEvent_ConversationStartData:
+# class BaseStreamEvent[Event, DataT](TypedDict):
+#     """Base Stream event, all stream responses follow this structure."""
+
+#     event: Event
+#     data: DataT
+
+
+class StreamEvent_ConversationStartData(TypedDict):
     """Contain conversation info start."""
 
     conversation_id: str
 
 
-@dataclass
-class StreamEvent_ConversationStart(
-    BaseStreamEvent[
-        Literal[StreamEventType.conversation_start],
-        StreamEvent_ConversationStartData,
-    ]
-):
-    """Signify conversation start."""
+type StreamEvent_ConversationStart = BaseStreamEvent[
+    Literal[StreamEventType.conversation_start],
+    StreamEvent_ConversationStartData,
+]
 
-    event: Literal[StreamEventType.conversation_start]
-    data: StreamEvent_ConversationStartData
-
-    def __init__(
-        self,
-        conversation_id: str,
-    ):
-        super().__init__(
-            event=StreamEventType.conversation_start,
-            data=StreamEvent_ConversationStartData(
-                conversation_id=conversation_id,
-            ),
-        )
+type StreamEvent_PartStart = BaseStreamEvent[
+    Literal[StreamEventType.part_start], StreamEvent_PartType
+]
 
 
-@dataclass
-class StreamEvent_PartStart(
-    BaseStreamEvent[Literal[StreamEventType.part_start], StreamEvent_PartType]
-):
-    """Signify part start."""
-
-    event: Literal[StreamEventType.part_start]
-    data: StreamEvent_PartType
-
-    def __init__(
-        self,
-        part_type: StreamEvent_PartType,
-    ):
-        super().__init__(
-            event=StreamEventType.part_start,
-            data=part_type,
-        )
-
-
-@dataclass
-class StreamEvent_PartDelta_Text:
+class StreamEvent_PartDelta_Output(TypedDict):
     """Contain new output tokens."""
 
     type: Literal[StreamEvent_PartType.output]
-    delta: str
+    delta: str | None
     citation: Annotated[
-        Citation | None,
-        Field(None, description="Citation to be added to citation list"),
+        NotRequired[Citation],
+        Field(description="Citation to be added to citation list"),
     ]
 
 
-@dataclass
-class StreamEvent_PartDelta_Thinking:
+class StreamEvent_PartDelta_Thinking(TypedDict):
     """Contain new reasoning output tokens."""
 
     type: Literal[StreamEvent_PartType.thinking]
     delta: str | None
 
 
-@dataclass
-class StreamEvent_PartDelta_BuiltinToolCall:
+class StreamEvent_PartDelta_BuiltinToolCall(TypedDict):
     """Contain builtin tool call, we provide hinted name and args for frontend update."""
 
     type: Literal[StreamEvent_PartType.builtin_tool_call]
@@ -352,8 +320,7 @@ class StreamEvent_PartDelta_BuiltinToolCall:
     hinted_args: str | None
 
 
-@dataclass
-class StreamEvent_PartDelta_BuiltinToolResult:
+class StreamEvent_PartDelta_BuiltinToolResult(TypedDict):
     """Signify builtin tool has done execute."""
 
     type: Literal[StreamEvent_PartType.builtin_tool_result]
@@ -362,103 +329,26 @@ class StreamEvent_PartDelta_BuiltinToolResult:
 
 
 type StreamEvent_PartDeltaData = Annotated[
-    StreamEvent_PartDelta_Text
+    StreamEvent_PartDelta_Output
     | StreamEvent_PartDelta_Thinking
     | StreamEvent_PartDelta_BuiltinToolCall
     | StreamEvent_PartDelta_BuiltinToolResult,
     Field(discriminator="type"),
 ]
 
+type StreamEvent_PartDelta = BaseStreamEvent[
+    Literal[StreamEventType.part_delta], StreamEvent_PartDeltaData
+]
 
-@dataclass
-class StreamEvent_PartDelta(
-    BaseStreamEvent[
-        Literal[StreamEventType.part_delta], StreamEvent_PartDeltaData
-    ]
-):
-    """Signify part delta."""
+type StreamEvent_FinalResult[T] = BaseStreamEvent[
+    Literal[StreamEventType.final_result], GenerationOutput[T]
+]
 
-    event: Literal[StreamEventType.part_delta]
-    data: StreamEvent_PartDeltaData
-
-    def __init__(self):
-        self.event = StreamEventType.part_delta
-
-    def addText(
-        self,
-        delta: str,
-        citation: Citation | None = None,
-    ) -> "StreamEvent_PartDelta":
-        self.data = StreamEvent_PartDelta_Text(
-            type=StreamEvent_PartType.output,
-            delta=delta,
-            citation=citation,
-        )
-        return self
-
-    def addThinking(
-        self,
-        delta: str | None = None,
-    ) -> "StreamEvent_PartDelta":
-        self.data = StreamEvent_PartDelta_Thinking(
-            type=StreamEvent_PartType.thinking,
-            delta=delta,
-        )
-        return self
-
-    def addBuiltinToolCall(
-        self,
-        tool_call_id: str,
-        hinted_tool_name: str | None = None,
-        hinted_args: str | None = None,
-    ) -> "StreamEvent_PartDelta":
-        self.data = StreamEvent_PartDelta_BuiltinToolCall(
-            type=StreamEvent_PartType.builtin_tool_call,
-            tool_call_id=tool_call_id,
-            hinted_tool_name=hinted_tool_name,
-            hinted_args=hinted_args,
-        )
-        return self
-
-    def addBuiltinToolResult(
-        self,
-        tool_call_id: str,
-        hinted_result: str | None = None,
-    ) -> "StreamEvent_PartDelta":
-        self.data = StreamEvent_PartDelta_BuiltinToolResult(
-            type=StreamEvent_PartType.builtin_tool_result,
-            tool_call_id=tool_call_id,
-            hinted_result=hinted_result,
-        )
-        return self
-
-
-@dataclass
-class StreamEvent_FinalResult(
-    BaseStreamEvent[
-        Literal[StreamEventType.final_result], GenerationOutput[None]
-    ]
-):
-    """Signify final result."""
-
-    event: Literal[StreamEventType.final_result]
-    data: GenerationOutput[None]
-
-    def __init__(
-        self,
-        data: GenerationOutput[None],
-    ):
-        super().__init__(
-            event=StreamEventType.final_result,
-            data=data,
-        )
-
-
-type StreamEvent = Annotated[
+type StreamEvent[T] = Annotated[
     StreamEvent_ConversationStart
     | StreamEvent_PartStart
     | StreamEvent_PartDelta
-    | StreamEvent_FinalResult,
+    | StreamEvent_FinalResult[T],
     Field(discriminator="event", description="Stream events"),
 ]
 

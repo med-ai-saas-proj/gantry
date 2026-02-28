@@ -139,20 +139,17 @@ async def get_file_url_and_metadata(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
-
-        api_key_info: Annotated[
-            ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
-        ],
-):
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
+) -> FileMetadataWithPresignedURLResponseDTO:
     """Get file URL and metadata by file ID."""
     (
         presigned_url,
         file_metadata,
     ) = (await file_storage_service.get_file_metadata_and_url(file_id, api_key_info["project_id"]
                                                               )).unwrap()
-    return {
-        "url": presigned_url,
-        "metadata": FileMetadataWithPresignedURLResponseDTO(
+    return FileMetadataWithPresignedURLResponseDTO(
             id=str(file_metadata["id"]),
             filename=file_metadata["filename"],
             storage_path=file_metadata["storage_path"],
@@ -160,8 +157,7 @@ async def get_file_url_and_metadata(
             size=file_metadata["size"],
             created_at=file_metadata["created_at"],
             url=presigned_url,
-        ),
-    }
+        )
 
 
 @file_storage_router.get(
@@ -175,10 +171,9 @@ async def get_file_metadata(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
-
-        api_key_info: Annotated[
-            ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
-        ],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
 ):
     """Get file metadata by file ID."""
     file_metadata = (

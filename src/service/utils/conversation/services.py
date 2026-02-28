@@ -278,7 +278,7 @@ class ConversationService:
                 conversation_id=conversation_id,
                 kind=msg.kind,
                 parts=parts,
-                timestamp=msg.timestamp.astimezone(UTC).replace(tzinfo=None),
+                timestamp=msg.timestamp.astimezone(UTC).replace(tzinfo=None) if msg.timestamp else datetime.now(UTC).replace(tzinfo=None),
                 model_name=None,
                 run_id=msg.run_id,
             )
@@ -621,6 +621,7 @@ class ConversationService:
                     title=None,
                     uuid=conversation_uid,
                     project_id=project_id,
+                    extra_metadata=None,
                 )
                 session.add(conversation)
                 await session.flush()
