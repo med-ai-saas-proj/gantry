@@ -1,6 +1,7 @@
 from src.shared.dtos.base import BaseDTO
 
 from typing import TypedDict
+from datetime import datetime
 
 from pydantic import Field
 
@@ -19,3 +20,14 @@ class CreateAPIKeyOutputSuccess(TypedDict):
 
     key: str
     hint: str
+
+
+class ApiKeyOutput(BaseDTO):
+    """Output DTO for API key details."""
+
+    id: int
+    name: str
+    description: str
+    hint: str
+    created_at: datetime
+    permissions: list[str]

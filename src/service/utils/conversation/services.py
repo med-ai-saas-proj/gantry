@@ -27,7 +27,7 @@ from ..file_storage.services import FileStorageService
 import json
 import uuid
 import asyncio
-from typing import Literal, Sequence, Awaitable, cast
+from typing import Any, Literal, Sequence, Awaitable, cast
 from datetime import UTC, date, datetime
 from dataclasses import asdict
 
@@ -160,7 +160,7 @@ class ConversationService:
         if content["type"] == "text":
             return content["data"]
         elif content["type"] == "sequence":
-            parts = []
+            parts: list[str | UserContent] = []
             for item in content["data"]:
                 deserialized_item = await self.deserialize_part_content(item, project_id)
                 if deserialized_item is None:
@@ -699,7 +699,7 @@ class ConversationService:
             await pipe.execute()
 
 
-def _json_serial(obj):
+def _json_serial(obj: Any):
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     raise TypeError(f"Type {type(obj)} not serializable")

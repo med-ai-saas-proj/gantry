@@ -28,7 +28,6 @@ from pydantic import ValidationError
 from opentelemetry import trace
 from sqlalchemy.orm import configure_mappers
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
-from fastapi.staticfiles import StaticFiles
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace.export import (
@@ -149,7 +148,7 @@ async def global_middleware(
 main_app.mount("/service", service_app, "service")
 main_app.mount("/management", management_app, "management")
 
-main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
+# main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
 
 
 apps = [main_app, service_app, management_app]

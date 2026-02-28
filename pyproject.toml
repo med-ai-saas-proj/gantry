@@ -39,6 +39,9 @@ project-includes = ["src", "scripts", "alembic", "templates"]
 project-excludes = ["**/.[!/.]*", "**/tests", "**/__pycache__"]
 search-path = ["."]
 
+[tool.uv.sources]
+examplenv = { git = "https://github.com/thng292/examplenv" }
+
 [dependency-groups]
 dev = [
     "inquirer>=3.4.1",
@@ -50,5 +53,7 @@ dev = [
     "ruff>=0.14.4",
     "typer>=0.19.1",
     "pyrefly==0.45.0",
+    "examplenv",
     "boto3-stubs[s3]>=1.42.33",
+    "ty>=0.0.19",
 ]

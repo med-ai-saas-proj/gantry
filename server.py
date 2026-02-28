@@ -1,11 +1,15 @@
 """This file is the entrypoint for debugging."""
 
-from src.main.app import main_app
-
 import argparse
 
 import uvicorn
 from uvicorn.config import LOGGING_CONFIG
+
+
+def getMainApp():
+    from src.main.app import main_app
+
+    return main_app
 
 
 if __name__ == "__main__":
@@ -19,8 +23,9 @@ if __name__ == "__main__":
         "%(asctime)s [%(name)s] %(levelprefix)s %(message)s"
     )
     uvicorn.run(
-        main_app,
+        getMainApp,
         host="0.0.0.0",
         port=int(args["port"]),
         workers=int(args["workers"]),
+        env_file=".env",
     )

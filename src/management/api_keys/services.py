@@ -6,6 +6,8 @@ from src.shared.custom_types.error_exception import (
     UnrecoverableError,
 )
 
+from .dtos import ApiKeyOutput, CreateAPIKeyOutputSuccess
+from .models import ApiKey, Permission
 from .dtos import CreateAPIKeyOutputSuccess
 from .models import Permission
 from .entities import ApiKeyInfo
@@ -170,11 +172,6 @@ class ApiKeyService:
         ApiKeyInfo, InvalidAPIKey | InsufficientPermission | UserNotFoundError
     ]:
         """Verify an API key and its permissions."""
-        if api_key == "bypass_key":
-            return Ok[ApiKeyInfo](
-                {"user_id": "test_user", "project_id": 0, "api_key_id": 0}
-            )
-
         if len(required_permissions) == 0:
             raise ValueError(
                 "At least one permission must be specified for verification"
@@ -208,3 +205,40 @@ class ApiKeyService:
                     "api_key_id": key.id,
                 }
             )
+
+    async def getApiKeys(
+        self, user_id: str
+    ) -> Result[list[ApiKeyOutput], UserNotFoundError]:
+        """Retrieve all API keys for a user."""
+        async with self.session_manager.get_session() as session:
+            keys = await self.api_key_repo.getByUserId(session, user_id)
+
+            output = [
+                ApiKeyOutput(
+                    id=key.id,
+                    name=key.name,
+                    description=key.description,
+                    hint=key.hint,
+                    created_at=key.created_at,
+                    permissions=[p.name for p in key.permissions],
+                )
+                for key in keys
+            ]
+
+            return Ok(output)
+
+    async def deleteApiKey(
+        self, user_id: str, key_id: int
+    ) -> Result[bool, ApiKeyNotFoundError]:
+        """Delete an API key by ID if it belongs to the user."""
+        async with self.session_manager.get_session() as session:
+            # Fetch the key to verify ownership
+            key = await self.api_key_repo.getByKey(session, key_id)
+
+            if not key or key.user_id != user_id:
+                return Err(ApiKeyNotFoundError())
+
+            await self.api_key_repo.delete(session, key)
+            await session.commit()
+
+            return Ok(True)

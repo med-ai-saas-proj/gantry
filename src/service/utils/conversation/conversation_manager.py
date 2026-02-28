@@ -68,6 +68,7 @@ class ConversationManager:
                 stream_handler=stream_handler,
                 mess_history=mess_history,
                 file_service=self.file_service,
+                project_id=api_key_info["project_id"],
             )
 
             file_upload_task = asyncio.create_task(

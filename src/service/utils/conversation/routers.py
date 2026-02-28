@@ -42,7 +42,7 @@ async def get_conversation(
             order_by=order_by,
         )
     ).unwrap()
-    return [MessageResponse.from_orm(mess) for mess in messages]
+    return [MessageResponse.model_validate(mess) for mess in messages]
 
 
 @conversation_router.post(

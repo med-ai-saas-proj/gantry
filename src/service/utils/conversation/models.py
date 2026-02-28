@@ -1,3 +1,5 @@
+from typing import TypedDict
+
 from sqlalchemy.sql.sqltypes import DateTime
 from sqlalchemy.sql.sqltypes import BigInteger
 from src.db.base import BaseSQLModel
@@ -68,7 +70,7 @@ class Message(WithID, ConversationBaseSQLModel):
     run_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     @classmethod
-    def parse_raw(cls, raw: dict) -> "Message":
+    def parse_raw(cls, raw: "MessageDict") -> "Message":
         mess = Message(
             conversation_id=raw["conversation_id"],
             kind=raw["kind"],
@@ -81,3 +83,13 @@ class Message(WithID, ConversationBaseSQLModel):
         mess.seq_id = raw["seq_id"]
         return mess
 
+class MessageDict(TypedDict):
+    """Represents the raw dictionary form of a Message"""
+    id: int
+    seq_id: int
+    conversation_id: int
+    kind: str
+    parts: list[MessagePart]
+    timestamp: datetime
+    model_name: str | None
+    run_id: str | None

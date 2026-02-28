@@ -53,3 +53,9 @@ class UnrecoverableError(Exception):
         super().__init__()
         self._stack_frames = traceback.format_stack()
         self._from = from_exception
+
+    def format(self) -> ProblemDetails:
+        res: ProblemDetails = {"status": 500, "title": "Unrecoverable Error"}
+        if self.detail:
+            res.update({"detail": self.detail})
+        return res
