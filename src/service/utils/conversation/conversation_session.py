@@ -312,7 +312,8 @@ class ConversationSession:
     async def convertSSEStream[T](
         self,
         agent_stream: AsyncIterator[AgentStreamEvent | AgentRunResultEvent[T]],
-    ) -> AsyncGenerator[StreamEvent[T]]:
+        skip_final_result: bool = True,
+    ) -> AsyncGenerator[StreamEvent[T | None]]:
         yield {
             "event": StreamEventType.conversation_start,
             "data": {
@@ -445,13 +446,13 @@ class ConversationSession:
                 case "agent_run_result":
                     # self.logger.debug("Got final result")
                     usage = event.result.usage()
-                    result: StreamEvent_FinalResult[T] = {
+                    result: StreamEvent_FinalResult[T | None] = {
                         "event": StreamEventType.final_result,
                         "data": {
                             "id": cast(str, event.result.run_id),
                             "conversation_id": str(self.conversation_uid),
                             "status": ResponseStatus.completed,
-                            "output": event.result.output,
+                            "output":  event.result.output if not skip_final_result else None,
                             "usage": {
                                 "input_tokens": usage.input_tokens,
                                 "output_tokens": usage.output_tokens,

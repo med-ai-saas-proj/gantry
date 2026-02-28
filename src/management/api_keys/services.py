@@ -135,6 +135,7 @@ class ApiKeyService:
             self.key_secret.encode(), api_key.encode(), "sha256"
         ).hexdigest()
 
+    @staticmethod
     def generateHint(api_key: str) -> str:
         return api_key[:5] + "..." + api_key[-4:]
 
