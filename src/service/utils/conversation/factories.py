@@ -18,7 +18,7 @@ def getConversationService():
         ConversationRepository(),
         getFileStorageService(),
         getRedis(),
-        getConversationSettings()
+        getConversationSettings(),
     )
 
 

@@ -1,11 +1,14 @@
 """Rx Advisor Service."""
 
 from src.ehr.dtos import InputEHR, InputPrescription
+from src.service.utils.conversation.conversation_manager import (
+    ConversationManager,
+)
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict, PrescriptionDict
 
 from .agents import constructRxAdvisorAgentDeps
-from ..utils.agent.stream import aggregateStream, convertAgentStream
+from ..utils.agent.stream import aggregateStream
 from ..utils.agent.agent_deps import AgentDeps
 from ..utils.agent.dtos.model import ChatOutput
 from ...management.api_keys.entities import ApiKeyInfo
@@ -24,19 +27,12 @@ class RxAdvisorService:
         logger: BoundLogger,
         agent: Agent[AgentDeps, str],
         models_service: ModelsService,
+        conversion_manager: ConversationManager,
     ):
         self.agent = agent
         self.logger = logger
         self.models_service = models_service
-
-    def _store_ehr_and_result(
-        self,
-        user_id: str,
-        ehr: EHRDict,
-        prescription: PrescriptionDict,
-        result: dict,
-    ):
-        pass
+        self.conversion_manager = conversion_manager
 
     def _process_ehr_and_prescription_to_prompt(
         self, ehr: EHRDict, prescription: PrescriptionDict
@@ -70,17 +66,24 @@ New Prescription:
                 PrescriptionDict.from_input_prescription(prescription),
             )
         ]
-        async for event in convertAgentStream(
-            self.agent.run_stream_events(
-                model_input,
-                model=model,
-                deps=constructRxAdvisorAgentDeps(
-                    api_key_info,
-                    model_config,
-                ),
-            )
-        ):
-            yield event
+        async with self.conversion_manager.startConversion(
+            None,
+            api_key_info,
+        ) as conversation:
+            async for event in conversation.convertSSEStream(
+                self.agent.run_stream_events(
+                    model_input,
+                    model=model,
+                    deps=constructRxAdvisorAgentDeps(
+                        api_key_info, model_config
+                    ),
+                )
+            ):
+                try:
+                    yield event
+                except Exception as e:
+                    # current version pydantic ai not supported cancel
+                    print("Error yielding event", e)
 
     async def generateAdvice(
         self,

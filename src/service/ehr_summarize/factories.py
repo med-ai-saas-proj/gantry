@@ -1,4 +1,5 @@
 from src.db.factories import getSessionManager
+from src.service.utils.conversation.factories import getConversationManager
 from src.shared.utils.logger import getLogger
 
 from .agents import getEhrSummarizeAgent
@@ -17,4 +18,5 @@ def getEHRSummarizeService():
         getLogger(),
         getEhrSummarizeAgent(),
         getModelsService(),
+        getConversationManager(),
     )

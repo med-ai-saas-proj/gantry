@@ -61,8 +61,15 @@ class Message(WithID, ConversationBaseSQLModel):
 
     __tablename__ = "Messages"
     conversation_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey(Conversation.id), index=True, nullable=False)
-    seq_id: Mapped[int] = mapped_column(BigInteger, index=True, nullable=False, init=False, server_default=FetchedValue())
+        BigInteger, ForeignKey(Conversation.id), index=True, nullable=False
+    )
+    seq_id: Mapped[int] = mapped_column(
+        BigInteger,
+        index=True,
+        nullable=False,
+        init=False,
+        server_default=FetchedValue(),
+    )
     kind: Mapped[str] = mapped_column(String(32), nullable=True)
     parts: Mapped[list[MessagePart]] = mapped_column(JSONB, nullable=False)
 
@@ -85,8 +92,10 @@ class Message(WithID, ConversationBaseSQLModel):
         mess.seq_id = raw["seq_id"]
         return mess
 
+
 class MessageDict(TypedDict):
     """Represents the raw dictionary form of a Message"""
+
     id: int
     seq_id: int
     conversation_id: int

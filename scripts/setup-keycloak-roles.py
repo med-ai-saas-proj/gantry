@@ -181,7 +181,7 @@ Environment variables:
 
     try:
         # Get admin token
-        admin_token = get_admin_token(  
+        admin_token = get_admin_token(
             args.url, args.admin_username, args.admin_password
         )
 

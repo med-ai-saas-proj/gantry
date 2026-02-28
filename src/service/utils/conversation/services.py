@@ -70,7 +70,7 @@ class ConversationService:
         conversation_repo: ConversationRepository,
         file_service: FileStorageService,
         redis_client: Redis,
-        setting: ConversationSettings
+        setting: ConversationSettings,
     ) -> None:
         """Initialize ConversationService."""
         self.redis_client = redis_client
@@ -114,13 +114,15 @@ class ConversationService:
                 "data": content,
             }
         elif isinstance(content, (ImageUrl, AudioUrl, DocumentUrl, VideoUrl)):
-            file_type = (FileType.IMAGE
-                    if isinstance(content, ImageUrl)
-                    else FileType.AUDIO
-                    if isinstance(content, AudioUrl)
-                    else FileType.VIDEO
-                    if isinstance(content, VideoUrl)
-                    else FileType.DOCUMENT)
+            file_type = (
+                FileType.IMAGE
+                if isinstance(content, ImageUrl)
+                else FileType.AUDIO
+                if isinstance(content, AudioUrl)
+                else FileType.VIDEO
+                if isinstance(content, VideoUrl)
+                else FileType.DOCUMENT
+            )
             if content.vendor_metadata and content.vendor_metadata["file_id"]:
                 return {
                     "type": "file",
@@ -131,12 +133,14 @@ class ConversationService:
                 return {
                     "type": "file_url",
                     "url": content.url,  # assume url holds file id if vendor_metadata is missing
-                    "file_type": file_type
+                    "file_type": file_type,
                 }
         elif isinstance(content, BinaryContent):
-            if (content.vendor_metadata
-                    and content.vendor_metadata["file_id"]
-                    and content.vendor_metadata.get("file_type")):
+            if (
+                content.vendor_metadata
+                and content.vendor_metadata["file_id"]
+                and content.vendor_metadata.get("file_type")
+            ):
                 return {
                     "type": "file",
                     "file_id": str(content.vendor_metadata["file_id"]),
@@ -152,9 +156,7 @@ class ConversationService:
             return None
 
     async def deserialize_part_content(
-        self,
-        content: SerializedContent,
-        project_id: int
+        self, content: SerializedContent, project_id: int
     ) -> str | list[UserContent] | None:
         """Deserialize content from its serialized form."""
         if content["type"] == "text":
@@ -162,7 +164,9 @@ class ConversationService:
         elif content["type"] == "sequence":
             parts: list[str | UserContent] = []
             for item in content["data"]:
-                deserialized_item = await self.deserialize_part_content(item, project_id)
+                deserialized_item = await self.deserialize_part_content(
+                    item, project_id
+                )
                 if deserialized_item is None:
                     continue
                 if isinstance(deserialized_item, list):
@@ -174,16 +178,14 @@ class ConversationService:
             return parts
         elif content["type"] == "file":
             file_id = content["file_id"]
-            res = (
-                await self.file_service.get_file_metadata_and_url(
-                    uuid.UUID(file_id),  project_id
-                )
+            res = await self.file_service.get_file_metadata_and_url(
+                uuid.UUID(file_id), project_id
             )
             if isinstance(res, Err):
                 return None
             file_url, metadata = res.unwrap()
             mime_type = metadata["mime_type"]
-            if content['file_type'] == FileType.VIDEO:
+            if content["file_type"] == FileType.VIDEO:
                 return [
                     VideoUrl(
                         url=file_url,
@@ -191,7 +193,7 @@ class ConversationService:
                         vendor_metadata={"file_id": file_id},
                     )
                 ]
-            elif content['file_type'] == FileType.IMAGE:
+            elif content["file_type"] == FileType.IMAGE:
                 return [
                     ImageUrl(
                         url=file_url,
@@ -199,7 +201,7 @@ class ConversationService:
                         vendor_metadata={"file_id": file_id},
                     )
                 ]
-            elif content['file_type'] == FileType.AUDIO:
+            elif content["file_type"] == FileType.AUDIO:
                 return [
                     AudioUrl(
                         url=file_url,
@@ -278,7 +280,9 @@ class ConversationService:
                 conversation_id=conversation_id,
                 kind=msg.kind,
                 parts=parts,
-                timestamp=msg.timestamp.astimezone(UTC).replace(tzinfo=None) if msg.timestamp else datetime.now(UTC).replace(tzinfo=None),
+                timestamp=msg.timestamp.astimezone(UTC).replace(tzinfo=None)
+                if msg.timestamp
+                else datetime.now(UTC).replace(tzinfo=None),
                 model_name=None,
                 run_id=msg.run_id,
             )
@@ -362,7 +366,9 @@ class ConversationService:
             for part in message.parts:
                 if part["part_kind"] == "user-prompt":
                     part = cast(SerializedRequestUserPromptMessagePart, part)
-                    content = await self.deserialize_part_content(part["content"], project_id)
+                    content = await self.deserialize_part_content(
+                        part["content"], project_id
+                    )
                     if content is not None:
                         parts.append(
                             UserPromptPart(
@@ -399,9 +405,7 @@ class ConversationService:
                     )
             return ModelRequest(
                 parts=parts,
-                timestamp=message.timestamp
-                if message.timestamp
-                else None,
+                timestamp=message.timestamp if message.timestamp else None,
                 run_id=message.run_id,
             )
         if message.kind == "response":
@@ -472,7 +476,7 @@ class ConversationService:
             return ModelResponse(
                 parts=parts,
                 model_name=message.model_name,
-                timestamp= message.timestamp,
+                timestamp=message.timestamp,
                 run_id=message.run_id,
             )
         raise ValueError("Unsupported message kind")
@@ -484,7 +488,7 @@ class ConversationService:
         limit: int = 20,
         last_cursor: int | None = None,
         order_by: Literal["asc", "desc"] = "asc",
-    )-> Result[Sequence[Message], ConversationNotFoundError]:
+    ) -> Result[Sequence[Message], ConversationNotFoundError]:
         async with self.session_manager.get_session() as session:
             conversation_id = await self.conversation_repo.get_conversation_id(
                 session, conversation_uid, project_id
@@ -496,7 +500,7 @@ class ConversationService:
             conversation_uid,
             limit=limit,
             last_cursor=last_cursor,
-            order_by=order_by
+            order_by=order_by,
         )
         return Ok(messages)
 
@@ -513,7 +517,7 @@ class ConversationService:
                 conversation_id,
                 limit=limit,
                 last_cursor=last_cursor,
-                order_by=order_by
+                order_by=order_by,
             )
             session.expunge_all()
         return msgs
@@ -526,13 +530,17 @@ class ConversationService:
         last_cursor: int | None = None,
         order_by: Literal["asc", "desc"] = "asc",
     ) -> Sequence[Message]:
-        can_cache = last_cursor is None and order_by == "desc" and limit <= self.setting.cache_limit
+        can_cache = (
+            last_cursor is None
+            and order_by == "desc"
+            and limit <= self.setting.cache_limit
+        )
         if not can_cache:
             return await self.loadMessageFromDbByUuid(
                 conversation_id,
                 limit=limit,
                 last_cursor=last_cursor,
-                order_by=order_by
+                order_by=order_by,
             )
 
         cache_key = f"conversation_cache:{{{conversation_uid}}}"
@@ -545,15 +553,19 @@ class ConversationService:
                return nil
            end
            """
-        result = await cast(Awaitable[list[str] | None],
-                            self.redis_client.eval(lua_script, 1,  cache_key, self.setting.cache_ttl))
+        result = await cast(
+            Awaitable[list[str] | None],
+            self.redis_client.eval(
+                lua_script, 1, cache_key, self.setting.cache_ttl
+            ),
+        )
         if result is not None:
             return [Message.parse_raw(json.loads(msg)) for msg in result]
         msgs = await self.loadMessageFromDbByUuid(
             conversation_id,
             limit=self.setting.cache_limit,
             last_cursor=last_cursor,
-            order_by=order_by
+            order_by=order_by,
         )
         await self._addCacheConversationMessages(conversation_uid, msgs)
         return msgs
@@ -636,13 +648,17 @@ class ConversationService:
             await session.flush()
             await session.commit()
         if is_new_conversation:
-            await self._addCacheConversationMessages(conversation_uid, serialized_msgs)
+            await self._addCacheConversationMessages(
+                conversation_uid, serialized_msgs
+            )
         else:
-            await self._tryAppendConversationMessages(conversation_uid, serialized_msgs)
+            await self._tryAppendConversationMessages(
+                conversation_uid, serialized_msgs
+            )
 
-    async def _tryAppendConversationMessages(self,
-                                             conversation_uid: uuid.UUID,
-                                             msgs: Sequence[Message]):
+    async def _tryAppendConversationMessages(
+        self, conversation_uid: uuid.UUID, msgs: Sequence[Message]
+    ):
         cache_key = f"conversation_cache:{{{conversation_uid}}}"
         # atomic check if cache exists and is ready,
         # if so append to cache, otherwise do nothing and let next read update the cache
@@ -671,16 +687,19 @@ class ConversationService:
             mappings.append(json.dumps(asdict(msg), default=_json_serial))
         mappings.append(self.setting.cache_ttl)
         mappings.append(self.setting.cache_limit)
-        res = await cast(Awaitable[int], self.redis_client.eval(
-            append_script,
-            1,
-            cache_key,
-            *mappings,
-        ))
+        res = await cast(
+            Awaitable[int],
+            self.redis_client.eval(
+                append_script,
+                1,
+                cache_key,
+                *mappings,
+            ),
+        )
 
-    async def _addCacheConversationMessages(self,
-                                            conversation_uid: uuid.UUID,
-                                            msgs: Sequence[Message]):
+    async def _addCacheConversationMessages(
+        self, conversation_uid: uuid.UUID, msgs: Sequence[Message]
+    ):
         if len(msgs) == 0:
             return
         cache_key = f"conversation_cache:{{{conversation_uid}}}"
@@ -692,11 +711,10 @@ class ConversationService:
             transaction=True,
         ) as pipe:
             await pipe.zadd(cache_key, mappings)
-            await pipe.zremrangebyrank(cache_key, 0, -self.setting.cache_limit - 1)
-            await pipe.expire(
-                cache_key,
-                self.setting.cache_ttl
+            await pipe.zremrangebyrank(
+                cache_key, 0, -self.setting.cache_limit - 1
             )
+            await pipe.expire(cache_key, self.setting.cache_ttl)
             await pipe.execute()
 
 

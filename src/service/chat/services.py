@@ -1,4 +1,5 @@
 """Chat service."""
+
 import uuid
 
 from .agents import constructChatAgentDeps
@@ -14,7 +15,6 @@ from ..utils.conversation.conversation_manager import ConversationManager
 from typing import AsyncGenerator
 
 from pydantic_ai import Agent
-from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 
 
@@ -27,21 +27,11 @@ class ChatService:
         # agent: Agent[Dep, AnswerStruct],
         models_service: ModelsService,
         conversion_manager: ConversationManager,
-        redis: Redis,
     ):
         self.agent = agent
         self.logger = logger
         self.models_service = models_service
         self.conversion_manager = conversion_manager
-        self.redis = redis
-
-    def _store_ehr_and_result(
-        self,
-        user_id: str,
-        query: ModelInput,
-        result: ChatOutput,
-    ):
-        pass
 
     async def chatStream(
         self,
@@ -58,7 +48,7 @@ class ChatService:
             model_input = (
                 await conversation.userInputToPydanticAI(query)
             ).unwrap()
-            async for event in conversation.stream_handler.convertSSEStream(
+            async for event in conversation.convertSSEStream(
                 self.agent.run_stream_events(
                     model_input,
                     model=model,

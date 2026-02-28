@@ -25,9 +25,13 @@ class FileURL(BaseModel):
 
     url: Annotated[str, Field(description="The file's url, can be base64")]
 
+
 class FileId(BaseModel):
     """Contain file id."""
-    file_id: Annotated[uuid.UUID, Field(description="The file's id in storage system")]
+
+    file_id: Annotated[
+        uuid.UUID, Field(description="The file's id in storage system")
+    ]
 
 
 class ImageBase(BaseModel):
@@ -53,60 +57,81 @@ class DocumentBase(BaseModel):
 
     type: Literal[MultiModalContentType.document]
 
+
 class ImageURLInput(ImageBase, FileURL):
     """Image part."""
+
     pass
+
 
 class AudioURLInput(AudioBase, FileURL):
     """Audio part."""
+
     pass
+
 
 class VideoURLInput(VideoBase, FileURL):
     """Video part."""
+
     pass
+
 
 class DocumentURLInput(DocumentBase, FileURL):
     """Document part."""
+
     mime_type: str | None
+
 
 class ImageIdInput(ImageBase, FileId):
     """Image part."""
+
     pass
+
 
 class AudioIdInput(AudioBase, FileId):
     """Audio part."""
+
     pass
+
 
 class VideoIdInput(VideoBase, FileId):
     """Video part."""
+
     pass
+
 
 class DocumentIdInput(DocumentBase, FileId):
     """Document part, can be PDF, text file, word, ..."""
+
     pass
+
 
 class ImageInput(RootModel):
     root: ImageURLInput | ImageIdInput
 
+
 class AudioInput(RootModel):
     root: AudioURLInput | AudioIdInput
+
 
 class VideoInput(RootModel):
     root: VideoURLInput | VideoIdInput
 
+
 class DocumentInput(RootModel):
     root: DocumentURLInput | DocumentIdInput
+
 
 type MultiModalContent = Annotated[
     ImageInput | AudioInput | VideoInput | DocumentInput,
     Field(discriminator="type", description="Multi modal content type"),
 ]
-type ModelInputPart = Annotated[str, Field(
-    ..., min_length=1
-)] | MultiModalContent
-type ModelInput = Annotated[str, Field(
-    ..., min_length=1
-)] | Sequence[ModelInputPart]
+type ModelInputPart = (
+    Annotated[str, Field(..., min_length=1)] | MultiModalContent
+)
+type ModelInput = (
+    Annotated[str, Field(..., min_length=1)] | Sequence[ModelInputPart]
+)
 
 
 class ReferenceType(str, Enum):

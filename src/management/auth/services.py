@@ -37,9 +37,7 @@ class InsufficientPermissionsError(ForbiddenError):
     def __init__(self, required_roles: list[str]):
         super().__init__()
         roles_str = ", ".join(required_roles)
-        self.detail = (
-            f"Insufficient permissions. Required roles: {roles_str}"
-        )
+        self.detail = f"Insufficient permissions. Required roles: {roles_str}"
 
 
 class AuthService:
@@ -124,18 +122,22 @@ class AuthService:
         # Client roles (from resource_access.{client_id}.roles)
         # Get roles from the management client
         client_roles = tryNone(
-            lambda: claims.get("resource_access", {})
-                          .get(self.client_id, {})
-                          .get("roles", [])
+            lambda: (
+                claims.get("resource_access", {})
+                .get(self.client_id, {})
+                .get("roles", [])
+            )
         )
         if client_roles:
             roles.extend(client_roles)
 
         # Also check account client roles for backwards compatibility
         account_roles = tryNone(
-            lambda: claims.get("resource_access", {})
-                          .get("account", {})
-                          .get("roles", [])
+            lambda: (
+                claims.get("resource_access", {})
+                .get("account", {})
+                .get("roles", [])
+            )
         )
         if account_roles:
             roles.extend(account_roles)
@@ -150,9 +152,7 @@ class AuthService:
         return Ok(auth_info)
 
     def checkRole(
-        self,
-        user_info: UserInfo,
-        role: ManagementRole
+        self, user_info: UserInfo, role: ManagementRole
     ) -> Result[None, InsufficientPermissionsError]:
         """
         Check if user has a specific role.
@@ -164,14 +164,12 @@ class AuthService:
         Returns:
             Ok(None) if user has the role, Err otherwise
         """
-        if not _has_role(user_info.get('roles'), role):
+        if not _has_role(user_info.get("roles"), role):
             return Err(InsufficientPermissionsError([role.value]))
         return Ok(None)
 
     def checkAnyRole(
-        self,
-        user_info: UserInfo,
-        roles: list[ManagementRole]
+        self, user_info: UserInfo, roles: list[ManagementRole]
     ) -> Result[None, InsufficientPermissionsError]:
         """
         Check if user has any of the specified roles.
@@ -183,15 +181,13 @@ class AuthService:
         Returns:
             Ok(None) if user has any role, Err otherwise
         """
-        if not _has_any_role(user_info.get('roles'), roles):
+        if not _has_any_role(user_info.get("roles"), roles):
             role_values = [r.value for r in roles]
             return Err(InsufficientPermissionsError(role_values))
         return Ok(None)
 
     def checkAllRoles(
-        self,
-        user_info: UserInfo,
-        roles: list[ManagementRole]
+        self, user_info: UserInfo, roles: list[ManagementRole]
     ) -> Result[None, InsufficientPermissionsError]:
         """
         Check if user has all of the specified roles.
@@ -203,7 +199,7 @@ class AuthService:
         Returns:
             Ok(None) if user has all roles, Err otherwise
         """
-        if not _has_all_roles(user_info.get('roles'), roles):
+        if not _has_all_roles(user_info.get("roles"), roles):
             role_values = [r.value for r in roles]
             return Err(InsufficientPermissionsError(role_values))
         return Ok(None)

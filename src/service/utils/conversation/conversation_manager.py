@@ -1,7 +1,6 @@
 from src.management.api_keys.entities import ApiKeyInfo
 from src.service.utils.conversation.types import FileUploadInfo
 from src.service.utils.file_storage.utils import detect_file_type
-from src.service.utils.agent.stream_handler import StreamHandler
 from src.service.utils.conversation.services import ConversationService
 from src.service.utils.file_storage.services import FileStorageService
 from src.service.utils.conversation.conversation_session import (
@@ -53,21 +52,17 @@ class ConversationManager:
             mess_history: Sequence[ModelMessage] = []
 
             if conversation_id:
-                mess_history = (
-                    await self.conversation_service.getAndDeserializeConversationMessage(
-                        conversation_id, conversation_uid, message_context_window, api_key_info["project_id"]
-                    )
+                mess_history = await self.conversation_service.getAndDeserializeConversationMessage(
+                    conversation_id,
+                    conversation_uid,
+                    message_context_window,
+                    api_key_info["project_id"],
                 )
 
-            stream_handler = StreamHandler(
-                conversation_id=conversation_id,
-                conversation_uid=conversation_uid,
-            )
-
             conversation_session = ConversationSession(
-                stream_handler=stream_handler,
                 mess_history=mess_history,
                 file_service=self.file_service,
+                conversation_uid=conversation_uid,
                 project_id=api_key_info["project_id"],
             )
 
@@ -84,16 +79,18 @@ class ConversationManager:
                 print(f"An error occurred during conversion: {e}")
                 raise e
             finally:
-                new_message = stream_handler.new_messages
+                new_message = conversation_session.new_messages
                 conversation_session.file_upload_queue.shutdown()
                 await file_upload_task
 
                 if new_message:
-                    await self.conversation_service.serializeAndStoreConversation(
-                        conversation_id,
-                        conversation_uid,
-                        api_key_info["project_id"],
-                        new_message,
+                    await (
+                        self.conversation_service.serializeAndStoreConversation(
+                            conversation_id,
+                            conversation_uid,
+                            api_key_info["project_id"],
+                            new_message,
+                        )
                     )
                 pass
 
@@ -113,10 +110,7 @@ class ConversationManager:
             except Exception as e:
                 print(f"Error uploading file: {e}")
 
-    async def fileUpload(self,
-         file_info: FileUploadInfo,
-        project_id: int
-     ):
+    async def fileUpload(self, file_info: FileUploadInfo, project_id: int):
         file_data = file_info["file_data"]
         if file_info["mime_type"]:
             mime_type = file_info["mime_type"]

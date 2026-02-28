@@ -47,15 +47,21 @@ def requireRole(role: ManagementRole):
 
     Usage::
 
-        @router.post("/members")
+        @router.post(
+            "/members"
+        )
         async def create_member(
             user_info: Annotated[
                 UserInfo,
-                Depends(requireRole(ManagementRole.MEMBER_ADD))
-            ]
-        ):
-            ...
+                Depends(
+                    requireRole(
+                        ManagementRole.MEMBER_ADD
+                    )
+                ),
+            ],
+        ): ...
     """
+
     async def dependency(
         token: Annotated[str, Security(oauth_2_scheme)],
         auth_service: Annotated[AuthService, Depends(getAuthService)],
@@ -73,18 +79,24 @@ def requireAnyRole(roles: list[ManagementRole]):
 
     Usage::
 
-        @router.get("/members")
+        @router.get(
+            "/members"
+        )
         async def list_members(
             user_info: Annotated[
                 UserInfo,
-                Depends(requireAnyRole([
-                    ManagementRole.MEMBER_VIEW,
-                    ManagementRole.MEMBER_ADMIN
-                ]))
-            ]
-        ):
-            ...
+                Depends(
+                    requireAnyRole(
+                        [
+                            ManagementRole.MEMBER_VIEW,
+                            ManagementRole.MEMBER_ADMIN,
+                        ]
+                    )
+                ),
+            ],
+        ): ...
     """
+
     async def dependency(
         token: Annotated[str, Security(oauth_2_scheme)],
         auth_service: Annotated[AuthService, Depends(getAuthService)],
@@ -102,18 +114,24 @@ def requireAllRoles(roles: list[ManagementRole]):
 
     Usage::
 
-        @router.post("/admin/critical")
+        @router.post(
+            "/admin/critical"
+        )
         async def critical_operation(
             user_info: Annotated[
                 UserInfo,
-                Depends(requireAllRoles([
-                    ManagementRole.SUPER_ADMIN,
-                    ManagementRole.AUDIT_VIEW
-                ]))
-            ]
-        ):
-            ...
+                Depends(
+                    requireAllRoles(
+                        [
+                            ManagementRole.SUPER_ADMIN,
+                            ManagementRole.AUDIT_VIEW,
+                        ]
+                    )
+                ),
+            ],
+        ): ...
     """
+
     async def dependency(
         token: Annotated[str, Security(oauth_2_scheme)],
         auth_service: Annotated[AuthService, Depends(getAuthService)],

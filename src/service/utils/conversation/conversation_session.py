@@ -1,3 +1,7 @@
+from hmac import new
+import json
+
+from src.service.utils.agent.dtos.generation_output import ResponseStatus
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import FileType, FileUploadInfo
@@ -5,6 +9,12 @@ from ..agent.dtos.model import (
     AudioInput,
     ImageInput,
     ModelInput,
+    StreamEvent,
+    StreamEvent_FinalResult,
+    StreamEvent_PartDelta_Output,
+    StreamEvent_PartType,
+    StreamEventType,
+    StreamEventType,
     VideoInput,
     AudioURLInput,
     DocumentInput,
@@ -12,7 +22,6 @@ from ..agent.dtos.model import (
     VideoURLInput,
     DocumentURLInput,
 )
-from ..agent.stream_handler import StreamHandler
 from ..file_storage.services import (
     FileStorageService,
     FileNotFoundInSystemError,
@@ -23,10 +32,16 @@ import uuid
 import base64
 import asyncio
 from typing import (
+    AsyncGenerator,
+    AsyncGenerator,
+    AsyncIterator,
     Sequence,
+    cast,
 )
 
 from pydantic_ai import (
+    AgentRunResultEvent,
+    AgentStreamEvent,
     AudioUrl,
     ImageUrl,
     VideoUrl,
@@ -64,31 +79,29 @@ class InvalidBase64ContentError(RecoverableError):
 class ConversationSession:
     """Manages the state of a conversation session, including message history and file uploads."""
 
-    stream_handler: StreamHandler
     mess_history: Sequence[ModelMessage]
     file_service: FileStorageService
     file_upload_queue: asyncio.Queue[FileUploadInfo]
     file_upload_map: dict[uuid.UUID, FileUploadInfo] = {}
+    new_messages: Sequence[ModelMessage] | None = None
 
     def __init__(
         self,
-        stream_handler: StreamHandler,
         mess_history: Sequence[ModelMessage],
         file_service: FileStorageService,
+        conversation_uid: uuid.UUID,
         project_id: int,
     ):
-        self.stream_handler = stream_handler
         self.mess_history = mess_history
         self.file_service = file_service
         self.file_upload_map = {}
         self.file_upload_queue = asyncio.Queue()
         self.project_id = project_id
+        self.conversation_uid = conversation_uid
+        self.new_messages = None
 
     def getMessageHistory(self) -> Sequence[ModelMessage]:
         return self.mess_history
-
-    def getStreamHandler(self) -> StreamHandler:
-        return self.stream_handler
 
     def extractFileContentFromUrl(
         self, data_url: str
@@ -141,13 +154,17 @@ class ConversationSession:
                 elif isinstance(message, ImageInput):
                     root_message = message.root
                     if isinstance(root_message, ImageURLInput):
-                        result = self.extractFileContentFromUrl(root_message.url)
+                        result = self.extractFileContentFromUrl(
+                            root_message.url
+                        )
                         if result.is_ok():
                             mime_type, file_data = result.unwrap()
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
                             )
-                            content = BinaryContent.from_data_uri(root_message.url)
+                            content = BinaryContent.from_data_uri(
+                                root_message.url
+                            )
                             content.vendor_metadata = {
                                 "file_id": file_id,
                                 "is_uploading": True,
@@ -157,8 +174,10 @@ class ConversationSession:
                             # If not data URL, assume it's a direct URL
                             content = ImageUrl(url=root_message.url)
                     else:
-                        _res = await self.file_service.get_file_metadata_and_url(
-                            root_message.file_id, self.project_id
+                        _res = (
+                            await self.file_service.get_file_metadata_and_url(
+                                root_message.file_id, self.project_id
+                            )
                         )
                         if isinstance(_res, Err):
                             return _res
@@ -166,9 +185,10 @@ class ConversationSession:
                         content = ImageUrl(
                             url=file_url,
                             vendor_metadata={
-                            "file_id": root_message.file_id,
-                            "file_type": FileType.IMAGE,
-                        })
+                                "file_id": root_message.file_id,
+                                "file_type": FileType.IMAGE,
+                            },
+                        )
                     model_input.append(content)
                 elif isinstance(message, AudioInput):
                     root_message = message.root
@@ -179,7 +199,9 @@ class ConversationSession:
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
                             )
-                            content = BinaryContent.from_data_uri(root_message.url)
+                            content = BinaryContent.from_data_uri(
+                                root_message.url
+                            )
                             content.vendor_metadata = {
                                 "file_id": file_id,
                                 "is_uploading": True,
@@ -189,8 +211,10 @@ class ConversationSession:
                             # If not data URL, assume it's a direct URL
                             content = AudioUrl(url=root_message.url)
                     else:
-                        _res = await self.file_service.get_file_metadata_and_url(
-                            root_message.file_id, self.project_id
+                        _res = (
+                            await self.file_service.get_file_metadata_and_url(
+                                root_message.file_id, self.project_id
+                            )
                         )
                         if isinstance(_res, Err):
                             return _res
@@ -198,9 +222,10 @@ class ConversationSession:
                         content = AudioUrl(
                             url=file_url,
                             vendor_metadata={
-                            "file_id": root_message.file_id,
-                            "file_type": FileType.AUDIO,
-                        })
+                                "file_id": root_message.file_id,
+                                "file_type": FileType.AUDIO,
+                            },
+                        )
                     model_input.append(content)
                 elif isinstance(message, VideoInput):
                     root_message = message.root
@@ -211,7 +236,9 @@ class ConversationSession:
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
                             )
-                            content = BinaryContent.from_data_uri(root_message.url)
+                            content = BinaryContent.from_data_uri(
+                                root_message.url
+                            )
                             content.vendor_metadata = {
                                 "file_id": file_id,
                                 "is_uploading": True,
@@ -221,8 +248,10 @@ class ConversationSession:
                             # If not data URL, assume it's a direct URL
                             content = VideoUrl(url=root_message.url)
                     else:
-                        _res = await self.file_service.get_file_metadata_and_url(
-                            root_message.file_id, self.project_id
+                        _res = (
+                            await self.file_service.get_file_metadata_and_url(
+                                root_message.file_id, self.project_id
+                            )
                         )
                         if isinstance(_res, Err):
                             return _res
@@ -230,9 +259,10 @@ class ConversationSession:
                         content = VideoUrl(
                             url=file_url,
                             vendor_metadata={
-                            "file_id": root_message.file_id,
-                            "file_type": FileType.VIDEO,
-                        })
+                                "file_id": root_message.file_id,
+                                "file_type": FileType.VIDEO,
+                            },
+                        )
                     model_input.append(content)
                 elif isinstance(message, DocumentInput):
                     root_message = message.root
@@ -243,7 +273,9 @@ class ConversationSession:
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
                             )
-                            content = BinaryContent.from_data_uri(root_message.url)
+                            content = BinaryContent.from_data_uri(
+                                root_message.url
+                            )
                             content.vendor_metadata = {
                                 "file_id": file_id,
                                 "is_uploading": True,
@@ -252,11 +284,14 @@ class ConversationSession:
                         else:
                             # If not data URL, assume it's a direct URL
                             content = DocumentUrl(
-                                url=root_message.url, media_type=root_message.mime_type
+                                url=root_message.url,
+                                media_type=root_message.mime_type,
                             )
                     else:
-                        _res = await self.file_service.get_file_metadata_and_url(
-                            root_message.file_id, self.project_id
+                        _res = (
+                            await self.file_service.get_file_metadata_and_url(
+                                root_message.file_id, self.project_id
+                            )
                         )
                         if isinstance(_res, Err):
                             return _res
@@ -273,3 +308,157 @@ class ConversationSession:
                 else:
                     pass
         return Ok(model_input)
+
+    async def convertSSEStream[T](
+        self,
+        agent_stream: AsyncIterator[AgentStreamEvent | AgentRunResultEvent[T]],
+    ) -> AsyncGenerator[StreamEvent[T]]:
+        yield {
+            "event": StreamEventType.conversation_start,
+            "data": {
+                "conversation_id": str(self.conversation_uid),
+            },
+        }
+        async for event in agent_stream:
+            # self.logger.debug("Got new event", new_event=event)
+            match event.event_kind:
+                case "part_start":
+                    part = event.part
+                    match part.part_kind:
+                        case "text":
+                            yield {
+                                "event": StreamEventType.part_start,
+                                "data": StreamEvent_PartType.output,
+                            }
+                            if part.has_content():
+                                yield {
+                                    "event": StreamEventType.part_delta,
+                                    "data": {
+                                        "type": StreamEvent_PartType.output,
+                                        "delta": part.content,
+                                    },
+                                }
+                        case "thinking":
+                            yield {
+                                "event": StreamEventType.part_start,
+                                "data": StreamEvent_PartType.thinking,
+                            }
+                            if part.has_content():
+                                yield {
+                                    "event": StreamEventType.part_delta,
+                                    "data": {
+                                        "type": StreamEvent_PartType.thinking,
+                                        "delta": part.content,
+                                    },
+                                }
+                        case "tool-call":
+                            yield {
+                                "event": StreamEventType.part_start,
+                                "data": StreamEvent_PartType.builtin_tool_call,
+                            }
+                        case "builtin-tool-call":
+                            yield {
+                                "event": StreamEventType.part_start,
+                                "data": StreamEvent_PartType.builtin_tool_call,
+                            }
+                        case "builtin-tool-return":
+                            yield {
+                                "event": StreamEventType.part_start,
+                                "data": StreamEvent_PartType.builtin_tool_result,
+                            }
+                        case _:
+                            pass
+                case "part_delta":
+                    mapped_event = StreamEventType.part_delta
+                    delta = event.delta
+                    match delta.part_delta_kind:
+                        case "text":
+                            data: StreamEvent_PartDelta_Output = {
+                                "type": StreamEvent_PartType.output,
+                                "delta": delta.content_delta,
+                            }
+                            yield {
+                                "event": mapped_event,
+                                "data": data,
+                            }
+                        case "thinking":
+                            yield {
+                                "event": mapped_event,
+                                "data": {
+                                    "type": StreamEvent_PartType.thinking,
+                                    "delta": delta.content_delta,
+                                },
+                            }
+                        case "tool_call":
+                            pass
+                        case _:
+                            pass
+                case "function_tool_call":
+                    yield {
+                        "event": StreamEventType.part_delta,
+                        "data": {
+                            "type": StreamEvent_PartType.builtin_tool_call,
+                            "tool_call_id": event.part.tool_call_id,
+                            "hinted_tool_name": event.part.tool_name,
+                            "hinted_args": event.part.args_as_json_str(),
+                        },
+                    }
+                case "function_tool_result":
+                    # Put part start to signify the end of last part
+                    yield {
+                        "event": StreamEventType.part_start,
+                        "data": StreamEvent_PartType.builtin_tool_result,
+                    }
+                    yield {
+                        "event": StreamEventType.part_delta,
+                        "data": {
+                            "type": StreamEvent_PartType.builtin_tool_result,
+                            "tool_call_id": event.result.tool_call_id,
+                            "hinted_result": json.dumps(
+                                event.result.content, ensure_ascii=False
+                            ),
+                        },
+                    }
+                case "builtin_tool_call":
+                    yield {
+                        "event": StreamEventType.part_delta,
+                        "data": {
+                            "type": StreamEvent_PartType.builtin_tool_call,
+                            "tool_call_id": event.part.tool_call_id,
+                            "hinted_tool_name": event.part.tool_name,
+                            "hinted_args": event.part.args_as_json_str(),
+                        },
+                    }
+                case "builtin_tool_result":
+                    yield {
+                        "event": StreamEventType.part_delta,
+                        "data": {
+                            "type": StreamEvent_PartType.builtin_tool_result,
+                            "tool_call_id": event.result.tool_call_id,
+                            "hinted_result": json.dumps(
+                                event.result.content, ensure_ascii=False
+                            ),
+                        },
+                    }
+                case "final_result":
+                    pass
+                case "agent_run_result":
+                    # self.logger.debug("Got final result")
+                    usage = event.result.usage()
+                    result: StreamEvent_FinalResult[T] = {
+                        "event": StreamEventType.final_result,
+                        "data": {
+                            "id": cast(str, event.result.run_id),
+                            "conversation_id": str(self.conversation_uid),
+                            "status": ResponseStatus.completed,
+                            "output": event.result.output,
+                            "usage": {
+                                "input_tokens": usage.input_tokens,
+                                "output_tokens": usage.output_tokens,
+                            },
+                        },
+                    }
+                    yield result
+                    self.new_messages = event.result.new_messages()
+                case _:
+                    pass

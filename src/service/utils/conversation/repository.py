@@ -34,9 +34,7 @@ class ConversationRepository(Repository[Conversation, int]):
         last_cursor: int | None = None,
         order_by: Literal["asc", "desc"] = "asc",
     ) -> Sequence[Message]:
-        stmt = select(Message).where(
-            Message.conversation_id == conversation_id
-        )
+        stmt = select(Message).where(Message.conversation_id == conversation_id)
 
         if order_by == "asc":
             if last_cursor is not None:

@@ -213,10 +213,12 @@ Environment variables:
         for role_name in args.roles:
             if role_name in available_roles_map:
                 role_data = available_roles_map[role_name]
-                roles_to_assign.append({
-                    "id": role_data["id"],
-                    "name": role_data["name"],
-                })
+                roles_to_assign.append(
+                    {
+                        "id": role_data["id"],
+                        "name": role_data["name"],
+                    }
+                )
             else:
                 missing_roles.append(role_name)
 

@@ -6,6 +6,7 @@ from typing import Any, Literal, Sequence, TypedDict
 
 from pydantic_core import ErrorDetails
 
+
 class FileType(enum.Enum):
     """Enumeration of supported file types."""
 
@@ -13,6 +14,7 @@ class FileType(enum.Enum):
     VIDEO = "video"
     AUDIO = "audio"
     DOCUMENT = "document"
+
 
 class SerializedTextContentPart(TypedDict):
     """Serialized representation of a message part."""

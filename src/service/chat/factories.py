@@ -1,4 +1,4 @@
-from src.db.factories import getRedis, getSessionManager
+from src.db.factories import getSessionManager
 from src.shared.utils.logger import getLogger
 
 from .agents import getChatAgent
@@ -20,5 +20,4 @@ def getChatService():
         getChatAgent(),
         getModelsService(),
         getConversationManager(),
-        getRedis(),
     )

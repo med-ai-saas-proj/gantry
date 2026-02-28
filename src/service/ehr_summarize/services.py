@@ -2,13 +2,15 @@
 
 from src.ehr import ehr_utils
 from src.ehr.dtos import InputEHR
+from src.service.utils.conversation.conversation_manager import (
+    ConversationManager,
+)
 from src.shared.utils import dict_utils
 from src.ehr.custom_types import EHRDict
 
 from .agents import constructEhrSummarizeAgentDeps
 from ..utils.agent.stream import (
     aggregateStream,
-    convertAgentStream,
 )
 from ..utils.agent.agent_deps import AgentDeps
 from ..utils.agent.dtos.model import ChatOutput, StreamEvent
@@ -29,10 +31,12 @@ class EHRSummarizeService:
         agent: Agent[AgentDeps, str],
         # agent: Agent[Dep, AnswerStruct],
         models_service: ModelsService,
+        conversion_manager: ConversationManager,
     ):
         self.agent = agent
         self.logger = logger
         self.models_service = models_service
+        self.conversion_manager = conversion_manager
 
     def _ehr_to_prompt(self, ehr: EHRDict):
         processed_ehr = ehr_utils.prune_and_preprocess_input_ehr(ehr)
@@ -46,14 +50,24 @@ class EHRSummarizeService:
         model, model_config = self.models_service.get_model(model_id)
         model_input = [self._ehr_to_prompt(EHRDict.from_input_ehr(ehr))]
 
-        async for event in convertAgentStream(
-            self.agent.run_stream_events(
-                model_input,
-                model=model,
-                deps=constructEhrSummarizeAgentDeps(api_key_info, model_config),
-            )
-        ):
-            yield event
+        async with self.conversion_manager.startConversion(
+            None,
+            api_key_info,
+        ) as conversation:
+            async for event in conversation.convertSSEStream(
+                self.agent.run_stream_events(
+                    model_input,
+                    model=model,
+                    deps=constructEhrSummarizeAgentDeps(
+                        api_key_info, model_config
+                    ),
+                )
+            ):
+                try:
+                    yield event
+                except Exception as e:
+                    # current version pydantic ai not supported cancel
+                    print("Error yielding event", e)
 
     async def summarize(
         self, api_key_info: ApiKeyInfo, model_id: str, ehr: InputEHR

@@ -64,7 +64,7 @@ def get_auth_token(
                 print(
                     f"  2. Navigate: {realm} → Clients → "
                     f"{client_id} → Settings",
-                    file=sys.stderr
+                    file=sys.stderr,
                 )
                 print("  3. Enable: Direct access grants", file=sys.stderr)
                 print("  4. Save", file=sys.stderr)

@@ -37,11 +37,7 @@ class PermissionRepository(Repository[Permission, str]):
         self, session: AsyncSession, permission_id: int
     ) -> Permission | None:
         """Get permission by ID."""
-        stmt = (
-            select(Permission)
-            .where(Permission.id == permission_id)
-            .limit(1)
-        )
+        stmt = select(Permission).where(Permission.id == permission_id).limit(1)
         return await self.selectOne(session, stmt)
 
     async def getPermissionByName(

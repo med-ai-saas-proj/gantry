@@ -58,6 +58,15 @@ class UserNotFoundError(UnrecoverableError):
     detail = "Check the user table, there is null in there"
 
 
+class ApiKeyNotFoundError(RecoverableError):
+    """Raised when an API key is not found or access is denied."""
+
+    status = 404
+    code = "api_key_not_found"
+    title = "API Key Not Found"
+    detail = "The requested API key does not exist or you do not have permission to access it."
+
+
 class ApiKeyServiceConfig(TypedDict):
     """Configuration for ApiKeyService."""
 

@@ -11,7 +11,9 @@ class AsyncSessionManager:
     def __init__(self, async_engine):
         """Initialize the session manager with the given async engine."""
         self.async_engine = async_engine
-        self.sessionmaker = async_sessionmaker(async_engine, expire_on_commit=False)
+        self.sessionmaker = async_sessionmaker(
+            async_engine, expire_on_commit=False
+        )
 
     @contextlib.asynccontextmanager
     async def get_session(self):

@@ -100,7 +100,9 @@ class FileStorageService:
             mime_type,
         )
         async with self.session_manager.get_session() as session:
-            file_record = await self.file_repo.getUploadingByUUID(session, file_record.uuid)
+            file_record = await self.file_repo.getUploadingByUUID(
+                session, file_record.uuid
+            )
             file_record = cast(File, file_record)
             file_record.status = FileStatus.AVAILABLE
             await session.commit()
@@ -167,12 +169,13 @@ class FileStorageService:
         return Ok((url, file_record))
 
     async def get_file_metadata(
-        self,
-            file_uuid: uuid.UUID, project_id: int
+        self, file_uuid: uuid.UUID, project_id: int
     ) -> Result[FileRecord, FileNotFoundInSystemError]:
         """Retrieve file metadata by UUID."""
         async with self.session_manager.get_session() as session:
-            file_record = await self.file_repo.getByUUID(session, file_uuid, project_id)
+            file_record = await self.file_repo.getByUUID(
+                session, file_uuid, project_id
+            )
             if not file_record or file_record.status != FileStatus.AVAILABLE:
                 return Err(FileNotFoundInSystemError())
 
@@ -188,25 +191,25 @@ class FileStorageService:
             )
 
     async def delete_file(
-        self,
-      file_id: uuid.UUID,
-          project_id: int
+        self, file_id: uuid.UUID, project_id: int
     ) -> Result[None, FileNotFoundInSystemError]:
         """Delete a file from storage and remove its metadata."""
         async with self.session_manager.get_session() as session:
             file_record = await self.file_repo.getByUUID(
-                session,
-                file_id, project_id)
+                session, file_id, project_id
+            )
             if not file_record:
                 return Err(FileNotFoundInSystemError())
-            file_record .status = FileStatus.DELETED
+            file_record.status = FileStatus.DELETED
             await session.commit()
         self.storage_backend.delete_object(
             Bucket=self.file_storage_settings.s3_bucket_name,
             Key=file_record.filepath,
         )
         async with self.session_manager.get_session() as session:
-            file_record = await self.file_repo.getByUUID(session, file_id, project_id)
+            file_record = await self.file_repo.getByUUID(
+                session, file_id, project_id
+            )
             if not file_record:
                 return Err(FileNotFoundInSystemError())
             await session.delete(file_record)
@@ -214,17 +217,19 @@ class FileStorageService:
         return Ok(None)
 
     async def list_files(self, project_id: int) -> list[FileRecord]:
-         """List all available files for a project."""
-         async with self.session_manager.get_session() as session:
-             file_records = await self.file_repo.getFileListByProjectID(session, project_id)
-             return [
-                 {
-                     "id": str(file_record.uuid),
-                     "filename": file_record.original_filename,
-                     "storage_path": file_record.filepath,
-                     "mime_type": file_record.mime_type,
-                     "size": file_record.size_in_bytes,
-                     "created_at": file_record.created_at,
-                 }
-                 for file_record in file_records
-             ]
+        """List all available files for a project."""
+        async with self.session_manager.get_session() as session:
+            file_records = await self.file_repo.getFileListByProjectID(
+                session, project_id
+            )
+            return [
+                {
+                    "id": str(file_record.uuid),
+                    "filename": file_record.original_filename,
+                    "storage_path": file_record.filepath,
+                    "mime_type": file_record.mime_type,
+                    "size": file_record.size_in_bytes,
+                    "created_at": file_record.created_at,
+                }
+                for file_record in file_records
+            ]

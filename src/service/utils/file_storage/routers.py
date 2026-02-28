@@ -65,6 +65,7 @@ async def upload_file(
         file_id=str(file_id),
     )
 
+
 @file_storage_router.get(
     "/",
     summary="List files in the file storage service.",
@@ -80,7 +81,9 @@ async def list_files(
     ],
 ):
     """List files in the file storage service."""
-    files_metadata = await file_storage_service.list_files(api_key_info["project_id"])
+    files_metadata = await file_storage_service.list_files(
+        api_key_info["project_id"]
+    )
     return [
         FileMetadataResponseDTO(
             id=str(file_metadata["id"]),
@@ -115,16 +118,19 @@ async def list_files(
 )
 async def download_file(
     file_id: uuid.UUID,
-        api_key_info: Annotated[
-            ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
-        ],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
 ):
     """Download a file by file ID."""
-    presigned_url = (await file_storage_service.get_file_url(file_id, api_key_info["project_id"]
-                                                             )).unwrap()
+    presigned_url = (
+        await file_storage_service.get_file_url(
+            file_id, api_key_info["project_id"]
+        )
+    ).unwrap()
     return RedirectResponse(url=presigned_url)
 
 
@@ -147,17 +153,20 @@ async def get_file_url_and_metadata(
     (
         presigned_url,
         file_metadata,
-    ) = (await file_storage_service.get_file_metadata_and_url(file_id, api_key_info["project_id"]
-                                                              )).unwrap()
-    return FileMetadataWithPresignedURLResponseDTO(
-            id=str(file_metadata["id"]),
-            filename=file_metadata["filename"],
-            storage_path=file_metadata["storage_path"],
-            mime_type=file_metadata["mime_type"],
-            size=file_metadata["size"],
-            created_at=file_metadata["created_at"],
-            url=presigned_url,
+    ) = (
+        await file_storage_service.get_file_metadata_and_url(
+            file_id, api_key_info["project_id"]
         )
+    ).unwrap()
+    return FileMetadataWithPresignedURLResponseDTO(
+        id=str(file_metadata["id"]),
+        filename=file_metadata["filename"],
+        storage_path=file_metadata["storage_path"],
+        mime_type=file_metadata["mime_type"],
+        size=file_metadata["size"],
+        created_at=file_metadata["created_at"],
+        url=presigned_url,
+    )
 
 
 @file_storage_router.get(
@@ -177,7 +186,9 @@ async def get_file_metadata(
 ):
     """Get file metadata by file ID."""
     file_metadata = (
-        await file_storage_service.get_file_metadata(file_id, api_key_info["project_id"])
+        await file_storage_service.get_file_metadata(
+            file_id, api_key_info["project_id"]
+        )
     ).unwrap()
     return FileMetadataResponseDTO(
         id=str(file_metadata["id"]),
@@ -205,11 +216,15 @@ async def get_file_presigned_url(
     ],
 ):
     """Get presigned URL for file download."""
-    presigned_url = (await file_storage_service.get_file_url(file_id, api_key_info["project_id"]
-                                                             )).unwrap()
+    presigned_url = (
+        await file_storage_service.get_file_url(
+            file_id, api_key_info["project_id"]
+        )
+    ).unwrap()
     return FilePresignedURLResponseDTO(
         url=presigned_url,
     )
+
 
 @file_storage_router.delete(
     "/{file_id}",
@@ -227,7 +242,9 @@ async def delete_file(
     ],
 ):
     """Delete a file by file ID."""
-    (await file_storage_service.delete_file(
-        file_id, api_key_info["project_id"]
-    )).unwrap()
+    (
+        await file_storage_service.delete_file(
+            file_id, api_key_info["project_id"]
+        )
+    ).unwrap()
     return None
