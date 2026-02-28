@@ -2,15 +2,11 @@ from .dtos.model import (
     StreamEvent,
     StreamEvent_PartDelta_Output,
     StreamEvent_PartType,
-    StreamEvent_PartDelta,
-    StreamEvent_PartStart,
     StreamEvent_FinalResult,
-    StreamEvent_ConversationStart,
     StreamEventType,
 )
 from .dtos.generation_output import (
     ResponseStatus,
-    GenerationOutput,
 )
 
 import json
@@ -192,5 +188,6 @@ class StreamHandler:
                         },
                     }
                     yield result
+                    self.new_messages = event.result.new_messages()
                 case _:
                     pass

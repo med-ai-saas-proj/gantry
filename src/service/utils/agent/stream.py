@@ -1,49 +1,31 @@
-import asyncio
+import json
 
-from src.management.api_keys.entities import ApiKeyInfo
-from src.service.utils.file_storage.utils import (
-    detect_file_type,
+from pydantic_ai import (
+    AgentRunResultEvent,
+    AgentStreamEvent,
+    ModelRequest,
+    ModelResponse,
 )
-from src.service.utils.conversation.services import ConversationService
 
 from .dtos.model import (
     ChatOutput,
-    ModelInput,
     StreamEvent,
-    StreamEvent_PartDelta,
-    StreamEvent_PartStart,
+    StreamEvent_FinalResult,
+    StreamEvent_PartDelta_Output,
     StreamEventType,
     ModelResponseContent,
     StreamEvent_PartType,
-    StreamEvent_FinalResult,
     ModelResponse_ContentType,
 )
 from .dtos.generation_output import (
-    ResponseStatus,
     GenerationOutput,
+    ResponseStatus,
 )
-from ..file_storage.factories import getFileStorageService
 
-import json
-import uuid
-import base64
 from typing import (
-    Sequence,
-    AsyncIterator,
     AsyncGenerator,
+    AsyncIterator,
     cast,
-)
-
-from pydantic_ai.run import AgentRunResultEvent
-from pydantic_ai.messages import (
-    AudioUrl,
-    ImageUrl,
-    VideoUrl,
-    DocumentUrl,
-    UserContent,
-    ModelRequest,
-    ModelResponse,
-    AgentStreamEvent,
 )
 
 
@@ -146,16 +128,26 @@ async def aggregateStream[T](
                             last_part["type"]
                             == ModelResponse_ContentType.builtin_tool_call
                         ), last_part["type"]
-                        last_part["tool_call_id"] = part_delta_data["tool_call_id"]
-                        last_part["hinted_tool_name"] = part_delta_data["hinted_tool_name"]
-                        last_part["hinted_args"] = part_delta_data["hinted_args"]
+                        last_part["tool_call_id"] = part_delta_data[
+                            "tool_call_id"
+                        ]
+                        last_part["hinted_tool_name"] = part_delta_data[
+                            "hinted_tool_name"
+                        ]
+                        last_part["hinted_args"] = part_delta_data[
+                            "hinted_args"
+                        ]
                     case StreamEvent_PartType.builtin_tool_result:
                         assert (
                             last_part["type"]
                             == ModelResponse_ContentType.builtin_tool_result
                         ), last_part["type"]
-                        last_part["tool_call_id"] = part_delta_data["tool_call_id"]
-                        last_part["hinted_result"] = part_delta_data["hinted_result"]
+                        last_part["tool_call_id"] = part_delta_data[
+                            "tool_call_id"
+                        ]
+                        last_part["hinted_result"] = part_delta_data[
+                            "hinted_result"
+                        ]
                     case _:
                         pass
             case StreamEventType.final_result:
@@ -168,3 +160,154 @@ async def aggregateStream[T](
     final_output_["output"] = model_response
     return final_output_
 
+
+async def convertAgentStream[T](
+    agent_stream: AsyncIterator[AgentStreamEvent | AgentRunResultEvent[T]],
+) -> AsyncGenerator[StreamEvent[T]]:
+    # i = 0
+    yield {
+        "event": StreamEventType.conversation_start,
+        "data": {
+            "conversation_id": "thisisaplaceholder",
+        },
+    }
+    async for event in agent_stream:
+        match event.event_kind:
+            case "part_start":
+                part = event.part
+                match part.part_kind:
+                    case "text":
+                        yield {
+                            "event": StreamEventType.part_start,
+                            "data": StreamEvent_PartType.output,
+                        }
+                        if part.has_content():
+                            yield {
+                                "event": StreamEventType.part_delta,
+                                "data": {
+                                    "type": StreamEvent_PartType.output,
+                                    "delta": part.content,
+                                },
+                            }
+                    case "thinking":
+                        yield {
+                            "event": StreamEventType.part_start,
+                            "data": StreamEvent_PartType.thinking,
+                        }
+                        if part.has_content():
+                            yield {
+                                "event": StreamEventType.part_delta,
+                                "data": {
+                                    "type": StreamEvent_PartType.thinking,
+                                    "delta": part.content,
+                                },
+                            }
+                    case "tool-call":
+                        yield {
+                            "event": StreamEventType.part_start,
+                            "data": StreamEvent_PartType.builtin_tool_call,
+                        }
+                    case "builtin-tool-call":
+                        yield {
+                            "event": StreamEventType.part_start,
+                            "data": StreamEvent_PartType.builtin_tool_call,
+                        }
+                    case "builtin-tool-return":
+                        yield {
+                            "event": StreamEventType.part_start,
+                            "data": StreamEvent_PartType.builtin_tool_result,
+                        }
+                    case _:
+                        pass
+            case "part_delta":
+                mapped_event = StreamEventType.part_delta
+                delta = event.delta
+                match delta.part_delta_kind:
+                    case "text":
+                        data: StreamEvent_PartDelta_Output = {
+                            "type": StreamEvent_PartType.output,
+                            "delta": delta.content_delta,
+                        }
+                        yield {
+                            "event": mapped_event,
+                            "data": data,
+                        }
+                    case "thinking":
+                        yield {
+                            "event": mapped_event,
+                            "data": {
+                                "type": StreamEvent_PartType.thinking,
+                                "delta": delta.content_delta,
+                            },
+                        }
+                    case "tool_call":
+                        pass
+                    case _:
+                        pass
+            case "function_tool_call":
+                yield {
+                    "event": StreamEventType.part_delta,
+                    "data": {
+                        "type": StreamEvent_PartType.builtin_tool_call,
+                        "tool_call_id": event.part.tool_call_id,
+                        "hinted_tool_name": event.part.tool_name,
+                        "hinted_args": event.part.args_as_json_str(),
+                    },
+                }
+            case "function_tool_result":
+                # Put part start to signify the end of last part
+                yield {
+                    "event": StreamEventType.part_start,
+                    "data": StreamEvent_PartType.builtin_tool_result,
+                }
+                yield {
+                    "event": StreamEventType.part_delta,
+                    "data": {
+                        "type": StreamEvent_PartType.builtin_tool_result,
+                        "tool_call_id": event.result.tool_call_id,
+                        "hinted_result": json.dumps(
+                            event.result.content, ensure_ascii=False
+                        ),
+                    },
+                }
+            case "builtin_tool_call":
+                yield {
+                    "event": StreamEventType.part_delta,
+                    "data": {
+                        "type": StreamEvent_PartType.builtin_tool_call,
+                        "tool_call_id": event.part.tool_call_id,
+                        "hinted_tool_name": event.part.tool_name,
+                        "hinted_args": event.part.args_as_json_str(),
+                    },
+                }
+            case "builtin_tool_result":
+                yield {
+                    "event": StreamEventType.part_delta,
+                    "data": {
+                        "type": StreamEvent_PartType.builtin_tool_result,
+                        "tool_call_id": event.result.tool_call_id,
+                        "hinted_result": json.dumps(
+                            event.result.content, ensure_ascii=False
+                        ),
+                    },
+                }
+            case "final_result":
+                pass
+            case "agent_run_result":
+                usage = event.result.usage()
+                result: StreamEvent_FinalResult[T] = {
+                    "event": StreamEventType.final_result,
+                    "data": {
+                        "conversation_id": "thisisaplaceholder",
+                        "id": "thisisaplaceholder",
+                        "status": ResponseStatus.completed,
+                        "output": event.result.output,
+                        "usage": {
+                            "input_tokens": usage.input_tokens,
+                            "output_tokens": usage.output_tokens,
+                        },
+                    },
+                }
+                yield result
+            case _:
+                pass
