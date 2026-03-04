@@ -6,6 +6,7 @@ from src.management.auth.factories import AuthService, getAuthService
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .services import InvalidPermissionError
+from .settings import getOrgSettings
 from .factories import OrgService, getOrgService
 from .permissions import OrgPermission, has_permission
 
@@ -18,6 +19,7 @@ from fastapi.security import OAuth2AuthorizationCodeBearer
 auth_settings = getAuthSettings()
 server_url_str = auth_settings.server_url.encoded_string()
 realm_name = auth_settings.realm_name
+org_settings = getOrgSettings()
 
 oauth_2_scheme = OAuth2AuthorizationCodeBearer(
     tokenUrl=(
@@ -40,6 +42,21 @@ async def _get_user_info(
     return auth_service.verifyToken(token).unwrap()
 
 
+async def getLimit(
+    org_id: Annotated[str, Path()],
+    org_service: Annotated[OrgService, Depends(getOrgService)],
+) -> int | None:
+    """Return effective org limit (org override or global default)."""
+    settings_res = await org_service.get_settings(org_id)
+    if settings_res.is_err():
+        raise settings_res.error
+
+    org_limit = settings_res.unwrap().rate_limit
+    if org_limit is not None:
+        return org_limit
+    return org_settings.default_rate_limit
+
+
 class _InsufficientOrgPermission(InvalidPermissionError):
     status = 403
     code = "insufficient_org_permission"
@@ -52,6 +69,49 @@ class _KeycloakOrgError(RecoverableError):
     code = "keycloak_error"
     title = "Keycloak Error"
     detail = "Could not fetch organisation permissions from Keycloak."
+
+
+def _is_trusted_backend_service_account(user_info: UserInfo) -> bool:
+    client_id = user_info.get("client_id")
+    username = user_info.get("username")
+    is_service_account = bool(user_info.get("is_service_account"))
+    expected_service_username = (
+        f"service-account-{org_settings.keycloak_service_client_id}"
+    )
+    return (
+        is_service_account
+        and client_id == org_settings.keycloak_service_client_id
+        and username == expected_service_username
+    )
+
+
+def _raise_permission_fetch_error(err: Exception) -> None:
+    err_status = getattr(err, "status", 500)
+    err_code = getattr(err, "code", "")
+    if err_status >= 500:
+        err_detail = getattr(err, "detail", str(err))
+        wrapped = _KeycloakOrgError()
+        wrapped.detail = (
+            "Could not fetch organisation permissions from Keycloak. "
+            f"{err_detail}"
+        )
+        raise wrapped
+
+    if err_code in {"member_not_found", "user_not_in_organization"}:
+        raise _InsufficientOrgPermission()
+
+    raise err
+
+
+async def _get_permissions_or_raise(
+    org_service: OrgService,
+    org_id: str,
+    user_id: str,
+) -> list[str]:
+    perms_res = await org_service.get_user_permissions(org_id, user_id)
+    if perms_res.is_err():
+        _raise_permission_fetch_error(perms_res.error)
+    return perms_res.unwrap().permissions
 
 
 def requiredOrgPermission(permission: OrgPermission):
@@ -83,39 +143,14 @@ def requiredOrgPermission(permission: OrgPermission):
         user_info: Annotated[UserInfo, Depends(_get_user_info)],
         org_service: Annotated[OrgService, Depends(getOrgService)],
     ) -> UserInfo:
-        # Fetch the user's org permissions from Keycloak attributes
-        perms_res = await org_service.get_user_permissions(
-            org_id, user_info["id"]
+        if _is_trusted_backend_service_account(user_info):
+            return user_info
+
+        user_perms = await _get_permissions_or_raise(
+            org_service, org_id, user_info["id"]
         )
-        if perms_res.is_err():
-            err = perms_res.error
-            err_status = getattr(err, "status", 500)
-            err_code = getattr(err, "code", "")
-            if 400 <= err_status < 500:
-                if err_code in {"member_not_found", "user_not_in_organization"}:
-                    raise _InsufficientOrgPermission()
-                raise err
-
-            # Surface configuration / connectivity problems clearly.
-            err_detail = getattr(err, "detail", str(err))
-            wrapped = _KeycloakOrgError()
-            wrapped.detail = (
-                "Could not fetch organisation permissions from Keycloak. "
-                f"{err_detail}"
-            )
-            raise wrapped
-        user_perms: list[str] = perms_res.unwrap().permissions
-
         if not has_permission(user_perms, permission):
             raise _InsufficientOrgPermission()
         return user_info
 
     return _dependency
-
-
-async def getLimit(
-    org_id: Annotated[str, Path()],
-    org_service: Annotated[OrgService, Depends(getOrgService)],
-) -> int | None:
-    """Dependency that resolves the effective rate-limit for an org."""
-    return await org_service.get_limit(org_id)

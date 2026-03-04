@@ -4,12 +4,12 @@ from src.shared.custom_types.error_exception import ProblemDetails
 from .api_keys import apikey_router
 from .organization import org_router
 from .organization.factories import getOrgService
-from .organization.rate_limit_middleware import OrgRateLimitMiddleware
+from .organization.settings import getOrgSettings
 
+import asyncio
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
 
 
 __all__ = ["management_app"]
@@ -33,7 +33,6 @@ management_app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
 )
-management_app.add_middleware(OrgRateLimitMiddleware)
 
 v1_router = APIRouter(prefix="/v1", tags=["v1"], include_in_schema=True)
 v1_router.include_router(apikey_router)
@@ -54,9 +53,9 @@ async def _org_delete_worker_loop():
         try:
             await service.process_due_deletions()
         except Exception:
-            # Keep loop alive; errors are logged by global exception paths.
+            # Keep loop alive; failures are logged in service/global handlers.
             pass
-        await asyncio.sleep(60)
+        await asyncio.sleep(getOrgSettings().deletion_worker_interval_seconds)
 
 
 @management_app.on_event("startup")

@@ -1,18 +1,19 @@
-"""Keycloak Admin REST API client for Organization operations.
+"""Keycloak Admin client adapter for Organization operations.
 
-Wraps the relevant Keycloak endpoints that deal with organizations,
-members, invitations, and user accounts.
+This module uses `python-keycloak` for authentication/session handling,
+while organization endpoints are called via raw admin REST paths.
 """
 
 from src.shared.custom_types.error_exception import RecoverableError
 
 from typing import Any
+import json
+from urllib.parse import urljoin
 
-import httpx
+from keycloak import KeycloakAdmin, KeycloakOpenIDConnection
+from keycloak.exceptions import KeycloakError
+
 from safe_result import Ok, Err, Result
-
-
-_HTTP_TIMEOUT_SECONDS = 15.0
 
 
 # Error types
@@ -76,13 +77,6 @@ class InvitationNotFoundError(RecoverableError):
     detail = "The specified invitation does not exist."
 
 
-class IdentityProviderNotFoundError(RecoverableError):
-    status = 404
-    code = "identity_provider_not_found"
-    title = "Identity Provider Not Found"
-    detail = "The specified identity provider was not found."
-
-
 class InviteEmailError(RecoverableError):
     """Keycloak could not send the invitation email."""
 
@@ -102,9 +96,8 @@ class UserNotInOrganizationError(RecoverableError):
     detail = "The user is not a member of this organization."
 
 
-# Client
 class KeycloakOrgClient:
-    """Async client for Keycloak Organization Admin REST API."""
+    """Async adapter over python-keycloak admin connection."""
 
     def __init__(
         self,
@@ -118,404 +111,216 @@ class KeycloakOrgClient:
         self.service_client_id = service_client_id
         self.service_client_secret = service_client_secret
 
-    # token
-    async def _get_service_token(
-        self,
-    ) -> Result[str, KeycloakOrgError]:
         if not self.service_client_secret:
-            return Err(KeycloakOrgConfigError())
+            self._connection = None
+            self._admin = None
+            self._init_error: KeycloakOrgError | None = KeycloakOrgConfigError()
+            return
 
-        url = (
-            f"{self.base_url}/realms/{self.realm}/protocol/openid-connect/token"
-        )
-        data = {
-            "client_id": self.service_client_id,
-            "client_secret": self.service_client_secret,
-            "grant_type": "client_credentials",
-        }
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.post(
-                    url,
-                    data=data,
-                    headers={
-                        "Content-Type": "application/x-www-form-urlencoded"
-                    },
-                )
-                if resp.status_code == 200:
-                    token = resp.json().get("access_token")
-                    if token:
-                        return Ok(token)
-                return Err(KeycloakOrgError())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            conn = KeycloakOpenIDConnection(
+                server_url=self.base_url,
+                realm_name=self.realm,
+                grant_type="client_credentials",
+                client_id=self.service_client_id,
+                client_secret_key=self.service_client_secret,
+            )
+            self._connection = conn
+            self._admin = KeycloakAdmin(connection=conn)
+            self._init_error = None
+        except Exception as exc:
+            self._connection = None
+            self._admin = None
+            self._init_error = KeycloakOrgError(from_exception=exc)
 
     def _admin_base(self) -> str:
-        return f"{self.base_url}/admin/realms/{self.realm}"
+        return f"/admin/realms/{self.realm}"
 
-    # organisation
-    async def get_organizations_count(
-        self,
-        exact: bool | None = None,
-        q: str | None = None,
-        search: str | None = None,
-    ) -> Result[int, RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        params: dict[str, str] = {}
-        if exact is not None:
-            params["exact"] = str(exact).lower()
-        if q:
-            params["q"] = q
-        if search:
-            params["search"] = search
-
-        url = f"{self._admin_base()}/organizations/count"
+    def _parse_response_json(self, response: Any) -> Any:
+        if not getattr(response, "content", b""):
+            return None
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    params=params,
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            return response.json()
+        except Exception:
+            return None
 
-    async def list_organizations(
+    async def _raw_request(
         self,
-        brief_representation: bool = True,
-        exact: bool | None = None,
-        first: int | None = None,
-        max_results: int | None = None,
-        q: str | None = None,
-        search: str | None = None,
-    ) -> Result[list[dict[str, Any]], RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
+        method: str,
+        path: str,
+        params: dict[str, Any] | None = None,
+        data: Any | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> Result[Any, KeycloakOrgError]:
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._connection is None:
+            return Err(KeycloakOrgError())
 
-        params: dict[str, str | int] = {
-            "briefRepresentation": str(brief_representation).lower()
-        }
-        if exact is not None:
-            params["exact"] = str(exact).lower()
-        if first is not None:
-            params["first"] = first
-        if max_results is not None:
-            params["max"] = max_results
-        if q:
-            params["q"] = q
-        if search:
-            params["search"] = search
-
-        url = f"{self._admin_base()}/organizations"
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    params=params,
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            if headers is not None:
+                await self._connection.a__refresh_if_required()
+                request_headers = {**self._connection.headers, **headers}
+                request_kwargs: dict[str, Any] = {
+                    "headers": request_headers,
+                    "timeout": self._connection.timeout,
+                }
+                if params is not None:
+                    request_kwargs["params"] = params
+                if data is not None:
+                    if isinstance(data, str):
+                        request_kwargs["content"] = data
+                    else:
+                        request_kwargs["data"] = data
 
-    async def create_org(
+                response = await self._connection.async_s.request(
+                    method=method.upper(),
+                    url=urljoin(self.base_url, path),
+                    **request_kwargs,
+                )
+                if response.status_code == 401:
+                    await self._connection.a_refresh_token()
+                    request_kwargs["headers"] = {
+                        **self._connection.headers,
+                        **headers,
+                    }
+                    response = await self._connection.async_s.request(
+                        method=method.upper(),
+                        url=urljoin(self.base_url, path),
+                        **request_kwargs,
+                    )
+                return Ok(response)
+
+            match method:
+                case "get":
+                    response = await self._connection.a_raw_get(
+                        path, params=params, headers=headers
+                    )
+                case "delete":
+                    response = await self._connection.a_raw_delete(
+                        path, params=params, headers=headers
+                    )
+                case "post":
+                    response = await self._connection.a_raw_post(
+                        path, params=params, data=data, headers=headers
+                    )
+                case "put":
+                    response = await self._connection.a_raw_put(
+                        path, params=params, data=data, headers=headers
+                    )
+                case _:
+                    return Err(KeycloakOrgError())
+            return Ok(response)
+        except KeycloakError as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
+
+    def _map_status_error(
         self,
-        payload: dict[str, Any],
-    ) -> Result[dict[str, Any], RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
+        status_code: int,
+        *,
+        not_found_error: RecoverableError | None = None,
+        extra_error_map: dict[int, RecoverableError] | None = None,
+        include_conflict: bool = True,
+    ) -> RecoverableError:
+        if extra_error_map is not None and status_code in extra_error_map:
+            return extra_error_map[status_code]
+        if status_code == 400:
+            return KeycloakOrgBadRequestError()
+        if status_code == 403:
+            return KeycloakOrgForbiddenError()
+        if status_code == 404 and not_found_error is not None:
+            return not_found_error
+        if status_code == 409 and include_conflict:
+            return KeycloakOrgConflictError()
+        return KeycloakOrgError()
 
-        url = f"{self._admin_base()}/organizations"
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.post(
-                    url,
-                    json=payload,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json",
-                    },
-                )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 409:
-                    return Err(KeycloakOrgConflictError())
-                if resp.status_code not in (200, 201, 204):
-                    return Err(KeycloakOrgError())
-                content: dict[str, Any] = {}
-                if resp.content:
-                    content = resp.json()
-                location = resp.headers.get("Location")
-                if location:
-                    content["location"] = location
-                return Ok(content)
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+    def _map_keycloak_error(
+        self,
+        exc: KeycloakError,
+        *,
+        not_found_error: RecoverableError | None = None,
+        extra_error_map: dict[int, RecoverableError] | None = None,
+        include_conflict: bool = True,
+    ) -> RecoverableError:
+        response_code = getattr(exc, "response_code", None)
+        if isinstance(response_code, int):
+            return self._map_status_error(
+                response_code,
+                not_found_error=not_found_error,
+                extra_error_map=extra_error_map,
+                include_conflict=include_conflict,
+            )
+        return KeycloakOrgError(from_exception=exc)
 
     async def get_org(
         self, org_id: str
     ) -> Result[dict[str, Any], RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
 
-        url = f"{self._admin_base()}/organizations/{org_id}"
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
+            payload = await self._admin.a_get_organization(org_id)
+            if isinstance(payload, dict):
+                return Ok(payload)
+            return Err(KeycloakOrgError())
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    not_found_error=OrgNotFoundError(),
                 )
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
 
     async def update_org(
         self,
         org_id: str,
         payload: dict[str, Any],
     ) -> Result[bool, RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
 
-        url = f"{self._admin_base()}/organizations/{org_id}"
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.put(
-                    url,
-                    json=payload,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json",
-                    },
+            await self._admin.a_update_organization(org_id, payload)
+            return Ok(True)
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    not_found_error=OrgNotFoundError(),
                 )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code == 409:
-                    return Err(KeycloakOrgConflictError())
-                if resp.status_code not in (200, 204):
-                    return Err(KeycloakOrgError())
-                return Ok(True)
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
 
-    async def delete_org(self, org_id: str) -> Result[bool, RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = f"{self._admin_base()}/organizations/{org_id}"
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.delete(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code == 409:
-                    return Err(KeycloakOrgConflictError())
-                if resp.status_code not in (200, 204):
-                    return Err(KeycloakOrgError())
-                return Ok(True)
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
-
-    # identity providers
-    async def list_org_identity_providers(
+    async def delete_org(
         self, org_id: str
-    ) -> Result[list[dict[str, Any]], RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = f"{self._admin_base()}/organizations/{org_id}/identity-providers"
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
-
-    async def get_org_identity_provider(
-        self,
-        org_id: str,
-        alias: str,
-    ) -> Result[dict[str, Any], RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = (
-            f"{self._admin_base()}/organizations/{org_id}"
-            f"/identity-providers/{alias}"
-        )
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(IdentityProviderNotFoundError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
-
-    async def add_org_identity_provider(
-        self,
-        org_id: str,
-        provider_id_or_alias: str,
     ) -> Result[bool, RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
 
-        url = f"{self._admin_base()}/organizations/{org_id}/identity-providers"
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.post(
-                    url,
-                    content=provider_id_or_alias.strip(),
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "text/plain",
-                    },
+            await self._admin.a_delete_organization(org_id)
+            return Ok(True)
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    not_found_error=OrgNotFoundError(),
                 )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 409:
-                    return Err(KeycloakOrgConflictError())
-                if resp.status_code not in (200, 204):
-                    return Err(KeycloakOrgError())
-                return Ok(True)
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
 
-    async def remove_org_identity_provider(
-        self,
-        org_id: str,
-        alias: str,
-    ) -> Result[bool, RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = (
-            f"{self._admin_base()}/organizations/{org_id}"
-            f"/identity-providers/{alias}"
-        )
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.delete(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(IdentityProviderNotFoundError())
-                if resp.status_code not in (200, 204):
-                    return Err(KeycloakOrgError())
-                return Ok(True)
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
-
-    # members
     async def get_org_members(
         self,
         org_id: str,
@@ -525,313 +330,161 @@ class KeycloakOrgClient:
         exact: bool | None = None,
         membership_type: str | None = None,
     ) -> Result[list[dict[str, Any]], RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = f"{self._admin_base()}/organizations/{org_id}/members"
-        params: dict[str, str | int] = {
-            "first": first,
-            "max": max_results,
-        }
+        query: dict[str, Any] = {"first": first, "max": max_results}
         if search:
-            params["search"] = search
+            query["search"] = search
         if exact is not None:
-            params["exact"] = str(exact).lower()
+            query["exact"] = str(exact).lower()
         if membership_type:
-            params["membershipType"] = membership_type
+            query["membershipType"] = membership_type
+
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
+
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    params=params,
-                    headers={"Authorization": f"Bearer {token}"},
+            payload = await self._admin.a_get_organization_members(
+                org_id, query=query
+            )
+            if isinstance(payload, list):
+                return Ok(payload)
+            return Err(KeycloakOrgError())
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    not_found_error=OrgNotFoundError(),
                 )
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
 
     async def get_org_member_count(
         self, org_id: str
     ) -> Result[int, RecoverableError]:
-        """GET /organizations/{org-id}/members/count"""
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
 
-        url = f"{self._admin_base()}/organizations/{org_id}/members/count"
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
+            payload = await self._admin.a_get_organization_members_count(org_id)
+            if isinstance(payload, int):
+                return Ok(payload)
+            return Err(KeycloakOrgError())
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    not_found_error=OrgNotFoundError(),
                 )
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
 
     async def get_member_organizations(
         self,
         user_id: str,
         brief_representation: bool = True,
     ) -> Result[list[dict[str, Any]], RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
+        del brief_representation
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
 
-        url = (
-            f"{self._admin_base()}/organizations/members/"
-            f"{user_id}/organizations"
-        )
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    params={
-                        "briefRepresentation": str(brief_representation).lower()
-                    },
-                    headers={"Authorization": f"Bearer {token}"},
+            payload = await self._admin.a_get_user_organizations(user_id)
+            if isinstance(payload, list):
+                return Ok(payload)
+            return Err(KeycloakOrgError())
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    not_found_error=MemberNotFoundError(),
                 )
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 404:
-                    return Err(MemberNotFoundError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
-
-    async def get_org_member(
-        self,
-        org_id: str,
-        user_id: str,
-    ) -> Result[dict[str, Any], RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = f"{self._admin_base()}/organizations/{org_id}/members/{user_id}"
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(MemberNotFoundError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
-
-    async def get_member_organizations_in_org(
-        self,
-        org_id: str,
-        user_id: str,
-        brief_representation: bool = True,
-    ) -> Result[list[dict[str, Any]], RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = (
-            f"{self._admin_base()}/organizations/{org_id}"
-            f"/members/{user_id}/organizations"
-        )
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    params={
-                        "briefRepresentation": str(brief_representation).lower()
-                    },
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(MemberNotFoundError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
-
-    async def add_member(
-        self,
-        org_id: str,
-        user_id: str,
-    ) -> Result[bool, RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = f"{self._admin_base()}/organizations/{org_id}/members"
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.post(
-                    url,
-                    json=user_id,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json",
-                    },
-                )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code == 409:
-                    return Err(KeycloakOrgConflictError())
-                if resp.status_code not in (200, 201, 204):
-                    return Err(KeycloakOrgError())
-                return Ok(True)
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
 
     async def remove_member(
         self, org_id: str, user_id: str
     ) -> Result[bool, RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
 
-        url = f"{self._admin_base()}/organizations/{org_id}/members/{user_id}"
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.delete(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
+            await self._admin.a_organization_user_remove(user_id, org_id)
+            return Ok(True)
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    not_found_error=MemberNotFoundError(),
                 )
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(MemberNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code not in (200, 204):
-                    return Err(KeycloakOrgError())
-                return Ok(True)
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
 
     async def delete_user(self, user_id: str) -> Result[bool, RecoverableError]:
-        """Delete a Keycloak user account entirely."""
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
 
-        url = f"{self._admin_base()}/users/{user_id}"
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.delete(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
+            await self._admin.a_delete_user(user_id)
+            return Ok(True)
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    not_found_error=MemberNotFoundError(),
                 )
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(MemberNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code not in (200, 204):
-                    return Err(KeycloakOrgError())
-                return Ok(True)
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
 
     async def find_user_by_email(
         self,
         email: str,
         exact: bool = True,
     ) -> Result[dict[str, Any] | None, RecoverableError]:
-        """Find a Keycloak user by email in the current realm."""
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
 
-        url = f"{self._admin_base()}/users"
-        params: dict[str, str] = {
-            "email": email,
-            "exact": str(exact).lower(),
-            "max": "1",
-        }
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    params=params,
-                    headers={"Authorization": f"Bearer {token}"},
+            payload = await self._admin.a_get_users(
+                query={
+                    "email": email,
+                    "exact": str(exact).lower(),
+                    "max": 1,
+                }
+            )
+            if not isinstance(payload, list):
+                return Err(KeycloakOrgError())
+            if not payload:
+                return Ok(None)
+            first = payload[0]
+            if not isinstance(first, dict):
+                return Err(KeycloakOrgError())
+            return Ok(first)
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    include_conflict=False,
                 )
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                users = resp.json()
-                if not users:
-                    return Ok(None)
-                return Ok(users[0])
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
 
-    # invitations
     async def invite_user(
         self,
         org_id: str,
@@ -839,95 +492,37 @@ class KeycloakOrgClient:
         first_name: str | None = None,
         last_name: str | None = None,
     ) -> Result[bool, RecoverableError]:
-        """POST /organizations/{org-id}/members/invite-user
-
-        Sends an invitation link to existing users or a
-        registration link to new users.
-        """
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = f"{self._admin_base()}/organizations/{org_id}/members/invite-user"
+        path = f"{self._admin_base()}/organizations/{org_id}/members/invite-user"
         form: dict[str, str] = {"email": email}
         if first_name:
             form["firstName"] = first_name
         if last_name:
             form["lastName"] = last_name
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.post(
-                    url,
-                    data=form,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                )
-                if resp.status_code in (200, 204):
-                    return Ok(True)
-                if resp.status_code == 409:
-                    return Ok(True)  # already invited
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 500:
-                    # SMTP not configured – treat as
-                    # soft success (invite recorded).
-                    return Ok(True)
-                return Err(KeycloakOrgError())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
 
-    async def invite_existing_user(
-        self,
-        org_id: str,
-        user_id_or_email: str,
-    ) -> Result[bool, RecoverableError]:
-        """POST /organizations/{org-id}/members/invite-existing-user"""
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = (
-            f"{self._admin_base()}"
-            f"/organizations/{org_id}"
-            "/members/invite-existing-user"
+        response_res = await self._raw_request(
+            "post",
+            path,
+            data=form,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.post(
-                    url,
-                    data={"id": user_id_or_email.strip()},
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                )
-                if resp.status_code in (200, 201, 204):
-                    return Ok(True)
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code == 409:
-                    return Err(KeycloakOrgConflictError())
-                if resp.status_code == 500:
-                    return Err(KeycloakOrgError())
-                return Err(KeycloakOrgError())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+        if response_res.is_err():
+            return response_res
+
+        response = response_res.unwrap()
+        if response.status_code in (200, 204):
+            return Ok(True)
+        if response.status_code == 409:
+            return Ok(True)
+        if response.status_code == 500:
+            # Treat SMTP issue as soft success.
+            return Ok(True)
+
+        return Err(
+            self._map_status_error(
+                response.status_code,
+                not_found_error=OrgNotFoundError(),
+            )
+        )
 
     async def get_invitations(
         self,
@@ -940,180 +535,130 @@ class KeycloakOrgClient:
         search: str | None = None,
         status: str | None = None,
     ) -> Result[list[dict[str, Any]], RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = f"{self._admin_base()}/organizations/{org_id}/invitations"
-        params: dict[str, str | int] = {}
+        path = f"{self._admin_base()}/organizations/{org_id}/invitations"
+        query: dict[str, Any] = {}
         if email:
-            params["email"] = email
+            query["email"] = email
         if first is not None:
-            params["first"] = first
+            query["first"] = first
         if first_name:
-            params["firstName"] = first_name
+            query["firstName"] = first_name
         if last_name:
-            params["lastName"] = last_name
+            query["lastName"] = last_name
         if max_results is not None:
-            params["max"] = max_results
+            query["max"] = max_results
         if search:
-            params["search"] = search
+            query["search"] = search
         if status:
-            params["status"] = status
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    params=params,
-                    headers={"Authorization": f"Bearer {token}"},
+            query["status"] = status
+
+        response_res = await self._raw_request("get", path, params=query)
+        if response_res.is_err():
+            return response_res
+
+        response = response_res.unwrap()
+        if response.status_code != 200:
+            return Err(
+                self._map_status_error(
+                    response.status_code,
+                    not_found_error=OrgNotFoundError(),
                 )
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(OrgNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+
+        payload = self._parse_response_json(response)
+        if isinstance(payload, list):
+            return Ok(payload)
+        return Err(KeycloakOrgError())
 
     async def get_invitation(
         self, org_id: str, invitation_id: str
     ) -> Result[dict[str, Any], RecoverableError]:
-        """GET /organizations/{org-id}/invitations/{id}"""
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return Err(KeycloakOrgError())
-        token = token_res.unwrap()
+        path = f"{self._admin_base()}/organizations/{org_id}/invitations/{invitation_id}"
+        response_res = await self._raw_request("get", path)
+        if response_res.is_err():
+            return response_res
 
-        url = (
-            f"{self._admin_base()}"
-            f"/organizations/{org_id}"
-            f"/invitations/{invitation_id}"
-        )
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
+        response = response_res.unwrap()
+        if response.status_code != 200:
+            return Err(
+                self._map_status_error(
+                    response.status_code,
+                    not_found_error=InvitationNotFoundError(),
+                    extra_error_map={405: InvitationNotFoundError()},
+                    include_conflict=False,
                 )
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(InvitationNotFoundError())
-                if resp.status_code == 405:
-                    return Err(InvitationNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+
+        payload = self._parse_response_json(response)
+        if isinstance(payload, dict):
+            return Ok(payload)
+        return Err(KeycloakOrgError())
 
     async def delete_invitation(
         self, org_id: str, invitation_id: str
     ) -> Result[bool, RecoverableError]:
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return Err(KeycloakOrgError())
-        token = token_res.unwrap()
+        path = f"{self._admin_base()}/organizations/{org_id}/invitations/{invitation_id}"
+        response_res = await self._raw_request("delete", path)
+        if response_res.is_err():
+            return response_res
 
-        url = (
-            f"{self._admin_base()}/organizations/{org_id}"
-            f"/invitations/{invitation_id}"
+        response = response_res.unwrap()
+        if response.status_code in (200, 204):
+            return Ok(True)
+        return Err(
+            self._map_status_error(
+                response.status_code,
+                not_found_error=InvitationNotFoundError(),
+                include_conflict=False,
+            )
         )
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.delete(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(InvitationNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code not in (200, 204):
-                    return Err(KeycloakOrgError())
-                return Ok(True)
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
 
     async def resend_invitation(
         self, org_id: str, invitation_id: str
     ) -> Result[bool, RecoverableError]:
-        """POST /organizations/{org-id}/invitations/{id}/resend"""
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return Err(KeycloakOrgError())
-        token = token_res.unwrap()
-
-        url = (
-            f"{self._admin_base()}"
-            f"/organizations/{org_id}"
+        path = (
+            f"{self._admin_base()}/organizations/{org_id}"
             f"/invitations/{invitation_id}/resend"
         )
-        try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.post(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                if resp.status_code in (200, 204):
-                    return Ok(True)
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(InvitationNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                return Err(KeycloakOrgError())
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+        response_res = await self._raw_request("post", path)
+        if response_res.is_err():
+            return response_res
 
-    # user attributes (org permissions)
+        response = response_res.unwrap()
+        if response.status_code in (200, 204):
+            return Ok(True)
+        return Err(
+            self._map_status_error(
+                response.status_code,
+                not_found_error=InvitationNotFoundError(),
+                include_conflict=False,
+            )
+        )
+
     async def get_user_attributes(
         self, user_id: str
     ) -> Result[dict[str, Any], RecoverableError]:
-        """Get a Keycloak user's attributes."""
-        token_res = await self._get_service_token()
-        if token_res.is_err():
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
             return Err(KeycloakOrgError())
-        token = token_res.unwrap()
 
-        url = f"{self._admin_base()}/users/{user_id}"
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                resp = await client.get(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
+            user = await self._admin.a_get_user(user_id)
+            attrs = user.get("attributes", {})
+            if isinstance(attrs, dict):
+                return Ok(attrs)
+            return Ok({})
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    not_found_error=MemberNotFoundError(),
+                    include_conflict=False,
                 )
-                if resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if resp.status_code == 404:
-                    return Err(MemberNotFoundError())
-                if resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-                return Ok(resp.json().get("attributes", {}))
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
 
     async def set_user_attribute(
         self,
@@ -1121,55 +666,27 @@ class KeycloakOrgClient:
         key: str,
         values: list[str],
     ) -> Result[bool, RecoverableError]:
-        """Set a single attribute on a Keycloak user.
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
 
-        We first fetch user, merge the attribute, then PUT the full
-        representation back – this is the only safe way in Keycloak.
-        """
-        token_res = await self._get_service_token()
-        if token_res.is_err():
-            return token_res
-        token = token_res.unwrap()
-
-        url = f"{self._admin_base()}/users/{user_id}"
         try:
-            async with httpx.AsyncClient(
-                timeout=_HTTP_TIMEOUT_SECONDS
-            ) as client:
-                # Fetch current representation
-                get_resp = await client.get(
-                    url,
-                    headers={"Authorization": f"Bearer {token}"},
+            user = await self._admin.a_get_user(user_id)
+            attrs = user.get("attributes", {})
+            if not isinstance(attrs, dict):
+                attrs = {}
+            attrs[key] = values
+            user["attributes"] = attrs
+            await self._admin.a_update_user(user_id, user)
+            return Ok(True)
+        except KeycloakError as exc:
+            return Err(
+                self._map_keycloak_error(
+                    exc,
+                    not_found_error=MemberNotFoundError(),
+                    include_conflict=False,
                 )
-                if get_resp.status_code == 403:
-                    return Err(KeycloakOrgForbiddenError())
-                if get_resp.status_code == 404:
-                    return Err(MemberNotFoundError())
-                if get_resp.status_code == 400:
-                    return Err(KeycloakOrgBadRequestError())
-                if get_resp.status_code != 200:
-                    return Err(KeycloakOrgError())
-
-                user_rep = get_resp.json()
-                attrs = user_rep.get("attributes", {})
-                attrs[key] = values
-                user_rep["attributes"] = attrs
-
-                # PUT back
-                put_resp = await client.put(
-                    url,
-                    json=user_rep,
-                    headers={
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json",
-                    },
-                )
-                if put_resp.status_code not in (200, 204):
-                    if put_resp.status_code == 400:
-                        return Err(KeycloakOrgBadRequestError())
-                    if put_resp.status_code == 403:
-                        return Err(KeycloakOrgForbiddenError())
-                    return Err(KeycloakOrgError())
-                return Ok(True)
-        except Exception as e:
-            return Err(KeycloakOrgError(from_exception=e))
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))

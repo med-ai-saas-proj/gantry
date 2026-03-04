@@ -7,17 +7,16 @@ Feature: Organization
 Reason: Add Organization schema with Settings and DeletionRequests tables
 
 """
+
 from alembic import op
 
-from typing import Sequence, Union
+from typing import Union, Sequence
 from pathlib import Path
-
-import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'a1b2c3d4e5f6'
-down_revision: Union[str, Sequence[str], None] = '0433e52b355a'
+revision: str = "a1b2c3d4e5f6"
+down_revision: Union[str, Sequence[str], None] = "0433e52b355a"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -40,9 +39,6 @@ def upgrade() -> None:
         with open(path) as f:
             sql = f.read()
         executeScript(sql)
-    else:
-        open(path, "w")
-        pass
 
 
 def downgrade() -> None:
@@ -52,6 +48,3 @@ def downgrade() -> None:
         with open(path) as f:
             sql = f.read()
         executeScript(sql)
-    else:
-        open(path, "w")
-        pass

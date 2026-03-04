@@ -20,7 +20,7 @@ class PaginatedQuery(BaseDTO):
 
 
 # Organization
-class OrgInfoOutput(BaseDTO):
+class OrgInfoResponse(BaseDTO):
     """Organization metadata."""
 
     id: str
@@ -28,31 +28,41 @@ class OrgInfoOutput(BaseDTO):
     owner_id: str | None = None
 
 
-class DeleteRequestOutput(BaseDTO):
+class DeleteRequestResponse(BaseDTO):
     """Org deletion request acknowledgement."""
 
     org_id: str
+    requested_at: str = Field(
+        ...,
+        description="ISO-8601 timestamp when deletion was requested",
+    )
     cancel_before: str = Field(
         ...,
-        description="ISO-8601 timestamp; request can be cancelled before this",
+        description=(
+            "ISO-8601 timestamp deadline to cancel deletion "
+            "before hard-delete is executed"
+        ),
     )
 
 
-class CancelDeleteRequestOutput(BaseDTO):
-    """Org deletion cancellation acknowledgement."""
+class DeleteCancelResponse(BaseDTO):
+    """Deletion cancel acknowledgement."""
 
     org_id: str
-    cancelled: bool
+    cancelled: bool = Field(
+        True,
+        description="Always true when cancellation succeeds",
+    )
 
 
-class UpdateOrgMetadataInput(BaseDTO):
+class UpdateOrgMetadataRequest(BaseDTO):
     """Body for updating basic org metadata."""
 
     name: str = Field(..., min_length=1, max_length=256)
 
 
 # Users
-class OrgUserOutput(BaseDTO):
+class OrgUserResponse(BaseDTO):
     """A user inside the organization."""
 
     id: str
@@ -60,38 +70,15 @@ class OrgUserOutput(BaseDTO):
     email: str | None = None
 
 
-class OrgUserListOutput(BaseDTO):
+class OrgUserListResponse(BaseDTO):
     """Paginated list of org users."""
 
     total: int
-    results: list[OrgUserOutput]
-
-
-# Projects
-class OrgProjectOutput(BaseDTO):
-    """A project inside the organization."""
-
-    id: str
-    name: str
-    description: str | None = None
-
-
-class OrgProjectListOutput(BaseDTO):
-    """Paginated list of org projects."""
-
-    total: int
-    results: list[OrgProjectOutput]
-
-
-class CreateProjectInput(BaseDTO):
-    """Body for creating a new project."""
-
-    name: str = Field(..., min_length=1, max_length=256)
-    description: str = Field("", max_length=4096)
+    results: list[OrgUserResponse]
 
 
 # Settings
-class OrgSettingsOutput(BaseDTO):
+class OrgSettingsResponse(BaseDTO):
     """Organization settings (flattened key-value map)."""
 
     rate_limit: int | None = Field(
@@ -104,7 +91,7 @@ class OrgSettingsOutput(BaseDTO):
     )
 
 
-class UpdateSettingsInput(BaseDTO):
+class UpdateSettingsRequest(BaseDTO):
     """Body for PATCH /settings.
 
     Follows the flattening convention described in the spec, e.g.::
@@ -117,6 +104,7 @@ class UpdateSettingsInput(BaseDTO):
 
     rate_limit: int | None = Field(
         None,
+        ge=1,
         description="Requests per minute; null to inherit global default",
     )
     extra: dict[str, Any] = Field(
@@ -126,39 +114,34 @@ class UpdateSettingsInput(BaseDTO):
 
 
 # Invitations
-class InviteUserInput(BaseDTO):
+class InviteUserRequest(BaseDTO):
     """Body for POST /invitations."""
 
     email: EmailStr
-    permissions: list[str] = Field(
-        default_factory=list,
-        description="Org permissions to assign to the invited user",
-    )
 
 
-class InvitationOutput(BaseDTO):
+class InvitationResponse(BaseDTO):
     """An invitation record."""
 
     id: str
     email: str
     status: str | None = None
-    permissions: list[str] = Field(default_factory=list)
 
 
-class InvitationListOutput(BaseDTO):
+class InvitationListResponse(BaseDTO):
     """List of invitations."""
 
-    results: list[InvitationOutput]
+    results: list[InvitationResponse]
 
 
 # User permissions
-class UserPermissionsOutput(BaseDTO):
+class UserPermissionsResponse(BaseDTO):
     """List of org permissions for a user."""
 
     permissions: list[str]
 
 
-class UserPermissionsInput(BaseDTO):
+class UserPermissionsRequest(BaseDTO):
     """Body for PUT /users/{user_id}/permissions."""
 
     permissions: list[str] = Field(

@@ -7,43 +7,33 @@ from src.db.factories import AsyncSessionManager
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .dtos import (
-    OrgInfoOutput,
-    OrgUserOutput,
-    InvitationOutput,
-    OrgProjectOutput,
-    OrgSettingsOutput,
-    OrgUserListOutput,
-    CreateProjectInput,
-    DeleteRequestOutput,
-    InvitationListOutput,
-    OrgProjectListOutput,
-    UserPermissionsOutput,
-    CancelDeleteRequestOutput,
+    OrgInfoResponse,
+    OrgUserResponse,
+    InvitationResponse,
+    OrgSettingsResponse,
+    OrgUserListResponse,
+    DeleteRequestResponse,
+    InvitationListResponse,
+    UserPermissionsResponse,
 )
-from .models import OrgProject
 from .settings import getOrgSettings
 from .permissions import OrgPermission, has_permission
 from .repositories import (
-    OrgProjectRepository,
-    OrgMetadataRepository,
     OrgSettingsRepository,
-    OrgInvitationRepository,
     OrgDeletionRequestRepository,
 )
 from .keycloak_client import (
-    OrgNotFoundError,
     KeycloakOrgClient,
     UserNotInOrganizationError,
+    OrgNotFoundError,
 )
 
 from typing import Any
-from datetime import datetime, timezone, timedelta
-
+from datetime import datetime, timedelta, UTC
 from safe_result import Ok, Err, Result
 from structlog.stdlib import BoundLogger
 
 
-_CANCEL_WINDOW_DAYS = 30
 _ORG_PERM_ATTR = "org_permissions"
 
 
@@ -52,6 +42,13 @@ class DeletionAlreadyRequestedError(RecoverableError):
     code = "deletion_already_requested"
     title = "Deletion Already Requested"
     detail = "A deletion request for this organization already exists."
+
+
+class DeletionRequestNotFoundError(RecoverableError):
+    status = 404
+    code = "deletion_request_not_found"
+    title = "Deletion Request Not Found"
+    detail = "No pending deletion request exists for this organization."
 
 
 class InvalidPermissionError(RecoverableError):
@@ -137,18 +134,15 @@ class UserAlreadyInAnotherOrganizationError(RecoverableError):
     detail = "A user can belong to only one organization."
 
 
-class DeleteRequestNotFoundError(RecoverableError):
-    status = 404
-    code = "deletion_request_not_found"
-    title = "Deletion Request Not Found"
-    detail = "No pending deletion request exists for this organization."
-
-
 class MultipleOrganizationMembershipError(RecoverableError):
     status = 409
     code = "multiple_org_membership_not_allowed"
     title = "Multiple Organization Membership Not Allowed"
     detail = "A user can belong to only one organization."
+
+
+def _extract_org_ids(orgs: list[dict[str, Any]]) -> set[str]:
+    return {str(org.get("id", "")) for org in orgs if org.get("id")}
 
 
 class OrgService:
@@ -158,26 +152,34 @@ class OrgService:
         self,
         kc_client: KeycloakOrgClient,
         settings_repo: OrgSettingsRepository,
-        metadata_repo: OrgMetadataRepository,
         deletion_repo: OrgDeletionRequestRepository,
-        project_repo: OrgProjectRepository,
-        invitation_repo: OrgInvitationRepository,
         session_manager: AsyncSessionManager,
         logger: BoundLogger,
     ):
         self.kc = kc_client
         self.settings_repo = settings_repo
-        self.metadata_repo = metadata_repo
         self.deletion_repo = deletion_repo
-        self.project_repo = project_repo
-        self.invitation_repo = invitation_repo
         self.session_manager = session_manager
         self.logger = logger
+
+    def _compute_cancel_before(self, requested_at: datetime) -> datetime:
+        days = getOrgSettings().deletion_cancel_window_days
+        return requested_at + timedelta(days=days)
 
     async def _ensure_org_exists(
         self, org_id: str
     ) -> Result[dict[str, Any], RecoverableError]:
         return await self.kc.get_org(org_id)
+
+    def _is_backend_service_account(
+        self,
+        *,
+        actor_is_service_account: bool,
+        actor_client_id: str | None,
+    ) -> bool:
+        if not actor_is_service_account:
+            return False
+        return actor_client_id == getOrgSettings().keycloak_service_client_id
 
     async def _ensure_user_in_org(
         self, org_id: str, user_id: str
@@ -239,14 +241,6 @@ class OrgService:
     async def _get_org_owner_id(
         self, org_id: str
     ) -> Result[str, RecoverableError]:
-        async with self.session_manager.get_session() as session:
-            metadata = await self.metadata_repo.get(session, org_id)
-            if metadata is not None and metadata.owner_id:
-                owner_id = metadata.owner_id
-                await session.commit()
-                return Ok(owner_id)
-            await session.commit()
-
         first = 0
         max_results = 100
         owners: list[str] = []
@@ -281,26 +275,11 @@ class OrgService:
             return Err(OwnerNotFoundError())
         if len(unique_owners) > 1:
             return Err(MultipleOwnersError())
-        owner_id = unique_owners[0]
-
-        org_res = await self.kc.get_org(org_id)
-        if org_res.is_err():
-            return org_res
-        org_name = str(org_res.unwrap().get("name") or org_id)
-
-        async with self.session_manager.get_session() as session:
-            await self.metadata_repo.upsert(
-                session=session,
-                org_id=org_id,
-                name=org_name,
-                owner_id=owner_id,
-            )
-            await session.commit()
-        return Ok(owner_id)
+        return Ok(unique_owners[0])
 
     async def _sync_metadata_from_keycloak(
         self, org_id: str
-    ) -> Result[OrgInfoOutput, RecoverableError]:
+    ) -> Result[OrgInfoResponse, RecoverableError]:
         org_res = await self.kc.get_org(org_id)
         if org_res.is_err():
             return org_res
@@ -309,28 +288,27 @@ class OrgService:
 
         owner_id_res = await self._get_org_owner_id(org_id)
         if owner_id_res.is_err():
+            if isinstance(owner_id_res.error, OwnerNotFoundError):
+                return Ok(
+                    OrgInfoResponse(
+                        id=str(org.get("id") or org_id),
+                        name=name,
+                        owner_id=None,
+                    )
+                )
             return owner_id_res
-        owner_id = owner_id_res.unwrap()
-
-        async with self.session_manager.get_session() as session:
-            metadata = await self.metadata_repo.upsert(
-                session=session,
-                org_id=org_id,
+        return Ok(
+            OrgInfoResponse(
+                id=str(org.get("id") or org_id),
                 name=name,
-                owner_id=owner_id,
+                owner_id=owner_id_res.unwrap(),
             )
-            output = OrgInfoOutput(
-                id=metadata.org_id,
-                name=metadata.name,
-                owner_id=metadata.owner_id,
-            )
-            await session.commit()
-            return Ok(output)
+        )
 
     # delete org
     async def request_delete_org(
-        self, org_id: str, user_id: str
-    ) -> Result[DeleteRequestOutput, RecoverableError]:
+        self, org_id: str
+    ) -> Result[DeleteRequestResponse, RecoverableError]:
         org_res = await self._ensure_org_exists(org_id)
         if org_res.is_err():
             return org_res
@@ -340,75 +318,77 @@ class OrgService:
             if existing is not None:
                 return Err(DeletionAlreadyRequestedError())
 
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
-            cancel_before = now + timedelta(days=_CANCEL_WINDOW_DAYS)
-
-            await self.deletion_repo.upsert_request(
+            record = await self.deletion_repo.upsert_request(
                 session=session,
                 org_id=org_id,
-                requested_by=user_id,
-                cancel_before=cancel_before,
             )
+            requested_at_dt = record.requested_at
+            cancel_before_dt = self._compute_cancel_before(requested_at_dt)
             await session.commit()
 
             return Ok(
-                DeleteRequestOutput(
+                DeleteRequestResponse(
                     org_id=org_id,
-                    cancel_before=cancel_before.isoformat(),
+                    requested_at=requested_at_dt.isoformat(),
+                    cancel_before=cancel_before_dt.isoformat(),
                 )
             )
 
     async def cancel_delete_org(
         self, org_id: str
-    ) -> Result[CancelDeleteRequestOutput, RecoverableError]:
-        org_res = await self._ensure_org_exists(org_id)
-        if org_res.is_err():
-            return org_res
+    ) -> Result[bool, RecoverableError]:
+        async with self.session_manager.get_session() as session:
+            deleted = await self.deletion_repo.delete_by_org_id(session, org_id)
+            if not deleted:
+                return Err(DeletionRequestNotFoundError())
+            await session.commit()
+            return Ok(True)
+
+    async def process_due_deletions(self, batch_size: int = 100) -> int:
+        now_utc = datetime.now(UTC)
+        cutoff = now_utc - timedelta(
+            days=getOrgSettings().deletion_cancel_window_days
+        )
+        processed = 0
 
         async with self.session_manager.get_session() as session:
-            record = await self.deletion_repo.cancel_by_org_id(session, org_id)
-            if record is None:
-                return Err(DeleteRequestNotFoundError())
-            await session.commit()
-            return Ok(
-                CancelDeleteRequestOutput(
-                    org_id=org_id,
-                    cancelled=True,
-                )
+            due_requests = await self.deletion_repo.list_due_requests(
+                session=session,
+                due_before_or_equal=cutoff,
+                limit=batch_size,
             )
 
-    async def process_due_deletions(
-        self,
-        now: datetime | None = None,
-    ) -> Result[int, RecoverableError]:
-        current = now or datetime.now(timezone.utc).replace(tzinfo=None)
-        deleted = 0
-
-        async with self.session_manager.get_session() as session:
-            due = await self.deletion_repo.list_due(session, current)
-            for req in due:
+            for req in due_requests:
                 org_id = req.org_id
-                delete_org_res = await self.kc.delete_org(org_id)
-                if delete_org_res.is_err():
-                    err = delete_org_res.error
-                    if not isinstance(err, OrgNotFoundError):
-                        continue
+                delete_res = await self.kc.delete_org(org_id)
+                if delete_res.is_err() and not isinstance(
+                    delete_res.error, OrgNotFoundError
+                ):
+                    self.logger.warning(
+                        "org_delete_worker_failed",
+                        org_id=org_id,
+                        error=getattr(
+                            delete_res.error,
+                            "detail",
+                            str(delete_res.error),
+                        ),
+                    )
+                    continue
 
-                await self.project_repo.delete_by_org_id(session, org_id)
-                await self.invitation_repo.delete_by_org_id(session, org_id)
-                await self.settings_repo.deleteByKey(session, org_id)
-                await self.metadata_repo.delete_by_org_id(session, org_id)
+                await self.settings_repo.delete_by_org_id(session, org_id)
                 await self.deletion_repo.delete_by_org_id(session, org_id)
-                deleted += 1
+                processed += 1
+                self.logger.info("org_deleted_after_grace_period", org_id=org_id)
 
-            await session.commit()
+            if processed > 0:
+                await session.commit()
 
-        return Ok(deleted)
+        return processed
 
     # organization metadata
     async def get_org_info(
         self, org_id: str
-    ) -> Result[OrgInfoOutput, RecoverableError]:
+    ) -> Result[OrgInfoResponse, RecoverableError]:
         return await self._sync_metadata_from_keycloak(org_id)
 
     async def update_org_info(
@@ -416,103 +396,52 @@ class OrgService:
         org_id: str,
         actor_user_id: str,
         name: str,
-    ) -> Result[OrgInfoOutput, RecoverableError]:
-        owner_id_res = await self._get_org_owner_id(org_id)
-        if owner_id_res.is_err():
-            return owner_id_res
-        if owner_id_res.unwrap() != actor_user_id:
-            return Err(OwnerPermissionRequiredError())
+        actor_is_service_account: bool = False,
+        actor_client_id: str | None = None,
+    ) -> Result[OrgInfoResponse, RecoverableError]:
+        is_service_actor = self._is_backend_service_account(
+            actor_is_service_account=actor_is_service_account,
+            actor_client_id=actor_client_id,
+        )
+        owner_id: str | None = None
+        if not is_service_actor:
+            owner_id_res = await self._get_org_owner_id(org_id)
+            if owner_id_res.is_err():
+                return owner_id_res
+            owner_id = owner_id_res.unwrap()
+            if owner_id != actor_user_id:
+                return Err(OwnerPermissionRequiredError())
 
         current_org_res = await self.kc.get_org(org_id)
         if current_org_res.is_err():
             return current_org_res
         current_org = current_org_res.unwrap()
-        payload = {**current_org, "name": name}
+        payload = dict(current_org)
+        payload["name"] = name
 
         update_res = await self.kc.update_org(org_id, payload)
         if update_res.is_err():
             return update_res
 
-        async with self.session_manager.get_session() as session:
-            metadata = await self.metadata_repo.upsert(
-                session=session,
-                org_id=org_id,
+        return Ok(
+            OrgInfoResponse(
+                id=org_id,
                 name=name,
-                owner_id=owner_id_res.unwrap(),
+                owner_id=owner_id,
             )
-            output = OrgInfoOutput(
-                id=metadata.org_id,
-                name=metadata.name,
-                owner_id=metadata.owner_id,
-            )
-            await session.commit()
-            return Ok(output)
-
-    # projects
-    async def get_projects(
-        self,
-        org_id: str,
-        limit: int = 20,
-        offset: int = 0,
-        q: str | None = None,
-    ) -> Result[OrgProjectListOutput, RecoverableError]:
-        org_res = await self._ensure_org_exists(org_id)
-        if org_res.is_err():
-            return org_res
-
-        async with self.session_manager.get_session() as session:
-            projects = await self.project_repo.get_by_org_id(
-                session, org_id, limit=limit, offset=offset, q=q
-            )
-            total = await self.project_repo.count_by_org_id(session, org_id)
-            await session.commit()
-
-        results = [
-            OrgProjectOutput(
-                id=str(project.id),
-                name=project.name,
-                description=project.description,
-            )
-            for project in projects
-        ]
-        return Ok(OrgProjectListOutput(total=total, results=results))
-
-    async def create_project(
-        self,
-        org_id: str,
-        input_data: CreateProjectInput,
-    ) -> Result[OrgProjectOutput, RecoverableError]:
-        org_res = await self._ensure_org_exists(org_id)
-        if org_res.is_err():
-            return org_res
-
-        async with self.session_manager.get_session() as session:
-            project = OrgProject(
-                org_id=org_id,
-                name=input_data.name,
-                description=input_data.description,
-            )
-            project = await self.project_repo.create(session, project)
-            output = OrgProjectOutput(
-                id=str(project.id),
-                name=project.name,
-                description=project.description,
-            )
-            await session.commit()
-
-        return Ok(output)
+        )
 
     # settings
     async def get_settings(
         self, org_id: str
-    ) -> Result[OrgSettingsOutput, RecoverableError]:
+    ) -> Result[OrgSettingsResponse, RecoverableError]:
         org_res = await self._ensure_org_exists(org_id)
         if org_res.is_err():
             return org_res
 
         async with self.session_manager.get_session() as session:
             settings = await self.settings_repo.get_or_create(session, org_id)
-            output = OrgSettingsOutput(
+            output = OrgSettingsResponse(
                 rate_limit=settings.rate_limit,
                 extra=settings.extra or {},
             )
@@ -524,7 +453,7 @@ class OrgService:
         org_id: str,
         rate_limit: int | None,
         extra: dict[str, Any],
-    ) -> Result[OrgSettingsOutput, RecoverableError]:
+    ) -> Result[OrgSettingsResponse, RecoverableError]:
         org_res = await self._ensure_org_exists(org_id)
         if org_res.is_err():
             return org_res
@@ -535,7 +464,7 @@ class OrgService:
             settings = await self.settings_repo.upsert(
                 session, org_id, rate_limit, flattened_extra
             )
-            output = OrgSettingsOutput(
+            output = OrgSettingsResponse(
                 rate_limit=settings.rate_limit,
                 extra=settings.extra or {},
             )
@@ -549,7 +478,7 @@ class OrgService:
         limit: int = 20,
         offset: int = 0,
         q: str | None = None,
-    ) -> Result[OrgUserListOutput, RecoverableError]:
+    ) -> Result[OrgUserListResponse, RecoverableError]:
         members_res = await self.kc.get_org_members(
             org_id, first=offset, max_results=limit, search=q
         )
@@ -561,14 +490,14 @@ class OrgService:
         total = count_res.unwrap() if count_res.is_ok() else len(members)
 
         results = [
-            OrgUserOutput(
+            OrgUserResponse(
                 id=m.get("id", ""),
                 username=m.get("username"),
                 email=m.get("email"),
             )
             for m in members
         ]
-        return Ok(OrgUserListOutput(total=total, results=results))
+        return Ok(OrgUserListResponse(total=total, results=results))
 
     async def remove_user(
         self, org_id: str, user_id: str
@@ -587,58 +516,37 @@ class OrgService:
     # invitations
     async def get_invitations(
         self, org_id: str
-    ) -> Result[InvitationListOutput, RecoverableError]:
+    ) -> Result[InvitationListResponse, RecoverableError]:
         inv_res = await self.kc.get_invitations(org_id)
         if inv_res.is_err():
             return inv_res
         raw_list = inv_res.unwrap()
 
-        async with self.session_manager.get_session() as session:
-            db_invs = await self.invitation_repo.get_by_org_id(session, org_id)
-            permissions_by_email = {
-                inv.email: list(inv.permissions or []) for inv in db_invs
-            }
-            await session.commit()
-
         results = []
         for inv in raw_list:
             email = inv.get("email", "")
-            permissions = permissions_by_email.get(email, [])
             results.append(
-                InvitationOutput(
+                InvitationResponse(
                     id=str(inv.get("id", "")),
                     email=email,
                     status=inv.get("status"),
-                    permissions=permissions,
                 )
             )
-        return Ok(InvitationListOutput(results=results))
+        return Ok(InvitationListResponse(results=results))
 
     async def get_invitation(
         self, org_id: str, invitation_id: str
-    ) -> Result[InvitationOutput, RecoverableError]:
+    ) -> Result[InvitationResponse, RecoverableError]:
         inv_res = await self.kc.get_invitation(org_id, invitation_id)
         if inv_res.is_err():
             return inv_res
         inv = inv_res.unwrap()
 
-        permissions: list[str] = []
-        email = inv.get("email", "")
-        if email:
-            async with self.session_manager.get_session() as session:
-                db_inv = await self.invitation_repo.get_by_org_and_email(
-                    session, org_id, email
-                )
-                if db_inv is not None:
-                    permissions = list(db_inv.permissions or [])
-                await session.commit()
-
         return Ok(
-            InvitationOutput(
+            InvitationResponse(
                 id=str(inv.get("id", "")),
-                email=email,
+                email=inv.get("email", ""),
                 status=inv.get("status"),
-                permissions=permissions,
             )
         )
 
@@ -646,14 +554,7 @@ class OrgService:
         self,
         org_id: str,
         email: str,
-        permissions: list[str],
-        invited_by: str | None = None,
     ) -> Result[bool, RecoverableError]:
-        valid = {p.value for p in OrgPermission}
-        invalid = set(permissions) - valid
-        if invalid:
-            return Err(InvalidPermissionError())
-
         existing_user_res = await self.kc.find_user_by_email(email)
         if existing_user_res.is_err():
             return existing_user_res
@@ -661,52 +562,25 @@ class OrgService:
         if existing_user and existing_user.get("id"):
             existing_user_id = str(existing_user["id"])
             orgs_res = await self.kc.get_member_organizations(existing_user_id)
-            if orgs_res.is_ok():
-                org_ids = {
-                    str(org.get("id", ""))
-                    for org in orgs_res.unwrap()
-                    if org.get("id")
-                }
-                if org_id in org_ids:
-                    return Err(UserAlreadyInOrganizationError())
-                if org_ids:
-                    return Err(UserAlreadyInAnotherOrganizationError())
+            if orgs_res.is_err():
+                return orgs_res
+
+            org_ids = _extract_org_ids(orgs_res.unwrap())
+            if org_id in org_ids:
+                return Err(UserAlreadyInOrganizationError())
+            if org_ids:
+                return Err(UserAlreadyInAnotherOrganizationError())
 
         invite_res = await self.kc.invite_user(org_id, email)
         if invite_res.is_err():
             return invite_res
-
-        async with self.session_manager.get_session() as session:
-            await self.invitation_repo.upsert_by_org_email(
-                session=session,
-                org_id=org_id,
-                email=email,
-                invited_by=invited_by,
-                permissions=permissions,
-            )
-            await session.commit()
         return Ok(True)
 
     async def delete_invitation(
         self, org_id: str, invitation_id: str
     ) -> Result[bool, RecoverableError]:
-        inv_res = await self.kc.get_invitation(org_id, invitation_id)
-        if inv_res.is_err():
-            return inv_res
-        email = inv_res.unwrap().get("email", "")
-
         delete_res = await self.kc.delete_invitation(org_id, invitation_id)
-        if delete_res.is_err():
-            return delete_res
-
-        if email:
-            async with self.session_manager.get_session() as session:
-                await self.invitation_repo.delete_by_org_and_email(
-                    session, org_id, email
-                )
-                await session.commit()
-
-        return Ok(True)
+        return delete_res
 
     async def resend_invitation(
         self, org_id: str, invitation_id: str
@@ -719,7 +593,15 @@ class OrgService:
         org_id: str,
         actor_user_id: str,
         target_user_id: str,
+        actor_is_service_account: bool = False,
+        actor_client_id: str | None = None,
     ) -> Result[None, RecoverableError]:
+        if self._is_backend_service_account(
+            actor_is_service_account=actor_is_service_account,
+            actor_client_id=actor_client_id,
+        ):
+            return Ok(None)
+
         target_member_res = await self._ensure_user_in_org(
             org_id, target_user_id
         )
@@ -745,11 +627,11 @@ class OrgService:
 
     async def get_user_permissions(
         self, org_id: str, user_id: str
-    ) -> Result[UserPermissionsOutput, RecoverableError]:
+    ) -> Result[UserPermissionsResponse, RecoverableError]:
         perms_res = await self._get_member_permissions(org_id, user_id)
         if perms_res.is_err():
             return perms_res
-        return Ok(UserPermissionsOutput(permissions=perms_res.unwrap()))
+        return Ok(UserPermissionsResponse(permissions=perms_res.unwrap()))
 
     async def update_user_permissions(
         self,
@@ -757,28 +639,39 @@ class OrgService:
         actor_user_id: str,
         user_id: str,
         permissions: list[str],
-    ) -> Result[UserPermissionsOutput, RecoverableError]:
+        actor_is_service_account: bool = False,
+        actor_client_id: str | None = None,
+    ) -> Result[UserPermissionsResponse, RecoverableError]:
         valid = {p.value for p in OrgPermission}
         invalid = set(permissions) - valid
         if invalid:
             return Err(InvalidPermissionError())
 
-        owner_id_res = await self._get_org_owner_id(org_id)
-        if owner_id_res.is_err():
-            return owner_id_res
-        owner_id = owner_id_res.unwrap()
+        is_service_actor = self._is_backend_service_account(
+            actor_is_service_account=actor_is_service_account,
+            actor_client_id=actor_client_id,
+        )
+
+        owner_id = ""
+        if not is_service_actor:
+            owner_id_res = await self._get_org_owner_id(org_id)
+            if owner_id_res.is_err():
+                return owner_id_res
+            owner_id = owner_id_res.unwrap()
 
         if user_id == owner_id and OrgPermission.OWNER.value not in permissions:
             return Err(OwnerPermissionImmutableError())
         if user_id != owner_id and OrgPermission.OWNER.value in permissions:
             return Err(OwnerTransferNotAllowedError())
 
-        actor_perms_res = await self._get_member_permissions(
-            org_id, actor_user_id
-        )
-        if actor_perms_res.is_err():
-            return actor_perms_res
-        actor_perms = actor_perms_res.unwrap()
+        actor_perms: list[str] = []
+        if not is_service_actor:
+            actor_perms_res = await self._get_member_permissions(
+                org_id, actor_user_id
+            )
+            if actor_perms_res.is_err():
+                return actor_perms_res
+            actor_perms = actor_perms_res.unwrap()
 
         if (
             OrgPermission.USERS_PERMISSIONS_RW.value in permissions
@@ -786,9 +679,10 @@ class OrgService:
         ):
             return Err(OwnerRequiredForGrantError())
 
-        target_member_res = await self._ensure_user_in_org(org_id, user_id)
-        if target_member_res.is_err():
-            return target_member_res
+        if not is_service_actor:
+            target_member_res = await self._ensure_user_in_org(org_id, user_id)
+            if target_member_res.is_err():
+                return target_member_res
 
         set_res = await self.kc.set_user_attribute(
             user_id, _ORG_PERM_ATTR, permissions
@@ -796,18 +690,4 @@ class OrgService:
         if set_res.is_err():
             return set_res
 
-        return Ok(UserPermissionsOutput(permissions=permissions))
-
-    # rate limit (exported dependency)
-    async def get_limit(self, org_id: str) -> int | None:
-        """Return the effective rate limit for the org.
-
-        Falls back to the global default when the org has no override.
-        """
-        async with self.session_manager.get_session() as session:
-            settings = await self.settings_repo.get_or_create(session, org_id)
-            limit = settings.rate_limit
-            await session.commit()
-            if limit is not None:
-                return limit
-        return getOrgSettings().default_rate_limit
+        return Ok(UserPermissionsResponse(permissions=permissions))

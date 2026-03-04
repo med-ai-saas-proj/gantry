@@ -24,10 +24,6 @@ class OrgPermission(str, Enum):
     # User permission management (only owner can grant this)
     USERS_PERMISSIONS_RW = "organization.users.permissions.read_write"
 
-    # Project management
-    PROJECTS_GET_ALL = "organization.projects.get_all"
-    PROJECTS_CREATE = "organization.projects.create"
-
     # Settings management
     SETTINGS_READ = "organization.settings.read"
     SETTINGS_WRITE = "organization.settings.write"
@@ -40,8 +36,6 @@ PERMISSION_HIERARCHY: Final[dict[OrgPermission, list[OrgPermission]]] = {
         OrgPermission.USERS_GET_ALL,
         OrgPermission.USERS_REMOVE,
         OrgPermission.USERS_PERMISSIONS_RW,
-        OrgPermission.PROJECTS_GET_ALL,
-        OrgPermission.PROJECTS_CREATE,
         OrgPermission.SETTINGS_READ,
         OrgPermission.SETTINGS_WRITE,
     ],
