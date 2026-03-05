@@ -39,7 +39,7 @@ class File(
     filepath: Mapped[str] = mapped_column(String(512), nullable=False)
     project_id: Mapped[int] = mapped_column(
         BigInteger,
-        ForeignKey(Project.id),
+        ForeignKey(Project.id, ondelete="CASCADE"),
         index=True,
         nullable=False,
     )

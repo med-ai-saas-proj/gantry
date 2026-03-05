@@ -8,6 +8,7 @@ from src.db.utils import (
     WithClientUUID,
     WithCreateUpdateTimestamp,
 )
+from src.management.projects.models import Project
 from src.service.utils.conversation.types import MessagePart
 
 from datetime import datetime
@@ -31,7 +32,12 @@ class Conversation(
     """Represents a conversation in the agent system."""
 
     __tablename__ = "Conversations"
-    project_id: Mapped[int] = mapped_column(nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(Project.id, ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     extra_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
 
