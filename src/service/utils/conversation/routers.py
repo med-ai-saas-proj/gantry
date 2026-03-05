@@ -101,9 +101,9 @@ async def delete_conversation(
     ],
 ):
     """Delete a conversation by conversation UID."""
-    await conversation_service.deleteConversation(
+    (await conversation_service.deleteConversation(
         conversation_uid, api_key_info["project_id"]
-    )
+    )).unwrap()
 
 
 @conversation_router.get(
@@ -177,11 +177,11 @@ async def add_message_to_conversation(
         ConversationService, Depends(getConversationService)
     ],
 ):
-    await conversation_service.storeConversationMessages(
+    (await conversation_service.storeConversationMessages(
         conversation_uid=conversation_uid,
         project_id=api_key_info["project_id"],
         msgs=body.messages,
-    )
+    )).unwrap()
 
 
 @conversation_router.delete(
@@ -200,11 +200,11 @@ async def delete_message_from_conversation(
     ],
 ):
     """Delete a message from the conversation by conversation UID and message sequence ID."""
-    await conversation_service.deleteMessage(
+    (await conversation_service.deleteMessage(
         conversation_uid=conversation_uid,
         message_seq_id=message_seq_id,
         project_id=api_key_info["project_id"],
-    )
+    )).unwrap()
 
 
 @conversation_router.get(
