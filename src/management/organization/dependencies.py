@@ -47,11 +47,8 @@ async def getLimit(
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> int | None:
     """Return effective org limit (org override or global default)."""
-    settings_res = await org_service.get_settings(org_id)
-    if settings_res.is_err():
-        raise settings_res.error
-
-    org_limit = settings_res.unwrap().rate_limit
+    settings_res = (await org_service.get_settings(org_id)).unwrap()
+    org_limit = settings_res.rate_limit
     if org_limit is not None:
         return org_limit
     return org_settings.default_rate_limit
