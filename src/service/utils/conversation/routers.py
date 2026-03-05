@@ -1,14 +1,30 @@
+from griffe import Kind
+
 from src.management.api_keys.entities import ApiKeyInfo
+from src.service.utils.conversation.dtos import (
+    AddMessageRequest,
+    CreateConversationRequest,
+)
 from src.management.api_keys.dependencies import requiredPermissions
+from src.service.utils.conversation.models import Message
 from src.service.utils.conversation.services import ConversationService
 from src.service.utils.conversation.factories import getConversationService
 
-from .dtos import MessageResponse
+from .dtos import (
+    ConversationMetadataResponse,
+    CreateConversationResponse,
+    RequestMessage,
+    RequestMessagePart,
+    RequestMessageResponse,
+    ResponseMessage,
+    ResponseMessagePart,
+    ResponseMessageResponse,
+)
 
 import uuid
-from typing import Literal, Sequence, Annotated
+from typing import Literal, Sequence, Annotated, cast
 
-from fastapi import Query, Depends, Security, APIRouter
+from fastapi import Body, Query, Depends, Security, APIRouter
 
 
 conversation_router = APIRouter(
@@ -16,25 +32,101 @@ conversation_router = APIRouter(
     tags=["Conversation"],
 )
 
+
+@conversation_router.post(
+    "/",
+    summary="Create a new conversation",
+    description="Endpoint to create a new conversation.",
+    response_model=CreateConversationResponse,
+)
+async def create_conversation(
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
+    body: Annotated[CreateConversationRequest, Body()],
+    conversation_service: Annotated[
+        ConversationService, Depends(getConversationService)
+    ],
+):
+    """Create a new conversation."""
+    conversation_uid = await conversation_service.createConversation(
+        project_id=api_key_info["project_id"],
+        extra_metadata=body.extra_metadata,
+        messages=body.messages,
+    )
+    return CreateConversationResponse(conversation_uid=conversation_uid)
+
+
 @conversation_router.get(
     "/{conversation_uid}",
+    summary="Get conversation metadata",
+    description="Endpoint to retrieve conversation details by conversation UID.",
+    response_model=ConversationMetadataResponse,
+)
+async def get_conversation_metadata(
+    conversation_uid: uuid.UUID,
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
+    conversation_service: Annotated[
+        ConversationService, Depends(getConversationService)
+    ],
+):
+    """Get conversation metadata by conversation UID."""
+    metadata = (
+        await conversation_service.getConversationMetadata(
+            conversation_uid, api_key_info["project_id"]
+        )
+    ).unwrap()
+    return ConversationMetadataResponse(
+        conversation_uid=metadata["conversation_uid"],
+        project_id=metadata["project_id"],
+        extra_metadata=metadata["extra_metadata"],
+        created_at=metadata["created_at"],
+    )
+
+
+@conversation_router.delete(
+    "/{conversation_uid}",
+    summary="Delete a conversation",
+    description="Endpoint to delete a conversation by conversation UID.",
+)
+async def delete_conversation(
+    conversation_uid: uuid.UUID,
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
+    conversation_service: Annotated[
+        ConversationService, Depends(getConversationService)
+    ],
+):
+    """Delete a conversation by conversation UID."""
+    await conversation_service.deleteConversation(
+        conversation_uid, api_key_info["project_id"]
+    )
+
+
+@conversation_router.get(
+    "/{conversation_uid}/messages",
     summary="Get conversation messages",
     description="Endpoint to retrieve conversation details and messages by conversation UID.",
-    response_model=Sequence[MessageResponse],
+    response_model=Sequence[ResponseMessage | RequestMessage],
 )
 async def get_conversation(
     conversation_uid: uuid.UUID,
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
     ],
-    conversation_service: Annotated[ConversationService, Depends(getConversationService)],
+    conversation_service: Annotated[
+        ConversationService, Depends(getConversationService)
+    ],
     last_cursor: Annotated[int | None, Query(gt=0)] = None,
-    limit: Annotated[int, Query( gt=0, le=100)] = 20,
+    limit: Annotated[int, Query(gt=0, le=100)] = 20,
     order_by: Annotated[Literal["asc", "desc"], Query()] = "asc",
 ):
     """Get conversation details and messages by conversation UID."""
     messages = (
-        await conversation_service.getConversationMessageByUuid(
+        await conversation_service.getConversationMessages(
             conversation_uid,
             api_key_info["project_id"],
             limit=limit,
@@ -42,15 +134,117 @@ async def get_conversation(
             order_by=order_by,
         )
     ).unwrap()
-    return [MessageResponse.model_validate(mess) for mess in messages]
+    res: list[ResponseMessageResponse | RequestMessageResponse] = []
+
+    for mess in messages:
+        if mess.kind == "request":
+            res.append(
+                RequestMessageResponse(
+                    message_seq_id=mess.seq_id,
+                    kind="request",
+                    parts=cast(list[RequestMessagePart], mess.parts),
+                    model_name=mess.model_name,
+                    timestamp=mess.timestamp,
+                    run_id=mess.run_id,
+                )
+            )
+        elif mess.kind == "response":
+            res.append(
+                ResponseMessageResponse(
+                    message_seq_id=mess.seq_id,
+                    kind="response",
+                    parts=cast(list[ResponseMessagePart], mess.parts),
+                    model_name=mess.model_name,
+                    timestamp=mess.timestamp,
+                    run_id=mess.run_id,
+                )
+            )
+    return res
 
 
 @conversation_router.post(
-    "/{conversation_uid}",
+    "/{conversation_uid}/messages",
     summary="Add a message to the conversation, creating a new conversation if the UID does not exist.",
     description="Endpoint to add a new message to the conversation by conversation UID.",
 )
 async def add_message_to_conversation(
     conversation_uid: uuid.UUID,
+    body: Annotated[AddMessageRequest, Body()],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
+    conversation_service: Annotated[
+        ConversationService, Depends(getConversationService)
+    ],
 ):
-    pass
+    await conversation_service.storeConversationMessages(
+        conversation_uid=conversation_uid,
+        project_id=api_key_info["project_id"],
+        msgs=body.messages,
+    )
+
+
+@conversation_router.delete(
+    "/{conversation_uid}/messages/{message_seq_id}",
+    summary="Delete a message from the conversation.",
+    description="Endpoint to delete a message from the conversation by conversation UID and message sequence ID.",
+)
+async def delete_message_from_conversation(
+    conversation_uid: uuid.UUID,
+    message_seq_id: int,
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
+    conversation_service: Annotated[
+        ConversationService, Depends(getConversationService)
+    ],
+):
+    """Delete a message from the conversation by conversation UID and message sequence ID."""
+    await conversation_service.deleteMessage(
+        conversation_uid=conversation_uid,
+        message_seq_id=message_seq_id,
+        project_id=api_key_info["project_id"],
+    )
+
+
+@conversation_router.get(
+    "/{conversation_uid}/messages/{message_seq_id}",
+    summary="Get a specific message from the conversation.",
+    description="Endpoint to retrieve a specific message from the conversation by conversation UID and message sequence ID.",
+    response_model=ResponseMessageResponse | RequestMessageResponse,
+)
+async def get_message_from_conversation(
+    conversation_uid: uuid.UUID,
+    message_seq_id: int,
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
+    conversation_service: Annotated[
+        ConversationService, Depends(getConversationService)
+    ],
+):
+    res = (
+        await conversation_service.getMessage(
+            project_id=api_key_info["project_id"],
+            conversation_uid=conversation_uid,
+            message_seq_id=message_seq_id,
+        )
+    ).unwrap()
+    if res.kind == "request":
+        return RequestMessageResponse(
+            message_seq_id=res.seq_id,
+            kind="request",
+            parts=cast(list[RequestMessagePart], res.parts),
+            model_name=res.model_name,
+            timestamp=res.timestamp,
+            run_id=res.run_id,
+        )
+    elif res.kind == "response":
+        return ResponseMessageResponse(
+            message_seq_id=res.seq_id,
+            kind="response",
+            parts=cast(list[ResponseMessagePart], res.parts),
+            model_name=res.model_name,
+            timestamp=res.timestamp,
+            run_id=res.run_id,
+        )

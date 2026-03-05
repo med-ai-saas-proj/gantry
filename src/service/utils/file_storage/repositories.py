@@ -15,12 +15,13 @@ class FileRepository(Repository):
         """Initialize FileRepository."""
         super().__init__(File, File.id)
 
-    async def getByUUID(
+    async def getAvailableByUUID(
         self, session: AsyncSession, file_uuid: uuid.UUID, project_id: int
     ) -> File | None:
         """Get file by UUID."""
         stmt = (
             select(File)
+            .select_from(File)
             .where(
                 (File.uuid == file_uuid)
                 & (File.status == FileStatus.AVAILABLE)
@@ -36,6 +37,7 @@ class FileRepository(Repository):
         """Get uploading file by UUID."""
         stmt = (
             select(File)
+            .select_from(File)
             .where(
                 (File.uuid == file_uuid) & (File.status == FileStatus.UPLOADING)
             )
@@ -47,8 +49,12 @@ class FileRepository(Repository):
         self, session: AsyncSession, project_id: int
     ) -> Sequence[File]:
         """Get file list by project ID."""
-        stmt = select(File).where(
-            (File.project_id == project_id)
-            & (File.status == FileStatus.AVAILABLE)
+        stmt = (
+            select(File)
+            .select_from(File)
+            .where(
+                (File.project_id == project_id)
+                & (File.status == FileStatus.AVAILABLE)
+            )
         )
         return await self.selectMany(session, stmt)

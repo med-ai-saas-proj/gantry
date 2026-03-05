@@ -31,7 +31,6 @@ class Conversation(
     """Represents a conversation in the agent system."""
 
     __tablename__ = "Conversations"
-    title: Mapped[str | None] = mapped_column(String(128), nullable=True)
     project_id: Mapped[int] = mapped_column(nullable=False, index=True)
     extra_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
@@ -61,7 +60,10 @@ class Message(WithID, ConversationBaseSQLModel):
 
     __tablename__ = "Messages"
     conversation_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey(Conversation.id), index=True, nullable=False
+        BigInteger,
+        ForeignKey(Conversation.id, ondelete="CASCADE"),
+        index=True,
+        nullable=False,
     )
     seq_id: Mapped[int] = mapped_column(
         BigInteger,
@@ -75,7 +77,7 @@ class Message(WithID, ConversationBaseSQLModel):
 
     # metadata fields
     model_name: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    timestamp: Mapped[datetime] = mapped_column(DateTime)
+    timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     run_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
     @classmethod

@@ -173,7 +173,7 @@ class FileStorageService:
     ) -> Result[FileRecord, FileNotFoundInSystemError]:
         """Retrieve file metadata by UUID."""
         async with self.session_manager.get_session() as session:
-            file_record = await self.file_repo.getByUUID(
+            file_record = await self.file_repo.getAvailableByUUID(
                 session, file_uuid, project_id
             )
             if not file_record or file_record.status != FileStatus.AVAILABLE:
@@ -195,7 +195,7 @@ class FileStorageService:
     ) -> Result[None, FileNotFoundInSystemError]:
         """Delete a file from storage and remove its metadata."""
         async with self.session_manager.get_session() as session:
-            file_record = await self.file_repo.getByUUID(
+            file_record = await self.file_repo.getAvailableByUUID(
                 session, file_id, project_id
             )
             if not file_record:
@@ -207,7 +207,7 @@ class FileStorageService:
             Key=file_record.filepath,
         )
         async with self.session_manager.get_session() as session:
-            file_record = await self.file_repo.getByUUID(
+            file_record = await self.file_repo.getAvailableByUUID(
                 session, file_id, project_id
             )
             if not file_record:

@@ -38,11 +38,12 @@ class ConversationManager:
     ):
         conversation_id: int | None = None
         if conversation_uid is not None:
-            conversation_id = (
-                await self.conversation_service.get_conversation_id(
+            metadata = (
+                await self.conversation_service.getConversationMetadata(
                     conversation_uid, api_key_info["project_id"]
                 )
             ).unwrap()
+            conversation_id = metadata["conversation_id"]
         else:
             conversation_uid = uuid.uuid4()
 
@@ -52,7 +53,7 @@ class ConversationManager:
             mess_history: Sequence[ModelMessage] = []
 
             if conversation_id:
-                mess_history = await self.conversation_service.getAndDeserializeConversationMessage(
+                mess_history = await self.conversation_service.getAndDeserializeConversationMessages(
                     conversation_id,
                     conversation_uid,
                     message_context_window,
@@ -84,13 +85,11 @@ class ConversationManager:
                 await file_upload_task
 
                 if new_message:
-                    await (
-                        self.conversation_service.serializeAndStoreConversation(
-                            conversation_id,
-                            conversation_uid,
-                            api_key_info["project_id"],
-                            new_message,
-                        )
+                    await self.conversation_service.serializeAndStoreConversationMessages(
+                        conversation_id,
+                        conversation_uid,
+                        api_key_info["project_id"],
+                        new_message,
                     )
                 pass
 

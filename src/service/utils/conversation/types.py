@@ -1,3 +1,4 @@
+from datetime import datetime
 import enum
 import uuid
 
@@ -154,3 +155,11 @@ class FileUploadInfo(TypedDict):
     file_data: bytes
     mime_type: str
     is_uploaded: bool
+
+
+class ConversationMetadata(TypedDict):
+    conversation_id: int
+    conversation_uid: uuid.UUID
+    project_id: int
+    extra_metadata: dict | None
+    created_at: datetime

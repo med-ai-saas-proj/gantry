@@ -452,7 +452,9 @@ class ConversationSession:
                             "id": cast(str, event.result.run_id),
                             "conversation_id": str(self.conversation_uid),
                             "status": ResponseStatus.completed,
-                            "output":  event.result.output if not skip_final_result else None,
+                            "output": event.result.output
+                            if not skip_final_result
+                            else None,
                             "usage": {
                                 "input_tokens": usage.input_tokens,
                                 "output_tokens": usage.output_tokens,
