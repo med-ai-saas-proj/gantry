@@ -174,10 +174,8 @@ class ConversationSession:
                             # If not data URL, assume it's a direct URL
                             content = ImageUrl(url=root_message.url)
                     else:
-                        _res = (
-                            await self.file_service.get_file_metadata_and_url(
-                                root_message.file_id, self.project_id
-                            )
+                        _res = await self.file_service.getFileMetadataAndUrl(
+                            root_message.file_id, self.project_id
                         )
                         if isinstance(_res, Err):
                             return _res
@@ -211,10 +209,8 @@ class ConversationSession:
                             # If not data URL, assume it's a direct URL
                             content = AudioUrl(url=root_message.url)
                     else:
-                        _res = (
-                            await self.file_service.get_file_metadata_and_url(
-                                root_message.file_id, self.project_id
-                            )
+                        _res = await self.file_service.getFileMetadataAndUrl(
+                            root_message.file_id, self.project_id
                         )
                         if isinstance(_res, Err):
                             return _res
@@ -248,10 +244,8 @@ class ConversationSession:
                             # If not data URL, assume it's a direct URL
                             content = VideoUrl(url=root_message.url)
                     else:
-                        _res = (
-                            await self.file_service.get_file_metadata_and_url(
-                                root_message.file_id, self.project_id
-                            )
+                        _res = await self.file_service.getFileMetadataAndUrl(
+                            root_message.file_id, self.project_id
                         )
                         if isinstance(_res, Err):
                             return _res
@@ -288,10 +282,8 @@ class ConversationSession:
                                 media_type=root_message.mime_type,
                             )
                     else:
-                        _res = (
-                            await self.file_service.get_file_metadata_and_url(
-                                root_message.file_id, self.project_id
-                            )
+                        _res = await self.file_service.getFileMetadataAndUrl(
+                            root_message.file_id, self.project_id
                         )
                         if isinstance(_res, Err):
                             return _res

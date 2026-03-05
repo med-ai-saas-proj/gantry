@@ -23,7 +23,7 @@ file_storage_router = APIRouter(prefix="/file-storage", tags=["file-storage"])
 
 
 @file_storage_router.post(
-    "/upload",
+    "/",
     summary="Upload a file to the file storage service.",
     description="Endpoint to upload a file to the file storage service.",
     response_model=FileUploadResponseDTO,
@@ -53,7 +53,7 @@ async def upload_file(
     if ext is None and file.filename:
         ext = file.filename.split(".")[-1]  # Fallback to filename extension
 
-    file_id = await file_storage_service.upload_file(
+    file_id = await file_storage_service.uploadFile(
         file.filename or "unknown",
         file.file,
         file.size,
@@ -81,7 +81,7 @@ async def list_files(
     ],
 ):
     """List files in the file storage service."""
-    files_metadata = await file_storage_service.list_files(
+    files_metadata = await file_storage_service.listFilesInProject(
         api_key_info["project_id"]
     )
     return [
@@ -127,7 +127,7 @@ async def download_file(
 ):
     """Download a file by file ID."""
     presigned_url = (
-        await file_storage_service.get_file_url(
+        await file_storage_service.getFileUrl(
             file_id, api_key_info["project_id"]
         )
     ).unwrap()
@@ -154,7 +154,7 @@ async def get_file_url_and_metadata(
         presigned_url,
         file_metadata,
     ) = (
-        await file_storage_service.get_file_metadata_and_url(
+        await file_storage_service.getFileMetadataAndUrl(
             file_id, api_key_info["project_id"]
         )
     ).unwrap()
@@ -186,7 +186,7 @@ async def get_file_metadata(
 ):
     """Get file metadata by file ID."""
     file_metadata = (
-        await file_storage_service.get_file_metadata(
+        await file_storage_service.getFileMetadata(
             file_id, api_key_info["project_id"]
         )
     ).unwrap()
@@ -217,7 +217,7 @@ async def get_file_presigned_url(
 ):
     """Get presigned URL for file download."""
     presigned_url = (
-        await file_storage_service.get_file_url(
+        await file_storage_service.getFileUrl(
             file_id, api_key_info["project_id"]
         )
     ).unwrap()
@@ -243,7 +243,7 @@ async def delete_file(
 ):
     """Delete a file by file ID."""
     (
-        await file_storage_service.delete_file(
+        await file_storage_service.deleteFile(
             file_id, api_key_info["project_id"]
         )
     ).unwrap()

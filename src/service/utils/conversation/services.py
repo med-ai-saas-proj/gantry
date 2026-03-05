@@ -200,7 +200,7 @@ class ConversationService:
             return parts
         elif content["type"] == "file":
             file_id = content["file_id"]
-            res = await self.file_service.get_file_metadata_and_url(
+            res = await self.file_service.getFileMetadataAndUrl(
                 uuid.UUID(file_id), project_id
             )
             if isinstance(res, Err):

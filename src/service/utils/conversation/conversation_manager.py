@@ -118,12 +118,12 @@ class ConversationManager:
                 ext = ext.lstrip(".")  # Remove leading dot
         else:
             mime_type, ext = detect_file_type(file_data)
-        await self.file_service.upload_file(
+        await self.file_service.uploadFile(
             file_name=f"uploaded_file.{ext}",
             file_data=file_data,
             file_size=len(file_data),
             mime_type=mime_type,
             project_id=project_id,
             ext=ext,
-            file_id=file_info["file_id"],
+            file_uid=file_info["file_id"],
         )
