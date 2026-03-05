@@ -1,12 +1,12 @@
 from src.shared.custom_types.error_exception import ProblemDetails
 
-from .ocr.routers import ocr_router
-from .chat.routers import chat_router
-from .ai_search.routers import ai_search_router
-from .rx_advisor.routers import rx_advisor_router
-from .ehr_summarize.routers import ehr_summarize_router
-from .utils.conversation.routers import conversation_router
-from .utils.file_storage.routers import file_storage_router
+from .ocr import ocr_router
+from .chat import chat_router
+from .ai_search import ai_search_router
+from .rx_advisor import rx_advisor_router
+from .ehr_summarize import ehr_summarize_router
+from .utils.conversation import conversation_router
+from .utils.file_storage import file_storage_router
 
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
