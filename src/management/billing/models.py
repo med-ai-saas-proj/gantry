@@ -116,7 +116,7 @@ class OrganizationSpendingLimit(
     __tablename__ = "OrganizationSpendingLimits"
 
     organization_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, unique=True
+        String(128), nullable=False, unique=True, index=True
     )
 
     # NULL = no limit set (global default applies)
@@ -140,7 +140,7 @@ class ProjectSpendingLimit(
     __tablename__ = "ProjectSpendingLimits"
 
     project_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, unique=True
+        String(128), nullable=False, unique=True, index=True
     )
 
     # NULL = fall back to org-level limit
