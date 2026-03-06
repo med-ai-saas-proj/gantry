@@ -28,4 +28,5 @@ if __name__ == "__main__":
         port=int(args["port"]),
         workers=int(args["workers"]),
         env_file=".env",
+        loop="uvloop",
     )
