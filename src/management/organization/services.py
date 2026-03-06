@@ -1,0 +1,693 @@
+"""Business-logic service for Organization operations.
+
+Orchestrates the Keycloak admin client and Postgres repositories.
+"""
+
+from src.db.factories import AsyncSessionManager
+from src.shared.custom_types.error_exception import RecoverableError
+
+from .dtos import (
+    OrgInfoResponse,
+    OrgUserResponse,
+    InvitationResponse,
+    OrgSettingsResponse,
+    OrgUserListResponse,
+    DeleteRequestResponse,
+    InvitationListResponse,
+    UserPermissionsResponse,
+)
+from .settings import getOrgSettings
+from .permissions import OrgPermission, has_permission
+from .repositories import (
+    OrgSettingsRepository,
+    OrgDeletionRequestRepository,
+)
+from .keycloak_client import (
+    KeycloakOrgClient,
+    UserNotInOrganizationError,
+    OrgNotFoundError,
+)
+
+from typing import Any
+from datetime import datetime, timedelta, UTC
+from safe_result import Ok, Err, Result
+from structlog.stdlib import BoundLogger
+
+
+_ORG_PERM_ATTR = "org_permissions"
+
+
+class DeletionAlreadyRequestedError(RecoverableError):
+    status = 409
+    code = "deletion_already_requested"
+    title = "Deletion Already Requested"
+    detail = "A deletion request for this organization already exists."
+
+
+class DeletionRequestNotFoundError(RecoverableError):
+    status = 404
+    code = "deletion_request_not_found"
+    title = "Deletion Request Not Found"
+    detail = "No pending deletion request exists for this organization."
+
+
+class InvalidPermissionError(RecoverableError):
+    status = 400
+    code = "invalid_org_permission"
+    title = "Invalid Organization Permission"
+    detail = "One or more permissions are invalid."
+
+
+class ReadOwnPermissionsOrManageRequiredError(RecoverableError):
+    status = 403
+    code = "insufficient_org_permission"
+    title = "Insufficient Organization Permission"
+    detail = (
+        "You can read only your own permissions unless you have "
+        "organization.users.permissions.read_write."
+    )
+
+
+class OwnerRequiredForGrantError(RecoverableError):
+    status = 403
+    code = "owner_required_for_permission_grant"
+    title = "Owner Required"
+    detail = (
+        "Only organization owner can grant "
+        "organization.users.permissions.read_write."
+    )
+
+
+class OwnerPermissionRequiredError(RecoverableError):
+    status = 403
+    code = "owner_required"
+    title = "Owner Required"
+    detail = "Only organization owner can perform this operation."
+
+
+class OwnerPermissionImmutableError(RecoverableError):
+    status = 403
+    code = "owner_permission_immutable"
+    title = "Owner Permission Immutable"
+    detail = "Organization owner permission is permanent and cannot be removed."
+
+
+class OwnerTransferNotAllowedError(RecoverableError):
+    status = 403
+    code = "owner_transfer_not_allowed"
+    title = "Owner Transfer Not Allowed"
+    detail = "Organization owner cannot be transferred to another user."
+
+
+class OwnerRemovalNotAllowedError(RecoverableError):
+    status = 403
+    code = "owner_removal_not_allowed"
+    title = "Owner Removal Not Allowed"
+    detail = "Organization owner cannot be removed from the organization."
+
+
+class OwnerNotFoundError(RecoverableError):
+    status = 409
+    code = "owner_not_found"
+    title = "Owner Not Found"
+    detail = "No organization owner is configured for this organization."
+
+
+class MultipleOwnersError(RecoverableError):
+    status = 409
+    code = "multiple_owners_not_allowed"
+    title = "Multiple Owners Not Allowed"
+    detail = "An organization must have exactly one owner."
+
+
+class UserAlreadyInOrganizationError(RecoverableError):
+    status = 409
+    code = "user_already_in_organization"
+    title = "User Already In Organization"
+    detail = "The user is already a member of this organization."
+
+
+class UserAlreadyInAnotherOrganizationError(RecoverableError):
+    status = 409
+    code = "user_already_in_another_organization"
+    title = "User Already In Another Organization"
+    detail = "A user can belong to only one organization."
+
+
+class MultipleOrganizationMembershipError(RecoverableError):
+    status = 409
+    code = "multiple_org_membership_not_allowed"
+    title = "Multiple Organization Membership Not Allowed"
+    detail = "A user can belong to only one organization."
+
+
+def _extract_org_ids(orgs: list[dict[str, Any]]) -> set[str]:
+    return {str(org.get("id", "")) for org in orgs if org.get("id")}
+
+
+class OrgService:
+    """Organisation feature service."""
+
+    def __init__(
+        self,
+        kc_client: KeycloakOrgClient,
+        settings_repo: OrgSettingsRepository,
+        deletion_repo: OrgDeletionRequestRepository,
+        session_manager: AsyncSessionManager,
+        logger: BoundLogger,
+    ):
+        self.kc = kc_client
+        self.settings_repo = settings_repo
+        self.deletion_repo = deletion_repo
+        self.session_manager = session_manager
+        self.logger = logger
+
+    def _compute_cancel_before(self, requested_at: datetime) -> datetime:
+        days = getOrgSettings().deletion_cancel_window_days
+        return requested_at + timedelta(days=days)
+
+    async def _ensure_org_exists(
+        self, org_id: str
+    ) -> Result[dict[str, Any], RecoverableError]:
+        return await self.kc.get_org(org_id)
+
+    def _is_backend_service_account(
+        self,
+        *,
+        actor_is_service_account: bool,
+        actor_client_id: str | None,
+    ) -> bool:
+        if not actor_is_service_account:
+            return False
+        return actor_client_id == getOrgSettings().keycloak_service_client_id
+
+    async def _ensure_user_in_org(
+        self, org_id: str, user_id: str
+    ) -> Result[bool, RecoverableError]:
+        orgs_res = await self.kc.get_member_organizations(user_id)
+        if orgs_res.is_err():
+            return orgs_res
+
+        orgs = orgs_res.unwrap()
+        unique_org_ids = {
+            str(org.get("id", "")) for org in orgs if org.get("id")
+        }
+        if len(unique_org_ids) > 1:
+            return Err(MultipleOrganizationMembershipError())
+        for org in orgs:
+            if org.get("id") == org_id:
+                return Ok(True)
+        return Err(UserNotInOrganizationError())
+
+    def _extract_user_permissions(self, attrs: dict[str, Any]) -> list[str]:
+        # Keycloak user-profile validation allows org_permissions.
+        legacy = attrs.get(_ORG_PERM_ATTR, [])
+        if isinstance(legacy, str):
+            legacy = [legacy]
+        if isinstance(legacy, list):
+            return [p for p in legacy if isinstance(p, str)]
+        return []
+
+    def _flatten_settings(
+        self,
+        data: dict[str, Any],
+        prefix: str = "",
+    ) -> dict[str, Any]:
+        """Flatten nested settings to dot-notation keys."""
+        flattened: dict[str, Any] = {}
+        for key, value in data.items():
+            final_key = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict):
+                flattened.update(
+                    self._flatten_settings(value, prefix=final_key)
+                )
+            else:
+                flattened[final_key] = value
+        return flattened
+
+    async def _get_member_permissions(
+        self, org_id: str, user_id: str
+    ) -> Result[list[str], RecoverableError]:
+        member_res = await self._ensure_user_in_org(org_id, user_id)
+        if member_res.is_err():
+            return member_res
+
+        attrs_res = await self.kc.get_user_attributes(user_id)
+        if attrs_res.is_err():
+            return attrs_res
+        attrs = attrs_res.unwrap()
+        return Ok(self._extract_user_permissions(attrs))
+
+    async def _get_org_owner_id(
+        self, org_id: str
+    ) -> Result[str, RecoverableError]:
+        first = 0
+        max_results = 100
+        owners: list[str] = []
+
+        while True:
+            members_res = await self.kc.get_org_members(
+                org_id, first=first, max_results=max_results
+            )
+            if members_res.is_err():
+                return members_res
+            members = members_res.unwrap()
+            if not members:
+                break
+
+            for member in members:
+                member_id = member.get("id")
+                if not member_id:
+                    continue
+                attrs_res = await self.kc.get_user_attributes(member_id)
+                if attrs_res.is_err():
+                    return attrs_res
+                perms = self._extract_user_permissions(attrs_res.unwrap())
+                if OrgPermission.OWNER.value in perms:
+                    owners.append(member_id)
+
+            if len(members) < max_results:
+                break
+            first += max_results
+
+        unique_owners = list(dict.fromkeys(owners))
+        if not unique_owners:
+            return Err(OwnerNotFoundError())
+        if len(unique_owners) > 1:
+            return Err(MultipleOwnersError())
+        return Ok(unique_owners[0])
+
+    async def _sync_metadata_from_keycloak(
+        self, org_id: str
+    ) -> Result[OrgInfoResponse, RecoverableError]:
+        org_res = await self.kc.get_org(org_id)
+        if org_res.is_err():
+            return org_res
+        org = org_res.unwrap()
+        name = str(org.get("name") or org_id)
+
+        owner_id_res = await self._get_org_owner_id(org_id)
+        if owner_id_res.is_err():
+            if isinstance(owner_id_res.error, OwnerNotFoundError):
+                return Ok(
+                    OrgInfoResponse(
+                        id=str(org.get("id") or org_id),
+                        name=name,
+                        owner_id=None,
+                    )
+                )
+            return owner_id_res
+        return Ok(
+            OrgInfoResponse(
+                id=str(org.get("id") or org_id),
+                name=name,
+                owner_id=owner_id_res.unwrap(),
+            )
+        )
+
+    # delete org
+    async def request_delete_org(
+        self, org_id: str
+    ) -> Result[DeleteRequestResponse, RecoverableError]:
+        org_res = await self._ensure_org_exists(org_id)
+        if org_res.is_err():
+            return org_res
+
+        async with self.session_manager.get_session() as session:
+            existing = await self.deletion_repo.get_by_org_id(session, org_id)
+            if existing is not None:
+                return Err(DeletionAlreadyRequestedError())
+
+            record = await self.deletion_repo.upsert_request(
+                session=session,
+                org_id=org_id,
+            )
+            requested_at_dt = record.requested_at
+            cancel_before_dt = self._compute_cancel_before(requested_at_dt)
+            await session.commit()
+
+            return Ok(
+                DeleteRequestResponse(
+                    org_id=org_id,
+                    requested_at=requested_at_dt.isoformat(),
+                    cancel_before=cancel_before_dt.isoformat(),
+                )
+            )
+
+    async def cancel_delete_org(
+        self, org_id: str
+    ) -> Result[bool, RecoverableError]:
+        async with self.session_manager.get_session() as session:
+            deleted = await self.deletion_repo.delete_by_org_id(session, org_id)
+            if not deleted:
+                return Err(DeletionRequestNotFoundError())
+            await session.commit()
+            return Ok(True)
+
+    async def process_due_deletions(self, batch_size: int = 100) -> int:
+        now_utc = datetime.now(UTC)
+        cutoff = now_utc - timedelta(
+            days=getOrgSettings().deletion_cancel_window_days
+        )
+        processed = 0
+
+        async with self.session_manager.get_session() as session:
+            due_requests = await self.deletion_repo.list_due_requests(
+                session=session,
+                due_before_or_equal=cutoff,
+                limit=batch_size,
+            )
+
+            for req in due_requests:
+                org_id = req.org_id
+                delete_res = await self.kc.delete_org(org_id)
+                if delete_res.is_err() and not isinstance(
+                    delete_res.error, OrgNotFoundError
+                ):
+                    self.logger.warning(
+                        "org_delete_worker_failed",
+                        org_id=org_id,
+                        error=getattr(
+                            delete_res.error,
+                            "detail",
+                            str(delete_res.error),
+                        ),
+                    )
+                    continue
+
+                await self.settings_repo.delete_by_org_id(session, org_id)
+                await self.deletion_repo.delete_by_org_id(session, org_id)
+                processed += 1
+                self.logger.info("org_deleted_after_grace_period", org_id=org_id)
+
+            if processed > 0:
+                await session.commit()
+
+        return processed
+
+    # organization metadata
+    async def get_org_info(
+        self, org_id: str
+    ) -> Result[OrgInfoResponse, RecoverableError]:
+        return await self._sync_metadata_from_keycloak(org_id)
+
+    async def update_org_info(
+        self,
+        org_id: str,
+        actor_user_id: str,
+        name: str,
+        actor_is_service_account: bool = False,
+        actor_client_id: str | None = None,
+    ) -> Result[OrgInfoResponse, RecoverableError]:
+        is_service_actor = self._is_backend_service_account(
+            actor_is_service_account=actor_is_service_account,
+            actor_client_id=actor_client_id,
+        )
+        owner_id: str | None = None
+        if not is_service_actor:
+            owner_id_res = await self._get_org_owner_id(org_id)
+            if owner_id_res.is_err():
+                return owner_id_res
+            owner_id = owner_id_res.unwrap()
+            if owner_id != actor_user_id:
+                return Err(OwnerPermissionRequiredError())
+
+        current_org_res = await self.kc.get_org(org_id)
+        if current_org_res.is_err():
+            return current_org_res
+        current_org = current_org_res.unwrap()
+        payload = dict(current_org)
+        payload["name"] = name
+
+        update_res = await self.kc.update_org(org_id, payload)
+        if update_res.is_err():
+            return update_res
+
+        return Ok(
+            OrgInfoResponse(
+                id=org_id,
+                name=name,
+                owner_id=owner_id,
+            )
+        )
+
+    # settings
+    async def get_settings(
+        self, org_id: str
+    ) -> Result[OrgSettingsResponse, RecoverableError]:
+        org_res = await self._ensure_org_exists(org_id)
+        if org_res.is_err():
+            return org_res
+
+        async with self.session_manager.get_session() as session:
+            settings = await self.settings_repo.get_or_create(session, org_id)
+            output = OrgSettingsResponse(
+                rate_limit=settings.rate_limit,
+                extra=settings.extra or {},
+            )
+            await session.commit()
+            return Ok(output)
+
+    async def update_settings(
+        self,
+        org_id: str,
+        rate_limit: int | None,
+        extra: dict[str, Any],
+    ) -> Result[OrgSettingsResponse, RecoverableError]:
+        org_res = await self._ensure_org_exists(org_id)
+        if org_res.is_err():
+            return org_res
+
+        flattened_extra = self._flatten_settings(extra)
+
+        async with self.session_manager.get_session() as session:
+            settings = await self.settings_repo.upsert(
+                session, org_id, rate_limit, flattened_extra
+            )
+            output = OrgSettingsResponse(
+                rate_limit=settings.rate_limit,
+                extra=settings.extra or {},
+            )
+            await session.commit()
+            return Ok(output)
+
+    # users
+    async def get_users(
+        self,
+        org_id: str,
+        limit: int = 20,
+        offset: int = 0,
+        q: str | None = None,
+    ) -> Result[OrgUserListResponse, RecoverableError]:
+        members_res = await self.kc.get_org_members(
+            org_id, first=offset, max_results=limit, search=q
+        )
+        if members_res.is_err():
+            return members_res
+        members = members_res.unwrap()
+
+        count_res = await self.kc.get_org_member_count(org_id)
+        total = count_res.unwrap() if count_res.is_ok() else len(members)
+
+        results = [
+            OrgUserResponse(
+                id=m.get("id", ""),
+                username=m.get("username"),
+                email=m.get("email"),
+            )
+            for m in members
+        ]
+        return Ok(OrgUserListResponse(total=total, results=results))
+
+    async def remove_user(
+        self, org_id: str, user_id: str
+    ) -> Result[bool, RecoverableError]:
+        owner_id_res = await self._get_org_owner_id(org_id)
+        if owner_id_res.is_err():
+            return owner_id_res
+        if user_id == owner_id_res.unwrap():
+            return Err(OwnerRemovalNotAllowedError())
+
+        remove_res = await self.kc.remove_member(org_id, user_id)
+        if remove_res.is_err():
+            return remove_res
+        return await self.kc.delete_user(user_id)
+
+    # invitations
+    async def get_invitations(
+        self, org_id: str
+    ) -> Result[InvitationListResponse, RecoverableError]:
+        inv_res = await self.kc.get_invitations(org_id)
+        if inv_res.is_err():
+            return inv_res
+        raw_list = inv_res.unwrap()
+
+        results = []
+        for inv in raw_list:
+            email = inv.get("email", "")
+            results.append(
+                InvitationResponse(
+                    id=str(inv.get("id", "")),
+                    email=email,
+                    status=inv.get("status"),
+                )
+            )
+        return Ok(InvitationListResponse(results=results))
+
+    async def get_invitation(
+        self, org_id: str, invitation_id: str
+    ) -> Result[InvitationResponse, RecoverableError]:
+        inv_res = await self.kc.get_invitation(org_id, invitation_id)
+        if inv_res.is_err():
+            return inv_res
+        inv = inv_res.unwrap()
+
+        return Ok(
+            InvitationResponse(
+                id=str(inv.get("id", "")),
+                email=inv.get("email", ""),
+                status=inv.get("status"),
+            )
+        )
+
+    async def create_invitation(
+        self,
+        org_id: str,
+        email: str,
+    ) -> Result[bool, RecoverableError]:
+        existing_user_res = await self.kc.find_user_by_email(email)
+        if existing_user_res.is_err():
+            return existing_user_res
+        existing_user = existing_user_res.unwrap()
+        if existing_user and existing_user.get("id"):
+            existing_user_id = str(existing_user["id"])
+            orgs_res = await self.kc.get_member_organizations(existing_user_id)
+            if orgs_res.is_err():
+                return orgs_res
+
+            org_ids = _extract_org_ids(orgs_res.unwrap())
+            if org_id in org_ids:
+                return Err(UserAlreadyInOrganizationError())
+            if org_ids:
+                return Err(UserAlreadyInAnotherOrganizationError())
+
+        invite_res = await self.kc.invite_user(org_id, email)
+        if invite_res.is_err():
+            return invite_res
+        return Ok(True)
+
+    async def delete_invitation(
+        self, org_id: str, invitation_id: str
+    ) -> Result[bool, RecoverableError]:
+        delete_res = await self.kc.delete_invitation(org_id, invitation_id)
+        return delete_res
+
+    async def resend_invitation(
+        self, org_id: str, invitation_id: str
+    ) -> Result[bool, RecoverableError]:
+        return await self.kc.resend_invitation(org_id, invitation_id)
+
+    # user permissions
+    async def ensure_can_read_user_permissions(
+        self,
+        org_id: str,
+        actor_user_id: str,
+        target_user_id: str,
+        actor_is_service_account: bool = False,
+        actor_client_id: str | None = None,
+    ) -> Result[None, RecoverableError]:
+        if self._is_backend_service_account(
+            actor_is_service_account=actor_is_service_account,
+            actor_client_id=actor_client_id,
+        ):
+            return Ok(None)
+
+        target_member_res = await self._ensure_user_in_org(
+            org_id, target_user_id
+        )
+        if target_member_res.is_err():
+            return target_member_res
+
+        if actor_user_id == target_user_id:
+            return Ok(None)
+
+        actor_perms_res = await self._get_member_permissions(
+            org_id, actor_user_id
+        )
+        if actor_perms_res.is_err():
+            return actor_perms_res
+
+        if not has_permission(
+            actor_perms_res.unwrap(),
+            OrgPermission.USERS_PERMISSIONS_RW,
+        ):
+            return Err(ReadOwnPermissionsOrManageRequiredError())
+
+        return Ok(None)
+
+    async def get_user_permissions(
+        self, org_id: str, user_id: str
+    ) -> Result[UserPermissionsResponse, RecoverableError]:
+        perms_res = await self._get_member_permissions(org_id, user_id)
+        if perms_res.is_err():
+            return perms_res
+        return Ok(UserPermissionsResponse(permissions=perms_res.unwrap()))
+
+    async def update_user_permissions(
+        self,
+        org_id: str,
+        actor_user_id: str,
+        user_id: str,
+        permissions: list[str],
+        actor_is_service_account: bool = False,
+        actor_client_id: str | None = None,
+    ) -> Result[UserPermissionsResponse, RecoverableError]:
+        valid = {p.value for p in OrgPermission}
+        invalid = set(permissions) - valid
+        if invalid:
+            return Err(InvalidPermissionError())
+
+        is_service_actor = self._is_backend_service_account(
+            actor_is_service_account=actor_is_service_account,
+            actor_client_id=actor_client_id,
+        )
+
+        owner_id = ""
+        if not is_service_actor:
+            owner_id_res = await self._get_org_owner_id(org_id)
+            if owner_id_res.is_err():
+                return owner_id_res
+            owner_id = owner_id_res.unwrap()
+
+        if user_id == owner_id and OrgPermission.OWNER.value not in permissions:
+            return Err(OwnerPermissionImmutableError())
+        if user_id != owner_id and OrgPermission.OWNER.value in permissions:
+            return Err(OwnerTransferNotAllowedError())
+
+        actor_perms: list[str] = []
+        if not is_service_actor:
+            actor_perms_res = await self._get_member_permissions(
+                org_id, actor_user_id
+            )
+            if actor_perms_res.is_err():
+                return actor_perms_res
+            actor_perms = actor_perms_res.unwrap()
+
+        if (
+            OrgPermission.USERS_PERMISSIONS_RW.value in permissions
+            and not has_permission(actor_perms, OrgPermission.OWNER)
+        ):
+            return Err(OwnerRequiredForGrantError())
+
+        if not is_service_actor:
+            target_member_res = await self._ensure_user_in_org(org_id, user_id)
+            if target_member_res.is_err():
+                return target_member_res
+
+        set_res = await self.kc.set_user_attribute(
+            user_id, _ORG_PERM_ATTR, permissions
+        )
+        if set_res.is_err():
+            return set_res
+
+        return Ok(UserPermissionsResponse(permissions=permissions))

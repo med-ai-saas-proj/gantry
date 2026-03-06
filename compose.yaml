@@ -44,11 +44,12 @@ services:
           memory: 20M
 
   keycloak:
-    image: quay.io/keycloak/keycloak:26.4.7
+    image: quay.io/keycloak/keycloak:26.5.3
     container_name: keycloak
     environment:
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_FEATURES=organization
     ports:
       - "8080:8080"
     command: start-dev --import-realm --http-access-log-enabled=true
