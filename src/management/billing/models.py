@@ -4,6 +4,7 @@ from src.db.utils import WithID, WithCreateTimestamp, WithCreateUpdateTimestamp
 from decimal import Decimal
 
 from sqlalchemy import (
+    UUID,
     Index,
     String,
     Numeric,
@@ -20,7 +21,7 @@ class BillingBaseSQLModel(BaseSQLModel):
     __table_args__ = {"schema": "Billing"}
 
 
-class BillingTransaction(WithCreateTimestamp, WithID, BillingBaseSQLModel):
+class BillingTransaction(WithCreateTimestamp, UUID, BillingBaseSQLModel):
     """Individual charge record for each API call.
 
     All amounts are in USD. Currency conversion is handled by the payment
@@ -48,23 +49,6 @@ class BillingTransaction(WithCreateTimestamp, WithID, BillingBaseSQLModel):
 
     # e.g. { "llm_usages": { "gpt-4o": { "input_tokens": 100, "output_tokens": 50 } } }
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
-
-
-class BillingHold(WithCreateTimestamp, WithID, BillingBaseSQLModel):
-    """Temporary hold on funds before the real cost is known.
-
-    Created by HOLD(maximum_cost), deleted by RELEASE(uuid, real_cost).
-    Used to check spending limits before processing a request.
-    """
-
-    __tablename__ = "BillingHolds"
-
-    apikey_id: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, index=True
-    )
-    amount: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False
-    )
 
 
 class MonthlyAggregate(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
