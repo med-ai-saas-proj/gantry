@@ -16,7 +16,7 @@ from pathlib import Path
 
 # revision identifiers, used by Alembic.
 revision: str = "a1b2c3d4e5f6"
-down_revision: Union[str, Sequence[str], None] = "0433e52b355a"
+down_revision: Union[str, Sequence[str], None] = "909c37558b63"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -245,6 +245,7 @@ dependencies = [
     { name = "scalar-fastapi" },
     { name = "sqlalchemy" },
     { name = "structlog" },
+    { name = "uvloop" },
 ]
 
 [package.dev-dependencies]
@@ -287,6 +288,7 @@ requires-dist = [
     { name = "scalar-fastapi", specifier = ">=1.4.3" },
     { name = "sqlalchemy", specifier = ">=2.0.43" },
     { name = "structlog", specifier = ">=25.4.0" },
+    { name = "uvloop", specifier = ">=0.22.1" },
 ]
 
 [package.metadata.requires-dev]

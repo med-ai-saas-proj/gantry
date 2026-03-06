@@ -29,6 +29,7 @@ dependencies = [
     "opentelemetry-instrumentation-sqlalchemy>=0.60b0",
     "opentelemetry-sdk>=1.39.0",
     "python-keycloak>=5.3.1",
+    "uvloop>=0.22.1",
 ]
 
 [tool.pyrefly]
