@@ -56,8 +56,8 @@ class ConversationManager:
                 mess_history = await self.conversation_service.getAndDeserializeConversationMessages(
                     conversation_id,
                     conversation_uid,
-                    message_context_window,
                     api_key_info["project_id"],
+                    message_context_window,
                 )
 
             conversation_session = ConversationSession(

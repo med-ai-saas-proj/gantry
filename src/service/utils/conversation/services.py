@@ -156,6 +156,7 @@ class ConversationService:
                     "type": "file_url",
                     "url": content.url,  # assume url holds file id if vendor_metadata is missing
                     "file_type": file_type,
+                    "mime_type": content.media_type,
                 }
         elif isinstance(content, BinaryContent):
             if (

@@ -46,7 +46,7 @@ class File(
     mime_type: Mapped[str] = mapped_column(String(64), nullable=False)
     size_in_bytes: Mapped[int] = mapped_column(nullable=False)
     status: Mapped[FileStatus] = mapped_column(
-        Enum(FileStatus),
+        Enum(FileStatus, schema="FileStorage"),
         nullable=False,
         default=FileStatus.UPLOADING,
         init=False,

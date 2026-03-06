@@ -8,7 +8,7 @@ from typing import Any, Literal, Sequence, TypedDict
 from pydantic_core import ErrorDetails
 
 
-class FileType(enum.Enum):
+class FileType(str, enum.Enum):
     """Enumeration of supported file types."""
 
     IMAGE = "image"
@@ -38,6 +38,7 @@ class SerializedFileUrlContentPart(TypedDict):
     type: Literal["file_url"]
     url: str
     file_type: FileType
+    mime_type: str
 
 
 SerializedContentPart = (
