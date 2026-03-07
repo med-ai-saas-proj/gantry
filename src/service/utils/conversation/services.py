@@ -1,3 +1,5 @@
+from redis.utils import C
+
 from src.db.session import AsyncSessionManager
 from src.service.utils.conversation.dtos import RequestMessage, ResponseMessage
 from src.shared.custom_types.error_exception import RecoverableError
@@ -568,7 +570,7 @@ class ConversationService:
                 order_by=order_by,
             )
 
-        cache_key = f"conversation_cache:{{{conversation_uid}}}"
+        cache_key = ConversationService._message_cache_key(conversation_uid)
         # atomic check if cache exists and is ready, if so get from cache, otherwise get from db and update cache
         lua_script = """
            if redis.call('EXISTS', KEYS[1]) == 1 then
@@ -703,7 +705,7 @@ class ConversationService:
     async def _tryAppendConversationMessagesCache(
         self, conversation_uid: uuid.UUID, msgs: Sequence[Message]
     ):
-        cache_key = f"conversation_cache:{{{conversation_uid}}}"
+        cache_key = ConversationService._message_cache_key(conversation_uid)
         # atomic check if cache exists and is ready,
         # if so append to cache, otherwise do nothing and let next read update the cache
         # (avoid appending to cache when cache is not loaded
@@ -746,11 +748,12 @@ class ConversationService:
     ):
         if len(msgs) == 0:
             return
-        cache_key = f"conversation_cache:{{{conversation_uid}}}"
+        cache_key = ConversationService._message_cache_key(conversation_uid)
         mappings = {
             json.dumps(asdict(msg), default=_json_serial): msg.seq_id
             for msg in msgs
         }
+
         async with self.redis_client.pipeline(
             transaction=True,
         ) as pipe:
@@ -791,8 +794,8 @@ class ConversationService:
 
     async def getMessage(
         self,
-        project_id: int,
         conversation_uid: uuid.UUID,
+        project_id: int,
         message_seq_id: int,
     ) -> Result[Message, MessageNotFoundError]:
         async with self.session_manager.get_session() as session:
@@ -806,9 +809,11 @@ class ConversationService:
     async def deleteMessage(
         self,
         conversation_uid: uuid.UUID,
-        message_seq_id: int,
         project_id: int,
+        message_seq_id: int,
     ):
+        mess_cache_key = ConversationService._message_cache_key(conversation_uid)
+
         async with self.session_manager.get_session() as session:
             deleted = await self.conversation_repo.deleteMessageBySeqId(
                 session, conversation_uid, project_id, message_seq_id
@@ -816,9 +821,8 @@ class ConversationService:
             if deleted is None:
                 return Err(MessageNotFoundError())
             await session.commit()
-        await self.redis_client.delete(
-            f"conversation_cache:{{{conversation_uid}}}"
-        )
+
+        await self.redis_client.delete(mess_cache_key)
         return Ok(None)
 
     async def deleteConversation(
@@ -826,6 +830,8 @@ class ConversationService:
         conversation_uid: uuid.UUID,
         project_id: int,
     ):
+        mess_cache_key = ConversationService._message_cache_key(conversation_uid)
+
         async with self.session_manager.get_session() as session:
             deleted = await self.conversation_repo.deleteConversationByUUID(
                 session, conversation_uid, project_id
@@ -833,10 +839,13 @@ class ConversationService:
             if deleted is None:
                 return Err(ConversationNotFoundError())
             await session.commit()
-        await self.redis_client.delete(
-            f"conversation_cache:{{{conversation_uid}}}"
-        )
+
+        await self.redis_client.delete(mess_cache_key)
         return Ok(None)
+    
+    @staticmethod
+    def _message_cache_key(conversation_uid: uuid.UUID) -> str:
+        return f"conversation_cache:{{{conversation_uid}}}"
 
     async def updateConversationMetadata(
             self,

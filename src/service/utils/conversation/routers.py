@@ -222,8 +222,8 @@ async def delete_message_from_conversation(
     """Delete a message from the conversation by conversation UID and message sequence ID."""
     (await conversation_service.deleteMessage(
         conversation_uid=conversation_uid,
-        message_seq_id=message_seq_id,
         project_id=api_key_info["project_id"],
+        message_seq_id=message_seq_id,
     )).unwrap()
 
 
@@ -245,8 +245,8 @@ async def get_message_from_conversation(
 ):
     res = (
         await conversation_service.getMessage(
-            project_id=api_key_info["project_id"],
             conversation_uid=conversation_uid,
+            project_id=api_key_info["project_id"],
             message_seq_id=message_seq_id,
         )
     ).unwrap()
