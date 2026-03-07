@@ -95,3 +95,8 @@ class ConversationMetadataResponse(BaseModel):
     project_id: int
     extra_metadata: dict | None = None
     created_at: datetime
+
+class UpdateConversationMetadataRequest(BaseModel):
+    """Represents a request to update a conversation."""
+
+    extra_metadata: dict | None = None

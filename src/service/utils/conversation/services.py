@@ -838,6 +838,21 @@ class ConversationService:
         )
         return Ok(None)
 
+    async def updateConversationMetadata(
+            self,
+            conversation_uid: uuid.UUID,
+            project_id: int,
+            extra_metadata: dict | None,
+    ):
+        async with self.session_manager.get_session() as session:
+            updated = await self.conversation_repo.updateConversationMetadataByUUID(
+                session, conversation_uid, project_id, extra_metadata
+            )
+            if updated is None:
+                return Err(ConversationNotFoundError())
+            await session.commit()
+        return Ok(None)
+
 
 def _json_serial(obj: Any):
     if isinstance(obj, (datetime, date)):

@@ -4,7 +4,7 @@ from src.service.utils.conversation.models import Message, Conversation
 import uuid
 from typing import Literal, Sequence
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.service.utils.conversation.types import ConversationMetadata
@@ -132,3 +132,30 @@ class ConversationRepository(Repository[Conversation, int]):
         res = await session.execute(stmt)
         deleted_conversation_id = res.scalar_one_or_none()
         return deleted_conversation_id
+
+    async def updateConversationMetadataByUUID(
+        self,
+        session: AsyncSession,
+        conversation_uuid: uuid.UUID,
+        project_id: int,
+        extra_metadata: dict | None,
+    ) -> ConversationMetadata | None:
+        stmt = (
+            update(Conversation)
+            .where(
+                Conversation.uuid == conversation_uuid,
+                Conversation.project_id == project_id,
+            ).values(extra_metadata=extra_metadata).returning(Conversation)
+        )
+        res = await session.execute(stmt)
+        conversation = res.scalar_one_or_none()
+        if conversation is None:
+            return None
+        
+        return {
+            "conversation_id": conversation.id,
+            "conversation_uid": conversation.uuid,
+            "project_id": conversation.project_id,
+            "extra_metadata": conversation.extra_metadata,
+            "created_at": conversation.created_at,
+        }

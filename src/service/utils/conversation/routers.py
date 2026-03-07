@@ -3,7 +3,7 @@ from griffe import Kind
 from src.management.api_keys.entities import ApiKeyInfo
 from src.service.utils.conversation.dtos import (
     AddMessageRequest,
-    CreateConversationRequest,
+    CreateConversationRequest, UpdateConversationMetadataRequest,
 )
 from src.management.api_keys.dependencies import requiredPermissions
 from src.service.utils.conversation.models import Message
@@ -85,6 +85,26 @@ async def get_conversation_metadata(
         created_at=metadata["created_at"],
     )
 
+@conversation_router.put(
+    "/{conversation_uid}/metadata",
+)
+async def update_conversation_metadata(
+    conversation_uid: uuid.UUID,
+    body: Annotated[UpdateConversationMetadataRequest, Body()],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
+    conversation_service: Annotated[
+        ConversationService, Depends(getConversationService)
+    ],
+):
+    """Update conversation metadata by conversation UID."""
+    (await conversation_service.updateConversationMetadata(
+        conversation_uid=conversation_uid,
+        project_id=api_key_info["project_id"],
+        extra_metadata=body.extra_metadata,
+    )).unwrap()
+
 
 @conversation_router.delete(
     "/{conversation_uid}",
@@ -164,7 +184,7 @@ async def get_conversation(
 
 @conversation_router.post(
     "/{conversation_uid}/messages",
-    summary="Add a message to the conversation, creating a new conversation if the UID does not exist.",
+    summary="Add a message to the conversation.",
     description="Endpoint to add a new message to the conversation by conversation UID.",
 )
 async def add_message_to_conversation(
