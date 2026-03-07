@@ -16,7 +16,6 @@ class FileInfoResponse(BaseModel):
     filename: str
     mime_type: str
     size: int
-    storage_path: str
     created_at: datetime
     extra_metadata: dict | None
 

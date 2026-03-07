@@ -97,7 +97,6 @@ async def list_files(
         FileInfoResponse(
             id=str(file_info["id"]),
             filename=file_info["filename"],
-            storage_path=file_info["storage_path"],
             mime_type=file_info["mime_type"],
             size=file_info["size"],
             created_at=file_info["created_at"],
@@ -146,11 +145,11 @@ async def download_file(
 
 @file_storage_router.get(
     "/{file_id}",
-    summary="Get file presigned URL and info by file ID.",
-    description="Endpoint to retrieve file URL and info by file ID.",
+    summary="Get file info and presigned URL by file ID.",
+    description="Endpoint to retrieve file info and a presigned URL for downloading the file by file ID.",
     response_model=FileInfoWithPresignedURLResponse,
 )
-async def get_file_url_and_info(
+async def get_file_info_and_presigned_url(
     file_id: uuid.UUID,
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
@@ -171,7 +170,6 @@ async def get_file_url_and_info(
     return FileInfoWithPresignedURLResponse(
         id=str(file_info["id"]),
         filename=file_info["filename"],
-        storage_path=file_info["storage_path"],
         mime_type=file_info["mime_type"],
         size=file_info["size"],
         created_at=file_info["created_at"],
@@ -204,7 +202,6 @@ async def get_file_info(
     return FileInfoResponse(
         id=str(file_info["id"]),
         filename=file_info["filename"],
-        storage_path=file_info["storage_path"],
         mime_type=file_info["mime_type"],
         size=file_info["size"],
         created_at=file_info["created_at"],

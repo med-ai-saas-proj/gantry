@@ -8,7 +8,7 @@ from .model_config import ModelConfig, ModelProvider
 from structlog.stdlib import BoundLogger
 from pydantic_ai.models import Model
 from pydantic_ai.models.groq import GroqModel
-from pydantic_ai.models.openai import OpenAIModel, OpenAIChatModel
+from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.groq import GroqProvider
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.providers.openai import OpenAIProvider
