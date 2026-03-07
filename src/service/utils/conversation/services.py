@@ -523,7 +523,7 @@ class ConversationService:
             )
             if metadata is None:
                 return Err(ConversationNotFoundError())
-        messages = await self._getConversationMessage(
+        messages = await self._getConversationMessages(
             metadata["conversation_id"],
             conversation_uid,
             limit=limit,
@@ -550,7 +550,7 @@ class ConversationService:
             session.expunge_all()
         return msgs
 
-    async def _getConversationMessage(
+    async def _getConversationMessages(
         self,
         conversation_id: int,
         conversation_uid: uuid.UUID,
@@ -605,7 +605,7 @@ class ConversationService:
         project_id: int,
         limit: int = 20,
     ) -> Sequence[ModelMessage]:
-        serialized_msgs = await self._getConversationMessage(
+        serialized_msgs = await self._getConversationMessages(
             conversation_id,
             conversation_uid,
             limit=limit,
@@ -793,7 +793,7 @@ class ConversationService:
         )
         return conversation_uid
 
-    async def getMessage(
+    async def getConversationMessage(
         self,
         conversation_uid: uuid.UUID,
         project_id: int,
@@ -805,9 +805,10 @@ class ConversationService:
             )
             if msg is None:
                 return Err(MessageNotFoundError())
+            session.expunge_all()
             return Ok(msg)
 
-    async def deleteMessage(
+    async def deleteConversationMessage(
         self,
         conversation_uid: uuid.UUID,
         project_id: int,

@@ -38,6 +38,7 @@ conversation_router = APIRouter(
     summary="Create a new conversation",
     description="Endpoint to create a new conversation.",
     response_model=CreateConversationResponse,
+    status_code=201,
 )
 async def create_conversation(
     api_key_info: Annotated[
@@ -87,6 +88,7 @@ async def get_conversation_metadata(
 
 @conversation_router.put(
     "/{conversation_uid}/metadata",
+    status_code=204,
 )
 async def update_conversation_metadata(
     conversation_uid: uuid.UUID,
@@ -110,6 +112,7 @@ async def update_conversation_metadata(
     "/{conversation_uid}",
     summary="Delete a conversation",
     description="Endpoint to delete a conversation by conversation UID.",
+    status_code=204,
 )
 async def delete_conversation(
     conversation_uid: uuid.UUID,
@@ -186,6 +189,7 @@ async def get_conversation(
     "/{conversation_uid}/messages",
     summary="Add a message to the conversation.",
     description="Endpoint to add a new message to the conversation by conversation UID.",
+    status_code=201,
 )
 async def add_message_to_conversation(
     conversation_uid: uuid.UUID,
@@ -208,6 +212,7 @@ async def add_message_to_conversation(
     "/{conversation_uid}/messages/{message_seq_id}",
     summary="Delete a message from the conversation.",
     description="Endpoint to delete a message from the conversation by conversation UID and message sequence ID.",
+    status_code=204,
 )
 async def delete_message_from_conversation(
     conversation_uid: uuid.UUID,
@@ -220,7 +225,7 @@ async def delete_message_from_conversation(
     ],
 ):
     """Delete a message from the conversation by conversation UID and message sequence ID."""
-    (await conversation_service.deleteMessage(
+    (await conversation_service.deleteConversationMessage(
         conversation_uid=conversation_uid,
         project_id=api_key_info["project_id"],
         message_seq_id=message_seq_id,
@@ -244,7 +249,7 @@ async def get_message_from_conversation(
     ],
 ):
     res = (
-        await conversation_service.getMessage(
+        await conversation_service.getConversationMessage(
             conversation_uid=conversation_uid,
             project_id=api_key_info["project_id"],
             message_seq_id=message_seq_id,

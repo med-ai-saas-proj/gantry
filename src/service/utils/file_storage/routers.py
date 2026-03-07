@@ -28,6 +28,7 @@ file_storage_router = APIRouter(prefix="/file-storage", tags=["file-storage"])
     summary="Upload a file to the file storage service.",
     description="Endpoint to upload a file to the file storage service.",
     response_model=FileUploadResponse,
+    status_code=201,
 )
 async def upload_file(
     file: UploadFile,
