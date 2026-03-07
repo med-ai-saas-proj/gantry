@@ -3,6 +3,7 @@ from redis.utils import C
 from src.db.session import AsyncSessionManager
 from src.service.utils.conversation.dtos import RequestMessage, ResponseMessage
 from src.shared.custom_types.error_exception import RecoverableError
+from src.shared.utils.json_utils import json_serializer
 
 from .types import (
     ConversationMetadata,
@@ -730,7 +731,7 @@ class ConversationService:
         mappings: list[str | int] = []
         for msg in msgs:
             mappings.append(msg.seq_id)
-            mappings.append(json.dumps(asdict(msg), default=_json_serial))
+            mappings.append(json.dumps(asdict(msg), default=json_serializer))
         mappings.append(self.setting.cache_ttl)
         mappings.append(self.setting.cache_limit)
         res = await cast(
@@ -750,7 +751,7 @@ class ConversationService:
             return
         cache_key = ConversationService._message_cache_key(conversation_uid)
         mappings = {
-            json.dumps(asdict(msg), default=_json_serial): msg.seq_id
+            json.dumps(asdict(msg), default=json_serializer): msg.seq_id
             for msg in msgs
         }
 
@@ -863,7 +864,3 @@ class ConversationService:
         return Ok(None)
 
 
-def _json_serial(obj: Any):
-    if isinstance(obj, (datetime, date)):
-        return obj.isoformat()
-    raise TypeError(f"Type {type(obj)} not serializable")

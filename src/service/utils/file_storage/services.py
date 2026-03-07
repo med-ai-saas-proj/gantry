@@ -1,9 +1,11 @@
 import json
+from datetime import datetime
 
 from redis.asyncio import Redis
 
 from src.db.session import AsyncSessionManager
 from src.shared.custom_types.error_exception import RecoverableError
+from src.shared.utils.json_utils import json_serializer
 
 from .types import FileRecord
 from .models import File, FileStatus
@@ -52,11 +54,13 @@ class FileStorageService:
             session_manager: AsyncSessionManager,
             file_storage_settings: ObjectStorageSettings,
             file_repo: FileRepository,
+            redis: Redis,
         ):
             self.storage_backend = storage_backend
             self.session_manager = session_manager
             self.file_storage_settings = file_storage_settings
             self.file_repo = file_repo
+            self.redis = redis
 
     def _uploadFileToStorage(
         self,
@@ -197,7 +201,7 @@ class FileStorageService:
                     "storage_path": json_data["storage_path"],
                     "mime_type": json_data["mime_type"],
                     "size": json_data["size"],
-                    "created_at": json_data["created_at"],
+                    "created_at": datetime.fromisoformat(json_data["created_at"]),
                     "extra_metadata": json_data["extra_metadata"],
                 }
             )
@@ -220,7 +224,9 @@ class FileStorageService:
             }
 
         await self.redis.set(cache_key, 
-                    json.dumps(res), 
+                    json.dumps(
+                        res, default=json_serializer
+                    ),
                     ex=self.file_storage_settings.redis_cache_expiry_seconds)
         return Ok[FileRecord](res)
 
