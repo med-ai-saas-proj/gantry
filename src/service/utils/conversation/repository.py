@@ -149,13 +149,14 @@ class ConversationRepository(Repository[Conversation, int]):
         )
         res = await session.execute(stmt)
         conversation = res.scalar_one_or_none()
-        if conversation is None:
-            return None
-        
-        return {
-            "conversation_id": conversation.id,
-            "conversation_uid": conversation.uuid,
-            "project_id": conversation.project_id,
-            "extra_metadata": conversation.extra_metadata,
-            "created_at": conversation.created_at,
-        }
+        return (
+            {
+                "conversation_id": conversation.id,
+                "conversation_uid": conversation.uuid,
+                "project_id": conversation.project_id,
+                "extra_metadata": conversation.extra_metadata,
+                "created_at": conversation.created_at,
+            }
+            if conversation
+            else None
+        )

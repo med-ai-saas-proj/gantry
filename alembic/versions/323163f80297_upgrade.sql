@@ -51,6 +51,7 @@ CREATE TABLE "FileStorage"."Files" (
     status "FileStorage".filestatus NOT NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
+    extra_metadata JSONB,
     CONSTRAINT "Files_pkey" PRIMARY KEY (id),
     CONSTRAINT "Files_project_id_fkey" FOREIGN KEY(project_id) REFERENCES "Project"."Projects" (id) ON DELETE CASCADE
 );

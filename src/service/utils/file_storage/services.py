@@ -8,7 +8,7 @@ from .repositories import FileRepository
 
 import uuid
 import asyncio
-from typing import TYPE_CHECKING, BinaryIO, cast
+from typing import TYPE_CHECKING, BinaryIO
 
 from safe_result import Ok, Err, Result
 
@@ -77,6 +77,7 @@ class FileStorageService:
         project_id: int,
         ext: str | None = None,
         file_uid: uuid.UUID | None = None,
+        extra_metadata: dict | None = None,
     ):
         """Upload a file and store its metadata."""
         if file_uid is None:
@@ -92,6 +93,7 @@ class FileStorageService:
                 filepath=file_path,
                 mime_type=mime_type,
                 size_in_bytes=file_size,
+                extra_metadata=extra_metadata,
             )
             session.add(file_record)
             await session.flush()
@@ -124,7 +126,7 @@ class FileStorageService:
         self, file_uuid: uuid.UUID, project_id: int
     ) -> Result[bytes, FileNotFoundInSystemError]:
         """Retrieve file content by UUID."""
-        res = await self.getFileMetadata(file_uuid, project_id)
+        res = await self.getFileInfo(file_uuid, project_id)
         if isinstance(res, Err):
             return res
         file_record = res.unwrap()
@@ -138,7 +140,7 @@ class FileStorageService:
         self, file_uuid: uuid.UUID, project_id: int
     ) -> Result[str, FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID."""
-        res = await self.getFileMetadata(file_uuid, project_id)
+        res = await self.getFileInfo(file_uuid, project_id)
         if isinstance(res, Err):
             return res
         file_record = res.unwrap()
@@ -152,11 +154,11 @@ class FileStorageService:
         )
         return Ok(url)
 
-    async def getFileMetadataAndUrl(
+    async def getFileInfoAndUrl(
         self, file_uuid: uuid.UUID, project_id: int
     ) -> Result[tuple[str, FileRecord], FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID."""
-        res = await self.getFileMetadata(file_uuid, project_id)
+        res = await self.getFileInfo(file_uuid, project_id)
         if isinstance(res, Err):
             return res
         file_record = res.unwrap()
@@ -170,10 +172,10 @@ class FileStorageService:
         )
         return Ok((url, file_record))
 
-    async def getFileMetadata(
+    async def getFileInfo(
         self, file_uuid: uuid.UUID, project_id: int
     ) -> Result[FileRecord, FileNotFoundInSystemError]:
-        """Retrieve file metadata by UUID."""
+        """Retrieve file info by UUID."""
         async with self.session_manager.get_session() as session:
             file_record = await self.file_repo.getAvailableByUUID(
                 session, file_uuid, project_id
@@ -189,8 +191,22 @@ class FileStorageService:
                     "mime_type": file_record.mime_type,
                     "size": file_record.size_in_bytes,
                     "created_at": file_record.created_at,
+                    "extra_metadata": file_record.extra_metadata,
                 }
             )
+        
+    async def updateFileMetadata(
+        self, file_uuid: uuid.UUID, project_id: int, extra_metadata: dict | None
+    ) -> Result[None, FileNotFoundInSystemError]:
+        """Update file metadata by UUID."""
+        async with self.session_manager.get_session() as session:
+            file_record = await self.file_repo.updateExtraMetadataByUUID(
+                session, file_uuid, project_id, extra_metadata
+            )
+            if not file_record:
+                return Err(FileNotFoundInSystemError())
+            await session.commit()
+            return Ok(None)
 
     def _deleteFileFromStorage(self, file_path: str) -> None:
         self.storage_backend.delete_object(
@@ -233,6 +249,7 @@ class FileStorageService:
                     "mime_type": file_record.mime_type,
                     "size": file_record.size_in_bytes,
                     "created_at": file_record.created_at,
+                    "extra_metadata": file_record.extra_metadata,
                 }
                 for file_record in file_records
             ]

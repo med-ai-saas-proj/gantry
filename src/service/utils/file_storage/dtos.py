@@ -3,14 +3,14 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
-class FileUploadResponseDTO(BaseModel):
+class FileUploadResponse(BaseModel):
     """DTO for file upload response."""
 
     file_id: str
 
 
-class FileMetadataResponseDTO(BaseModel):
-    """DTO for file metadata response."""
+class FileInfoResponse(BaseModel):
+    """DTO for file info response."""
 
     id: str
     filename: str
@@ -18,17 +18,24 @@ class FileMetadataResponseDTO(BaseModel):
     size: int
     storage_path: str
     created_at: datetime
+    extra_metadata: dict | None
 
 
-class FilePresignedURLResponseDTO(BaseModel):
+class FilePresignedURLResponse(BaseModel):
     """DTO for file presigned URL response."""
 
     url: str
 
 
-class FileMetadataWithPresignedURLResponseDTO(
-    FileMetadataResponseDTO, FilePresignedURLResponseDTO
+class FileInfoWithPresignedURLResponse(
+    FileInfoResponse, FilePresignedURLResponse
 ):
-    """DTO for file metadata with URL response."""
+    """DTO for file info with URL response."""
 
     pass
+
+
+class UpdateFileMetadataRequest(BaseModel):
+    """DTO for updating file metadata."""
+
+    extra_metadata: dict | None

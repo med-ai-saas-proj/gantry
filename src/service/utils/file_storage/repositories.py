@@ -84,3 +84,25 @@ class FileRepository(Repository):
         res = await session.execute(stmt)
         file_record = res.scalar_one_or_none()
         return file_record if file_record else None
+
+    async def updateExtraMetadataByUUID(
+        self,
+        session: AsyncSession,
+        file_uuid: uuid.UUID,
+        project_id: int,
+        extra_metadata: dict | None,
+    ) -> File | None:
+        """Update file extra metadata by UUID."""
+        stmt = (
+            update(File)
+            .where(
+                (File.uuid == file_uuid)
+                & (File.project_id == project_id)
+                & (File.status == FileStatus.AVAILABLE)
+            )
+            .values(extra_metadata=extra_metadata)
+            .returning(File)
+        )
+        res = await session.execute(stmt)
+        file_record = res.scalar_one_or_none()
+        return file_record if file_record else None

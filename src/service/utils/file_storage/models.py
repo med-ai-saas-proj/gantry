@@ -11,6 +11,7 @@ import enum
 from sqlalchemy import Enum, String, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.schema import ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 class FileStorageBaseSQLModel(BaseSQLModel):
@@ -51,3 +52,4 @@ class File(
         default=FileStatus.UPLOADING,
         init=False,
     )
+    extra_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)

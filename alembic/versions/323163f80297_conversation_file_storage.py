@@ -150,6 +150,7 @@ def upgrade() -> None:
     #     sa.Column("project_id", sa.BigInteger(), nullable=False),
     #     sa.Column("mime_type", sa.String(length=64), nullable=False),
     #     sa.Column("size_in_bytes", sa.Integer(), nullable=False),
+    #     sa.Column('extra_metadata', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     #     sa.Column(
     #         "status",
     #         sa.Enum(

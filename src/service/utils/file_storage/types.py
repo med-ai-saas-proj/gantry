@@ -11,3 +11,4 @@ class FileRecord(TypedDict):
     size: int
     storage_path: str
     created_at: datetime
+    extra_metadata: dict | None

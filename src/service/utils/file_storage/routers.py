@@ -2,10 +2,11 @@ from src.management.api_keys.entities import ApiKeyInfo
 from src.management.api_keys.dependencies import requiredPermissions
 
 from .dtos import (
-    FileUploadResponseDTO,
-    FileMetadataResponseDTO,
-    FilePresignedURLResponseDTO,
-    FileMetadataWithPresignedURLResponseDTO,
+    FileUploadResponse,
+    FileInfoResponse,
+    FilePresignedURLResponse,
+    FileInfoWithPresignedURLResponse,
+    UpdateFileMetadataRequest,
 )
 from .utils import detect_file_type
 from .services import FileStorageService
@@ -15,7 +16,7 @@ import uuid
 import mimetypes
 from typing import Annotated
 
-from fastapi import Depends, Security, APIRouter, UploadFile, HTTPException
+from fastapi import Body, Depends, Security, APIRouter, UploadFile, HTTPException
 from starlette.responses import RedirectResponse
 
 
@@ -26,7 +27,7 @@ file_storage_router = APIRouter(prefix="/file-storage", tags=["file-storage"])
     "/",
     summary="Upload a file to the file storage service.",
     description="Endpoint to upload a file to the file storage service.",
-    response_model=FileUploadResponseDTO,
+    response_model=FileUploadResponse,
 )
 async def upload_file(
     file: UploadFile,
@@ -61,7 +62,7 @@ async def upload_file(
         api_key_info["project_id"],
         ext,
     )
-    return FileUploadResponseDTO(
+    return FileUploadResponse(
         file_id=str(file_id),
     )
 
@@ -70,7 +71,7 @@ async def upload_file(
     "/",
     summary="List files in the file storage service.",
     description="Endpoint to list files in the file storage service.",
-    response_model=list[FileMetadataResponseDTO],
+    response_model=list[FileInfoResponse],
 )
 async def list_files(
     file_storage_service: Annotated[
@@ -81,19 +82,20 @@ async def list_files(
     ],
 ):
     """List files in the file storage service."""
-    files_metadata = await file_storage_service.listFilesInProject(
+    files_info = await file_storage_service.listFilesInProject(
         api_key_info["project_id"]
     )
     return [
-        FileMetadataResponseDTO(
-            id=str(file_metadata["id"]),
-            filename=file_metadata["filename"],
-            storage_path=file_metadata["storage_path"],
-            mime_type=file_metadata["mime_type"],
-            size=file_metadata["size"],
-            created_at=file_metadata["created_at"],
+        FileInfoResponse(
+            id=str(file_info["id"]),
+            filename=file_info["filename"],
+            storage_path=file_info["storage_path"],
+            mime_type=file_info["mime_type"],
+            size=file_info["size"],
+            created_at=file_info["created_at"],
+            extra_metadata=file_info["extra_metadata"],
         )
-        for file_metadata in files_metadata
+        for file_info in files_info
     ]
 
 
@@ -136,11 +138,11 @@ async def download_file(
 
 @file_storage_router.get(
     "/{file_id}",
-    summary="Get file presigned URL and metadata by file ID.",
-    description="Endpoint to retrieve file URL and metadata by file ID.",
-    response_model=FileMetadataWithPresignedURLResponseDTO,
+    summary="Get file presigned URL and info by file ID.",
+    description="Endpoint to retrieve file URL and info by file ID.",
+    response_model=FileInfoWithPresignedURLResponse,
 )
-async def get_file_url_and_metadata(
+async def get_file_url_and_info(
     file_id: uuid.UUID,
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
@@ -148,34 +150,35 @@ async def get_file_url_and_metadata(
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
     ],
-) -> FileMetadataWithPresignedURLResponseDTO:
-    """Get file URL and metadata by file ID."""
+) -> FileInfoWithPresignedURLResponse:
+    """Get file URL and info by file ID."""
     (
         presigned_url,
-        file_metadata,
+        file_info,
     ) = (
-        await file_storage_service.getFileMetadataAndUrl(
+        await file_storage_service.getFileInfoAndUrl(
             file_id, api_key_info["project_id"]
         )
     ).unwrap()
-    return FileMetadataWithPresignedURLResponseDTO(
-        id=str(file_metadata["id"]),
-        filename=file_metadata["filename"],
-        storage_path=file_metadata["storage_path"],
-        mime_type=file_metadata["mime_type"],
-        size=file_metadata["size"],
-        created_at=file_metadata["created_at"],
+    return FileInfoWithPresignedURLResponse(
+        id=str(file_info["id"]),
+        filename=file_info["filename"],
+        storage_path=file_info["storage_path"],
+        mime_type=file_info["mime_type"],
+        size=file_info["size"],
+        created_at=file_info["created_at"],
+        extra_metadata=file_info["extra_metadata"],
         url=presigned_url,
     )
 
 
 @file_storage_router.get(
-    "/{file_id}/metadata",
-    summary="Get file metadata by file ID.",
-    description="Endpoint to retrieve file metadata by file ID.",
-    response_model=FileMetadataResponseDTO,
+    "/{file_id}/info",
+    summary="Get file info by file ID.",
+    description="Endpoint to retrieve file info by file ID.",
+    response_model=FileInfoResponse,
 )
-async def get_file_metadata(
+async def get_file_info(
     file_id: uuid.UUID,
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
@@ -184,19 +187,20 @@ async def get_file_metadata(
         ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
     ],
 ):
-    """Get file metadata by file ID."""
-    file_metadata = (
-        await file_storage_service.getFileMetadata(
+    """Get file info by file ID."""
+    file_info = (
+        await file_storage_service.getFileInfo(
             file_id, api_key_info["project_id"]
         )
     ).unwrap()
-    return FileMetadataResponseDTO(
-        id=str(file_metadata["id"]),
-        filename=file_metadata["filename"],
-        storage_path=file_metadata["storage_path"],
-        mime_type=file_metadata["mime_type"],
-        size=file_metadata["size"],
-        created_at=file_metadata["created_at"],
+    return FileInfoResponse(
+        id=str(file_info["id"]),
+        filename=file_info["filename"],
+        storage_path=file_info["storage_path"],
+        mime_type=file_info["mime_type"],
+        size=file_info["size"],
+        created_at=file_info["created_at"],
+        extra_metadata=file_info["extra_metadata"],
     )
 
 
@@ -204,7 +208,7 @@ async def get_file_metadata(
     "/{file_id}/presigned-url",
     summary="Get presigned URL for file download.",
     description="Endpoint to generate a presigned URL for downloading the file.",
-    response_model=FilePresignedURLResponseDTO,
+    response_model=FilePresignedURLResponse,
 )
 async def get_file_presigned_url(
     file_id: uuid.UUID,
@@ -221,7 +225,7 @@ async def get_file_presigned_url(
             file_id, api_key_info["project_id"]
         )
     ).unwrap()
-    return FilePresignedURLResponseDTO(
+    return FilePresignedURLResponse(
         url=presigned_url,
     )
 
@@ -245,6 +249,30 @@ async def delete_file(
     (
         await file_storage_service.deleteFile(
             file_id, api_key_info["project_id"]
+        )
+    ).unwrap()
+    return None
+
+@file_storage_router.put(
+    "/{file_id}/metadata",
+    summary="Update file metadata by file ID.",
+    description="Endpoint to update file metadata by file ID.",
+    status_code=204,
+)
+async def update_file_metadata(
+    file_id: uuid.UUID,
+    body: Annotated[UpdateFileMetadataRequest, Body()],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
+    file_storage_service: Annotated[
+        FileStorageService, Depends(getFileStorageService)
+    ],
+):
+    """Update file metadata by file ID."""
+    (
+        await file_storage_service.updateFileMetadata(
+            file_id, api_key_info["project_id"], body.extra_metadata
         )
     ).unwrap()
     return None
