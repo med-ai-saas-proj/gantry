@@ -14,6 +14,7 @@ class ObjectStorageSettings(BaseSettings):
     s3_secret_access_key: str
     s3_endpoint_url: str
     s3_presigned_url_expiry_seconds: int = 3600  # in seconds
+    redis_cache_expiry_seconds: int = 3600  # in seconds
 
 
 def getObjectStorageSettings() -> ObjectStorageSettings:

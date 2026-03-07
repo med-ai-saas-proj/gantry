@@ -1,4 +1,4 @@
-from src.db.factories import getSessionManager
+from src.db.factories import getRedis, getSessionManager
 from src.service.utils.file_storage.services import FileStorageService
 from src.service.utils.file_storage.settings import getObjectStorageSettings
 from src.service.utils.file_storage.repositories import FileRepository
@@ -15,4 +15,5 @@ def getFileStorageService():
         getSessionManager(),
         getObjectStorageSettings(),
         FileRepository(),
+        getRedis(),
     )
