@@ -1,19 +1,17 @@
-from datetime import date, datetime
-import uuid
-
 from .types import (
-    MessagePart,
-    SerializedRequestRetryPromptMessagePart,
-    SerializedRequestToolReturnMessagePart,
-    SerializedRequestUserPromptMessagePart,
-    SerializedResponseBuiltInToolCallMessagePart,
-    SerializedResponseBuiltInToolResultMessagePart,
     SerializedResponseTextMessagePart,
     SerializedResponseThinkingMessagePart,
     SerializedResponseToolCallMessagePart,
+    SerializedRequestToolReturnMessagePart,
+    SerializedRequestUserPromptMessagePart,
+    SerializedRequestRetryPromptMessagePart,
+    SerializedResponseBuiltInToolCallMessagePart,
+    SerializedResponseBuiltInToolResultMessagePart,
 )
 
-from typing import Sequence, Union, Literal
+import uuid
+from typing import Union, Literal, Sequence
+from datetime import datetime
 
 from pydantic import BaseModel
 
@@ -95,6 +93,7 @@ class ConversationMetadataResponse(BaseModel):
     project_id: int
     extra_metadata: dict | None = None
     created_at: datetime
+
 
 class UpdateConversationMetadataRequest(BaseModel):
     """Represents a request to update a conversation."""

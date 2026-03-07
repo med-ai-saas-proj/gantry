@@ -1,7 +1,3 @@
-from typing import TypedDict
-
-from sqlalchemy.sql.sqltypes import DateTime
-from sqlalchemy.sql.sqltypes import BigInteger
 from src.db.base import BaseSQLModel
 from src.db.utils import (
     WithID,
@@ -11,6 +7,7 @@ from src.db.utils import (
 from src.management.projects.models import Project
 from src.service.utils.conversation.types import MessagePart
 
+from typing import TypedDict
 from datetime import datetime
 
 from sqlalchemy import String, ForeignKey, FetchedValue

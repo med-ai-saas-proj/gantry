@@ -6,7 +6,7 @@ from .generation_output import GenerationOutput
 
 import uuid
 from enum import Enum
-from typing import Literal, NotRequired, Sequence, Annotated, TypedDict
+from typing import Literal, Sequence, Annotated, TypedDict, NotRequired
 
 from pydantic import Field, BaseModel, RootModel
 

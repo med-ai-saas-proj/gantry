@@ -1,9 +1,10 @@
 from src.management.api_keys.entities import ApiKeyInfo
-from src.service.utils.conversation.types import FileUploadInfo
 from src.service.utils.file_storage.utils import detect_file_type
-from src.service.utils.conversation.services import ConversationService
 from src.service.utils.file_storage.services import FileStorageService
-from src.service.utils.conversation.conversation_session import (
+
+from .types import FileUploadInfo
+from .services import ConversationService
+from .conversation_session import (
     ConversationSession,
 )
 

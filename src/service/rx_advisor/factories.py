@@ -1,6 +1,6 @@
 from src.db.factories import getSessionManager
-from src.service.utils.conversation.factories import getConversationManager
 from src.shared.utils.logger import getLogger
+from src.service.utils.conversation.factories import getConversationManager
 
 from .agents import getRxAdvisorAgent
 from .services import RxAdvisorService

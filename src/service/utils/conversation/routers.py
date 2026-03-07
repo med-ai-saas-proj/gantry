@@ -1,25 +1,19 @@
-from griffe import Kind
-
 from src.management.api_keys.entities import ApiKeyInfo
-from src.service.utils.conversation.dtos import (
-    AddMessageRequest,
-    CreateConversationRequest, UpdateConversationMetadataRequest,
-)
 from src.management.api_keys.dependencies import requiredPermissions
-from src.service.utils.conversation.models import Message
-from src.service.utils.conversation.services import ConversationService
-from src.service.utils.conversation.factories import getConversationService
 
 from .dtos import (
-    ConversationMetadataResponse,
-    CreateConversationResponse,
-    RequestMessage,
+    AddMessageRequest,
     RequestMessagePart,
-    RequestMessageResponse,
-    ResponseMessage,
     ResponseMessagePart,
+    RequestMessageResponse,
     ResponseMessageResponse,
+    CreateConversationRequest,
+    CreateConversationResponse,
+    ConversationMetadataResponse,
+    UpdateConversationMetadataRequest,
 )
+from .services import ConversationService
+from .factories import getConversationService
 
 import uuid
 from typing import Literal, Sequence, Annotated, cast
@@ -86,8 +80,11 @@ async def get_conversation_metadata(
         created_at=metadata["created_at"],
     )
 
+
 @conversation_router.put(
     "/{conversation_uid}/metadata",
+    summary="Update conversation metadata",
+    description="Endpoint to update conversation metadata by conversation UID.",
     status_code=204,
 )
 async def update_conversation_metadata(
@@ -101,11 +98,13 @@ async def update_conversation_metadata(
     ],
 ):
     """Update conversation metadata by conversation UID."""
-    (await conversation_service.updateConversationMetadata(
-        conversation_uid=conversation_uid,
-        project_id=api_key_info["project_id"],
-        extra_metadata=body.extra_metadata,
-    )).unwrap()
+    (
+        await conversation_service.updateConversationMetadata(
+            conversation_uid=conversation_uid,
+            project_id=api_key_info["project_id"],
+            extra_metadata=body.extra_metadata,
+        )
+    ).unwrap()
 
 
 @conversation_router.delete(
@@ -124,18 +123,20 @@ async def delete_conversation(
     ],
 ):
     """Delete a conversation by conversation UID."""
-    (await conversation_service.deleteConversation(
-        conversation_uid, api_key_info["project_id"]
-    )).unwrap()
+    (
+        await conversation_service.deleteConversation(
+            conversation_uid, api_key_info["project_id"]
+        )
+    ).unwrap()
 
 
 @conversation_router.get(
     "/{conversation_uid}/messages",
     summary="Get conversation messages",
     description="Endpoint to retrieve conversation details and messages by conversation UID.",
-    response_model=Sequence[ResponseMessage | RequestMessage],
+    response_model=Sequence[ResponseMessageResponse | RequestMessageResponse],
 )
-async def get_conversation(
+async def get_conversation_messages(
     conversation_uid: uuid.UUID,
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
@@ -201,11 +202,13 @@ async def add_message_to_conversation(
         ConversationService, Depends(getConversationService)
     ],
 ):
-    (await conversation_service.storeConversationMessages(
-        conversation_uid=conversation_uid,
-        project_id=api_key_info["project_id"],
-        msgs=body.messages,
-    )).unwrap()
+    (
+        await conversation_service.storeConversationMessages(
+            conversation_uid=conversation_uid,
+            project_id=api_key_info["project_id"],
+            msgs=body.messages,
+        )
+    ).unwrap()
 
 
 @conversation_router.delete(
@@ -225,11 +228,13 @@ async def delete_message_from_conversation(
     ],
 ):
     """Delete a message from the conversation by conversation UID and message sequence ID."""
-    (await conversation_service.deleteConversationMessage(
-        conversation_uid=conversation_uid,
-        project_id=api_key_info["project_id"],
-        message_seq_id=message_seq_id,
-    )).unwrap()
+    (
+        await conversation_service.deleteConversationMessage(
+            conversation_uid=conversation_uid,
+            project_id=api_key_info["project_id"],
+            message_seq_id=message_seq_id,
+        )
+    ).unwrap()
 
 
 @conversation_router.get(

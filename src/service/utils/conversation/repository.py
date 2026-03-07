@@ -1,13 +1,13 @@
 from src.db.repository import Repository
-from src.service.utils.conversation.models import Message, Conversation
+
+from .types import ConversationMetadata
+from .models import Message, Conversation
 
 import uuid
 from typing import Literal, Sequence
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from src.service.utils.conversation.types import ConversationMetadata
 
 
 class ConversationRepository(Repository[Conversation, int]):
@@ -145,7 +145,9 @@ class ConversationRepository(Repository[Conversation, int]):
             .where(
                 Conversation.uuid == conversation_uuid,
                 Conversation.project_id == project_id,
-            ).values(extra_metadata=extra_metadata).returning(Conversation)
+            )
+            .values(extra_metadata=extra_metadata)
+            .returning(Conversation)
         )
         res = await session.execute(stmt)
         conversation = res.scalar_one_or_none()

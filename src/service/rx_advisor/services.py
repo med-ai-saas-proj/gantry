@@ -1,18 +1,18 @@
 """Rx Advisor Service."""
 
 from src.ehr.dtos import InputEHR, InputPrescription
+from src.shared.utils import dict_utils
+from src.ehr.custom_types import EHRDict, PrescriptionDict
 from src.service.utils.conversation.conversation_manager import (
     ConversationManager,
 )
-from src.shared.utils import dict_utils
-from src.ehr.custom_types import EHRDict, PrescriptionDict
 
 from .agents import constructRxAdvisorAgentDeps
 from ..utils.agent.stream import aggregateStream
 from ..utils.agent.agent_deps import AgentDeps
 from ..utils.agent.dtos.model import ChatOutput
-from ...management.api_keys.entities import ApiKeyInfo
 from ..utils.models.models_service import ModelsService
+from ...management.api_keys.entities import ApiKeyInfo
 
 from pydantic_ai import Agent
 from structlog.stdlib import BoundLogger

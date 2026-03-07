@@ -1,5 +1,5 @@
 from src.db.base import BaseSQLModel
-from src.db.utils import WithID, WithCreateUpdateTimestamp, WithUUID
+from src.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
 
 from decimal import Decimal
 
@@ -20,7 +20,9 @@ class BillingBaseSQLModel(BaseSQLModel):
     __table_args__ = {"schema": "Billing"}
 
 
-class BillingTransaction(WithCreateUpdateTimestamp, WithUUID, BillingBaseSQLModel):
+class BillingTransaction(
+    WithCreateUpdateTimestamp, WithUUID, BillingBaseSQLModel
+):
     """Individual charge record for each API call.
 
     All amounts are in USD. Currency conversion is handled by the payment
@@ -35,7 +37,9 @@ class BillingTransaction(WithCreateUpdateTimestamp, WithUUID, BillingBaseSQLMode
     __tablename__ = "BillingTransactions"
 
     # apikey_id is enough, project_id and org_id can be derived from it
-    apikey_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    apikey_id: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, index=True
+    )
 
     # Numeric avoids float rounding — critical for billing.
     # Postgres stores Numeric as varchar internally; (18, 8) is a soft limit,
@@ -85,7 +89,9 @@ class MonthlyAggregate(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
     is_finalized: Mapped[bool] = mapped_column(nullable=False, default=False)
 
 
-class OrganizationSpendingLimit(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
+class OrganizationSpendingLimit(
+    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
+):
     """Spending cap at the organization level. All amounts in USD.
 
     NULL on a limit field means no limit is set — falls back to global default.
@@ -107,7 +113,9 @@ class OrganizationSpendingLimit(WithCreateUpdateTimestamp, WithID, BillingBaseSQ
     )
 
 
-class ProjectSpendingLimit(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
+class ProjectSpendingLimit(
+    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
+):
     """Spending cap at the project level. All amounts in USD.
 
     Takes precedence over OrganizationSpendingLimit.

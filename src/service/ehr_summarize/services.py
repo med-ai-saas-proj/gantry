@@ -2,11 +2,11 @@
 
 from src.ehr import ehr_utils
 from src.ehr.dtos import InputEHR
+from src.shared.utils import dict_utils
+from src.ehr.custom_types import EHRDict
 from src.service.utils.conversation.conversation_manager import (
     ConversationManager,
 )
-from src.shared.utils import dict_utils
-from src.ehr.custom_types import EHRDict
 
 from .agents import constructEhrSummarizeAgentDeps
 from ..utils.agent.stream import (
@@ -14,8 +14,8 @@ from ..utils.agent.stream import (
 )
 from ..utils.agent.agent_deps import AgentDeps
 from ..utils.agent.dtos.model import ChatOutput, StreamEvent
-from ...management.api_keys.entities import ApiKeyInfo
 from ..utils.models.models_service import ModelsService
+from ...management.api_keys.entities import ApiKeyInfo
 
 from typing import AsyncGenerator
 

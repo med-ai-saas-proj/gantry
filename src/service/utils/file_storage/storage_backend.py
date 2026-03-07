@@ -1,4 +1,4 @@
-from src.service.utils.file_storage.settings import (
+from .settings import (
     getObjectStorageSettings,
 )
 

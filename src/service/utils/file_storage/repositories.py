@@ -1,8 +1,9 @@
-from typing import Sequence
 from src.db.repository import Repository
-from src.service.utils.file_storage.models import File, FileStatus
+
+from .models import File, FileStatus
 
 import uuid
+from typing import Sequence
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio.session import AsyncSession

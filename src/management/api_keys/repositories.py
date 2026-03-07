@@ -4,7 +4,7 @@ from src.db.repository import Repository
 
 from .models import ApiKey, Permission
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 

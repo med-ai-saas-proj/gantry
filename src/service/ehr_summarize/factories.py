@@ -1,13 +1,12 @@
 from src.db.factories import getSessionManager
-from src.service.utils.conversation.factories import getConversationManager
 from src.shared.utils.logger import getLogger
+from src.service.utils.conversation.factories import getConversationManager
 
 from .agents import getEhrSummarizeAgent
 from .services import EHRSummarizeService
+from ..utils.agent.factories import getModelsService
 
 from functools import lru_cache
-
-from ..utils.agent.factories import getModelsService
 
 
 @lru_cache(1)

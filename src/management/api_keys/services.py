@@ -8,8 +8,6 @@ from src.shared.custom_types.error_exception import (
 
 from .dtos import ApiKeyOutput, CreateAPIKeyOutputSuccess
 from .models import ApiKey, Permission
-from .dtos import CreateAPIKeyOutputSuccess
-from .models import Permission
 from .entities import ApiKeyInfo
 from .repositories import (
     ApiKeyRepository,

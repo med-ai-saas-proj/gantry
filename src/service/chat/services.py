@@ -1,7 +1,5 @@
 """Chat service."""
 
-import uuid
-
 from .agents import constructChatAgentDeps
 from ..utils.agent.stream import (
     aggregateStream,
@@ -12,6 +10,7 @@ from ..utils.models.models_service import ModelsService
 from ...management.api_keys.entities import ApiKeyInfo
 from ..utils.conversation.conversation_manager import ConversationManager
 
+import uuid
 from typing import AsyncGenerator
 
 from pydantic_ai import Agent

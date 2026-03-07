@@ -1,15 +1,13 @@
-from redis.utils import C
-
 from src.db.session import AsyncSessionManager
-from src.service.utils.conversation.dtos import RequestMessage, ResponseMessage
-from src.shared.custom_types.error_exception import RecoverableError
 from src.shared.utils.json_utils import json_serializer
+from src.shared.custom_types.error_exception import RecoverableError
 
+from .dtos import RequestMessage, ResponseMessage
 from .types import (
-    ConversationMetadata,
     FileType,
     MessagePart,
     SerializedContent,
+    ConversationMetadata,
     SerializedContentPart,
     SerializedSequenceContentPart,
     SerializedResponseTextMessagePart,
@@ -32,8 +30,8 @@ from ..file_storage.services import FileStorageService
 import json
 import uuid
 import asyncio
-from typing import Any, Literal, Sequence, Awaitable, cast
-from datetime import UTC, date, datetime
+from typing import Literal, Sequence, Awaitable, cast
+from datetime import UTC, datetime
 from dataclasses import asdict
 
 from pydantic_ai import (
@@ -814,7 +812,9 @@ class ConversationService:
         project_id: int,
         message_seq_id: int,
     ):
-        mess_cache_key = ConversationService._message_cache_key(conversation_uid)
+        mess_cache_key = ConversationService._message_cache_key(
+            conversation_uid
+        )
 
         async with self.session_manager.get_session() as session:
             deleted = await self.conversation_repo.deleteMessageBySeqId(
@@ -832,7 +832,9 @@ class ConversationService:
         conversation_uid: uuid.UUID,
         project_id: int,
     ):
-        mess_cache_key = ConversationService._message_cache_key(conversation_uid)
+        mess_cache_key = ConversationService._message_cache_key(
+            conversation_uid
+        )
 
         async with self.session_manager.get_session() as session:
             deleted = await self.conversation_repo.deleteConversationByUUID(
@@ -844,24 +846,24 @@ class ConversationService:
 
         await self.redis_client.delete(mess_cache_key)
         return Ok(None)
-    
+
     @staticmethod
     def _message_cache_key(conversation_uid: uuid.UUID) -> str:
         return f"conversation_cache:{{{conversation_uid}}}"
 
     async def updateConversationMetadata(
-            self,
-            conversation_uid: uuid.UUID,
-            project_id: int,
-            extra_metadata: dict | None,
+        self,
+        conversation_uid: uuid.UUID,
+        project_id: int,
+        extra_metadata: dict | None,
     ):
         async with self.session_manager.get_session() as session:
-            updated = await self.conversation_repo.updateConversationMetadataByUUID(
-                session, conversation_uid, project_id, extra_metadata
+            updated = (
+                await self.conversation_repo.updateConversationMetadataByUUID(
+                    session, conversation_uid, project_id, extra_metadata
+                )
             )
             if updated is None:
                 return Err(ConversationNotFoundError())
             await session.commit()
         return Ok(None)
-
-

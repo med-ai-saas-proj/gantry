@@ -1,14 +1,14 @@
 """FastAPI dependencies for authentication and authorization."""
 
+from .roles import ManagementRole
+from .entities import UserInfo
+from .settings import getAuthSettings
+from .factories import AuthService, getAuthService
+
 from typing import Annotated
 
 from fastapi import Depends, Security
 from fastapi.security import OAuth2AuthorizationCodeBearer
-
-from .entities import UserInfo
-from .factories import AuthService, getAuthService
-from .roles import ManagementRole
-from .settings import getAuthSettings
 
 
 auth_settings = getAuthSettings()

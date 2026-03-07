@@ -1,9 +1,9 @@
 """Factory functions for creating service instances."""
 
-from functools import lru_cache
-
 from .services import AuthService
 from .settings import getAuthSettings
+
+from functools import lru_cache
 
 
 @lru_cache(1)

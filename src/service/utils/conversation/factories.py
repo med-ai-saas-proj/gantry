@@ -1,9 +1,10 @@
-from src.service.utils.conversation.settings import getConversationSettings
 from src.db.factories import getRedis, getSessionManager, getRedisLockManager
-from src.service.utils.conversation.services import ConversationService
 from src.service.utils.file_storage.factories import getFileStorageService
-from src.service.utils.conversation.repository import ConversationRepository
-from src.service.utils.conversation.conversation_manager import (
+
+from .services import ConversationService
+from .settings import getConversationSettings
+from .repository import ConversationRepository
+from .conversation_manager import (
     ConversationManager,
 )
 

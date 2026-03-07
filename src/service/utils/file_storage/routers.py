@@ -2,11 +2,11 @@ from src.management.api_keys.entities import ApiKeyInfo
 from src.management.api_keys.dependencies import requiredPermissions
 
 from .dtos import (
-    FileUploadResponse,
     FileInfoResponse,
+    FileUploadResponse,
     FilePresignedURLResponse,
-    FileInfoWithPresignedURLResponse,
     UpdateFileMetadataRequest,
+    FileInfoWithPresignedURLResponse,
 )
 from .utils import detect_file_type
 from .services import FileStorageService
@@ -16,7 +16,14 @@ import uuid
 import mimetypes
 from typing import Annotated
 
-from fastapi import Body, Depends, Security, APIRouter, UploadFile, HTTPException
+from fastapi import (
+    Body,
+    Depends,
+    Security,
+    APIRouter,
+    UploadFile,
+    HTTPException,
+)
 from starlette.responses import RedirectResponse
 
 
@@ -253,6 +260,7 @@ async def delete_file(
         )
     ).unwrap()
     return None
+
 
 @file_storage_router.put(
     "/{file_id}/metadata",

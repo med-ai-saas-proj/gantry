@@ -1,7 +1,6 @@
-import uuid
-
 from src.shared.dtos.base import BaseDTO
 
+import uuid
 from enum import Enum
 from typing import Annotated
 

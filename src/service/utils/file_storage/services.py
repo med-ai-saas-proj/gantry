@@ -1,22 +1,20 @@
-import json
-from datetime import datetime
-
-from redis.asyncio import Redis
-
 from src.db.session import AsyncSessionManager
-from src.shared.custom_types.error_exception import RecoverableError
 from src.shared.utils.json_utils import json_serializer
+from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import FileRecord
 from .models import File, FileStatus
 from .settings import ObjectStorageSettings
 from .repositories import FileRepository
 
+import json
 import uuid
 import asyncio
 from typing import TYPE_CHECKING, BinaryIO
+from datetime import datetime
 
 from safe_result import Ok, Err, Result
+from redis.asyncio import Redis
 
 
 class FileNotFoundInSystemError(RecoverableError):
@@ -131,7 +129,7 @@ class FileStorageService:
             Key=file_path,
         )
         return res["Body"].read()
-    
+
     @staticmethod
     def _cache_key(project_id: int, file_uuid: uuid.UUID) -> str:
         return f"file_info:{project_id}:{file_uuid}"
@@ -201,11 +199,13 @@ class FileStorageService:
                     "storage_path": json_data["storage_path"],
                     "mime_type": json_data["mime_type"],
                     "size": json_data["size"],
-                    "created_at": datetime.fromisoformat(json_data["created_at"]),
+                    "created_at": datetime.fromisoformat(
+                        json_data["created_at"]
+                    ),
                     "extra_metadata": json_data["extra_metadata"],
                 }
             )
-        
+
         async with self.session_manager.get_session() as session:
             file_record = await self.file_repo.getAvailableByUUID(
                 session, file_uuid, project_id
@@ -223,11 +223,11 @@ class FileStorageService:
                 "extra_metadata": file_record.extra_metadata,
             }
 
-        await self.redis.set(cache_key, 
-                    json.dumps(
-                        res, default=json_serializer
-                    ),
-                    ex=self.file_storage_settings.redis_cache_expiry_seconds)
+        await self.redis.set(
+            cache_key,
+            json.dumps(res, default=json_serializer),
+            ex=self.file_storage_settings.redis_cache_expiry_seconds,
+        )
         return Ok[FileRecord](res)
 
     async def updateFileMetadata(
@@ -241,7 +241,7 @@ class FileStorageService:
             )
             if not file_record:
                 return Err(FileNotFoundInSystemError())
-            
+
             await session.commit()
         await self.redis.delete(cache_key)  # Invalidate cache
         return Ok(None)
@@ -257,7 +257,7 @@ class FileStorageService:
     ) -> Result[None, FileNotFoundInSystemError]:
         """Delete a file from storage and remove its metadata."""
         cache_key = FileStorageService._cache_key(project_id, file_uid)
-        
+
         async with self.session_manager.get_session() as session:
             file_record = await self.file_repo.markFileAsDeletedByUUID(
                 session, file_uid, project_id
