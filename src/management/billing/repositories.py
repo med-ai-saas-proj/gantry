@@ -1,22 +1,22 @@
 """Billing repository layer."""
 
-from collections.abc import Sequence
-from decimal import Decimal
-from datetime import datetime
-from uuid import UUID
-
-from sqlalchemy import select, update, func
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.db.repository import Repository
 
 from .models import (
-    BillingTransaction,
     MonthlyAggregate,
-    OrganizationSpendingLimit,
+    BillingTransaction,
     ProjectSpendingLimit,
+    OrganizationSpendingLimit,
 )
+
+from uuid import UUID
+from decimal import Decimal
+from datetime import datetime
+from collections.abc import Sequence
+
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert
 
 
 class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
@@ -130,7 +130,9 @@ class MonthlyAggregateRepository(Repository[MonthlyAggregate, int]):
                 total_amount=Decimal("0"),
                 is_finalized=False,
             )
-            .on_conflict_do_nothing(index_elements=["project_id", "billing_period"])
+            .on_conflict_do_nothing(
+                index_elements=["project_id", "billing_period"]
+            )
         )
         await session.execute(stmt)
 
@@ -226,11 +228,15 @@ class MonthlyAggregateRepository(Repository[MonthlyAggregate, int]):
         return await self.selectOne(session, stmt)
 
 
-class OrganizationSpendingLimitRepository(Repository[OrganizationSpendingLimit, int]):
+class OrganizationSpendingLimitRepository(
+    Repository[OrganizationSpendingLimit, int]
+):
     """Repository for organization-level spending limits."""
 
     def __init__(self):
-        super().__init__(OrganizationSpendingLimit, OrganizationSpendingLimit.id)
+        super().__init__(
+            OrganizationSpendingLimit, OrganizationSpendingLimit.id
+        )
 
     async def getForOrg(
         self,
