@@ -13,10 +13,15 @@ from src.shared.custom_types.error_exception import (
 )
 
 from . import exception_handlers
+from ..service.lifespan import (
+    startup as service_startup,
+    shutdown as service_shutdown,
+)
 
 import time
 import uuid
 import traceback
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from pydantic import ValidationError
@@ -64,6 +69,17 @@ otlp_exporter = OTLPSpanExporter(
 span_processor = BatchSpanProcessor(otlp_exporter)
 provider.add_span_processor(span_processor)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup code here
+    await service_startup(app)
+    yield
+
+    # Shutdown code here
+    await service_shutdown(app)
+
+
 main_app = FastAPI(
     title="Med AI SaaS",
     openapi_url="/docs/openapi.json",
@@ -74,6 +90,7 @@ main_app = FastAPI(
         422: {"model": ProblemDetails},
         500: {"model": ProblemDetails},
     },
+    lifespan=lifespan,
 )
 
 

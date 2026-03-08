@@ -9,7 +9,6 @@ dependencies = [
     "crawl4ai>=0.7.4",
     "fastapi[standard]>=0.116.1",
     "orjson>=3.11.3",
-    "pydantic-ai>=1.0.6",
     "sqlalchemy>=2.0.43",
     "structlog>=25.4.0",
     "scalar-fastapi>=1.4.3",
@@ -28,8 +27,13 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.60b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.60b0",
     "opentelemetry-sdk>=1.39.0",
+     "filetype>=1.2.0",
+    "boto3>=1.40.61",
+    "aioredlock>=0.7.3",
+    "setuptools>=82.0.0",
+    "pydantic-ai>=1.58.0",
     "python-keycloak>=5.3.1",
-    "uvloop>=0.22.1",
+    "uvloop>=0.22.1; sys_platform == 'linux'",
 ]
 
 [tool.pyrefly]
@@ -52,4 +56,6 @@ dev = [
     "typer>=0.19.1",
     "pyrefly==0.45.0",
     "examplenv",
+    "boto3-stubs[s3]>=1.42.33",
+    "ty>=0.0.19",
 ]

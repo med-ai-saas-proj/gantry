@@ -1,3 +1,1 @@
-"""This file contain definition of chat's constants."""
-
-import os
+CHAT_AGENT_ID = "chat_agent"

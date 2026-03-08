@@ -4,7 +4,7 @@ from src.db.repository import Repository
 
 from .models import ApiKey, Permission
 
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -37,11 +37,7 @@ class PermissionRepository(Repository[Permission, str]):
         self, session: AsyncSession, permission_id: int
     ) -> Permission | None:
         """Get permission by ID."""
-        stmt = (
-            select(Permission)
-            .where(Permission.id == permission_id)
-            .limit(1)
-        )
+        stmt = select(Permission).where(Permission.id == permission_id).limit(1)
         return await self.selectOne(session, stmt)
 
     async def getPermissionByName(

@@ -1,1 +1,0 @@
-"""This file contain utilities of chat."""

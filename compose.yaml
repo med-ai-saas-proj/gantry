@@ -88,6 +88,7 @@ services:
           memory: 20M
 
 volumes:
+  rustfs_data:
   postgres_data:
   redis_data:
   keycloak_data:

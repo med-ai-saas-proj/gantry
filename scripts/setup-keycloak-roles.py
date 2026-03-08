@@ -11,8 +11,10 @@
 import os
 import sys
 import argparse
+
 import requests
 from dotenv import load_dotenv
+
 
 load_dotenv()
 
@@ -181,7 +183,7 @@ Environment variables:
 
     try:
         # Get admin token
-        admin_token = get_admin_token(  
+        admin_token = get_admin_token(
             args.url, args.admin_username, args.admin_password
         )
 

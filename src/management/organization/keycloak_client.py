@@ -6,14 +6,13 @@ while organization endpoints are called via raw admin REST paths.
 
 from src.shared.custom_types.error_exception import RecoverableError
 
-from typing import Any
 import json
+from typing import Any
 from urllib.parse import urljoin
 
 from keycloak import KeycloakAdmin, KeycloakOpenIDConnection
-from keycloak.exceptions import KeycloakError
-
 from safe_result import Ok, Err, Result
+from keycloak.exceptions import KeycloakError
 
 
 # Error types
@@ -300,9 +299,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def delete_org(
-        self, org_id: str
-    ) -> Result[bool, RecoverableError]:
+    async def delete_org(self, org_id: str) -> Result[bool, RecoverableError]:
         if self._init_error is not None:
             return Err(self._init_error)
         if self._admin is None:
@@ -492,7 +489,9 @@ class KeycloakOrgClient:
         first_name: str | None = None,
         last_name: str | None = None,
     ) -> Result[bool, RecoverableError]:
-        path = f"{self._admin_base()}/organizations/{org_id}/members/invite-user"
+        path = (
+            f"{self._admin_base()}/organizations/{org_id}/members/invite-user"
+        )
         form: dict[str, str] = {"email": email}
         if first_name:
             form["firstName"] = first_name

@@ -1,9 +1,8 @@
 """Asynchronous database sessions management."""
 
 import contextlib
-from typing import final
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 
 class AsyncSessionManager:
@@ -12,11 +11,14 @@ class AsyncSessionManager:
     def __init__(self, async_engine):
         """Initialize the session manager with the given async engine."""
         self.async_engine = async_engine
+        self.sessionmaker = async_sessionmaker(
+            async_engine, expire_on_commit=False
+        )
 
     @contextlib.asynccontextmanager
     async def get_session(self):
         """Provide an asynchronous database session."""
-        async with AsyncSession(self.async_engine) as session:
+        async with self.sessionmaker() as session:
             try:
                 yield session
                 # manual commit in caller, because `return Error(...)`

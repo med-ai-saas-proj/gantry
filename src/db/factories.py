@@ -6,12 +6,12 @@ from .settings import getDBSettings
 
 from functools import lru_cache
 
+import aioredlock
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import create_async_engine
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
 
-@lru_cache(1)
 def getAsyncEngine():
     engine = create_async_engine(
         getDBSettings().postgres_connection_uri.encoded_string(), echo=True
@@ -26,5 +26,12 @@ def getSessionManager():
 
 
 @lru_cache(1)
-def getRedis():
+def getRedis() -> Redis:
     return Redis.from_url(getDBSettings().redis_connection_uri.encoded_string())
+
+
+@lru_cache(1)
+def getRedisLockManager():
+    return aioredlock.Aioredlock(
+        [getDBSettings().redis_connection_uri.encoded_string()]
+    )

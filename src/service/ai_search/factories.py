@@ -3,15 +3,14 @@ from src.shared.utils.logger import getLogger
 
 from .agents import getAiSearchAgent
 from .services import AiSearchService
-from ..utils.agent.llms import AvailableModels, getModel
+from ..utils.agent.factories import getModelsService
 
 from functools import lru_cache
 
 
 @lru_cache(1)
 def getAiSearchService():
+    """Returns a cached instance of the AiSearchService."""
     return AiSearchService(
-        getSessionManager(),
-        getLogger(),
-        getAiSearchAgent(getModel(AvailableModels.SmallModel).unwrap()),
+        getSessionManager(), getLogger(), getAiSearchAgent(), getModelsService()
     )

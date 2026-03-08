@@ -30,17 +30,22 @@ ai_search_router = APIRouter(prefix="/ai_search", tags=["Doctor Help"])
     },
 )
 async def ai_search(
-    user: Annotated[ApiKeyInfo, Security(requiredPermissions(["placeholder"]))],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+    ],
     input: AiSearchInput,
     ai_search_service: Annotated[AiSearchService, Depends(getAiSearchService)],
 ) -> SSEResponse | JSONResponse:
     """Use AI to search the internet and summarize the result."""
-    user_id = user["user_id"]
-    LOGGER.debug("user", user_id=user_id)
+    LOGGER.debug("api_key_info", api_key_info=api_key_info)
     if input.stream:
         return SSEResponse(
-            ai_search_service.aiSearchStream(user_id, input.query),
+            ai_search_service.aiSearchStream(
+                api_key_info, input.model, input.query
+            ),
         )
     else:
-        output = await ai_search_service.aiSearch(user_id, input.query)
+        output = await ai_search_service.aiSearch(
+            api_key_info, input.model, input.query
+        )
         return JSONResponse(output)

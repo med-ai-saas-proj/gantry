@@ -7,9 +7,10 @@ from .models import (
     OrgDeletionRequest,
 )
 
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
 
 
 class OrgSettingsRepository(Repository[OrgSettings, str]):

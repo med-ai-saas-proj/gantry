@@ -3,10 +3,11 @@ from src.shared.custom_types.error_exception import ProblemDetails
 
 from .api_keys import apikey_router
 from .organization import org_router
-from .organization.factories import getOrgService
 from .organization.settings import getOrgSettings
+from .organization.factories import getOrgService
 
 import asyncio
+
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
 from fastapi.middleware.cors import CORSMiddleware

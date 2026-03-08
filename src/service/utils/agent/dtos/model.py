@@ -2,22 +2,22 @@
 
 from src.shared.custom_types.responses.sse import SSEContent as BaseStreamEvent
 
-from .generation_input import GenerationInput
 from .generation_output import GenerationOutput
 
+import uuid
 from enum import Enum
-from typing import Any, Literal, Sequence, Annotated, TypedDict, NotRequired
+from typing import Literal, Sequence, Annotated, TypedDict, NotRequired
 
-from pydantic import Field, BaseModel
+from pydantic import Field, BaseModel, RootModel
 
 
 class MultiModalContentType(str, Enum):
     """Content type."""
 
-    image_url = "image_url"
-    audio_url = "audio_url"
-    video_url = "video_url"
-    document_url = "document_url"
+    image = "image"
+    audio = "audio"
+    video = "video"
+    document = "document"
 
 
 class FileURL(BaseModel):
@@ -26,37 +26,112 @@ class FileURL(BaseModel):
     url: Annotated[str, Field(description="The file's url, can be base64")]
 
 
-class ImageURL(FileURL):
+class FileId(BaseModel):
+    """Contain file id."""
+
+    file_id: Annotated[
+        uuid.UUID, Field(description="The file's id in storage system")
+    ]
+
+
+class ImageBase(BaseModel):
     """Image part."""
 
-    type: Literal[MultiModalContentType.image_url]
+    type: Literal[MultiModalContentType.image]
 
 
-class AudioURL(FileURL):
+class AudioBase(BaseModel):
     """Audio part."""
 
-    type: Literal[MultiModalContentType.audio_url]
+    type: Literal[MultiModalContentType.audio]
 
 
-class VideoURL(FileURL):
+class VideoBase(BaseModel):
     """Video part."""
 
-    type: Literal[MultiModalContentType.video_url]
+    type: Literal[MultiModalContentType.video]
 
 
-class DocumentURL(FileURL):
+class DocumentBase(BaseModel):
     """Document part, can be PDF, text file, word, ..."""
 
-    type: Literal[MultiModalContentType.document_url]
-    mime_type: str
+    type: Literal[MultiModalContentType.document]
+
+
+class ImageURLInput(ImageBase, FileURL):
+    """Image part."""
+
+    pass
+
+
+class AudioURLInput(AudioBase, FileURL):
+    """Audio part."""
+
+    pass
+
+
+class VideoURLInput(VideoBase, FileURL):
+    """Video part."""
+
+    pass
+
+
+class DocumentURLInput(DocumentBase, FileURL):
+    """Document part."""
+
+    mime_type: str | None
+
+
+class ImageIdInput(ImageBase, FileId):
+    """Image part."""
+
+    pass
+
+
+class AudioIdInput(AudioBase, FileId):
+    """Audio part."""
+
+    pass
+
+
+class VideoIdInput(VideoBase, FileId):
+    """Video part."""
+
+    pass
+
+
+class DocumentIdInput(DocumentBase, FileId):
+    """Document part, can be PDF, text file, word, ..."""
+
+    pass
+
+
+class ImageInput(RootModel):
+    root: ImageURLInput | ImageIdInput
+
+
+class AudioInput(RootModel):
+    root: AudioURLInput | AudioIdInput
+
+
+class VideoInput(RootModel):
+    root: VideoURLInput | VideoIdInput
+
+
+class DocumentInput(RootModel):
+    root: DocumentURLInput | DocumentIdInput
 
 
 type MultiModalContent = Annotated[
-    ImageURL | AudioURL | VideoURL | DocumentURL,
+    ImageInput | AudioInput | VideoInput | DocumentInput,
     Field(discriminator="type", description="Multi modal content type"),
 ]
-type ModelInputPart = str | MultiModalContent
-type ModelInput = str | Sequence[ModelInputPart]
+type ModelInputPart = (
+    Annotated[str, Field(..., min_length=1)] | MultiModalContent
+)
+type ModelInput = (
+    Annotated[str, Field(..., min_length=1)] | Sequence[ModelInputPart]
+)
 
 
 class ReferenceType(str, Enum):
@@ -290,15 +365,15 @@ type StreamEvent_PartDelta = BaseStreamEvent[
     Literal[StreamEventType.part_delta], StreamEvent_PartDeltaData
 ]
 
-type StreamEvent_FinalResult = BaseStreamEvent[
-    Literal[StreamEventType.final_result], GenerationOutput[None]
+type StreamEvent_FinalResult[T] = BaseStreamEvent[
+    Literal[StreamEventType.final_result], GenerationOutput[T]
 ]
 
-type StreamEvent = Annotated[
+type StreamEvent[T] = Annotated[
     StreamEvent_ConversationStart
     | StreamEvent_PartStart
     | StreamEvent_PartDelta
-    | StreamEvent_FinalResult,
+    | StreamEvent_FinalResult[T],
     Field(discriminator="event", description="Stream events"),
 ]
 

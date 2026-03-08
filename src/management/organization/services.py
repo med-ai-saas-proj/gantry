@@ -23,13 +23,14 @@ from .repositories import (
     OrgDeletionRequestRepository,
 )
 from .keycloak_client import (
+    OrgNotFoundError,
     KeycloakOrgClient,
     UserNotInOrganizationError,
-    OrgNotFoundError,
 )
 
 from typing import Any
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
+
 from safe_result import Ok, Err, Result
 from structlog.stdlib import BoundLogger
 
@@ -378,7 +379,9 @@ class OrgService:
                 await self.settings_repo.delete_by_org_id(session, org_id)
                 await self.deletion_repo.delete_by_org_id(session, org_id)
                 processed += 1
-                self.logger.info("org_deleted_after_grace_period", org_id=org_id)
+                self.logger.info(
+                    "org_deleted_after_grace_period", org_id=org_id
+                )
 
             if processed > 0:
                 await session.commit()
