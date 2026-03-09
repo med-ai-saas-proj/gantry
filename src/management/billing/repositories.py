@@ -10,9 +10,9 @@ from .models import (
 )
 
 from uuid import UUID
+from typing import Sequence
 from decimal import Decimal
 from datetime import datetime
-from collections.abc import Sequence
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -112,31 +112,17 @@ class MonthlyAggregateRepository(Repository[MonthlyAggregate, int]):
     def __init__(self):
         super().__init__(MonthlyAggregate, MonthlyAggregate.id)
 
-    async def getOrCreate(
+    async def getAggregate(
         self,
         session: AsyncSession,
         project_id: int,
         billing_period: str,
     ) -> MonthlyAggregate | None:
-        """Get an aggregate or create it if it doesn't exist.
+        """Get an aggregate.
 
         Billing_period format: "YYYY-MM" (e.g., "2026-02").
         """
         stmt = (
-            insert(MonthlyAggregate)
-            .values(
-                project_id=project_id,
-                billing_period=billing_period,
-                total_amount=Decimal("0"),
-                is_finalized=False,
-            )
-            .on_conflict_do_nothing(
-                index_elements=["project_id", "billing_period"]
-            )
-        )
-        await session.execute(stmt)
-
-        fetch_stmt = (
             select(MonthlyAggregate)
             .where(
                 MonthlyAggregate.project_id == project_id,
@@ -144,29 +130,40 @@ class MonthlyAggregateRepository(Repository[MonthlyAggregate, int]):
             )
             .limit(1)
         )
-        return await self.selectOne(session, fetch_stmt)
+        return await self.selectOne(session, stmt)
 
     async def addToAggregate(
         self,
         session: AsyncSession,
-        aggregate_id: int,
+        project_id: str,
+        billing_period: str,
         amount: Decimal,
     ) -> MonthlyAggregate | None:
-        """Increment an aggregate's total by amount.
+        """Upsert an aggregate row and atomically increment its total.
 
-        Single UPDATE avoids lost-update races. Returns None if the
-        aggregate was already finalized or not found, the service layer
-        should treat that as an error.
+        - If the row doesn't exist yet: inserts it with total_amount = amount.
+        - If it exists and is open: increments total_amount atomically.
+        - If it exists but is finalized: DO NOTHING, returns None — the
+          service layer should treat that as an error.
+
+        Takes (project_id, billing_period) instead of aggregate_id so
+        the caller doesn't need a prior getOrCreate round-trip.
         """
         stmt = (
-            update(MonthlyAggregate)
-            .where(
-                MonthlyAggregate.id == aggregate_id,
-                MonthlyAggregate.is_finalized == False,
-            )
+            insert(MonthlyAggregate)
             .values(
-                total_amount=MonthlyAggregate.total_amount + amount,
-                updated_at=func.now(),
+                project_id=project_id,
+                billing_period=billing_period,
+                total_amount=amount,
+                is_finalized=False,
+            )
+            .on_conflict_do_update(
+                index_elements=["project_id", "billing_period"],
+                set_={
+                    "total_amount": MonthlyAggregate.total_amount + amount,
+                    "updated_at": func.now(),
+                },
+                where=MonthlyAggregate.is_finalized == False,
             )
             .returning(MonthlyAggregate)
         )
