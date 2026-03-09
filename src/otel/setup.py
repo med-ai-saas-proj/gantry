@@ -30,11 +30,7 @@ from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (
 otel_settings = getOtelSettings()
 
 
-def setupOtel(
-        service_name: str,
-        service_version: str,
-        logger: BoundLogger
-):
+def setupOtel(service_name: str, service_version: str, logger: BoundLogger):
     resource = Resource.create(
         {
             "service.name": service_name,

@@ -41,6 +41,7 @@ setupOtel(
     logger=getLogger(),
 )
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup code here
