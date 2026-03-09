@@ -27,17 +27,15 @@ exporters:
     resource_to_telemetry_conversion:
       enabled: true
 
-  loki:
-    endpoint: http://loki:3100/loki/api/v1/push
-    default_labels_enabled:
-      exporter: true
-      job: true
-      instance: true
+  otlp/loki:
+    endpoint: "loki:4317"
+    tls:
+      insecure: true
 
   debug:
     verbosity: detailed
 
-  otlp:
+  otlp/jaeger:
     endpoint: "jaeger:4317"
     tls:
       insecure: true
@@ -56,7 +54,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlp, debug]
+      exporters: [otlp/jaeger, debug]
     metrics:
       receivers: [otlp]
       processors: [batch]
@@ -64,4 +62,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [resource, batch]
-      exporters: [loki, debug]
+      exporters: [otlp/loki, debug]
