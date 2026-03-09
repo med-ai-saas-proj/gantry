@@ -153,7 +153,6 @@ services:
           memory: 512M
 
 volumes:
-  rustfs_data:
   timescale_data:
   postgres_data:
   redis_data:
