@@ -73,7 +73,7 @@ class MonthlyAggregate(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
         {"schema": "Billing"},
     )
 
-    project_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    project_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
     # "2026-02" — always calendar month, always UTC
     billing_period: Mapped[str] = mapped_column(String(7), nullable=False)
@@ -116,8 +116,8 @@ class ProjectSpendingLimit(WithCreateUpdateTimestamp, WithID, BillingBaseSQLMode
 
     __tablename__ = "ProjectSpendingLimits"
 
-    project_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, unique=True, index=True
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, nullable=False, unique=True, index=True
     )
 
     # NULL = fall back to org-level limit
