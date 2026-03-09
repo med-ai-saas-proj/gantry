@@ -70,10 +70,11 @@ def configure_default_logging(
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(min_level)
 
-    if settings.stage == AppStage.PROD:
-        processors += [orjson_renderer]
-    else:
-        processors += [structlog.dev.ConsoleRenderer()]
+    # if settings.stage == AppStage.PROD:
+    #     processors += [orjson_renderer]
+    # else:
+    #     processors += [structlog.dev.ConsoleRenderer()]
+    processors += [orjson_renderer]
 
     return structlog.wrap_logger(
         logger,

@@ -27,8 +27,8 @@ exporters:
     resource_to_telemetry_conversion:
       enabled: true
 
-  otlp/loki:
-    endpoint: "loki:4317"
+  otlphttp/loki:
+    endpoint:  http://loki:3100/otlp
     tls:
       insecure: true
 
@@ -36,7 +36,7 @@ exporters:
     verbosity: detailed
 
   otlp/jaeger:
-    endpoint: "jaeger:4317"
+    endpoint: jaeger:4317
     tls:
       insecure: true
 
@@ -62,4 +62,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [resource, batch]
-      exporters: [otlp/loki, debug]
+      exporters: [otlphttp/loki, debug]
