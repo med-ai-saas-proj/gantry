@@ -15,6 +15,9 @@ from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
 from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
 from opentelemetry.instrumentation.botocore import BotocoreInstrumentor
+from opentelemetry.instrumentation.system_metrics import (
+    SystemMetricsInstrumentor,
+)
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
     OTLPSpanExporter,
@@ -86,5 +89,6 @@ def setupOtel(
     BotocoreInstrumentor().instrument()
     RedisInstrumentor().instrument()
     AsyncPGInstrumentor().instrument()
+    SystemMetricsInstrumentor().instrument()
 
     logger.info("OpenTelemetry instrumentation completed.")

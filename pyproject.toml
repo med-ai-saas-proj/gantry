@@ -40,6 +40,7 @@ dependencies = [
     "python-keycloak>=5.3.1",
     "uvloop>=0.22.1; sys_platform == 'linux'",
     "sqlalchemy-timescaledb>=0.4.1",
+    "opentelemetry-instrumentation-system-metrics>=0.60b1",
 ]
 
 [tool.pyrefly]
