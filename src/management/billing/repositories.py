@@ -115,7 +115,7 @@ class MonthlyAggregateRepository(Repository[MonthlyAggregate, int]):
     async def getOrCreate(
         self,
         session: AsyncSession,
-        project_id: str,
+        project_id: int,
         billing_period: str,
     ) -> MonthlyAggregate | None:
         """Get an aggregate or create it if it doesn't exist.
@@ -197,7 +197,7 @@ class MonthlyAggregateRepository(Repository[MonthlyAggregate, int]):
     async def getByProject(
         self,
         session: AsyncSession,
-        project_id: str,
+        project_id: int,
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[MonthlyAggregate]:
@@ -213,7 +213,7 @@ class MonthlyAggregateRepository(Repository[MonthlyAggregate, int]):
     async def getByProjectAndPeriod(
         self,
         session: AsyncSession,
-        project_id: str,
+        project_id: int,
         billing_period: str,
     ) -> MonthlyAggregate | None:
         """Get the aggregate for a specific project and billing period."""
@@ -289,7 +289,7 @@ class ProjectSpendingLimitRepository(Repository[ProjectSpendingLimit, int]):
     async def getForProject(
         self,
         session: AsyncSession,
-        project_id: str,
+        project_id: int,
     ) -> ProjectSpendingLimit | None:
         """Get the spending limit record for a project."""
         stmt = (
@@ -302,7 +302,7 @@ class ProjectSpendingLimitRepository(Repository[ProjectSpendingLimit, int]):
     async def upsert(
         self,
         session: AsyncSession,
-        project_id: str,
+        project_id: int,
         monthly_limit: Decimal | None,
         daily_limit: Decimal | None,
     ) -> ProjectSpendingLimit | None:
