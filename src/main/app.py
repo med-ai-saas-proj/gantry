@@ -13,6 +13,7 @@ from src.shared.custom_types.error_exception import (
 )
 
 from . import exception_handlers
+from ..otel.setup import setupOtel
 from ..service.lifespan import (
     startup as service_startup,
     shutdown as service_shutdown,
@@ -25,50 +26,20 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from pydantic import ValidationError
-from opentelemetry import trace
 from sqlalchemy.orm import configure_mappers
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace.export import (
-    BatchSpanProcessor,
-)
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-    OTLPSpanExporter,
-)
 
 
 configure_mappers()
 
 app_settings = getAppSetting()
 
-# 1. Define a Resource (identifies the service)
-# This is crucial for your backend to identify which service the data belongs to.
-resource = Resource.create(
-    {
-        "service.name": "main-server",
-        "service.version": "0.0.1",
-    }
+setupOtel(
+    service_name=app_settings.app_name,
+    service_version=app_settings.app_version,
+    logger=getLogger(),
 )
-
-# 2. Setup the Tracer Provider
-provider = TracerProvider(resource=resource)
-trace.set_tracer_provider(provider)
-
-# 3. Setup the Exporter (OTLP is standard)
-# OTLP Exporter sends data to a Collector or compatible backend
-otlp_exporter = OTLPSpanExporter(
-    # Set your collector/backend URL here (default is usually 'http://localhost:4317')
-    endpoint=app_settings.otlp_endpoint,
-    insecure=app_settings.stage
-    == AppStage.DEV,  # Use for unencrypted local testing
-)
-
-# 4. Setup the Span Processor (Batches spans before exporting)
-span_processor = BatchSpanProcessor(otlp_exporter)
-provider.add_span_processor(span_processor)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
