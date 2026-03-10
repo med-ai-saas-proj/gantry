@@ -2,10 +2,9 @@ services:
   otelcol:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: otel-collector
-    restart: unless-stopped
     command: [ "--config=/etc/otel-collector-config.yml" ]
     volumes:
-      - ./otel-collector-config.yaml:/etc/otel-collector-config.yml:ro
+      - ./asset/otel/otel-collector-config.yaml:/etc/otel-collector-config.yml:ro
     ports:
       - "4317:4317" # OTLP gRPC receiver port
       - "4318:4318" # OTLP HTTP receiver port
@@ -19,6 +18,7 @@ services:
       - jaeger
       - prometheus
       - loki
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:latest
@@ -27,27 +27,45 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--web.enable-remote-write-receiver'
+      - '--enable-feature=exemplar-storage'
+      - '--enable-feature=native-histograms'
+      - '--storage.tsdb.retention.time=7d' # Retention period for metrics
+      - '--storage.tsdb.retention.size=100MB' # Retention size limit for metrics
     volumes:
       - prometheus_data:/prometheus
     ports:
-      - "9090:9090"
+      - "9090:9090" # Prometheus UI and API
+    restart: unless-stopped
 
   loki:
     image: grafana/loki:latest
     container_name: loki
-    command: -config.file=/etc/loki/local-config.yaml
+    command:
+      - "-config.file=/etc/loki/local-config.yaml"
+      - "-store.retention=7d" # Retention period for logs
     volumes:
       - loki_data:/loki
     ports:
-      - "3100:3100"
+      - "3100:3100" # Loki API
+    restart: unless-stopped
 
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: jaeger
+    command:
+      - "--badger.span-store-ttl=168h"  # Retention period for traces and spans
+    user: root # to fix permission issues with badger storage (/badger/data, /badger/key)
     environment:
       - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=badger
+      - BADGER_EPHEMERAL=false
+      - BADGER_DIRECTORY_VALUE=/badger/data
+      - BADGER_DIRECTORY_KEY=/badger/key
+    volumes:
+      - jaeger_data:/badger
     ports:
       - "16686:16686" # Jaeger UI
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:latest
@@ -59,6 +77,7 @@ services:
       - grafana_data:/var/lib/grafana
     ports:
       - "3000:3000"
+    restart: unless-stopped
 
   timescale_db:
     image: timescale/timescaledb:latest-pg17
@@ -159,4 +178,5 @@ volumes:
   keycloak_data:
   prometheus_data:
   loki_data:
+  jaeger_data:
   grafana_data:

@@ -41,8 +41,6 @@ exporters:
       insecure: true
 
 
-
-
 service:
   telemetry:
     logs:
