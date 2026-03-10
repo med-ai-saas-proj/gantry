@@ -28,6 +28,7 @@ from opentelemetry.instrumentation.system_metrics import (
 
 otel_settings = getOtelSettings()
 
+
 def setupOtel(
     service_name: str,
     service_version: str,
@@ -45,7 +46,10 @@ def setupOtel(
             from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
                 OTLPSpanExporter,
             )
-        elif otel_settings.exporter_otlp_protocol == ExporterProtocol.http_protobuf:
+        elif (
+            otel_settings.exporter_otlp_protocol
+            == ExporterProtocol.http_protobuf
+        ):
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
                 OTLPSpanExporter,
             )
@@ -53,12 +57,12 @@ def setupOtel(
             raise ValueError(
                 f"Unsupported OTLP exporter protocol: {otel_settings.exporter_otlp_protocol}"
             )
-        exporter = OTLPSpanExporter(
+        span_exporter = OTLPSpanExporter(
             endpoint=otel_settings.exporter_otlp_endpoint.encoded_string(),
             insecure=True,
         )
         tracer_provider = TracerProvider(resource=resource)
-        tracer_provider.add_span_processor(BatchSpanProcessor(exporter))
+        tracer_provider.add_span_processor(BatchSpanProcessor(span_exporter))
         trace.set_tracer_provider(tracer_provider)
 
     if otel_settings.metrics == MetricsType.otlp:
@@ -66,7 +70,10 @@ def setupOtel(
             from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (
                 OTLPMetricExporter,
             )
-        elif otel_settings.exporter_otlp_protocol == ExporterProtocol.http_protobuf:
+        elif (
+            otel_settings.exporter_otlp_protocol
+            == ExporterProtocol.http_protobuf
+        ):
             from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
                 OTLPMetricExporter,
             )
@@ -81,9 +88,7 @@ def setupOtel(
         )
         meter_provider = MeterProvider(
             resource=resource,
-            metric_readers=[
-                PeriodicExportingMetricReader(metric_exporter)
-            ],
+            metric_readers=[PeriodicExportingMetricReader(metric_exporter)],
         )
         metrics.set_meter_provider(meter_provider)
     elif otel_settings.metrics == MetricsType.prometheus:
@@ -102,7 +107,10 @@ def setupOtel(
             from opentelemetry.exporter.otlp.proto.grpc._log_exporter import (
                 OTLPLogExporter,
             )
-        elif otel_settings.exporter_otlp_protocol == ExporterProtocol.http_protobuf:
+        elif (
+            otel_settings.exporter_otlp_protocol
+            == ExporterProtocol.http_protobuf
+        ):
             from opentelemetry.exporter.otlp.proto.http._log_exporter import (
                 OTLPLogExporter,
             )
@@ -111,12 +119,14 @@ def setupOtel(
                 f"Unsupported OTLP exporter protocol: {otel_settings.exporter_otlp_protocol}"
             )
 
-        exporter = OTLPLogExporter(
+        log_exporter = OTLPLogExporter(
             endpoint=otel_settings.exporter_otlp_endpoint.encoded_string(),
             insecure=True,
         )
         logger_provider = LoggerProvider(resource=resource)
-        logger_provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+        logger_provider.add_log_record_processor(
+            BatchLogRecordProcessor(log_exporter)
+        )
         _logs.set_logger_provider(logger_provider)
 
         handler = LoggingHandler(

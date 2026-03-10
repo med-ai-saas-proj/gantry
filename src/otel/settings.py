@@ -9,14 +9,17 @@ class TracesType(str, Enum):
     otlp = "otlp"
     disabled = "disabled"
 
+
 class MetricsType(str, Enum):
     otlp = "otlp"
     prometheus = "prometheus"
     disabled = "disabled"
 
+
 class LogsType(str, Enum):
     otlp = "otlp"
     disabled = "disabled"
+
 
 class ExporterProtocol(str, Enum):
     grpc = "grpc"
