@@ -153,7 +153,13 @@ services:
     environment:
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
-      - KC_FEATURES=organization
+      - KC_FEATURES=organization,opentelemetry-metrics,opentelemetry-logs
+      - KC_TELEMETRY_ENDPOINT=http://otelcol:4317
+      - KC_TELEMETRY_RESOURCE_ATTRIBUTES=service.name=keycloak,deployment.environment=dev
+      - KC_TRACING_ENABLED=true
+      - KC_TELEMETRY_LOGS_ENABLED=true
+      - KC_METRICS_ENABLED=true
+      - KC_TELEMETRY_METRICS_ENABLED=true
     ports:
       - "8080:8080"
     command: start-dev --import-realm --http-access-log-enabled=true
