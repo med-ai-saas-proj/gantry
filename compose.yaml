@@ -75,6 +75,7 @@ services:
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./asset/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
     ports:
       - "3000:3000"
     restart: unless-stopped
