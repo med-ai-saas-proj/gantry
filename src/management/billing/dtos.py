@@ -1,9 +1,9 @@
 """DTOs for the billing module."""
 
-from typing import TypedDict
-from uuid import UUID
-
 from src.shared.dtos.base import BaseDTO
+
+from uuid import UUID
+from typing import TypedDict
 
 
 class ScaledAmount(TypedDict):

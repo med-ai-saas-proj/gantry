@@ -18,26 +18,27 @@ Flow (see architecture diagram):
     TODO(BILL-008): INSERT BillingTransaction into TimescaleDB.
 """
 
-import json
-from decimal import Decimal
-from datetime import datetime, timezone
-from typing import TypedDict
-from uuid import UUID, uuid4
-
-from redis.asyncio import Redis
-from safe_result import Err, Ok, Result
-from sqlalchemy.ext.asyncio import AsyncSession
-from structlog.stdlib import BoundLogger
-
 from src.db.factories import AsyncSessionManager
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .dtos import BillingPing, ScaledAmount
 from .repositories import (
     MonthlyAggregateRepository,
-    OrganizationSpendingLimitRepository,
     ProjectSpendingLimitRepository,
+    OrganizationSpendingLimitRepository,
 )
+
+import json
+from uuid import UUID, uuid4
+from typing import TypedDict
+from decimal import Decimal
+from datetime import datetime, timezone
+
+from safe_result import Ok, Err, Result
+from redis.asyncio import Redis
+from structlog.stdlib import BoundLogger
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 # ---------------------------------------------------------------------------
 # Error types
@@ -151,7 +152,9 @@ class BillingService:
     # Public API
     # -----------------------------------------------------------------------
 
-    async def hold(self, ping: BillingPing) -> Result[UUID, SpendingLimitExceeded]:
+    async def hold(
+        self, ping: BillingPing
+    ) -> Result[UUID, SpendingLimitExceeded]:
         """Reserve spending capacity before a request is processed.
 
         Returns Ok(hold_uuid) on success.
@@ -175,11 +178,17 @@ class BillingService:
             )
 
         limit_redis = (
-            _decimal_to_redis_int(monthly_limit) if monthly_limit is not None else -1
+            _decimal_to_redis_int(monthly_limit)
+            if monthly_limit is not None
+            else -1
         )
-        pg_total_redis = _decimal_to_redis_int(pg_agg.total_amount) if pg_agg else 0
+        pg_total_redis = (
+            _decimal_to_redis_int(pg_agg.total_amount) if pg_agg else 0
+        )
 
-        agg_key = self._AGG_KEY.format(project_id=project_id, period=billing_period)
+        agg_key = self._AGG_KEY.format(
+            project_id=project_id, period=billing_period
+        )
         result = self.redis.eval(
             _HOLD_LUA,
             1,
@@ -201,7 +210,9 @@ class BillingService:
             "amount_redis": hold_amount_redis,
             "billing_period": billing_period,
         }
-        await self.redis.set(hold_key, json.dumps(hold_record), ex=self._HOLD_TTL)
+        await self.redis.set(
+            hold_key, json.dumps(hold_record), ex=self._HOLD_TTL
+        )
 
         self.logger.info(
             "billing.hold.ok",
@@ -231,11 +242,15 @@ class BillingService:
         hold_amount_redis: int = hold["amount_redis"]
         billing_period: str = hold["billing_period"]
 
-        real_amount_redis = _to_redis_int(real_amount["value"], real_amount["scale"])
+        real_amount_redis = _to_redis_int(
+            real_amount["value"], real_amount["scale"]
+        )
         # delta is negative when real_cost < hold (typical case — over-estimated)
         delta = real_amount_redis - hold_amount_redis
 
-        agg_key = self._AGG_KEY.format(project_id=project_id, period=billing_period)
+        agg_key = self._AGG_KEY.format(
+            project_id=project_id, period=billing_period
+        )
 
         # Redis: adjust aggregate counter + delete hold in one pipeline.
         # Not strictly atomic across two keys, but the worst-case failure
