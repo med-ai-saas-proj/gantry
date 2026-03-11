@@ -59,7 +59,7 @@ class HoldNotFound(RecoverableError):
 
 
 # ---------------------------------------------------------------------------
-# Internal Redis record shape
+# Redis configs
 # ---------------------------------------------------------------------------
 
 
@@ -70,10 +70,6 @@ class _HoldRecord(TypedDict):
     amount_redis: int  # hold amount normalised to _REDIS_SCALE
     billing_period: str  # "YYYY-MM" — period active when HOLD was placed
 
-
-# ---------------------------------------------------------------------------
-# Module-level constants / helpers
-# ---------------------------------------------------------------------------
 
 # All amounts in Redis are stored as integers at this implicit scale.
 # Scale 8 matches the Postgres Numeric(18, 8) columns.
@@ -133,7 +129,7 @@ class BillingService:
 
     _AGG_KEY = "billing:agg:{project_id}:{period}"
     _HOLD_KEY = "billing:hold:{uuid}"
-    _HOLD_TTL = 3600  # holds expire after 1 hour if never released
+    _HOLD_TTL = 3600  # seconds
 
     def __init__(
         self,
@@ -250,7 +246,7 @@ class BillingService:
             pipe.delete(hold_key)
             await pipe.execute()
 
-        # Postgres: upsert MonthlyAggregate — always the source of truth.
+        # Postgres: upsert MonthlyAggregate
         real_decimal = Decimal(real_amount["value"]) * Decimal(10) ** (
             -real_amount["scale"]
         )
