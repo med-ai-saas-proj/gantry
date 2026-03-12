@@ -1,9 +1,6 @@
 """DTOs for the billing module."""
 
 from typing import TypedDict
-from uuid import UUID
-
-from src.shared.dtos.base import BaseDTO
 
 
 class ScaledAmount(TypedDict):
@@ -25,5 +22,6 @@ class BillingPing(TypedDict):
     organization_id: str
     project_id: int
     apikey_id: str  # string ID of the API key that triggered the charge
+    org_project_ids: list[int]
     amount: ScaledAmount  # maximum (worst-case) cost estimate
     details: dict  # e.g. {"llm_usages": {"gpt-4o": {"input_tokens": 100}}}

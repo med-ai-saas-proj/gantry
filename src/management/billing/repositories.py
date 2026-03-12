@@ -14,7 +14,7 @@ from typing import Sequence
 from decimal import Decimal
 from datetime import datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import and_, func, select, true, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 
@@ -25,9 +25,6 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
     BillingTransaction stores only apikey_id. For project/org-level queries
     the service layer resolves project_id / org_id -> apikey_ids first, then
     passes the list to getByApiKeys / sumByApiKeysInPeriod.
-
-    The HOLD step (Redis) is handled entirely in the service layer.
-    This repository only handles the Postgres INSERT that happens during RELEASE.
     """
 
     def __init__(self):
@@ -132,12 +129,33 @@ class MonthlyAggregateRepository(Repository[MonthlyAggregate, int]):
         )
         return await self.selectOne(session, stmt)
 
-    async def addToAggregate(
+    async def sumOrgTotal(
+        self,
+        session: AsyncSession,
+        org_project_ids: list[int],
+        billing_period: str,
+    ) -> Decimal:
+        """Sum total_amount across all open aggregates for the org's projects.
+
+        Used to enforce the org-level monthly spending cap.
+        Finalized rows are included — finalization doesn't reduce the org total.
+        """
+        stmt = select(
+            func.coalesce(func.sum(MonthlyAggregate.total_amount), Decimal("0"))
+        ).where(
+            MonthlyAggregate.project_id.in_(org_project_ids),
+            MonthlyAggregate.billing_period == billing_period,
+        )
+        result = await session.execute(stmt)
+        return result.scalar() or Decimal("0")
+
+    async def holdAggregate(
         self,
         session: AsyncSession,
         project_id: int,
         billing_period: str,
-        amount: Decimal,
+        hold_amount: Decimal,
+        project_limit: Decimal | None,
     ) -> MonthlyAggregate | None:
         """Upsert an aggregate row and atomically increment its total.
 
@@ -149,21 +167,65 @@ class MonthlyAggregateRepository(Repository[MonthlyAggregate, int]):
         Takes (project_id, billing_period) instead of aggregate_id so
         the caller doesn't need a prior getOrCreate round-trip.
         """
+
+        if project_limit is not None and hold_amount > project_limit:
+            return None
+
+        limit_where = (
+            MonthlyAggregate.total_amount + hold_amount <= project_limit
+            if project_limit is not None
+            else true()
+        )
+
         stmt = (
             insert(MonthlyAggregate)
             .values(
                 project_id=project_id,
                 billing_period=billing_period,
-                total_amount=amount,
+                total_amount=hold_amount,
                 is_finalized=False,
             )
             .on_conflict_do_update(
                 index_elements=["project_id", "billing_period"],
                 set_={
-                    "total_amount": MonthlyAggregate.total_amount + amount,
+                    "total_amount": MonthlyAggregate.total_amount + hold_amount,
                     "updated_at": func.now(),
                 },
-                where=MonthlyAggregate.is_finalized == False,
+                where=and_(
+                    MonthlyAggregate.is_finalized == False,
+                    limit_where,
+                ),
+            )
+            .returning(MonthlyAggregate)
+        )
+        result = await session.execute(stmt)
+        return result.scalars().first()
+
+    async def releaseAggregate(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        billing_period: str,
+        delta_amount: Decimal,
+    ) -> MonthlyAggregate | None:
+        """Adjust the aggregate total by delta_amount (may be negative).
+
+        delta = real_cost − hold_amount. Negative when the hold over-estimated
+        (the common case).
+
+        Returns None if the period was finalized between HOLD and RELEASE
+        (month-end race).
+        """
+        stmt = (
+            update(MonthlyAggregate)
+            .where(
+                MonthlyAggregate.project_id == project_id,
+                MonthlyAggregate.billing_period == billing_period,
+                MonthlyAggregate.is_finalized == False,
+            )
+            .values(
+                total_amount=MonthlyAggregate.total_amount + delta_amount,
+                updated_at=func.now(),
             )
             .returning(MonthlyAggregate)
         )
