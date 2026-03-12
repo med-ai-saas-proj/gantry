@@ -1,6 +1,6 @@
 """Singleton factory for BillingService."""
 
-from src.db.factories import getSessionManager, getRedis
+from src.db.factories import getRedis, getSessionManager
 from src.shared.utils.logger import getLogger
 
 from .services import BillingService

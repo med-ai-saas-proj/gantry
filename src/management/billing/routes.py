@@ -1,8 +1,8 @@
 """Billing API routes."""
 
 from .dtos import BillingPing, ScaledAmount
-from .dependencies import BillingContext, get_billing_context
 from .factories import BillingService, getBillingService
+from .dependencies import BillingContext, get_billing_context
 
 from uuid import UUID
 from typing import Annotated

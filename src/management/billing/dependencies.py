@@ -1,7 +1,7 @@
-from src.management.api_keys.dependencies import requiredPermissions
-from src.management.api_keys.entities import ApiKeyInfo
-from src.management.projects.models import Project
 from src.db.factories import getSessionManager
+from src.management.projects.models import Project
+from src.management.api_keys.entities import ApiKeyInfo
+from src.management.api_keys.dependencies import requiredPermissions
 from src.shared.custom_types.error_exception import RecoverableError
 
 from typing import Annotated, TypedDict
@@ -16,7 +16,9 @@ class BillingContext(TypedDict):
     apikey_id: int  # integer PK of the verified ApiKey row
     project_id: int  # project the key belongs to
     organization_id: str  # org the project belongs to
-    org_project_ids: list[int]  # all project IDs in the same org (for org-total cap)
+    org_project_ids: list[
+        int
+    ]  # all project IDs in the same org (for org-total cap)
 
 
 # ---------------------------------------------------------------------------
@@ -39,7 +41,9 @@ class BillingContextResolutionError(RecoverableError):
 async def get_billing_context(
     # Reuse existing API key verification — passes permission check too.
     # billing:write is the permission required to trigger charges.
-    key_info: Annotated[ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))],
+    key_info: Annotated[
+        ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
+    ],
 ) -> BillingContext:
     """Resolve full billing context from the verified API key.
 
@@ -72,7 +76,9 @@ async def get_billing_context(
         org_id: str = row.organization_id
 
         # Get all project IDs in the same org (single IN-free query)
-        sibling_stmt = select(Project.id).where(Project.organization_id == org_id)
+        sibling_stmt = select(Project.id).where(
+            Project.organization_id == org_id
+        )
         sibling_result = await session.execute(sibling_stmt)
         org_project_ids: list[int] = [r[0] for r in sibling_result.all()]
 
