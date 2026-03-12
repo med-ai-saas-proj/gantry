@@ -33,16 +33,6 @@ Flow (see architecture diagram):
     TODO(BILL-008): INSERT BillingTransaction into TimescaleDB.
 """
 
-import json
-from decimal import Decimal
-from datetime import datetime, timezone
-from typing import TypedDict
-from uuid import UUID, uuid4
-
-from redis.asyncio import Redis
-from safe_result import Err, Ok, Result
-from structlog.stdlib import BoundLogger
-
 from src.db.factories import AsyncSessionManager
 from src.shared.custom_types.error_exception import RecoverableError
 
@@ -168,7 +158,9 @@ class BillingService:
 
         async with self.session_manager.get_session() as session:
             proj_limit_row, org_limit_row, org_total = (
-                await self.project_limit_repo.getForProject(session, project_id),
+                await self.project_limit_repo.getForProject(
+                    session, project_id
+                ),
                 await self.org_limit_repo.getForOrg(session, org_id),
                 await self.monthly_agg_repo.sumOrgTotal(
                     session, org_project_ids, billing_period
@@ -176,10 +168,14 @@ class BillingService:
             )
 
             project_limit: Decimal | None = (
-                proj_limit_row.monthly_limit if proj_limit_row is not None else None
+                proj_limit_row.monthly_limit
+                if proj_limit_row is not None
+                else None
             )
             org_limit: Decimal | None = (
-                org_limit_row.monthly_limit if org_limit_row is not None else None
+                org_limit_row.monthly_limit
+                if org_limit_row is not None
+                else None
             )
 
             if org_limit is not None and (org_total + hold_amount) > org_limit:
@@ -217,7 +213,9 @@ class BillingService:
             "billing_period": billing_period,
         }
         hold_key = self._HOLD_KEY.format(uuid=hold_uuid)
-        await self.redis.set(hold_key, json.dumps(hold_record), ex=self._HOLD_TTL)
+        await self.redis.set(
+            hold_key, json.dumps(hold_record), ex=self._HOLD_TTL
+        )
 
         self.logger.info(
             "billing.hold.ok",

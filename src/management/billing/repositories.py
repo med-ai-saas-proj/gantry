@@ -14,7 +14,7 @@ from typing import Sequence
 from decimal import Decimal
 from datetime import datetime
 
-from sqlalchemy import and_, func, select, true, update
+from sqlalchemy import and_, func, true, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 
