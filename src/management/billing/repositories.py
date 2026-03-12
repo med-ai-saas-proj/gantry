@@ -287,11 +287,15 @@ class MonthlyAggregateRepository(Repository[MonthlyAggregate, int]):
         return await self.selectOne(session, stmt)
 
 
-class OrganizationSpendingLimitRepository(Repository[OrganizationSpendingLimit, int]):
+class OrganizationSpendingLimitRepository(
+    Repository[OrganizationSpendingLimit, int]
+):
     """Repository for organization-level spending limits."""
 
     def __init__(self):
-        super().__init__(OrganizationSpendingLimit, OrganizationSpendingLimit.id)
+        super().__init__(
+            OrganizationSpendingLimit, OrganizationSpendingLimit.id
+        )
 
     async def getForOrg(
         self,
