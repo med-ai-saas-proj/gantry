@@ -89,7 +89,7 @@ class HoldNotFound(RecoverableError):
 class _HoldRecord(TypedDict):
     project_id: int
     org_id: str
-    apikey_id: str
+    apikey_id: int
     hold_amount: ScaledAmount
     billing_period: str  # "YYYY-MM" — period active when HOLD was placed
 
@@ -158,9 +158,7 @@ class BillingService:
 
         async with self.session_manager.get_session() as session:
             proj_limit_row, org_limit_row, org_total = (
-                await self.project_limit_repo.getForProject(
-                    session, project_id
-                ),
+                await self.project_limit_repo.getForProject(session, project_id),
                 await self.org_limit_repo.getForOrg(session, org_id),
                 await self.monthly_agg_repo.sumOrgTotal(
                     session, org_project_ids, billing_period
@@ -168,14 +166,10 @@ class BillingService:
             )
 
             project_limit: Decimal | None = (
-                proj_limit_row.monthly_limit
-                if proj_limit_row is not None
-                else None
+                proj_limit_row.monthly_limit if proj_limit_row is not None else None
             )
             org_limit: Decimal | None = (
-                org_limit_row.monthly_limit
-                if org_limit_row is not None
-                else None
+                org_limit_row.monthly_limit if org_limit_row is not None else None
             )
 
             if org_limit is not None and (org_total + hold_amount) > org_limit:
@@ -213,9 +207,7 @@ class BillingService:
             "billing_period": billing_period,
         }
         hold_key = self._HOLD_KEY.format(uuid=hold_uuid)
-        await self.redis.set(
-            hold_key, json.dumps(hold_record), ex=self._HOLD_TTL
-        )
+        await self.redis.set(hold_key, json.dumps(hold_record), ex=self._HOLD_TTL)
 
         self.logger.info(
             "billing.hold.ok",
