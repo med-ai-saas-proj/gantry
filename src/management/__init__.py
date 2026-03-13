@@ -2,6 +2,7 @@ from src.shared.settings import getAppSetting
 from src.shared.custom_types.error_exception import ProblemDetails
 
 from .logging import logging_router
+from .project import project_router
 from .api_keys import apikey_router
 from .organization import org_router
 from .organization.settings import getOrgSettings
@@ -64,6 +65,7 @@ management_app.add_middleware(
 v1_router = APIRouter(prefix="/v1", tags=["v1"], include_in_schema=True)
 v1_router.include_router(apikey_router)
 v1_router.include_router(org_router)
+v1_router.include_router(project_router)
 
 # api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
 # api_router.include_router(v1_router)

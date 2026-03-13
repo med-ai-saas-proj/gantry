@@ -486,6 +486,8 @@ class KeycloakOrgClient:
         self,
         org_id: str,
         email: str,
+        client_id: str | None = None,
+        redirect_uri: str | None = None,
         first_name: str | None = None,
         last_name: str | None = None,
     ) -> Result[bool, RecoverableError]:
@@ -493,6 +495,10 @@ class KeycloakOrgClient:
             f"{self._admin_base()}/organizations/{org_id}/members/invite-user"
         )
         form: dict[str, str] = {"email": email}
+        if client_id:
+            form["clientId"] = client_id
+        if redirect_uri:
+            form["redirectUri"] = redirect_uri
         if first_name:
             form["firstName"] = first_name
         if last_name:

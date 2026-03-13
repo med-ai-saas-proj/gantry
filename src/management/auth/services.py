@@ -149,6 +149,13 @@ class AuthService:
             "username": claims.get("preferred_username"),
             "email": claims.get("email"),
             "roles": roles,
+            "client_id": claims.get("azp"),
+            "is_service_account": (
+                isinstance(claims.get("preferred_username"), str)
+                and claims.get("preferred_username", "").startswith(
+                    "service-account-"
+                )
+            ),
         }
 
         return Ok(auth_info)

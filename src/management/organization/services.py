@@ -142,6 +142,13 @@ class MultipleOrganizationMembershipError(RecoverableError):
     detail = "A user can belong to only one organization."
 
 
+class ServiceAccountOrgCreateNotAllowedError(RecoverableError):
+    status = 403
+    code = "service_account_org_create_not_allowed"
+    title = "Service Account Not Allowed"
+    detail = "Organization creation requires an authenticated user."
+
+
 def _extract_org_ids(orgs: list[dict[str, Any]]) -> set[str]:
     return {str(org.get("id", "")) for org in orgs if org.get("id")}
 
@@ -574,7 +581,13 @@ class OrgService:
             if org_ids:
                 return Err(UserAlreadyInAnotherOrganizationError())
 
-        invite_res = await self.kc.invite_user(org_id, email)
+        settings = getOrgSettings()
+        invite_res = await self.kc.invite_user(
+            org_id,
+            email,
+            client_id=settings.invite_client_id,
+            redirect_uri=settings.invite_redirect_uri,
+        )
         if invite_res.is_err():
             return invite_res
         return Ok(True)
