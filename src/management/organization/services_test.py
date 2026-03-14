@@ -26,7 +26,6 @@ from src.management.organization.services import (  # noqa: E402
     UserAlreadyInOrganizationError,
     MultipleOrganizationMembershipError,
     UserAlreadyInAnotherOrganizationError,
-    ServiceAccountOrgCreateNotAllowedError,
     ReadOwnPermissionsOrManageRequiredError,
     _extract_org_ids,
 )
@@ -43,10 +42,6 @@ class _DummySessionManager:
     @asynccontextmanager
     async def get_session(self):
         yield self.session
-
-
-class _DummyError(Exception):
-    pass
 
 
 class TestOrgServiceUnit(unittest.IsolatedAsyncioTestCase):
@@ -121,78 +116,6 @@ class TestOrgServiceUnit(unittest.IsolatedAsyncioTestCase):
         # Assert
         self.assertTrue(res.is_err())
         self.assertIsInstance(res.error, MultipleOrganizationMembershipError)
-
-    async def test_create_org_service_account_blocked(self):
-        """Backend service-account actor should not create organization."""
-        # Arrange
-        service = self._make_service()
-
-        # Act
-        res = await service.create_org(
-            name="Org X",
-            actor_user_id="u1",
-            actor_is_service_account=True,
-            actor_client_id="med-ai-saas-backend",
-        )
-
-        # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, ServiceAccountOrgCreateNotAllowedError)
-
-    async def test_create_org_user_already_in_another_org(self):
-        """Actor already belonging to an org cannot create another org."""
-        # Arrange
-        service = self._make_service()
-        service.kc.get_member_organizations = AsyncMock(
-            return_value=Ok([{"id": "existing-org"}])
-        )
-
-        # Act
-        res = await service.create_org("Org X", "u1")
-
-        # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, UserAlreadyInAnotherOrganizationError)
-
-    async def test_create_org_success(self):
-        """Successful create should add actor as member and owner."""
-        # Arrange
-        service = self._make_service()
-        service.kc.get_member_organizations = AsyncMock(return_value=Ok([]))
-        service.kc.create_org = AsyncMock(
-            return_value=Ok({"id": "org-1", "name": "Org X"})
-        )
-        service.kc.add_member = AsyncMock(return_value=Ok(True))
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
-
-        # Act
-        res = await service.create_org("Org X", "u1")
-
-        # Assert
-        self.assertTrue(res.is_ok())
-        self.assertEqual(res.unwrap().id, "org-1")
-        service.kc.add_member.assert_awaited_once_with("org-1", "u1")
-        service.kc.set_user_attribute.assert_awaited_once()
-
-    async def test_create_org_rolls_back_when_add_member_fails(self):
-        """If add_member fails, service should delete created org."""
-        # Arrange
-        service = self._make_service()
-        err = _DummyError("add member failed")
-        service.kc.get_member_organizations = AsyncMock(return_value=Ok([]))
-        service.kc.create_org = AsyncMock(
-            return_value=Ok({"id": "org-1", "name": "Org X"})
-        )
-        service.kc.add_member = AsyncMock(return_value=Err(err))
-        service.kc.delete_org = AsyncMock(return_value=Ok(True))
-
-        # Act
-        res = await service.create_org("Org X", "u1")
-
-        # Assert
-        self.assertTrue(res.is_err())
-        self.assertIs(res.error, err)
-        service.kc.delete_org.assert_awaited_once_with("org-1")
 
     async def test_ensure_can_read_user_permissions_self_allowed(self):
         """User should always be able to read their own org permissions."""

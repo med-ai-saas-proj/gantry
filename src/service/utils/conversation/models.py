@@ -4,7 +4,7 @@ from src.db.utils import (
     WithClientUUID,
     WithCreateUpdateTimestamp,
 )
-from src.management.projects.models import Project
+from src.management.project.models import Project
 from src.service.utils.conversation.types import MessagePart
 
 from typing import TypedDict
