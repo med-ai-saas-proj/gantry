@@ -1,6 +1,7 @@
 """Repositories for Project module models."""
 
 from src.db.repository import Repository
+from src.shared.utils.uuid_utils import uuid7
 
 from .models import Project, ProjectMembership
 
@@ -28,6 +29,7 @@ class ProjectRepository(Repository[Project, int]):
             description=description,
             organization_id=organization_id,
         )
+        project.uuid = uuid7()
         session.add(project)
         await session.flush()
         await session.refresh(project)
