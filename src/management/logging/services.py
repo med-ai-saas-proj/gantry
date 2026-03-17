@@ -22,6 +22,11 @@ class SearchPipeline(TypedDict):
     mode: Literal["eq", "ne", "regex", "ne_regex"]
     value: str
 
+class FilterPipeline(TypedDict):
+    """Represents a filter term in the log query pipeline."""
+
+    mode: Literal["eq", "ne", "regex", "ne_regex", "gt", "lt", "gte", "lte"]
+    value: str
 
 class InvalidLogQueryError(RecoverableError):
     """Raised when an invalid log query is encountered."""
@@ -55,10 +60,10 @@ class LogQueryService:
         direction: Literal["forward", "backward"] = "forward",
         level: Literal["debug", "info", "warn", "error"] | None = None,
         search_term: str
-        | list[SearchPipeline | str]
         | SearchPipeline
+        | list[SearchPipeline | str]
         | None = None,
-        filter: dict[LogFilterKey, str] | None = None,
+        filter: dict[LogFilterKey, str | FilterPipeline] | None = None,
     ):
         """Search logs from Loki with optional filters."""
         labels = []
@@ -82,7 +87,7 @@ class LogQueryService:
 
         if filter:
             for key, value in filter.items():
-                pipeline.append(f'| {key}="{value}"')
+                pipeline.append(f'| {filter_pipeline(key, value)}"')
 
         query = f"{selector} {' '.join(pipeline)}".strip()
 
@@ -133,7 +138,7 @@ class LogQueryService:
         self,
         start: int | float | datetime.datetime,
         end: int | float | datetime.datetime,
-    ):
+    ) -> Result[list[str], LogQueryServiceError | InvalidLogQueryError]:
         """Get log labels from Loki."""
         params = {
             "start": to_nanoseconds(start),
@@ -143,22 +148,22 @@ class LogQueryService:
         try:
             response = self.http_client.get(LOG_LABEL_ENDPOINT, params=params)
             response.raise_for_status()
-            return response.json()
+            res = response.json()
+            if "data" in res and isinstance(res["data"], list):
+                return Ok(res["data"])
+            else:
+                return Err(InvalidLogQueryError())
         except httpx.HTTPStatusError as exc:
-            print(
-                f"HTTP error occurred: {exc.response.status_code} - {exc.response.text}"
-            )
+            return Err(InvalidLogQueryError())
         except httpx.RequestError as exc:
-            print(f"An error occurred while requesting: {exc}")
-        except Exception as exc:
-            print(f"An unexpected error occurred: {exc}")
+            return Err(LogQueryServiceError())
 
     def get_log_label_values(
         self,
         label_name: str,
         start: int | float | datetime.datetime,
         end: int | float | datetime.datetime,
-    ):
+    ) -> Result[list[str], LogQueryServiceError | InvalidLogQueryError]:
         """Get log label values from Loki."""
         params = {
             "start": to_nanoseconds(start),
@@ -169,22 +174,22 @@ class LogQueryService:
         try:
             response = self.http_client.get(endpoint, params=params)
             response.raise_for_status()
-            return response.json()
+            res = response.json()
+            if "data" in res and isinstance(res["data"], list):
+                return Ok(res["data"])
+            else:
+                return Err(InvalidLogQueryError())
         except httpx.HTTPStatusError as exc:
-            print(
-                f"HTTP error occurred: {exc.response.status_code} - {exc.response.text}"
-            )
+            return Err(InvalidLogQueryError())
         except httpx.RequestError as exc:
-            print(f"An error occurred while requesting: {exc}")
-        except Exception as exc:
-            print(f"An unexpected error occurred: {exc}")
+            return Err(LogQueryServiceError())
 
 
 def to_nanoseconds(
     t: int  # nanoseconds since epoch
     | float  # seconds since epoch
     | datetime.datetime,
-) -> int:
+) -> str:
     """Convert a timestamp to nanoseconds since epoch. Accepts int, float (seconds), or datetime."""
     if isinstance(t, datetime.datetime):
         return str(int(t.timestamp() * 1e9))
@@ -207,6 +212,35 @@ def search_pipeline(search_term: str | SearchPipeline):
             return f" !~ {search_term['value']}"
         else:
             raise ValueError(f"Unknown search term mode: {search_term['mode']}")
+    else:
+        raise ValueError(f"Invalid search term type: {type(search_term)}")
+
+def filter_pipeline(
+    key: LogFilterKey,
+    value: str | FilterPipeline):
+    if isinstance(value, str):
+        return f'| {key}="{value}"'
+    elif isinstance(value, dict):
+        if value["mode"] == "eq":
+            return f'{key}="{value["value"]}"'
+        elif value["mode"] == "ne":
+            return f'{key}!="{value["value"]}"'
+        elif value["mode"] == "regex":
+            return f'{key}=~"{value["value"]}"'
+        elif value["mode"] == "ne_regex":
+            return f'{key}!~"{value["value"]}"'
+        elif value["mode"] == "gt":
+            return f'{key}>"{value["value"]}"'
+        elif value["mode"] == "lt":
+            return f'{key}<"{value["value"]}"'
+        elif value["mode"] == "gte":
+            return f'{key}>="{value["value"]}"'
+        elif value["mode"] == "lte":
+            return f'{key}<="{value["value"]}"'
+        else:
+            raise ValueError(f"Unknown filter mode: {value['mode']}")
+    else:
+        raise ValueError(f"Invalid filter value type: {type(value)}")
 
 
 if __name__ == "__main__":
@@ -218,25 +252,24 @@ if __name__ == "__main__":
     logs = log_query_service.search_logs(
         org_id="test_org1",
         service_name="Med-AI-SaaS",
-        start=datetime.datetime.now() - datetime.timedelta(hours=1),
+        start=datetime.datetime.now() - datetime.timedelta(hours=12),
         end=datetime.datetime.now(),
         limit=10,
     )
-    data = logs.unwrap()
-    for log_line in data:
+    for log_line in logs.unwrap():
         print(log_line)
 
-    # # Get log labels
+    # Get log labels
     labels = log_query_service.get_log_labels(
-        start=datetime.datetime.now() - datetime.timedelta(hours=1),
+        start=datetime.datetime.now() - datetime.timedelta(hours=12),
         end=datetime.datetime.now(),
     )
-    print(labels)
-    #
+    print(labels.unwrap())
+
     # Get log label values
     label_values = log_query_service.get_log_label_values(
         label_name="service_name",
         start=datetime.datetime.now() - datetime.timedelta(hours=1),
         end=datetime.datetime.now(),
     )
-    print(label_values)
+    print(label_values.unwrap())
