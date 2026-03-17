@@ -28,7 +28,8 @@ async def chat(
 ):
     """Just the good old chatbot."""
     getServiceLogger(
-        "Med-AI-SaaS", api_key_info["project_uid"], api_key_info["org_id"]
+        api_key_info["org_id"],
+        api_key_info["project_uid"],
     ).debug("api_key_info", api_key_info=api_key_info)
 
     if input.stream:

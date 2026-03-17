@@ -1,5 +1,5 @@
-from src.shared.utils import request_id_utils
-from src.shared.settings import AppStage, getAppSetting
+from ..utils import request_id_utils
+from ..settings import getAppSetting
 
 import time
 import logging
