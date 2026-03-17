@@ -1,7 +1,7 @@
 from src.shared.custom_types.error_exception import RecoverableError
 
 import datetime
-from typing import Any, Literal, TypedDict
+from typing import Literal, TypedDict
 
 import httpx
 from safe_result import Ok, Err, Result
@@ -27,6 +27,7 @@ class FilterPipeline(TypedDict):
 
     mode: Literal["eq", "ne", "regex", "ne_regex", "gt", "lt", "gte", "lte"]
     value: str
+
 
 class InvalidLogQueryError(RecoverableError):
     """Raised when an invalid log query is encountered."""
@@ -105,7 +106,7 @@ class LogQueryService:
         limit: int = 1000,
         direction: Literal["forward", "backward"] = "forward",
     ) -> Result[
-        list[dict | str | Any], InvalidLogQueryError | LogQueryServiceError
+        list[dict], InvalidLogQueryError | LogQueryServiceError
     ]:
         """Query logs from Loki."""
         params = {

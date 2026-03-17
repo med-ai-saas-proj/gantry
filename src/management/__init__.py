@@ -1,6 +1,7 @@
 from src.shared.settings import getAppSetting
 from src.shared.custom_types.error_exception import ProblemDetails
 
+from .logging import logging_router
 from .api_keys import apikey_router
 from .organization import org_router
 from .organization.settings import getOrgSettings
@@ -41,6 +42,8 @@ v1_router.include_router(org_router)
 
 # api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
 # api_router.include_router(v1_router)
+
+v1_router.include_router(logging_router)
 
 # management_app.include_router(api_router)
 management_app.include_router(v1_router)
