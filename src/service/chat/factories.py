@@ -1,5 +1,5 @@
 from src.db.factories import getSessionManager
-from src.shared.utils.logger import getLogger
+from src.shared.logging.logger import getLogger
 
 from .agents import getChatAgent
 from .services import ChatService
