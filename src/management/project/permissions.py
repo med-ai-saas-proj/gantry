@@ -36,6 +36,20 @@ PERMISSION_HIERARCHY: Final[
 
 
 ALL_PERMISSIONS: Final[list[str]] = [p.value for p in ProjectPermission]
+PROJECT_PERMISSIONS_ATTR: Final[str] = "project_permissions"
+
+
+def encode_project_permission(project_uuid: str, permission: str) -> str:
+    """Encode one project-scoped permission into a flat string entry."""
+    return f"{project_uuid}:{permission}"
+
+
+def decode_project_permission(entry: str) -> tuple[str, str] | None:
+    """Decode one flat string entry into project_uuid and permission."""
+    project_uuid, separator, permission = entry.partition(":")
+    if not separator or not project_uuid or not permission:
+        return None
+    return project_uuid, permission
 
 
 def get_effective_permissions(user_permissions: list[str]) -> set[str]:

@@ -15,8 +15,16 @@ from .dtos import (
     ProjectUserListResponse,
     ProjectUserPermissionsResponse,
 )
-from .permissions import ProjectPermission, has_permission
+from .permissions import (
+    PROJECT_PERMISSIONS_ATTR,
+    ProjectPermission,
+    has_permission,
+    decode_project_permission,
+    encode_project_permission,
+)
 from .repositories import ProjectRepository, ProjectMembershipRepository
+
+from typing import Any
 
 from safe_result import Ok, Err, Result
 from structlog.stdlib import BoundLogger
@@ -81,7 +89,7 @@ class LastOwnerRemovalNotAllowedError(RecoverableError):
 
 
 class ProjectService:
-    """Project feature service."""
+    """Coordinate project business rules across DB state and Keycloak attrs."""
 
     def __init__(
         self,
@@ -102,6 +110,7 @@ class ProjectService:
         user_id: str,
         org_id: str,
     ) -> Result[None, RecoverableError]:
+        """Verify that the user belongs to the owning organization."""
         orgs_res = await self.kc.get_member_organizations(user_id)
         if orgs_res.is_err():
             return orgs_res
@@ -113,6 +122,7 @@ class ProjectService:
     async def _get_project_or_err(
         self, project_uuid: str
     ) -> Result[tuple[int, str, ProjectInfoResponse], RecoverableError]:
+        """Load a project row and map it into the public DTO shape."""
         async with self.session_manager.get_session() as session:
             project = await self.project_repo.get_by_uuid(session, project_uuid)
             if project is None:
@@ -135,22 +145,124 @@ class ProjectService:
         self,
         project_info: ProjectInfoResponse,
     ) -> Result[None, RecoverableError]:
+        """Reject operations that are not allowed on archived projects."""
         if project_info.archived:
             return Err(ProjectArchivedError())
         return Ok(None)
 
+    def _extract_project_permissions(
+        self,
+        attrs: dict[str, Any],
+        project_uuid: str,
+    ) -> list[str]:
+        """Extract project-scoped permissions from flat Keycloak attr entries."""
+        raw = attrs.get(PROJECT_PERMISSIONS_ATTR, [])
+        if isinstance(raw, str):
+            raw = [raw]
+        if isinstance(raw, list):
+            extracted: list[str] = []
+            for entry in raw:
+                if not isinstance(entry, str):
+                    continue
+                decoded = decode_project_permission(entry)
+                if decoded is None:
+                    continue
+                entry_project_uuid, permission = decoded
+                if entry_project_uuid == project_uuid:
+                    extracted.append(permission)
+            return extracted
+        return []
+
+    async def _get_permissions_from_attrs(
+        self,
+        user_id: str,
+        project_uuid: str,
+    ) -> Result[list[str], RecoverableError]:
+        """Load project permissions for one user directly from Keycloak attrs."""
+        attrs_res = await self.kc.get_user_attributes(user_id)
+        if attrs_res.is_err():
+            return attrs_res
+        return Ok(
+            self._extract_project_permissions(attrs_res.unwrap(), project_uuid)
+        )
+
+    async def _set_project_permissions(
+        self,
+        user_id: str,
+        project_uuid: str,
+        permissions: list[str],
+    ) -> Result[bool, RecoverableError]:
+        """Replace one project's permission slice inside the shared attr list."""
+        attrs_res = await self.kc.get_user_attributes(user_id)
+        if attrs_res.is_err():
+            return attrs_res
+
+        attrs = attrs_res.unwrap()
+        raw = attrs.get(PROJECT_PERMISSIONS_ATTR, [])
+        if isinstance(raw, str):
+            raw = [raw]
+        elif not isinstance(raw, list):
+            raw = []
+
+        filtered_entries = []
+        for entry in raw:
+            if not isinstance(entry, str):
+                continue
+            decoded = decode_project_permission(entry)
+            if decoded is None:
+                continue
+            entry_project_uuid, _ = decoded
+            if entry_project_uuid != project_uuid:
+                filtered_entries.append(entry)
+
+        updated_entries = filtered_entries + [
+            encode_project_permission(project_uuid, permission)
+            for permission in permissions
+        ]
+
+        return await self.kc.set_user_attribute(
+            user_id,
+            PROJECT_PERMISSIONS_ATTR,
+            updated_entries,
+        )
+
     async def _get_member_permissions(
         self,
         project_id: int,
+        project_uuid: str,
         user_id: str,
     ) -> Result[list[str], RecoverableError]:
+        """Return project permissions for a confirmed project member."""
         async with self.session_manager.get_session() as session:
             member = await self.membership_repo.get_membership(
                 session, project_id, user_id
             )
             if member is None:
                 return Err(UserNotInProjectError())
-            return Ok(member.permissions or [])
+        return await self._get_permissions_from_attrs(user_id, project_uuid)
+
+    async def _count_project_owners(
+        self,
+        project_id: int,
+        project_uuid: str,
+    ) -> Result[int, RecoverableError]:
+        """Count current owners by reading project-scoped attrs of all members."""
+        async with self.session_manager.get_session() as session:
+            members = await self.membership_repo.list_members(
+                session, project_id
+            )
+            member_user_ids = [member.user_id for member in members]
+
+        owner_count = 0
+        for member_user_id in member_user_ids:
+            perms_res = await self._get_permissions_from_attrs(
+                member_user_id, project_uuid
+            )
+            if perms_res.is_err():
+                return perms_res
+            if ProjectPermission.OWNER.value in perms_res.unwrap():
+                owner_count += 1
+        return Ok(owner_count)
 
     async def authorize_project_permission(
         self,
@@ -159,6 +271,7 @@ class ProjectService:
         required: ProjectPermission,
         allow_archived: bool = False,
     ) -> Result[None, RecoverableError]:
+        """Authorize one project permission for the given user and project."""
         project_res = await self._get_project_or_err(project_uuid)
         if project_res.is_err():
             return project_res
@@ -167,7 +280,9 @@ class ProjectService:
             active_res = self._ensure_project_active(project_info)
             if active_res.is_err():
                 return active_res
-        perms_res = await self._get_member_permissions(project_id, user_id)
+        perms_res = await self._get_member_permissions(
+            project_id, project_uuid, user_id
+        )
         if perms_res.is_err():
             return perms_res
         if not has_permission(perms_res.unwrap(), required):
@@ -179,6 +294,7 @@ class ProjectService:
         actor_user_id: str,
         organization_id: str | None = None,
     ) -> Result[ProjectListResponse, RecoverableError]:
+        """List projects joined by the actor, optionally within one org."""
         if organization_id:
             member_res = await self._ensure_user_in_org(
                 actor_user_id, organization_id
@@ -212,15 +328,22 @@ class ProjectService:
         organization_id: str,
         required: ProjectPermission,
     ) -> Result[bool, RecoverableError]:
+        """Check org-wide project permissions across all joined projects in an org."""
         async with self.session_manager.get_session() as session:
-            memberships = (
-                await self.membership_repo.list_memberships_for_user_in_org(
-                    session, actor_user_id, organization_id
-                )
+            projects = await self.project_repo.list_by_member(
+                session, actor_user_id, organization_id=organization_id
             )
-            for membership in memberships:
-                if has_permission(membership.permissions or [], required):
-                    return Ok(True)
+            project_uuids = [str(project.uuid) for project in projects]
+
+        for project_uuid in project_uuids:
+            perms_res = await self._get_permissions_from_attrs(
+                actor_user_id,
+                project_uuid,
+            )
+            if perms_res.is_err():
+                return perms_res
+            if has_permission(perms_res.unwrap(), required):
+                return Ok(True)
         return Ok(False)
 
     async def list_org_projects(
@@ -228,6 +351,7 @@ class ProjectService:
         actor_user_id: str,
         organization_id: str,
     ) -> Result[ProjectListResponse, RecoverableError]:
+        """List every project in an org when actor has org-wide project access."""
         authz_res = await self._has_org_wide_project_permission(
             actor_user_id, organization_id, ProjectPermission.PROJECTS_GET_ALL
         )
@@ -263,6 +387,7 @@ class ProjectService:
         name: str,
         description: str | None,
     ) -> Result[ProjectInfoResponse, RecoverableError]:
+        """Create a project and seed the creator as project owner."""
         authz_res = await self._has_org_wide_project_permission(
             actor_user_id, organization_id, ProjectPermission.PROJECTS_CREATE
         )
@@ -282,8 +407,15 @@ class ProjectService:
                 session=session,
                 project_id=project.id,
                 user_id=actor_user_id,
-                permissions=[ProjectPermission.OWNER.value],
+                permissions=[],
             )
+            set_res = await self._set_project_permissions(
+                actor_user_id,
+                str(project.uuid),
+                [ProjectPermission.OWNER.value],
+            )
+            if set_res.is_err():
+                return set_res
             output = ProjectInfoResponse(
                 id=str(project.uuid),
                 name=project.name,
@@ -301,6 +433,7 @@ class ProjectService:
         limit: int = 20,
         q: str | None = None,
     ) -> Result[ProjectUserListResponse, RecoverableError]:
+        """List project members by intersecting project and org membership."""
         project_res = await self._get_project_or_err(project_uuid)
         if project_res.is_err():
             return project_res
@@ -345,6 +478,7 @@ class ProjectService:
         project_uuid: str,
         target_user_id: str,
     ) -> Result[bool, RecoverableError]:
+        """Add an organization member to the project with empty project perms."""
         project_res = await self._get_project_or_err(project_uuid)
         if project_res.is_err():
             return project_res
@@ -369,6 +503,13 @@ class ProjectService:
                 user_id=target_user_id,
                 permissions=[],
             )
+            set_res = await self._set_project_permissions(
+                target_user_id,
+                project_uuid,
+                [],
+            )
+            if set_res.is_err():
+                return set_res
             await session.commit()
             return Ok(True)
 
@@ -377,6 +518,7 @@ class ProjectService:
         project_uuid: str,
         target_user_id: str,
     ) -> Result[bool, RecoverableError]:
+        """Remove a project member while preserving the last-owner invariant."""
         project_res = await self._get_project_or_err(project_uuid)
         if project_res.is_err():
             return project_res
@@ -392,16 +534,30 @@ class ProjectService:
             if membership is None:
                 return Err(UserNotInProjectError())
 
-            if ProjectPermission.OWNER.value in (membership.permissions or []):
-                owner_count = await self.membership_repo.count_owners(
-                    session, project_id, ProjectPermission.OWNER.value
+            perms_res = await self._get_permissions_from_attrs(
+                target_user_id, project_uuid
+            )
+            if perms_res.is_err():
+                return perms_res
+            if ProjectPermission.OWNER.value in perms_res.unwrap():
+                owner_count_res = await self._count_project_owners(
+                    project_id, project_uuid
                 )
-                if owner_count <= 1:
+                if owner_count_res.is_err():
+                    return owner_count_res
+                if owner_count_res.unwrap() <= 1:
                     return Err(LastOwnerRemovalNotAllowedError())
 
             await self.membership_repo.delete_membership(
                 session, project_id, target_user_id
             )
+            clear_res = await self._set_project_permissions(
+                target_user_id,
+                project_uuid,
+                [],
+            )
+            if clear_res.is_err():
+                return clear_res
             await session.commit()
             return Ok(True)
 
@@ -410,6 +566,7 @@ class ProjectService:
         project_uuid: str,
         target_user_id: str,
     ) -> Result[ProjectUserPermissionsResponse, RecoverableError]:
+        """Return project-scoped permissions for one project member."""
         project_res = await self._get_project_or_err(project_uuid)
         if project_res.is_err():
             return project_res
@@ -419,7 +576,7 @@ class ProjectService:
             return active_res
 
         perms_res = await self._get_member_permissions(
-            project_id, target_user_id
+            project_id, project_uuid, target_user_id
         )
         if perms_res.is_err():
             return perms_res
@@ -435,6 +592,7 @@ class ProjectService:
         target_user_id: str,
         permissions: list[str],
     ) -> Result[ProjectUserPermissionsResponse, RecoverableError]:
+        """Replace one member's project permissions with owner safety checks."""
         valid = {p.value for p in ProjectPermission}
         invalid = set(permissions) - valid
         if invalid:
@@ -449,7 +607,7 @@ class ProjectService:
             return active_res
 
         actor_perms_res = await self._get_member_permissions(
-            project_id, actor_user_id
+            project_id, project_uuid, actor_user_id
         )
         if actor_perms_res.is_err():
             return actor_perms_res
@@ -468,24 +626,31 @@ class ProjectService:
             if target is None:
                 return Err(UserNotInProjectError())
 
+            target_perms_res = await self._get_permissions_from_attrs(
+                target_user_id, project_uuid
+            )
+            if target_perms_res.is_err():
+                return target_perms_res
             is_removing_owner = (
-                ProjectPermission.OWNER.value in (target.permissions or [])
+                ProjectPermission.OWNER.value in target_perms_res.unwrap()
                 and ProjectPermission.OWNER.value not in permissions
             )
             if is_removing_owner:
-                owner_count = await self.membership_repo.count_owners(
-                    session, project_id, ProjectPermission.OWNER.value
+                owner_count_res = await self._count_project_owners(
+                    project_id, project_uuid
                 )
-                if owner_count <= 1:
+                if owner_count_res.is_err():
+                    return owner_count_res
+                if owner_count_res.unwrap() <= 1:
                     return Err(LastOwnerRemovalNotAllowedError())
 
-            await self.membership_repo.upsert_membership(
-                session,
-                project_id=project_id,
-                user_id=target_user_id,
-                permissions=permissions,
+            set_res = await self._set_project_permissions(
+                target_user_id,
+                project_uuid,
+                permissions,
             )
-            await session.commit()
+            if set_res.is_err():
+                return set_res
             return Ok(ProjectUserPermissionsResponse(permissions=permissions))
 
     async def set_project_archived(
@@ -493,6 +658,7 @@ class ProjectService:
         project_uuid: str,
         archived: bool,
     ) -> Result[ProjectArchiveResponse, RecoverableError]:
+        """Archive or unarchive a project after validating current state."""
         async with self.session_manager.get_session() as session:
             project = await self.project_repo.get_by_uuid(session, project_uuid)
             if project is None:

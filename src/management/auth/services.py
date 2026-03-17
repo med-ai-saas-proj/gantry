@@ -144,11 +144,22 @@ class AuthService:
         if account_roles:
             roles.extend(account_roles)
 
+        org_id: str | None = None
+        organization_claim = claims.get("organization")
+        if isinstance(organization_claim, str):
+            org_id = organization_claim
+        elif isinstance(organization_claim, list):
+            for value in organization_claim:
+                if isinstance(value, str) and value:
+                    org_id = value
+                    break
+
         auth_info: UserInfo = {
             "id": claims["sub"],
             "username": claims.get("preferred_username"),
             "email": claims.get("email"),
             "roles": roles,
+            "org_id": org_id,
             "client_id": claims.get("azp"),
             "is_service_account": (
                 isinstance(claims.get("preferred_username"), str)

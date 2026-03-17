@@ -150,11 +150,12 @@ class ServiceAccountOrgCreateNotAllowedError(RecoverableError):
 
 
 def _extract_org_ids(orgs: list[dict[str, Any]]) -> set[str]:
+    """Collect non-empty organization ids from Keycloak org payloads."""
     return {str(org.get("id", "")) for org in orgs if org.get("id")}
 
 
 class OrgService:
-    """Organisation feature service."""
+    """Coordinate organization business rules across Keycloak and storage."""
 
     def __init__(
         self,
@@ -171,12 +172,14 @@ class OrgService:
         self.logger = logger
 
     def _compute_cancel_before(self, requested_at: datetime) -> datetime:
+        """Compute the deletion cancellation deadline from settings."""
         days = getOrgSettings().deletion_cancel_window_days
         return requested_at + timedelta(days=days)
 
     async def _ensure_org_exists(
         self, org_id: str
     ) -> Result[dict[str, Any], RecoverableError]:
+        """Fetch the organization from Keycloak or return the upstream error."""
         return await self.kc.get_org(org_id)
 
     def _is_backend_service_account(
@@ -185,6 +188,7 @@ class OrgService:
         actor_is_service_account: bool,
         actor_client_id: str | None,
     ) -> bool:
+        """Return whether the caller is the trusted backend service account."""
         if not actor_is_service_account:
             return False
         return actor_client_id == getOrgSettings().keycloak_service_client_id
@@ -192,6 +196,7 @@ class OrgService:
     async def _ensure_user_in_org(
         self, org_id: str, user_id: str
     ) -> Result[bool, RecoverableError]:
+        """Verify the user belongs to exactly this organization."""
         orgs_res = await self.kc.get_member_organizations(user_id)
         if orgs_res.is_err():
             return orgs_res
@@ -208,6 +213,7 @@ class OrgService:
         return Err(UserNotInOrganizationError())
 
     def _extract_user_permissions(self, attrs: dict[str, Any]) -> list[str]:
+        """Normalize organization permissions from Keycloak user attributes."""
         # Keycloak user-profile validation allows org_permissions.
         legacy = attrs.get(_ORG_PERM_ATTR, [])
         if isinstance(legacy, str):
@@ -221,7 +227,7 @@ class OrgService:
         data: dict[str, Any],
         prefix: str = "",
     ) -> dict[str, Any]:
-        """Flatten nested settings to dot-notation keys."""
+        """Flatten nested settings dictionaries into dot-notation keys."""
         flattened: dict[str, Any] = {}
         for key, value in data.items():
             final_key = f"{prefix}.{key}" if prefix else key
@@ -236,6 +242,7 @@ class OrgService:
     async def _get_member_permissions(
         self, org_id: str, user_id: str
     ) -> Result[list[str], RecoverableError]:
+        """Load organization permissions for a confirmed organization member."""
         member_res = await self._ensure_user_in_org(org_id, user_id)
         if member_res.is_err():
             return member_res
@@ -249,6 +256,7 @@ class OrgService:
     async def _get_org_owner_id(
         self, org_id: str
     ) -> Result[str, RecoverableError]:
+        """Find the single configured organization owner from org members."""
         first = 0
         max_results = 100
         owners: list[str] = []
@@ -288,6 +296,7 @@ class OrgService:
     async def _sync_metadata_from_keycloak(
         self, org_id: str
     ) -> Result[OrgInfoResponse, RecoverableError]:
+        """Build organization metadata from Keycloak plus owner resolution."""
         org_res = await self.kc.get_org(org_id)
         if org_res.is_err():
             return org_res
@@ -317,6 +326,7 @@ class OrgService:
     async def request_delete_org(
         self, org_id: str
     ) -> Result[DeleteRequestResponse, RecoverableError]:
+        """Create a delayed deletion request for an existing organization."""
         org_res = await self._ensure_org_exists(org_id)
         if org_res.is_err():
             return org_res
@@ -345,6 +355,7 @@ class OrgService:
     async def cancel_delete_org(
         self, org_id: str
     ) -> Result[bool, RecoverableError]:
+        """Cancel a pending organization deletion request."""
         async with self.session_manager.get_session() as session:
             deleted = await self.deletion_repo.delete_by_org_id(session, org_id)
             if not deleted:
@@ -353,6 +364,7 @@ class OrgService:
             return Ok(True)
 
     async def process_due_deletions(self, batch_size: int = 100) -> int:
+        """Delete organizations whose grace period has expired."""
         now_utc = datetime.now(UTC)
         cutoff = now_utc - timedelta(
             days=getOrgSettings().deletion_cancel_window_days
@@ -399,6 +411,7 @@ class OrgService:
     async def get_org_info(
         self, org_id: str
     ) -> Result[OrgInfoResponse, RecoverableError]:
+        """Return organization metadata enriched with resolved owner info."""
         return await self._sync_metadata_from_keycloak(org_id)
 
     async def update_org_info(
@@ -409,6 +422,7 @@ class OrgService:
         actor_is_service_account: bool = False,
         actor_client_id: str | None = None,
     ) -> Result[OrgInfoResponse, RecoverableError]:
+        """Rename an organization after owner or service-account checks."""
         is_service_actor = self._is_backend_service_account(
             actor_is_service_account=actor_is_service_account,
             actor_client_id=actor_client_id,
@@ -445,6 +459,7 @@ class OrgService:
     async def get_settings(
         self, org_id: str
     ) -> Result[OrgSettingsResponse, RecoverableError]:
+        """Fetch organization settings, creating an empty row when missing."""
         org_res = await self._ensure_org_exists(org_id)
         if org_res.is_err():
             return org_res
@@ -464,6 +479,7 @@ class OrgService:
         rate_limit: int | None,
         extra: dict[str, Any],
     ) -> Result[OrgSettingsResponse, RecoverableError]:
+        """Persist organization settings after flattening nested extra data."""
         org_res = await self._ensure_org_exists(org_id)
         if org_res.is_err():
             return org_res
@@ -489,6 +505,7 @@ class OrgService:
         offset: int = 0,
         q: str | None = None,
     ) -> Result[OrgUserListResponse, RecoverableError]:
+        """List organization members with Keycloak-backed pagination metadata."""
         members_res = await self.kc.get_org_members(
             org_id, first=offset, max_results=limit, search=q
         )
@@ -512,6 +529,7 @@ class OrgService:
     async def remove_user(
         self, org_id: str, user_id: str
     ) -> Result[bool, RecoverableError]:
+        """Remove a non-owner member from the organization and delete the user."""
         owner_id_res = await self._get_org_owner_id(org_id)
         if owner_id_res.is_err():
             return owner_id_res
@@ -527,6 +545,7 @@ class OrgService:
     async def get_invitations(
         self, org_id: str
     ) -> Result[InvitationListResponse, RecoverableError]:
+        """List pending invitations for an organization."""
         inv_res = await self.kc.get_invitations(org_id)
         if inv_res.is_err():
             return inv_res
@@ -547,6 +566,7 @@ class OrgService:
     async def get_invitation(
         self, org_id: str, invitation_id: str
     ) -> Result[InvitationResponse, RecoverableError]:
+        """Fetch one invitation and map it into the public DTO."""
         inv_res = await self.kc.get_invitation(org_id, invitation_id)
         if inv_res.is_err():
             return inv_res
@@ -565,6 +585,7 @@ class OrgService:
         org_id: str,
         email: str,
     ) -> Result[bool, RecoverableError]:
+        """Invite a user after enforcing the one-user-one-org invariant."""
         existing_user_res = await self.kc.find_user_by_email(email)
         if existing_user_res.is_err():
             return existing_user_res
@@ -595,12 +616,14 @@ class OrgService:
     async def delete_invitation(
         self, org_id: str, invitation_id: str
     ) -> Result[bool, RecoverableError]:
+        """Delete an existing invitation."""
         delete_res = await self.kc.delete_invitation(org_id, invitation_id)
         return delete_res
 
     async def resend_invitation(
         self, org_id: str, invitation_id: str
     ) -> Result[bool, RecoverableError]:
+        """Resend an existing invitation via Keycloak."""
         return await self.kc.resend_invitation(org_id, invitation_id)
 
     # user permissions
@@ -612,6 +635,7 @@ class OrgService:
         actor_is_service_account: bool = False,
         actor_client_id: str | None = None,
     ) -> Result[None, RecoverableError]:
+        """Authorize reading organization permissions for the target user."""
         if self._is_backend_service_account(
             actor_is_service_account=actor_is_service_account,
             actor_client_id=actor_client_id,
@@ -644,6 +668,7 @@ class OrgService:
     async def get_user_permissions(
         self, org_id: str, user_id: str
     ) -> Result[UserPermissionsResponse, RecoverableError]:
+        """Return normalized organization permissions for one user."""
         perms_res = await self._get_member_permissions(org_id, user_id)
         if perms_res.is_err():
             return perms_res
@@ -658,6 +683,7 @@ class OrgService:
         actor_is_service_account: bool = False,
         actor_client_id: str | None = None,
     ) -> Result[UserPermissionsResponse, RecoverableError]:
+        """Replace a member's organization permissions with invariant checks."""
         valid = {p.value for p in OrgPermission}
         invalid = set(permissions) - valid
         if invalid:

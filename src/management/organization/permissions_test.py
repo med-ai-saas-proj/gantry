@@ -37,6 +37,34 @@ class TestOrgPermissions(unittest.TestCase):
         # Act + Assert
         self.assertFalse(has_permission(perms, OrgPermission.USERS_REMOVE))
 
+    def test_owner_inherits_manage_permissions(self):
+        """Owner should inherit permission-management capability."""
+        # Arrange
+        perms = [OrgPermission.OWNER.value]
+
+        # Act + Assert
+        self.assertTrue(
+            has_permission(perms, OrgPermission.USERS_PERMISSIONS_RW)
+        )
+
+    def test_empty_permission_list_denies_access(self):
+        """Empty or missing org permissions should deny all checks."""
+        # Act + Assert
+        self.assertFalse(has_permission([], OrgPermission.SETTINGS_READ))
+        self.assertFalse(has_permission(None, OrgPermission.INVITE))
+
+    def test_invalid_permission_strings_are_ignored_in_expansion(self):
+        """Unknown raw strings should not break hierarchy expansion."""
+        # Arrange
+        perms = ["bogus.permission", OrgPermission.SETTINGS_READ.value]
+
+        # Act
+        effective = get_effective_permissions(perms)
+
+        # Assert
+        self.assertIn(OrgPermission.SETTINGS_READ.value, effective)
+        self.assertNotIn(OrgPermission.USERS_REMOVE.value, effective)
+
 
 if __name__ == "__main__":
     unittest.main()

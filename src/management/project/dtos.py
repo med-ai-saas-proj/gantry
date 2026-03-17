@@ -87,3 +87,9 @@ class ProjectArchiveResponse(BaseDTO):
 
     project_id: str
     archived: bool
+
+
+class ProjectPermissionCatalogResponse(BaseDTO):
+    """All supported project permissions without storage prefix."""
+
+    permissions: list[str]

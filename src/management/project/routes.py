@@ -1,7 +1,7 @@
 """API routes for project management."""
 
 from src.management.auth.entities import UserInfo
-from src.management.auth.dependencies import getUserInfo
+from src.management.auth.dependencies import getUserInfo, getUserOrgId
 
 from .dtos import (
     PaginationQuery,
@@ -14,9 +14,10 @@ from .dtos import (
     ProjectUserListResponse,
     ProjectUserPermissionsRequest,
     ProjectUserPermissionsResponse,
+    ProjectPermissionCatalogResponse,
 )
 from .factories import ProjectService, getProjectService
-from .permissions import ProjectPermission
+from .permissions import ALL_PERMISSIONS, ProjectPermission
 from .dependencies import requiredProjectPermission
 
 from typing import Annotated
@@ -27,13 +28,23 @@ from fastapi import Body, Path, Query, Depends, Response, APIRouter
 project_router = APIRouter(prefix="/projects", tags=["projects"])
 
 
+@project_router.get(
+    "/permissions",
+    response_model=ProjectPermissionCatalogResponse,
+)
+async def list_project_permissions() -> ProjectPermissionCatalogResponse:
+    """Return the full project permission catalog for UI consumers."""
+    return ProjectPermissionCatalogResponse(permissions=ALL_PERMISSIONS)
+
+
 @project_router.get("", response_model=ProjectListResponse)
 async def get_projects(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_org_id: Annotated[str | None, Depends(getUserOrgId)],
     query: Annotated[ProjectListQuery, Depends()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectListResponse:
-    """Get projects the user joined, or all projects in one organization."""
+    """List joined projects or all org projects depending on the query."""
     if query.organization:
         result = await project_service.list_org_projects(
             actor_user_id=user_info["id"],
@@ -43,7 +54,7 @@ async def get_projects(
 
     result = await project_service.list_user_projects(
         actor_user_id=user_info["id"],
-        organization_id=None,
+        organization_id=user_org_id,
     )
     return result.unwrap()
 
@@ -55,7 +66,7 @@ async def create_project(
     input_data: Annotated[CreateProjectRequest, Body()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectInfoResponse:
-    """Create a project in an organization."""
+    """Create a project inside the requested organization."""
     result = await project_service.create_project(
         actor_user_id=user_info["id"],
         organization_id=organization,
@@ -78,7 +89,7 @@ async def get_project_users(
     pagination: Annotated[PaginationQuery, Depends()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectUserListResponse:
-    """List users in a project."""
+    """List users currently assigned to one project."""
     result = await project_service.list_project_users(
         project_uuid=project_id,
         offset=pagination.offset,
@@ -98,7 +109,7 @@ async def add_project_user(
     input_data: Annotated[AddProjectUserRequest, Body()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> Response:
-    """Add user from org into project."""
+    """Add an organization member into the project."""
     result = await project_service.add_user_to_project(
         project_uuid=project_id,
         target_user_id=input_data.user_id,
@@ -117,7 +128,7 @@ async def remove_project_user(
     user_id: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> Response:
-    """Remove user from project."""
+    """Remove one user from the project."""
     result = await project_service.remove_user_from_project(
         project_uuid=project_id, target_user_id=user_id
     )
@@ -135,7 +146,7 @@ async def get_project_user_permissions(
     user_id: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectUserPermissionsResponse:
-    """Get project permissions for user (self-read allowed)."""
+    """Return project permissions for a user, allowing self-read."""
     if user_info["id"] != user_id:
         authz_res = await project_service.authorize_project_permission(
             project_uuid=project_id,
@@ -167,7 +178,7 @@ async def update_project_user_permissions(
     input_data: Annotated[ProjectUserPermissionsRequest, Body()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectUserPermissionsResponse:
-    """Replace project permissions for a user."""
+    """Replace all project permissions for one project member."""
     result = await project_service.update_user_permissions(
         project_uuid=project_id,
         actor_user_id=user_info["id"],
@@ -189,7 +200,7 @@ async def archive_project(
     project_id: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectArchiveResponse:
-    """Archive project. Only project owner can do this."""
+    """Archive a project owned by the current actor."""
     result = await project_service.set_project_archived(
         project_uuid=project_id, archived=True
     )
@@ -212,7 +223,7 @@ async def unarchive_project(
     project_id: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectArchiveResponse:
-    """Unarchive project. Only project owner can do this."""
+    """Unarchive a project owned by the current actor."""
     result = await project_service.set_project_archived(
         project_uuid=project_id, archived=False
     )

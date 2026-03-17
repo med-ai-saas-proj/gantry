@@ -148,3 +148,9 @@ class UserPermissionsRequest(BaseDTO):
         ...,
         description="Full replacement list of org permissions",
     )
+
+
+class PermissionCatalogResponse(BaseDTO):
+    """All supported permissions for one permission scope."""
+
+    permissions: list[str]

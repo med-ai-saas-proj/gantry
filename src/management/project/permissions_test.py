@@ -7,8 +7,12 @@ import unittest
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
 from src.management.project.permissions import (
+    ALL_PERMISSIONS,
+    PROJECT_PERMISSIONS_ATTR,
     ProjectPermission,
     has_permission,
+    decode_project_permission,
+    encode_project_permission,
     get_effective_permissions,
 )
 
@@ -45,6 +49,35 @@ class TestProjectPermissions(unittest.TestCase):
         self.assertFalse(
             has_permission(perms, ProjectPermission.SETTINGS_WRITE)
         )
+
+    def test_project_permission_encoding_uses_flat_attr_entries(self):
+        """Project permissions should be encoded into one shared attr list."""
+        # Act
+        attr_name = PROJECT_PERMISSIONS_ATTR
+        entry = encode_project_permission("proj-123", "project.owner")
+        decoded = decode_project_permission(entry)
+
+        # Assert
+        self.assertEqual(attr_name, "project_permissions")
+        self.assertEqual(entry, "proj-123:project.owner")
+        self.assertEqual(decoded, ("proj-123", "project.owner"))
+        self.assertIn(ProjectPermission.OWNER.value, ALL_PERMISSIONS)
+
+    def test_decode_project_permission_rejects_invalid_entries(self):
+        """Malformed flat entries should be ignored by decoder."""
+        # Act + Assert
+        self.assertIsNone(decode_project_permission("missing-separator"))
+        self.assertIsNone(decode_project_permission(":project.owner"))
+        self.assertIsNone(decode_project_permission("proj-1:"))
+
+    def test_invalid_project_permission_strings_do_not_gain_hierarchy(self):
+        """Unknown raw permission strings should not grant extra project access."""
+        # Arrange
+        perms = ["bogus.permission", ProjectPermission.SETTINGS_READ.value]
+
+        # Act + Assert
+        self.assertTrue(has_permission(perms, ProjectPermission.SETTINGS_READ))
+        self.assertFalse(has_permission(perms, ProjectPermission.USERS_REMOVE))
 
 
 if __name__ == "__main__":

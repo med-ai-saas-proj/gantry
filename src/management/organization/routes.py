@@ -18,9 +18,10 @@ from .dtos import (
     UserPermissionsRequest,
     UserPermissionsResponse,
     UpdateOrgMetadataRequest,
+    PermissionCatalogResponse,
 )
 from .factories import OrgService, getOrgService
-from .permissions import OrgPermission
+from .permissions import ALL_PERMISSIONS, OrgPermission
 from .dependencies import _get_user_info, requiredOrgPermission
 
 from typing import Annotated
@@ -32,6 +33,16 @@ org_router = APIRouter(
     prefix="/organizations",
     tags=["organizations"],
 )
+
+
+@org_router.get(
+    "/permissions",
+    response_model=PermissionCatalogResponse,
+    summary="List all organization permissions",
+)
+async def list_org_permissions() -> PermissionCatalogResponse:
+    """Return the full organization permission catalog for UI consumers."""
+    return PermissionCatalogResponse(permissions=ALL_PERMISSIONS)
 
 
 @org_router.get(
@@ -47,7 +58,7 @@ async def get_org_info(
     org_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> OrgInfoResponse:
-    """Return metadata for the requested organization."""
+    """Return organization metadata after permission checks pass."""
     result = await org_service.get_org_info(org_id)
     return result.unwrap()
 
@@ -66,7 +77,7 @@ async def update_org_info(
     input_data: Annotated[UpdateOrgMetadataRequest, Body()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> OrgInfoResponse:
-    """Update basic organization metadata."""
+    """Rename an organization using the current authorized actor."""
     result = await org_service.update_org_info(
         org_id=org_id,
         actor_user_id=user_info["id"],
@@ -91,7 +102,7 @@ async def delete_org(
     org_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> DeleteRequestResponse:
-    """Create an organization delete request."""
+    """Create a delayed organization deletion request."""
     result = await org_service.request_delete_org(org_id)
     return result.unwrap()
 
@@ -109,7 +120,7 @@ async def cancel_delete_org(
     org_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> DeleteCancelResponse:
-    """Cancel an existing organization deletion request."""
+    """Cancel a previously requested organization deletion."""
     result = await org_service.cancel_delete_org(org_id)
     result.unwrap()
     return DeleteCancelResponse(org_id=org_id, cancelled=True)
@@ -128,7 +139,7 @@ async def get_settings(
     org_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> OrgSettingsResponse:
-    """Return organization settings."""
+    """Return the effective persisted settings for one organization."""
     result = await org_service.get_settings(org_id)
     return result.unwrap()
 
@@ -147,7 +158,7 @@ async def update_settings(
     input_data: Annotated[UpdateSettingsRequest, Body()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> OrgSettingsResponse:
-    """Update organization settings."""
+    """Replace organization settings with the submitted payload."""
     result = await org_service.update_settings(
         org_id, input_data.rate_limit, input_data.extra
     )
@@ -168,7 +179,7 @@ async def get_users(
     org_service: Annotated[OrgService, Depends(getOrgService)],
     pagination: Annotated[PaginatedQuery, Depends()],
 ) -> OrgUserListResponse:
-    """List users in the organization."""
+    """List organization members with pagination and search."""
     result = await org_service.get_users(
         org_id,
         limit=pagination.limit,
@@ -191,7 +202,7 @@ async def remove_user(
     user_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> Response:
-    """Remove a user from the organization and delete the account."""
+    """Remove a member from the organization and delete the user account."""
     result = await org_service.remove_user(org_id, user_id)
     result.unwrap()
     return Response(status_code=200)
@@ -210,7 +221,7 @@ async def get_invitations(
     org_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> InvitationListResponse:
-    """List invitations for the organization."""
+    """List current invitations for the organization."""
     result = await org_service.get_invitations(org_id)
     return result.unwrap()
 
@@ -228,7 +239,7 @@ async def invite_user(
     input_data: Annotated[InviteUserRequest, Body()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> Response:
-    """Invite a user to join the organization."""
+    """Create and send an invitation to join the organization."""
     result = await org_service.create_invitation(
         org_id,
         input_data.email,
@@ -251,7 +262,7 @@ async def get_invitation(
     invitation_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> InvitationResponse:
-    """Return details for a single invitation."""
+    """Return details for one organization invitation."""
     result = await org_service.get_invitation(org_id, invitation_id)
     return result.unwrap()
 
@@ -269,7 +280,7 @@ async def delete_invitation(
     invitation_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> Response:
-    """Delete an invitation."""
+    """Delete one organization invitation."""
     result = await org_service.delete_invitation(org_id, invitation_id)
     result.unwrap()
     return Response(status_code=200)
@@ -288,7 +299,7 @@ async def resend_invitation(
     invitation_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> Response:
-    """Resend an invitation email."""
+    """Resend the invitation email for one invitation."""
     result = await org_service.resend_invitation(org_id, invitation_id)
     result.unwrap()
     return Response(status_code=200)
@@ -308,7 +319,7 @@ async def get_user_permissions(
     user_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> UserPermissionsResponse:
-    """Return organization permissions for a user."""
+    """Return organization permissions for the target user."""
     authz_res = await org_service.ensure_can_read_user_permissions(
         org_id=org_id,
         actor_user_id=user_info["id"],
@@ -336,7 +347,7 @@ async def update_user_permissions(
     input_data: Annotated[UserPermissionsRequest, Body()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> UserPermissionsResponse:
-    """Replace organization permissions for a user."""
+    """Replace the target user's organization permissions."""
     result = await org_service.update_user_permissions(
         org_id=org_id,
         actor_user_id=user_info["id"],

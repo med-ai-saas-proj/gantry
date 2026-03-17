@@ -1,5 +1,11 @@
 """FastAPI dependencies for authentication and authorization."""
 
+from src.shared.custom_types.error_exception import RecoverableError
+from src.management.organization.factories import (
+    KeycloakOrgClient,
+    getKeycloakOrgClient,
+)
+
 from .roles import ManagementRole
 from .entities import UserInfo
 from .settings import getAuthSettings
@@ -28,9 +34,19 @@ oauth_2_scheme = OAuth2AuthorizationCodeBearer(
 )
 
 
+class MissingOrganizationContextError(RecoverableError):
+    """Raised when the authenticated token has no organization context."""
+
+    status = 403
+    code = "missing_org_context"
+    title = "Missing Organization Context"
+    detail = "The authenticated token does not include an organization id."
+
+
 async def getUserInfo(
     token: Annotated[str, Security(oauth_2_scheme)],
     auth_service: Annotated[AuthService, Depends(getAuthService)],
+    kc_org_client: Annotated[KeycloakOrgClient, Depends(getKeycloakOrgClient)],
 ) -> UserInfo:
     """
     Get authenticated user info from JWT token.
@@ -38,7 +54,39 @@ async def getUserInfo(
     This is the base dependency for authentication.
     Returns UserInfo if token is valid, raises UnauthorizedError otherwise.
     """
-    return auth_service.verifyToken(token).unwrap()
+    user_info = auth_service.verifyToken(token).unwrap()
+
+    if user_info.get("org_id") or user_info.get("is_service_account"):
+        return user_info
+
+    orgs_res = await kc_org_client.get_member_organizations(user_info["id"])
+    if orgs_res.is_err():
+        return user_info
+
+    organizations = orgs_res.unwrap()
+    for org in organizations:
+        org_id = org.get("id")
+        if isinstance(org_id, str) and org_id:
+            user_info["org_id"] = org_id
+            break
+
+    return user_info
+
+
+async def getUserOrgId(
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+) -> str | None:
+    """Return the authenticated user's organization id from token context."""
+    return user_info.get("org_id")
+
+
+async def requireUserOrgId(
+    org_id: Annotated[str | None, Depends(getUserOrgId)],
+) -> str:
+    """Return token org id, failing if the token has no organization context."""
+    if not org_id:
+        raise MissingOrganizationContextError()
+    return org_id
 
 
 def requireRole(role: ManagementRole):
