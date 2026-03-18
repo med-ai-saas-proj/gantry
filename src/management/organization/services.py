@@ -142,13 +142,6 @@ class MultipleOrganizationMembershipError(RecoverableError):
     detail = "A user can belong to only one organization."
 
 
-class ServiceAccountOrgCreateNotAllowedError(RecoverableError):
-    status = 403
-    code = "service_account_org_create_not_allowed"
-    title = "Service Account Not Allowed"
-    detail = "Organization creation requires an authenticated user."
-
-
 def _extract_org_ids(orgs: list[dict[str, Any]]) -> set[str]:
     """Collect non-empty organization ids from Keycloak org payloads."""
     return {str(org.get("id", "")) for org in orgs if org.get("id")}

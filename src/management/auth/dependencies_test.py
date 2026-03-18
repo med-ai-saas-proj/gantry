@@ -103,7 +103,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
         service_account = await getUserInfo("token", auth_service, kc_org_client)
 
         self.assertIsNone(user_info.get("org_id"))
-        self.assertNotIn("org_id", service_account)
+        self.assertIsNone(service_account["org_id"])
 
     async def test_get_user_org_id_and_require_user_org_id(self):
         self.assertEqual(

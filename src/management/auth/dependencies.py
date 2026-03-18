@@ -55,6 +55,7 @@ async def getUserInfo(
     Returns UserInfo if token is valid, raises UnauthorizedError otherwise.
     """
     user_info = auth_service.verifyToken(token).unwrap()
+    user_info["org_id"] = user_info.get("org_id")
 
     if user_info.get("org_id") or user_info.get("is_service_account"):
         return user_info
