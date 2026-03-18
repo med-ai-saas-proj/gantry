@@ -1,5 +1,6 @@
 from src.shared.custom_types.error_exception import RecoverableError
 
+import json
 import datetime
 from typing import Literal, TypedDict
 
@@ -132,7 +133,10 @@ class LogQueryService:
                 for stream in res["data"]["result"]:
                     for entry in stream.get("values", []):
                         timestamp, log_line = entry
-                        logs.append(log_line)
+                        if isinstance(log_line, str):
+                            logs.append(json.loads(log_line))
+                        elif isinstance(log_line, dict):
+                            logs.append(log_line)
                 return Ok(logs)
             else:
                 return Err(InvalidLogQueryError())

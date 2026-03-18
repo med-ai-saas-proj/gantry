@@ -7,14 +7,8 @@ from pydantic import Field, BaseModel
 
 
 class QueryLogRequest(BaseModel):
-    start: int | float | datetime = Field(
-        ...,
-        description="int is epoch time in nanoseconds, float is epoch time in seconds",
-    )
-    end: int | float | datetime = Field(
-        ...,
-        description="int is epoch time in nanoseconds, float is epoch time in seconds",
-    )
+    start: datetime = Field(...)
+    end: datetime = Field(...)
     limit: int = Field(
         1000, gt=0, le=10000, description="Number of log entries to return"
     )
