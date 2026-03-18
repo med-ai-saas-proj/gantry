@@ -1,3 +1,5 @@
+import contextlib
+
 from src.shared.settings import getAppSetting
 from src.shared.custom_types.error_exception import ProblemDetails
 
@@ -16,10 +18,31 @@ from fastapi.middleware.cors import CORSMiddleware
 
 __all__ = ["management_app"]
 
+async def _org_delete_worker_loop():
+    service = getOrgService()
+    while True:
+        try:  # noqa: SIM105
+            await service.process_due_deletions()
+        except Exception:
+            # Keep loop alive; failures are logged in service/global handlers.
+            pass
+        await asyncio.sleep(getOrgSettings().deletion_worker_interval_seconds)
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI):
+    org_deletion_task = asyncio.create_task(_org_delete_worker_loop())
+    yield
+    org_deletion_task.cancel()
+    try:
+        await org_deletion_task
+    except Exception:
+        pass
+
 management_app = FastAPI(
     title="Venera API platform",
     openapi_url="/docs/openapi.json",
     docs_url=None,
+    lifespan=lifespan,
     responses={
         400: {"model": ProblemDetails},
         401: {"model": ProblemDetails},
@@ -47,39 +70,6 @@ v1_router.include_router(logging_router)
 
 # management_app.include_router(api_router)
 management_app.include_router(v1_router)
-
-_org_deletion_worker: asyncio.Task | None = None
-
-
-async def _org_delete_worker_loop():
-    service = getOrgService()
-    while True:
-        try:
-            await service.process_due_deletions()
-        except Exception:
-            # Keep loop alive; failures are logged in service/global handlers.
-            pass
-        await asyncio.sleep(getOrgSettings().deletion_worker_interval_seconds)
-
-
-@management_app.on_event("startup")
-async def _startup_org_worker():
-    global _org_deletion_worker
-    if _org_deletion_worker is None or _org_deletion_worker.done():
-        _org_deletion_worker = asyncio.create_task(_org_delete_worker_loop())
-
-
-@management_app.on_event("shutdown")
-async def _shutdown_org_worker():
-    global _org_deletion_worker
-    if _org_deletion_worker is not None:
-        _org_deletion_worker.cancel()
-        try:
-            await _org_deletion_worker
-        except Exception:
-            pass
-        _org_deletion_worker = None
-
 
 @management_app.get("/docs", include_in_schema=False)
 async def scalar_html():
