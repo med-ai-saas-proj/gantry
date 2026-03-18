@@ -1,4 +1,5 @@
 """Factory functions for creating service instances."""
+
 from .services import LogQueryService
 from .settings import getLoggingSettings
 

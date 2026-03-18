@@ -1,5 +1,3 @@
-import contextlib
-
 from src.shared.settings import getAppSetting
 from src.shared.custom_types.error_exception import ProblemDetails
 
@@ -10,6 +8,7 @@ from .organization.settings import getOrgSettings
 from .organization.factories import getOrgService
 
 import asyncio
+import contextlib
 
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
@@ -17,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 __all__ = ["management_app"]
+
 
 async def _org_delete_worker_loop():
     service = getOrgService()
@@ -28,6 +28,7 @@ async def _org_delete_worker_loop():
             pass
         await asyncio.sleep(getOrgSettings().deletion_worker_interval_seconds)
 
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     org_deletion_task = asyncio.create_task(_org_delete_worker_loop())
@@ -37,6 +38,7 @@ async def lifespan(app: FastAPI):
         await org_deletion_task
     except Exception:
         pass
+
 
 management_app = FastAPI(
     title="Venera API platform",
@@ -70,6 +72,7 @@ v1_router.include_router(logging_router)
 
 # management_app.include_router(api_router)
 management_app.include_router(v1_router)
+
 
 @management_app.get("/docs", include_in_schema=False)
 async def scalar_html():

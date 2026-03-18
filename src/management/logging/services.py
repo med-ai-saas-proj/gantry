@@ -16,13 +16,14 @@ LOG_LABEL_VALUE_ENDPOINT = "/loki/api/v1/label/<name>/values"
 type LogFilterKey = Literal["orgId", "projectId"] | str
 
 
-class SearchPipeline(TypedDict):
+class KeywordSearchQuery(TypedDict):
     """Represents a search term in the log query pipeline."""
 
     mode: Literal["eq", "ne", "regex", "ne_regex"]
     value: str
 
-class FilterPipeline(TypedDict):
+
+class FilterQuery(TypedDict):
     """Represents a filter term in the log query pipeline."""
 
     mode: Literal["eq", "ne", "regex", "ne_regex", "gt", "lt", "gte", "lte"]
@@ -60,11 +61,12 @@ class LogQueryService:
         limit: int = 1000,
         direction: Literal["forward", "backward"] = "forward",
         level: Literal["debug", "info", "warn", "error"] | None = None,
-        search_term: str
-        | SearchPipeline
-        | list[SearchPipeline | str]
+        keyword: str
+        | KeywordSearchQuery
+        | list[KeywordSearchQuery | str]
         | None = None,
-        filter: dict[LogFilterKey, str | FilterPipeline] | None = None,
+        filter: dict[LogFilterKey, str | FilterQuery] | None = None,
+        user_query: str | None = None,
     ):
         """Search logs from Loki with optional filters."""
         labels = []
@@ -74,12 +76,12 @@ class LogQueryService:
 
         pipeline = []
 
-        if search_term:
-            if isinstance(search_term, list):
-                for term in search_term:
-                    pipeline.append(search_pipeline(term))
+        if keyword:
+            if isinstance(keyword, list):
+                for v in keyword:
+                    pipeline.append(keyword_pipeline(v))
             else:
-                pipeline.append(search_pipeline(search_term))
+                pipeline.append(keyword_pipeline(keyword))
 
         pipeline.append("| json")
 
@@ -89,6 +91,12 @@ class LogQueryService:
         if filter:
             for key, value in filter.items():
                 pipeline.append(f'| {filter_pipeline(key, value)}"')
+
+        if user_query:
+            if user_query.startswith("|"):
+                pipeline.append(user_query)
+            else:
+                pipeline.append(f"| {user_query}")
 
         query = f"{selector} {' '.join(pipeline)}".strip()
 
@@ -105,9 +113,7 @@ class LogQueryService:
         | datetime.datetime,
         limit: int = 1000,
         direction: Literal["forward", "backward"] = "forward",
-    ) -> Result[
-        list[dict], InvalidLogQueryError | LogQueryServiceError
-    ]:
+    ) -> Result[list[dict], InvalidLogQueryError | LogQueryServiceError]:
         """Query logs from Loki."""
         params = {
             "query": query,
@@ -199,7 +205,8 @@ def to_nanoseconds(
     return str(int(t))
 
 
-def search_pipeline(search_term: str | SearchPipeline):
+def keyword_pipeline(search_term: str | KeywordSearchQuery):
+    """Convert a keyword search term to a Loki pipeline expression. Supports simple string search, equality, inequality, regex, and negative regex."""
     if isinstance(search_term, str):
         return f" |= {search_term}"
     elif isinstance(search_term, dict):
@@ -216,9 +223,9 @@ def search_pipeline(search_term: str | SearchPipeline):
     else:
         raise ValueError(f"Invalid search term type: {type(search_term)}")
 
-def filter_pipeline(
-    key: LogFilterKey,
-    value: str | FilterPipeline):
+
+def filter_pipeline(key: LogFilterKey, value: str | FilterQuery):
+    """Convert a filter term to a Loki label filter expression. Supports equality, inequality, regex, negative regex, greater than, less than, greater than or equal, and less than or equal."""
     if isinstance(value, str):
         return f'| {key}="{value}"'
     elif isinstance(value, dict):

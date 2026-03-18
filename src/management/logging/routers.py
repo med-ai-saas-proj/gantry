@@ -16,16 +16,31 @@ logging_router = APIRouter(prefix="/logging")
 log_query_service = getLogQueryService()
 app_settings = getAppSetting()
 
+
 @logging_router.get("/")
 async def query_log(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    start: int | float | datetime.datetime = Query(..., description="int is epoch time in seconds, float is epoch time in seconds"),
-    end: int | float | datetime.datetime = Query(..., description="int is epoch time in seconds, float is epoch time in seconds"),
+    start: int | float | datetime.datetime = Query(
+        ...,
+        description="int is epoch time in seconds, float is epoch time in seconds",
+    ),
+    end: int | float | datetime.datetime = Query(
+        ...,
+        description="int is epoch time in seconds, float is epoch time in seconds",
+    ),
     limit: int = Query(default=1000, le=10000, gt=0),
     direction: Literal["forward", "backward"] = Query(default="backward"),
-    level: Literal["debug", "info", "warn", "error"] | None = Query(default=None),
-    search_term: str | None = Query(default=None),
-    filters: str | None = Query(default=None, description="Filters in the format of key:value,key:value"),
+    level: Literal["debug", "info", "warn", "error"] | None = Query(
+        default=None
+    ),
+    keyword: str | None = Query(default=None),
+    filters: str | None = Query(
+        default=None, description="Filters in the format of key:value,key:value"
+    ),
+    custom_query: str | None = Query(
+        default=None,
+        description="Custom query string, should be valid Loki Label Filters",
+    ),
 ) -> list[dict]:
     filters_dict = {}
     for f in filters.split(",") if filters is not None else []:
@@ -40,15 +55,17 @@ async def query_log(
         limit,
         direction,
         level,
-        search_term,
+        keyword,
         filters_dict,
+        custom_query,
     )
     return res.unwrap()
+
 
 @logging_router.post("/")
 async def search_log(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    query_request: Annotated[QueryLogRequest, Body()]
+    query_request: Annotated[QueryLogRequest, Body()],
 ) -> list[dict]:
     res = log_query_service.search_logs(
         user_info["org_id"],
@@ -58,7 +75,7 @@ async def search_log(
         query_request.limit,
         query_request.direction,
         query_request.level,
-        query_request.search_term,
+        query_request.keyword,
         query_request.filters,
     )
     return res.unwrap()
