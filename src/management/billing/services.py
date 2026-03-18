@@ -33,6 +33,8 @@ Flow (see architecture diagram):
     TODO(BILL-008): INSERT BillingTransaction into TimescaleDB.
 """
 
+import asyncio
+
 from src.db.factories import AsyncSessionManager
 from src.shared.custom_types.error_exception import RecoverableError
 
@@ -65,13 +67,6 @@ class SpendingLimitExceeded(RecoverableError):
     code = "spending_limit_exceeded"
     title = "Spending Limit Exceeded"
     detail = "The request would exceed the configured spending limit."
-
-
-class AggregateFinalized(RecoverableError):
-    status = 409
-    code = "aggregate_finalized"
-    title = "Billing Period Finalized"
-    detail = "The billing aggregate for this period has been finalized and accepts no further charges."
 
 
 class HoldNotFound(RecoverableError):
@@ -145,28 +140,23 @@ class BillingService:
 
     async def hold(
         self, ping: BillingPing
-    ) -> Result[UUID, SpendingLimitExceeded | AggregateFinalized]:
+    ) -> Result[UUID, SpendingLimitExceeded]:
         """Reserve spending capacity before a request is processed.
 
         Returns Ok(hold_uuid) on success.
         """
         org_id = ping["organization_id"]
         project_id = ping["project_id"]
-        org_project_ids = ping["org_project_ids"]
         billing_period = _current_billing_period()
         hold_amount = _to_decimal(ping["amount"])
 
         async with self.session_manager.get_session() as session:
-            proj_limit_row, org_limit_row, org_total = (
-                await self.project_limit_repo.getForProject(
+            proj_limit_row, org_limit_row = await asyncio.gather(
+                self.project_limit_repo.getForProject(
                     session, project_id
                 ),
-                await self.org_limit_repo.getForOrg(session, org_id),
-                await self.monthly_agg_repo.sumOrgTotal(
-                    session, org_project_ids, billing_period
-                ),
+                self.org_limit_repo.getForOrg(session, org_id)
             )
-
             project_limit: Decimal | None = (
                 proj_limit_row.monthly_limit
                 if proj_limit_row is not None
@@ -178,27 +168,18 @@ class BillingService:
                 else None
             )
 
-            if org_limit is not None and (org_total + hold_amount) > org_limit:
-                return Err(SpendingLimitExceeded())
-
             # Returns None if project_limit would be exceeded OR period finalized.
             agg = await self.monthly_agg_repo.holdAggregate(
-                session, project_id, billing_period, hold_amount, project_limit
+                session, 
+                project_id, 
+                org_id,
+                billing_period, 
+                hold_amount, 
+                project_limit,
+                org_limit,
             )
 
             if agg is None:
-                # Distinguish finalized period from limit exceeded (rare path —
-                # extra query only on failure).
-                existing = await self.monthly_agg_repo.getAggregate(
-                    session, project_id, billing_period
-                )
-                if existing is not None and existing.is_finalized:
-                    self.logger.warning(
-                        "billing.hold.finalized_period",
-                        project_id=project_id,
-                        billing_period=billing_period,
-                    )
-                    return Err(AggregateFinalized())
                 return Err(SpendingLimitExceeded())
 
             # Commit to Postgres before touching Redis — if Redis write fails
@@ -229,7 +210,7 @@ class BillingService:
         self,
         hold_uuid: UUID,
         real_amount: ScaledAmount,
-    ) -> Result[bool, HoldNotFound | AggregateFinalized]:
+    ) -> Result[bool, HoldNotFound]:
         """Commit the actual charge after a request completes.
 
         Returns Ok(True) on success.
@@ -248,6 +229,7 @@ class BillingService:
         hold: _HoldRecord = json.loads(raw)
         project_id: int = hold["project_id"]
         billing_period: str = hold["billing_period"]
+        org_id: str = hold["org_id"]
 
         hold_amount = _to_decimal(hold["hold_amount"])
         real = _to_decimal(real_amount)
@@ -256,7 +238,7 @@ class BillingService:
 
         async with self.session_manager.get_session() as session:
             agg = await self.monthly_agg_repo.releaseAggregate(
-                session, project_id, billing_period, delta
+                session, project_id, org_id, billing_period, delta
             )
             if agg is None:
                 # Finalized period — should never happen in normal flow.
@@ -265,6 +247,7 @@ class BillingService:
                     hold_uuid=str(hold_uuid),
                     project_id=project_id,
                     billing_period=billing_period,
+                    org_id=org_id
                 )
                 return Err(AggregateFinalized())
 

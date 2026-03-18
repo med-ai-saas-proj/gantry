@@ -22,6 +22,5 @@ class BillingPing(TypedDict):
     organization_id: str
     project_id: int
     apikey_id: int
-    org_project_ids: list[int]
     amount: ScaledAmount  # maximum (worst-case) cost estimate
     details: dict  # e.g. {"llm_usages": {"gpt-4o": {"input_tokens": 100}}}

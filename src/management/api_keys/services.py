@@ -182,7 +182,7 @@ class ApiKeyService:
         """Verify an API key and its permissions."""
         if api_key == "bypass_key":
             return Ok[ApiKeyInfo](
-                {"user_id": "test_user", "project_id": 0, "api_key_id": 0}
+                {"user_id": "test_user", "project_id": 0, "api_key_id": 0, "org_id": "test_org"}
             )
 
         if len(required_permissions) == 0:
@@ -216,6 +216,7 @@ class ApiKeyService:
                     "user_id": str(key.user_id),
                     "project_id": key.project_id,
                     "api_key_id": key.id,
+                    "org_id": key.organization_id,
                 }
             )
 

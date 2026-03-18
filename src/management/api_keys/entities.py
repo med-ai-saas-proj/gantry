@@ -7,3 +7,4 @@ class ApiKeyInfo(TypedDict):
     api_key_id: int
     user_id: str
     project_id: int
+    org_id: str

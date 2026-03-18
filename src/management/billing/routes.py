@@ -1,8 +1,10 @@
 """Billing API routes."""
 
+from src.management.api_keys.dependencies import requiredPermissions
+from src.management.api_keys.entities import ApiKeyInfo
+
 from .dtos import BillingPing, ScaledAmount
 from .factories import BillingService, getBillingService
-from .dependencies import BillingContext, get_billing_context
 
 from uuid import UUID
 from typing import Annotated
@@ -28,15 +30,16 @@ billing_router = APIRouter(
 
 @billing_router.post("/hold")
 async def hold(
-    ctx: Annotated[BillingContext, Depends(get_billing_context)],
+    apikey_info: Annotated[
+        ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
+    ],
     body: Annotated[HoldRequest, Body()],
     billing_service: Annotated[BillingService, Depends(getBillingService)],
 ) -> UUID:
     ping: BillingPing = {
-        "organization_id": ctx["organization_id"],
-        "project_id": ctx["project_id"],
-        "apikey_id": ctx["apikey_id"],
-        "org_project_ids": ctx["org_project_ids"],
+        "organization_id": apikey_info["org_id"],
+        "project_id": apikey_info["project_id"],
+        "apikey_id": apikey_info["api_key_id"],
         "amount": body.amount,
         "details": body.details,
     }
@@ -46,7 +49,9 @@ async def hold(
 @billing_router.post("/release/{hold_uuid}")
 async def release(
     hold_uuid: UUID,
-    ctx: Annotated[BillingContext, Depends(get_billing_context)],
+    apikey_info: Annotated[
+        ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
+    ],
     body: Annotated[ReleaseRequest, Body()],
     billing_service: Annotated[BillingService, Depends(getBillingService)],
 ) -> bool:
