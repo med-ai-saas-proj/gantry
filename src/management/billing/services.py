@@ -41,8 +41,7 @@ from src.shared.custom_types.error_exception import RecoverableError
 from .dtos import BillingPing, ScaledAmount
 from .repositories import (
     MonthlyAggregateRepository,
-    ProjectSpendingLimitRepository,
-    OrganizationSpendingLimitRepository,
+    SpendingLimitRepository,
 )
 
 import json
@@ -124,15 +123,13 @@ class BillingService:
         session_manager: AsyncSessionManager,
         redis: Redis,
         monthly_agg_repo: MonthlyAggregateRepository,
-        project_limit_repo: ProjectSpendingLimitRepository,
-        org_limit_repo: OrganizationSpendingLimitRepository,
+        spending_limit_repo: SpendingLimitRepository,
     ) -> None:
         self.logger = logger
         self.session_manager = session_manager
         self.redis = redis
         self.monthly_agg_repo = monthly_agg_repo
-        self.project_limit_repo = project_limit_repo
-        self.org_limit_repo = org_limit_repo
+        self.spending_limit_repo = spending_limit_repo
 
     # -----------------------------------------------------------------------
     # Public API
@@ -152,10 +149,10 @@ class BillingService:
 
         async with self.session_manager.get_session() as session:
             proj_limit_row, org_limit_row = await asyncio.gather(
-                self.project_limit_repo.getForProject(
+                self.spending_limit_repo.getForProject(
                     session, project_id
                 ),
-                self.org_limit_repo.getForOrg(session, org_id)
+                self.spending_limit_repo.getForOrg(session, org_id)
             )
             project_limit: Decimal | None = (
                 proj_limit_row.monthly_limit

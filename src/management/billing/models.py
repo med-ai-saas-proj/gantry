@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from src.db.base import BaseSQLModel
 from src.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
@@ -6,6 +6,7 @@ from src.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
 from decimal import Decimal
 
 from sqlalchemy import (
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -88,7 +89,7 @@ class ProjectMonthlyAggregate(WithCreateUpdateTimestamp, WithID, BillingBaseSQLM
     project_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
     # "2026-02" — always calendar month, always UTC
-    billing_period: Mapped[str] = mapped_column(String(7), nullable=False)
+    billing_period: Mapped[date] = mapped_column(Date, nullable=False)
 
     total_amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=18, scale=8), nullable=False, default=Decimal("0")
@@ -120,7 +121,7 @@ class OrganizationMonthlyAggregate(WithCreateUpdateTimestamp, WithID, BillingBas
     )
 
     # "2026-02" — always calendar month, always UTC
-    billing_period: Mapped[str] = mapped_column(String(7), nullable=False)
+    billing_period: Mapped[date] = mapped_column(Date, nullable=False)
 
     total_amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=18, scale=8), nullable=False, default=Decimal("0")
@@ -141,11 +142,8 @@ class Credit(
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     note: Mapped[str] = mapped_column(String(512), nullable=True)
 
-    month_start: Mapped[int] = mapped_column(Integer, nullable=True)  # month of start, e.g. 01
-    year_start: Mapped[int] = mapped_column(Integer, nullable=True)  # year of start, e.g. 2024
-
-    month_exp: Mapped[int] = mapped_column(Integer, nullable=True)  # month of expiration, e.g. 02
-    year_exp: Mapped[int] = mapped_column(Integer, nullable=True)  # year of expiration, e.g. 2026
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    expired_date: Mapped[date] = mapped_column(Date, nullable=False)
 
     amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=18, scale=8), nullable=False
@@ -178,7 +176,7 @@ class BillingInvoice(
         String(128), nullable=False, index=True
     )
 
-    billing_period: Mapped[str] = mapped_column(String(7), nullable=False)
+    billing_period: Mapped[date] = mapped_column(Date, nullable=False, unique=True)
 
     total_amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=18, scale=8), nullable=False
@@ -215,49 +213,33 @@ class BillingInvoiceLineItem(
     ) # optional link to project
 
 
-class OrganizationSpendingLimit(
+class SpendingLimit(
     WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
 ):
-    """Spending cap at the organization level. All amounts in USD.
-
-    NULL on a limit field means no limit is set — falls back to global default.
-    Project-level limits (ProjectSpendingLimit) take precedence over these.
-    """
-
-    __tablename__ = "OrganizationSpendingLimits"
+    __tablename__ = "SpendingLimits"
 
     organization_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, unique=True, index=True
+        String(128), nullable=False, index=True
     )
-
-    # NULL = no limit set (global default applies)
-    monthly_limit: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=True
-    )
-    daily_limit: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=True
-    )
-
-
-class ProjectSpendingLimit(
-    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
-):
-    """Spending cap at the project level. All amounts in USD.
-
-    Takes precedence over OrganizationSpendingLimit.
-    NULL on a limit field means fall back to the org-level limit.
-    """
-
-    __tablename__ = "ProjectSpendingLimits"
-
     project_id: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, unique=True, index=True
+        BigInteger, 
+        ForeignKey(Project.id, ondelete="CASCADE"),
+        nullable=True, unique=True, index=True
     )
 
-    # NULL = fall back to org-level limit
     monthly_limit: Mapped[Decimal | None] = mapped_column(
         Numeric(precision=18, scale=8), nullable=True
     )
     daily_limit: Mapped[Decimal | None] = mapped_column(
         Numeric(precision=18, scale=8), nullable=True
     )
+
+    __table_args__ = (
+        UniqueConstraint(organization_id, project_id, name="uq_spending_limit"),
+        Index(
+            "ix_spending_limits_org",
+            organization_id,
+            unique=True,
+            postgresql_where=project_id.is_(None)  # global default record
+        ),
+     )

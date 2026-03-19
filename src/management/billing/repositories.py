@@ -6,8 +6,7 @@ from .models import (
     OrganizationMonthlyAggregate,
     ProjectMonthlyAggregate,
     BillingTransaction,
-    ProjectSpendingLimit,
-    OrganizationSpendingLimit,
+    SpendingLimit
 )
 
 from uuid import UUID
@@ -366,25 +365,32 @@ class MonthlyAggregateRepository:
         return result.scalar_one_or_none()
 
 
-class OrganizationSpendingLimitRepository(
-    Repository[OrganizationSpendingLimit, int]
+class SpendingLimitRepository(
+    Repository[SpendingLimit, int]
 ):
-    """Repository for organization-level spending limits."""
+    """Repository forspending limits."""
 
     def __init__(self):
         super().__init__(
-            OrganizationSpendingLimit, OrganizationSpendingLimit.id
+            SpendingLimit, SpendingLimit.id
         )
 
-    async def getForOrg(
+    async def get(
         self,
         session: AsyncSession,
         org_id: str,
-    ) -> OrganizationSpendingLimit | None:
+        project_id: int,
+    ) -> SpendingLimit | None:
         """Get the spending limit record for an organization."""
         stmt = (
-            select(OrganizationSpendingLimit)
-            .where(OrganizationSpendingLimit.organization_id == org_id)
+            select(SpendingLimit)
+            .where(
+                (SpendingLimit.organization_id == org_id)
+                & (
+                    (SpendingLimit.project_id == project_id)
+                    | SpendingLimit.project_id.is_(None)  # global default
+                )
+            )
             .limit(1)
         )
         return await self.selectOne(session, stmt)
@@ -393,74 +399,49 @@ class OrganizationSpendingLimitRepository(
         self,
         session: AsyncSession,
         org_id: str,
+        project_id: int | None,
         monthly_limit: Decimal | None,
         daily_limit: Decimal | None,
-    ) -> OrganizationSpendingLimit | None:
+    ) -> SpendingLimit | None:
         """Create or update the spending limits for an organization."""
-        stmt = (
-            insert(OrganizationSpendingLimit)
-            .values(
-                organization_id=org_id,
-                monthly_limit=monthly_limit,
-                daily_limit=daily_limit,
+        if project_id is not None:
+            stmt = (
+                insert(SpendingLimit)
+                .values(
+                    organization_id=org_id,
+                    project_id=project_id,
+                    monthly_limit=monthly_limit,
+                    daily_limit=daily_limit,
+                )
+                .on_conflict_do_update(
+                    index_elements=["organization_id", "project_id"],
+                    set_={
+                        "monthly_limit": monthly_limit,
+                        "daily_limit": daily_limit,
+                        "updated_at": func.now(),
+                    },
+                )
+                .returning(SpendingLimit)
             )
-            .on_conflict_do_update(
-                index_elements=["organization_id"],
-                set_={
-                    "monthly_limit": monthly_limit,
-                    "daily_limit": daily_limit,
-                    "updated_at": func.now(),
-                },
+        else:
+            stmt = (
+                insert(SpendingLimit)
+                .values(
+                    organization_id=org_id,
+                    monthly_limit=monthly_limit,
+                    daily_limit=daily_limit,
+                )
+                .on_conflict_do_update(
+                    index_elements=["organization_id"],
+                    index_where=SpendingLimit.project_id.is_(None),
+                    set_={
+                        "monthly_limit": monthly_limit,
+                        "daily_limit": daily_limit,
+                        "updated_at": func.now(),
+                    },
+                )
+                .returning(SpendingLimit)
             )
-            .returning(OrganizationSpendingLimit)
-        )
         result = await session.execute(stmt)
         return result.scalars().first()
 
-
-class ProjectSpendingLimitRepository(Repository[ProjectSpendingLimit, int]):
-    """Repository for project-level spending limits."""
-
-    def __init__(self):
-        super().__init__(ProjectSpendingLimit, ProjectSpendingLimit.id)
-
-    async def getForProject(
-        self,
-        session: AsyncSession,
-        project_id: int,
-    ) -> ProjectSpendingLimit | None:
-        """Get the spending limit record for a project."""
-        stmt = (
-            select(ProjectSpendingLimit)
-            .where(ProjectSpendingLimit.project_id == project_id)
-            .limit(1)
-        )
-        return await self.selectOne(session, stmt)
-
-    async def upsert(
-        self,
-        session: AsyncSession,
-        project_id: int,
-        monthly_limit: Decimal | None,
-        daily_limit: Decimal | None,
-    ) -> ProjectSpendingLimit | None:
-        """Create or update the spending limits for a project."""
-        stmt = (
-            insert(ProjectSpendingLimit)
-            .values(
-                project_id=project_id,
-                monthly_limit=monthly_limit,
-                daily_limit=daily_limit,
-            )
-            .on_conflict_do_update(
-                index_elements=["project_id"],
-                set_={
-                    "monthly_limit": monthly_limit,
-                    "daily_limit": daily_limit,
-                    "updated_at": func.now(),
-                },
-            )
-            .returning(ProjectSpendingLimit)
-        )
-        result = await session.execute(stmt)
-        return result.scalars().first()

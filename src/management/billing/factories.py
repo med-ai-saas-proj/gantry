@@ -7,7 +7,7 @@ from .services import BillingService
 from .repositories import (
     MonthlyAggregateRepository,
     ProjectSpendingLimitRepository,
-    OrganizationSpendingLimitRepository,
+    SpendingLimitRepository,
 )
 
 from functools import lru_cache
@@ -21,5 +21,5 @@ def getBillingService() -> BillingService:
         redis=getRedis(),
         monthly_agg_repo=MonthlyAggregateRepository(),
         project_limit_repo=ProjectSpendingLimitRepository(),
-        org_limit_repo=OrganizationSpendingLimitRepository(),
+        spending_limit_repo=SpendingLimitRepository(),
     )
