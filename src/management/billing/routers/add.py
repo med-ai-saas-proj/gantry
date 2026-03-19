@@ -3,29 +3,15 @@
 from src.management.api_keys.dependencies import requiredPermissions
 from src.management.api_keys.entities import ApiKeyInfo
 
-from .dtos import BillingPing, ScaledAmount
-from .factories import BillingService, getBillingService
+from ..dtos import BillingPing, HoldRequest, ReleaseRequest
+from ..factories import BillingService, getBillingService
 
 from uuid import UUID
 from typing import Annotated
 
-from fastapi import Body, Depends, APIRouter
-from pydantic import BaseModel
+from fastapi import Body, Depends
 
-
-class HoldRequest(BaseModel):
-    amount: ScaledAmount
-    details: dict = {}
-
-
-class ReleaseRequest(BaseModel):
-    real_amount: ScaledAmount
-
-
-billing_router = APIRouter(
-    prefix="/billing",
-    tags=["billing"],
-)
+from .router import billing_router
 
 
 @billing_router.post("/hold")
@@ -56,3 +42,17 @@ async def release(
     billing_service: Annotated[BillingService, Depends(getBillingService)],
 ) -> bool:
     return (await billing_service.release(hold_uuid, body.real_amount)).unwrap()
+
+@billing_router.post(
+        "/",
+        description="Directly create a transaction without a hold. For use cases where the cost is known upfront and there's no need to reserve funds in advance (e.g. one-time charges, fixed-price services, etc.)."
+        )
+async def direct_charge(
+    apikey_info: Annotated[
+        ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
+    ],
+    body: Annotated[HoldRequest, Body()],
+    billing_service: Annotated[BillingService, Depends(getBillingService)],
+):
+    pass
+

@@ -29,7 +29,7 @@ class BillingBaseSQLModel(BaseSQLModel):
 
 
 class BillingTransaction(
-    WithCreateUpdateTimestamp, WithUUID, BillingBaseSQLModel
+    WithCreateUpdateTimestamp, WithUUID, BillingBaseSQLModel, WithID
 ):
     """Individual charge record for each API call.
 

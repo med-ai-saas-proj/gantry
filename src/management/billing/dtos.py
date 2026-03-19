@@ -1,6 +1,11 @@
 """DTOs for the billing module."""
 
+from datetime import datetime
+from re import U
 from typing import TypedDict
+from uuid import UUID
+
+from pydantic import BaseModel
 
 
 class ScaledAmount(TypedDict):
@@ -24,3 +29,69 @@ class BillingPing(TypedDict):
     apikey_id: int
     amount: ScaledAmount  # maximum (worst-case) cost estimate
     details: dict  # e.g. {"llm_usages": {"gpt-4o": {"input_tokens": 100}}}
+
+
+class HoldRequest(BaseModel):
+    amount: ScaledAmount
+    details: dict = {}
+
+
+class ReleaseRequest(BaseModel):
+    real_amount: ScaledAmount
+
+
+class ManualPaymentResponse(BaseModel):
+    hosted_invoice_url: str # URL to hosted payment page on the payment gateway (e.g. Stripe Checkout) where the user can complete the payment
+    
+class TransactionInfo(BaseModel):
+    transaction_id: UUID
+    amount: ScaledAmount
+    date: datetime
+    project_id: int
+    details: dict
+
+class InvoiceInfo(BaseModel):
+    invoice_id: str
+    amount_due: ScaledAmount
+    due_date: datetime
+    
+class StripeInvoiceInfo(BaseModel):
+    invoice_id: str
+    amount_due: ScaledAmount
+    due_date: datetime
+    hosted_invoice_url: str
+
+type InvoiceDetailInfo = StripeInvoiceInfo # can be extended to support multiple payment gateways with different invoice formats in the future
+
+
+class SpendingLimitInfo(BaseModel):
+    project_uid: UUID
+    limit_amount: ScaledAmount
+    current_spend: ScaledAmount
+
+
+class UpdateSpendingLimitRequest(BaseModel):
+    new_limit: ScaledAmount | None = None # if null, will remove spending limit and allow all charges to go through regardless of amount
+    project_uid: UUID | None = None # if null, will apply to whole organization instead of specific project
+
+class CreditInfo(BaseModel):
+    credit_id: UUID
+    amount: ScaledAmount
+    name: str
+    current_spent: ScaledAmount
+    start_month: int
+    start_year: int
+    exp_month: int
+    exp_year: int
+    note: str | None = None
+
+class AddCreditRequest(BaseModel):
+    amount: ScaledAmount
+    organization_id: str
+    name: str
+    note: str | None = None
+    amount: ScaledAmount
+    start_month: int
+    start_year: int
+    exp_month: int
+    exp_year: int
