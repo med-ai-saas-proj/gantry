@@ -33,13 +33,6 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
         service.update_settings = AsyncMock(return_value=Ok(settings))
 
         user_info = {"id": "u1", "roles": []}
-        service_user = {
-            "id": "svc",
-            "roles": [],
-            "is_service_account": True,
-            "client_id": "client",
-        }
-
         self.assertEqual(
             (await routes.list_org_permissions()).permissions,
             ALL_PERMISSIONS,
@@ -49,7 +42,7 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             await routes.update_org_info(
-                service_user,
+                user_info,
                 "org-1",
                 UpdateOrgMetadataRequest(name="New Org"),
                 service,
@@ -141,12 +134,7 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             await routes.update_user_permissions(
-                {
-                    "id": "u1",
-                    "roles": [],
-                    "is_service_account": True,
-                    "client_id": "client",
-                },
+                user_info,
                 "org-1",
                 "u2",
                 UserPermissionsRequest(permissions=["organization.invite"]),

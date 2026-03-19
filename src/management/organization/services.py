@@ -175,17 +175,6 @@ class OrgService:
         """Fetch the organization from Keycloak or return the upstream error."""
         return await self.kc.get_org(org_id)
 
-    def _is_backend_service_account(
-        self,
-        *,
-        actor_is_service_account: bool,
-        actor_client_id: str | None,
-    ) -> bool:
-        """Return whether the caller is the trusted backend service account."""
-        if not actor_is_service_account:
-            return False
-        return actor_client_id == getOrgSettings().keycloak_service_client_id
-
     async def _ensure_user_in_org(
         self, org_id: str, user_id: str
     ) -> Result[bool, RecoverableError]:
@@ -412,22 +401,14 @@ class OrgService:
         org_id: str,
         actor_user_id: str,
         name: str,
-        actor_is_service_account: bool = False,
-        actor_client_id: str | None = None,
     ) -> Result[OrgInfoResponse, RecoverableError]:
-        """Rename an organization after owner or service-account checks."""
-        is_service_actor = self._is_backend_service_account(
-            actor_is_service_account=actor_is_service_account,
-            actor_client_id=actor_client_id,
-        )
-        owner_id: str | None = None
-        if not is_service_actor:
-            owner_id_res = await self._get_org_owner_id(org_id)
-            if owner_id_res.is_err():
-                return owner_id_res
-            owner_id = owner_id_res.unwrap()
-            if owner_id != actor_user_id:
-                return Err(OwnerPermissionRequiredError())
+        """Rename an organization after owner checks pass."""
+        owner_id_res = await self._get_org_owner_id(org_id)
+        if owner_id_res.is_err():
+            return owner_id_res
+        owner_id = owner_id_res.unwrap()
+        if owner_id != actor_user_id:
+            return Err(OwnerPermissionRequiredError())
 
         current_org_res = await self.kc.get_org(org_id)
         if current_org_res.is_err():
@@ -625,16 +606,8 @@ class OrgService:
         org_id: str,
         actor_user_id: str,
         target_user_id: str,
-        actor_is_service_account: bool = False,
-        actor_client_id: str | None = None,
     ) -> Result[None, RecoverableError]:
         """Authorize reading organization permissions for the target user."""
-        if self._is_backend_service_account(
-            actor_is_service_account=actor_is_service_account,
-            actor_client_id=actor_client_id,
-        ):
-            return Ok(None)
-
         target_member_res = await self._ensure_user_in_org(
             org_id, target_user_id
         )
@@ -673,8 +646,6 @@ class OrgService:
         actor_user_id: str,
         user_id: str,
         permissions: list[str],
-        actor_is_service_account: bool = False,
-        actor_client_id: str | None = None,
     ) -> Result[UserPermissionsResponse, RecoverableError]:
         """Replace a member's organization permissions with invariant checks."""
         valid = {p.value for p in OrgPermission}
@@ -682,31 +653,22 @@ class OrgService:
         if invalid:
             return Err(InvalidPermissionError())
 
-        is_service_actor = self._is_backend_service_account(
-            actor_is_service_account=actor_is_service_account,
-            actor_client_id=actor_client_id,
-        )
-
-        owner_id = ""
-        if not is_service_actor:
-            owner_id_res = await self._get_org_owner_id(org_id)
-            if owner_id_res.is_err():
-                return owner_id_res
-            owner_id = owner_id_res.unwrap()
+        owner_id_res = await self._get_org_owner_id(org_id)
+        if owner_id_res.is_err():
+            return owner_id_res
+        owner_id = owner_id_res.unwrap()
 
         if user_id == owner_id and OrgPermission.OWNER.value not in permissions:
             return Err(OwnerPermissionImmutableError())
         if user_id != owner_id and OrgPermission.OWNER.value in permissions:
             return Err(OwnerTransferNotAllowedError())
 
-        actor_perms: list[str] = []
-        if not is_service_actor:
-            actor_perms_res = await self._get_member_permissions(
-                org_id, actor_user_id
-            )
-            if actor_perms_res.is_err():
-                return actor_perms_res
-            actor_perms = actor_perms_res.unwrap()
+        actor_perms_res = await self._get_member_permissions(
+            org_id, actor_user_id
+        )
+        if actor_perms_res.is_err():
+            return actor_perms_res
+        actor_perms = actor_perms_res.unwrap()
 
         if (
             OrgPermission.USERS_PERMISSIONS_RW.value in permissions
@@ -714,10 +676,9 @@ class OrgService:
         ):
             return Err(OwnerRequiredForGrantError())
 
-        if not is_service_actor:
-            target_member_res = await self._ensure_user_in_org(org_id, user_id)
-            if target_member_res.is_err():
-                return target_member_res
+        target_member_res = await self._ensure_user_in_org(org_id, user_id)
+        if target_member_res.is_err():
+            return target_member_res
 
         set_res = await self.kc.set_user_attribute(
             user_id, _ORG_PERM_ATTR, permissions

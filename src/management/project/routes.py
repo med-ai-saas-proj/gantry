@@ -1,7 +1,7 @@
 """API routes for project management."""
 
 from src.management.auth.entities import UserInfo
-from src.management.auth.dependencies import getUserInfo, getUserOrgId
+from src.management.auth.dependencies import getUserInfo
 
 from .dtos import (
     PaginationQuery,
@@ -40,7 +40,6 @@ async def list_project_permissions() -> ProjectPermissionCatalogResponse:
 @project_router.get("", response_model=ProjectListResponse)
 async def get_projects(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    user_org_id: Annotated[str | None, Depends(getUserOrgId)],
     query: Annotated[ProjectListQuery, Depends()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectListResponse:
@@ -54,7 +53,6 @@ async def get_projects(
 
     result = await project_service.list_user_projects(
         actor_user_id=user_info["id"],
-        organization_id=user_org_id,
     )
     return result.unwrap()
 

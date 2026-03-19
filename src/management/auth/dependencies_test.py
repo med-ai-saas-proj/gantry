@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, Mock
 
-from safe_result import Ok
+from safe_result import Err, Ok
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
@@ -12,6 +12,7 @@ from src.management.auth.dependencies import (
     getUserOrgId,
     requireUserOrgId,
 )
+from src.management.auth.services import MissingOrganizationClaimError
 
 
 class _DummyErr(Exception):
@@ -19,7 +20,7 @@ class _DummyErr(Exception):
 
 
 class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
-    async def test_get_user_info_keeps_claim_org_id(self):
+    async def test_get_user_info_resolves_claim_org_id_from_memberships(self):
         auth_service = Mock()
         auth_service.verifyToken.return_value = Ok(
             {
@@ -27,36 +28,30 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
                 "username": "alice",
                 "email": "a@test",
                 "roles": [],
-                "org_id": "org-1",
-            }
-        )
-        kc_org_client = Mock()
-
-        user_info = await getUserInfo("token", auth_service, kc_org_client)
-
-        self.assertEqual(user_info["org_id"], "org-1")
-        kc_org_client.get_member_organizations.assert_not_called()
-
-    async def test_get_user_info_fetches_org_id_from_membership(self):
-        auth_service = Mock()
-        auth_service.verifyToken.return_value = Ok(
-            {
-                "id": "u1",
-                "username": "alice",
-                "email": "a@test",
-                "roles": [],
+                "org_id": "11111111-1111-1111-1111-111111111111",
             }
         )
         kc_org_client = Mock()
         kc_org_client.get_member_organizations = AsyncMock(
-            return_value=Ok([{"id": "org-1"}])
+            return_value=Ok(
+                [
+                    {
+                        "id": "11111111-1111-1111-1111-111111111111",
+                        "name": "org-name",
+                        "alias": "org-alias",
+                    }
+                ]
+            )
         )
 
         user_info = await getUserInfo("token", auth_service, kc_org_client)
 
-        self.assertEqual(user_info["org_id"], "org-1")
+        self.assertEqual(
+            user_info["org_id"], "11111111-1111-1111-1111-111111111111"
+        )
+        kc_org_client.get_member_organizations.assert_awaited_once_with("u1")
 
-    async def test_get_user_info_returns_none_when_user_has_no_org(self):
+    async def test_get_user_info_resolves_org_name_claim_to_org_id(self):
         auth_service = Mock()
         auth_service.verifyToken.return_value = Ok(
             {
@@ -64,53 +59,38 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
                 "username": "alice",
                 "email": "a@test",
                 "roles": [],
+                "org_id": "org-name",
             }
         )
         kc_org_client = Mock()
-        kc_org_client.get_member_organizations = AsyncMock(return_value=Ok([]))
-
-        user_info = await getUserInfo("token", auth_service, kc_org_client)
-
-        self.assertIsNone(user_info.get("org_id"))
-
-    async def test_get_user_info_ignores_lookup_failure_and_service_accounts(self):
-        auth_service = Mock()
-        auth_service.verifyToken.side_effect = [
-            Ok(
-                {
-                    "id": "u1",
-                    "username": "alice",
-                    "email": "a@test",
-                    "roles": [],
-                }
-            ),
-            Ok(
-                {
-                    "id": "svc",
-                    "username": "service-account-backend",
-                    "email": None,
-                    "roles": [],
-                    "is_service_account": True,
-                }
-            ),
-        ]
-        kc_org_client = Mock()
         kc_org_client.get_member_organizations = AsyncMock(
-            return_value=Ok([{"name": "missing-id"}])
+            return_value=Ok(
+                [{"id": "org-1", "name": "org-name", "alias": "org-alias"}]
+            )
         )
 
         user_info = await getUserInfo("token", auth_service, kc_org_client)
-        service_account = await getUserInfo("token", auth_service, kc_org_client)
 
-        self.assertIsNone(user_info.get("org_id"))
-        self.assertIsNone(service_account["org_id"])
+        self.assertEqual(user_info["org_id"], "org-1")
+
+    async def test_get_user_info_rejects_regular_user_without_org(self):
+        auth_service = Mock()
+        auth_service.verifyToken.return_value = Err(
+            MissingOrganizationClaimError()
+        )
+        kc_org_client = Mock()
+
+        with self.assertRaises(MissingOrganizationClaimError):
+            await getUserInfo("token", auth_service, kc_org_client)
 
     async def test_get_user_org_id_and_require_user_org_id(self):
         self.assertEqual(
             await getUserOrgId({"id": "u1", "roles": [], "org_id": "org-1"}),
             "org-1",
         )
-        self.assertIsNone(await getUserOrgId({"id": "u1", "roles": []}))
+        self.assertIsNone(
+            await getUserOrgId({"id": "u1", "roles": [], "org_id": None})
+        )
         self.assertEqual(await requireUserOrgId("org-1"), "org-1")
         with self.assertRaises(MissingOrganizationContextError):
             await requireUserOrgId(None)

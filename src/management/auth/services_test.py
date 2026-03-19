@@ -3,7 +3,10 @@ import unittest
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from src.management.auth.services import AuthService
+from src.management.auth.services import (
+    AuthService,
+    MissingOrganizationClaimError,
+)
 
 
 class TestAuthService(unittest.TestCase):
@@ -48,7 +51,7 @@ class TestAuthService(unittest.TestCase):
         self.assertTrue(result.is_ok())
         self.assertEqual(result.unwrap()["org_id"], "org-1")
 
-    def test_map_claims_ignores_legacy_claim_names(self):
+    def test_map_claims_rejects_regular_user_without_organization_claim(self):
         result = self.service._mapClaimsToAuthInfo(
             {
                 "sub": "user-1",
@@ -60,10 +63,10 @@ class TestAuthService(unittest.TestCase):
             }
         )
 
-        self.assertTrue(result.is_ok())
-        self.assertIsNone(result.unwrap()["org_id"])
+        self.assertTrue(result.is_err())
+        self.assertIsInstance(result.error, MissingOrganizationClaimError)
 
-    def test_map_claims_marks_service_account(self):
+    def test_map_claims_rejects_missing_organization_claim(self):
         result = self.service._mapClaimsToAuthInfo(
             {
                 "sub": "svc-1",
@@ -73,5 +76,5 @@ class TestAuthService(unittest.TestCase):
             }
         )
 
-        self.assertTrue(result.is_ok())
-        self.assertTrue(result.unwrap()["is_service_account"])
+        self.assertTrue(result.is_err())
+        self.assertIsInstance(result.error, MissingOrganizationClaimError)

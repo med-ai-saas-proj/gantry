@@ -407,7 +407,6 @@ class ProjectService:
                 session=session,
                 project_id=project.id,
                 user_id=actor_user_id,
-                permissions=[],
             )
             set_res = await self._set_project_permissions(
                 actor_user_id,
@@ -501,7 +500,6 @@ class ProjectService:
                 session=session,
                 project_id=project_id,
                 user_id=target_user_id,
-                permissions=[],
             )
             set_res = await self._set_project_permissions(
                 target_user_id,

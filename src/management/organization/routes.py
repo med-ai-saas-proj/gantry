@@ -82,8 +82,6 @@ async def update_org_info(
         org_id=org_id,
         actor_user_id=user_info["id"],
         name=input_data.name,
-        actor_is_service_account=bool(user_info.get("is_service_account")),
-        actor_client_id=user_info.get("client_id"),
     )
     return result.unwrap()
 
@@ -324,8 +322,6 @@ async def get_user_permissions(
         org_id=org_id,
         actor_user_id=user_info["id"],
         target_user_id=user_id,
-        actor_is_service_account=bool(user_info.get("is_service_account")),
-        actor_client_id=user_info.get("client_id"),
     )
     authz_res.unwrap()
     result = await org_service.get_user_permissions(org_id, user_id)
@@ -353,7 +349,5 @@ async def update_user_permissions(
         actor_user_id=user_info["id"],
         user_id=user_id,
         permissions=input_data.permissions,
-        actor_is_service_account=bool(user_info.get("is_service_account")),
-        actor_client_id=user_info.get("client_id"),
     )
     return result.unwrap()

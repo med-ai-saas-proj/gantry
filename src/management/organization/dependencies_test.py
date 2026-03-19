@@ -17,7 +17,6 @@ from src.management.organization.dependencies import (
     _get_permissions_or_raise,
     _InsufficientOrgPermission,
     _raise_permission_fetch_error,
-    _is_trusted_backend_service_account,
 )
 
 
@@ -62,26 +61,6 @@ class TestOrganizationDependencies(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_permission_helpers(self):
-        self.assertTrue(
-            _is_trusted_backend_service_account(
-                {
-                    "id": "svc",
-                    "roles": [],
-                    "client_id": org_settings.keycloak_service_client_id,
-                    "username": (
-                        f"service-account-"
-                        f"{org_settings.keycloak_service_client_id}"
-                    ),
-                    "is_service_account": True,
-                }
-            )
-        )
-        self.assertFalse(
-            _is_trusted_backend_service_account(
-                {"id": "u1", "roles": [], "username": "alice"}
-            )
-        )
-
         with self.assertRaises(_InsufficientOrgPermission):
             _raise_permission_fetch_error(_MemberMissingErr())
 
@@ -119,19 +98,9 @@ class TestOrganizationDependencies(unittest.IsolatedAsyncioTestCase):
             await dependency("org-1", user_info, org_service), user_info
         )
 
-    async def test_required_org_permission_bypass_and_deny(self):
+    async def test_required_org_permission_deny(self):
         dependency = requiredOrgPermission(OrgPermission.SETTINGS_READ)
-        trusted = {
-            "id": "svc",
-            "roles": [],
-            "client_id": org_settings.keycloak_service_client_id,
-            "username": f"service-account-{org_settings.keycloak_service_client_id}",
-            "is_service_account": True,
-        }
         org_service = Mock()
-        result = await dependency("org-1", trusted, org_service)
-        self.assertEqual(result, trusted)
-
         org_service.get_user_permissions = AsyncMock(
             return_value=Ok(SimpleNamespace(permissions=[]))
         )

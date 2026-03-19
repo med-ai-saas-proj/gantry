@@ -55,19 +55,20 @@ async def getUserInfo(
     Returns UserInfo if token is valid, raises UnauthorizedError otherwise.
     """
     user_info = auth_service.verifyToken(token).unwrap()
-    user_info["org_id"] = user_info.get("org_id")
 
-    if user_info.get("org_id") or user_info.get("is_service_account"):
+    org_claim = user_info["org_id"]
+    if not org_claim:
         return user_info
 
     orgs_res = await kc_org_client.get_member_organizations(user_info["id"])
     if orgs_res.is_err():
         return user_info
 
-    organizations = orgs_res.unwrap()
-    for org in organizations:
+    for org in orgs_res.unwrap():
         org_id = org.get("id")
-        if isinstance(org_id, str) and org_id:
+        if not isinstance(org_id, str) or not org_id:
+            continue
+        if org_claim in {org_id, org.get("name"), org.get("alias")}:
             user_info["org_id"] = org_id
             break
 
@@ -78,7 +79,7 @@ async def getUserOrgId(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
 ) -> str | None:
     """Return the authenticated user's organization id from token context."""
-    return user_info.get("org_id")
+    return user_info["org_id"]
 
 
 async def requireUserOrgId(

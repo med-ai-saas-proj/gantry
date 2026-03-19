@@ -162,23 +162,6 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
             res.error, ReadOwnPermissionsOrManageRequiredError
         )
 
-    async def test_ensure_can_read_user_permissions_service_actor_bypass(self):
-        """Trusted backend service-account should bypass read checks."""
-        # Arrange
-        service = self._make_service()
-
-        # Act
-        res = await service.ensure_can_read_user_permissions(
-            org_id="org-1",
-            actor_user_id="svc",
-            target_user_id="u2",
-            actor_is_service_account=True,
-            actor_client_id="med-ai-saas-backend",
-        )
-
-        # Assert
-        self.assertTrue(res.is_ok())
-
     async def test_ensure_can_read_user_permissions_other_user_allowed_with_rw(
         self,
     ):
@@ -352,32 +335,6 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         self.assertEqual(
             res.unwrap().permissions,
             [OrgPermission.USERS_GET_ALL.value],
-        )
-
-    async def test_update_user_permissions_service_actor_bypass_owner_checks(
-        self,
-    ):
-        """Trusted backend service-account should update org permissions directly."""
-        # Arrange
-        service = self._make_service()
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
-
-        # Act
-        res = await service.update_user_permissions(
-            org_id="org-1",
-            actor_user_id="svc",
-            user_id="u-target",
-            permissions=[OrgPermission.SETTINGS_READ.value],
-            actor_is_service_account=True,
-            actor_client_id="med-ai-saas-backend",
-        )
-
-        # Assert
-        self.assertTrue(res.is_ok())
-        service.kc.set_user_attribute.assert_awaited_once_with(
-            "u-target",
-            "org_permissions",
-            [OrgPermission.SETTINGS_READ.value],
         )
 
     async def test_get_user_permissions_success(self):

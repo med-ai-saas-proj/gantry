@@ -96,7 +96,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         self.assertTrue(res.unwrap())
         self.session_manager.session.commit.assert_awaited()
 
-    async def test_update_org_info_requires_owner(self):
+    async def test_update_org_info_requires_owner_for_non_owner_actor(self):
         """Non-owner actor cannot update org metadata."""
         # Arrange
         service = self._make_service()
@@ -113,32 +113,22 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         self.assertTrue(res.is_err())
         self.assertIsInstance(res.error, OwnerPermissionRequiredError)
 
-    async def test_update_org_info_service_actor_bypass_owner_check(self):
-        """Trusted backend service account should update org metadata directly."""
+    async def test_update_org_info_requires_owner(self):
+        """Non-owner should not be able to update organization metadata."""
         # Arrange
         service = self._make_service()
-        service.kc.get_org = AsyncMock(
-            return_value=Ok({"id": "org-1", "name": "old-name"})
-        )
-        service.kc.update_org = AsyncMock(return_value=Ok(True))
+        service._get_org_owner_id = AsyncMock(return_value=Ok("u-owner"))
 
         # Act
         res = await service.update_org_info(
             org_id="org-1",
-            actor_user_id="svc",
+            actor_user_id="u-other",
             name="new-name",
-            actor_is_service_account=True,
-            actor_client_id="med-ai-saas-backend",
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
-        self.assertEqual(res.unwrap().name, "new-name")
-        self.assertIsNone(res.unwrap().owner_id)
-        service.kc.update_org.assert_awaited_once_with(
-            "org-1",
-            {"id": "org-1", "name": "new-name"},
-        )
+        self.assertTrue(res.is_err())
+        self.assertIsInstance(res.error, OwnerPermissionRequiredError)
 
     async def test_update_org_info_owner_success(self):
         """Organization owner should be able to rename the organization."""

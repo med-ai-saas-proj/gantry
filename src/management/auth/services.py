@@ -24,6 +24,13 @@ class UnauthorizedError(RecoverableError):
     title = messages_const.UNAUTHORIZED
 
 
+class MissingOrganizationClaimError(UnauthorizedError):
+    """Raised when a regular user token has no organization claim."""
+
+    code = "missing_organization_claim"
+    detail = "The authenticated token does not include an organization claim."
+
+
 class ForbiddenError(RecoverableError):
     """Raised when user doesn't have required permissions."""
 
@@ -144,6 +151,8 @@ class AuthService:
         if account_roles:
             roles.extend(account_roles)
 
+        username = claims.get("preferred_username")
+
         org_id: str | None = None
         organization_claim = claims.get("organization")
         if isinstance(organization_claim, str):
@@ -153,20 +162,15 @@ class AuthService:
                 if isinstance(value, str) and value:
                     org_id = value
                     break
+        if not org_id:
+            return Err(MissingOrganizationClaimError())
 
         auth_info: UserInfo = {
             "id": claims["sub"],
-            "username": claims.get("preferred_username"),
+            "username": username if isinstance(username, str) else None,
             "email": claims.get("email"),
             "roles": roles,
             "org_id": org_id,
-            "client_id": claims.get("azp"),
-            "is_service_account": (
-                isinstance(claims.get("preferred_username"), str)
-                and claims.get("preferred_username", "").startswith(
-                    "service-account-"
-                )
-            ),
         }
 
         return Ok(auth_info)

@@ -20,7 +20,6 @@ CREATE INDEX IF NOT EXISTS "Projects_organization_id_idx" ON "Project"."Projects
 CREATE TABLE IF NOT EXISTS "Project"."ProjectMemberships" (
     project_id BIGINT NOT NULL,
     user_id VARCHAR(128) NOT NULL,
-    permissions JSON NOT NULL DEFAULT '[]',
     joined_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,

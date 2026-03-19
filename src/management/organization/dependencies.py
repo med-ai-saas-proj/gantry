@@ -68,20 +68,6 @@ class _KeycloakOrgError(RecoverableError):
     detail = "Could not fetch organisation permissions from Keycloak."
 
 
-def _is_trusted_backend_service_account(user_info: UserInfo) -> bool:
-    client_id = user_info.get("client_id")
-    username = user_info.get("username")
-    is_service_account = bool(user_info.get("is_service_account"))
-    expected_service_username = (
-        f"service-account-{org_settings.keycloak_service_client_id}"
-    )
-    return (
-        is_service_account
-        and client_id == org_settings.keycloak_service_client_id
-        and username == expected_service_username
-    )
-
-
 def _raise_permission_fetch_error(err: Exception) -> None:
     err_status = getattr(err, "status", 500)
     err_code = getattr(err, "code", "")
@@ -140,9 +126,6 @@ def requiredOrgPermission(permission: OrgPermission):
         user_info: Annotated[UserInfo, Depends(_get_user_info)],
         org_service: Annotated[OrgService, Depends(getOrgService)],
     ) -> UserInfo:
-        if _is_trusted_backend_service_account(user_info):
-            return user_info
-
         user_perms = await _get_permissions_or_raise(
             org_service, org_id, user_info["id"]
         )

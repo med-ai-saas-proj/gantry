@@ -6,7 +6,6 @@ from src.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
 from datetime import datetime
 
 from sqlalchemy import (
-    JSON,
     String,
     Boolean,
     DateTime,
@@ -42,7 +41,7 @@ class Project(WithCreateUpdateTimestamp, WithUUID, WithID, ProjectBaseSQLModel):
 
 
 class ProjectMembership(WithCreateUpdateTimestamp, ProjectBaseSQLModel):
-    """User membership and permissions inside a project."""
+    """User membership inside a project."""
 
     __tablename__ = "ProjectMemberships"
 
@@ -52,12 +51,6 @@ class ProjectMembership(WithCreateUpdateTimestamp, ProjectBaseSQLModel):
         primary_key=True,
     )
     user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
-    permissions: Mapped[list[str]] = mapped_column(
-        JSON,
-        nullable=False,
-        default=list,
-        server_default="[]",
-    )
     joined_at: Mapped[datetime] = mapped_column(
         DateTime,
         nullable=False,

@@ -102,18 +102,14 @@ class ProjectMembershipRepository(Repository[ProjectMembership, int]):
         session: AsyncSession,
         project_id: int,
         user_id: str,
-        permissions: list[str],
     ) -> ProjectMembership:
         existing = await self.get_membership(session, project_id, user_id)
         if existing is None:
             existing = ProjectMembership(
                 project_id=project_id,
                 user_id=user_id,
-                permissions=permissions,
             )
             session.add(existing)
-        else:
-            existing.permissions = permissions
         await session.flush()
         await session.refresh(existing)
         return existing
@@ -142,17 +138,6 @@ class ProjectMembershipRepository(Repository[ProjectMembership, int]):
             .order_by(ProjectMembership.joined_at.asc())
         )
         return list(await self.selectMany(session, stmt))
-
-    async def count_owners(
-        self,
-        session: AsyncSession,
-        project_id: int,
-        owner_permission: str,
-    ) -> int:
-        members = await self.list_members(session, project_id)
-        return sum(
-            1 for m in members if owner_permission in (m.permissions or [])
-        )
 
     async def list_memberships_for_user_in_org(
         self,

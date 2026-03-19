@@ -8,7 +8,6 @@ from src.management.project.dtos import (
 )
 from src.management.project.permissions import (
     ALL_PERMISSIONS,
-    ProjectPermission,
 )
 
 import unittest
@@ -32,7 +31,6 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             await routes.get_projects(
                 {"id": "u1", "roles": []},
-                "org-from-token",
                 ProjectListQuery(organization="org-1"),
                 service,
             ),
@@ -41,7 +39,6 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             await routes.get_projects(
                 {"id": "u1", "roles": []},
-                "org-from-token",
                 ProjectListQuery(),
                 service,
             ),
