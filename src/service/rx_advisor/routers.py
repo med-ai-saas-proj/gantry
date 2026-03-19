@@ -1,4 +1,4 @@
-from src.shared.utils.logger import LOGGER
+from src.shared.logging.logger import LOGGER
 from src.management.api_keys.entities import ApiKeyInfo
 from src.shared.custom_types.responses import SSEResponse
 from src.management.api_keys.dependencies import requiredPermissions

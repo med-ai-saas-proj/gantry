@@ -1,5 +1,4 @@
 from src.ehr.custom_types import EHRFormat
-from src.shared.utils.logger import LOGGER
 from src.management.api_keys.entities import ApiKeyInfo
 from src.management.api_keys.dependencies import requiredPermissions
 from src.shared.custom_types.responses.sse import SSEResponse

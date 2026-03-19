@@ -1,6 +1,6 @@
 from src.shared.consts import messages_const
 from src.shared.settings import getAppSetting
-from src.shared.utils.logger import getLogger
+from src.shared.logging.logger import getLogger
 from src.shared.dtos.error_output import (
     ProblemDetails,
 )

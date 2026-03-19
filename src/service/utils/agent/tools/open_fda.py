@@ -1,4 +1,4 @@
-from src.shared.utils.logger import LOGGER
+from src.shared.logging.logger import LOGGER
 from src.service.utils.agent.factories import getPromptService
 from src.service.utils.agent.agent_deps import AgentDeps
 from src.service.utils.agent.tools.consts import (

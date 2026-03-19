@@ -1,4 +1,4 @@
-from src.shared.utils.logger import LOGGER
+from src.shared.logging.logger import LOGGER
 
 from . import consts
 from .services import CrawlerService
