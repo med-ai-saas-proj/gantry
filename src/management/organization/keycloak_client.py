@@ -255,7 +255,7 @@ class KeycloakOrgClient:
 
     async def get_org(
         self, org_id: str
-    ) -> Result[dict[str, Any], RecoverableError]:
+    ) -> Result[dict[str, Any], OrgNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
             return Err(self._init_error)
         if self._admin is None:
@@ -280,7 +280,7 @@ class KeycloakOrgClient:
         self,
         org_id: str,
         payload: dict[str, Any],
-    ) -> Result[bool, RecoverableError]:
+    ) -> Result[bool, OrgNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
             return Err(self._init_error)
         if self._admin is None:
@@ -299,7 +299,9 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def delete_org(self, org_id: str) -> Result[bool, RecoverableError]:
+    async def delete_org(
+        self, org_id: str
+    ) -> Result[bool, OrgNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
             return Err(self._init_error)
         if self._admin is None:
@@ -326,7 +328,7 @@ class KeycloakOrgClient:
         search: str | None = None,
         exact: bool | None = None,
         membership_type: str | None = None,
-    ) -> Result[list[dict[str, Any]], RecoverableError]:
+    ) -> Result[list[dict[str, Any]], OrgNotFoundError | KeycloakOrgError]:
         query: dict[str, Any] = {"first": first, "max": max_results}
         if search:
             query["search"] = search
@@ -359,7 +361,7 @@ class KeycloakOrgClient:
 
     async def get_org_member_count(
         self, org_id: str
-    ) -> Result[int, RecoverableError]:
+    ) -> Result[int, OrgNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
             return Err(self._init_error)
         if self._admin is None:
@@ -384,7 +386,7 @@ class KeycloakOrgClient:
         self,
         user_id: str,
         brief_representation: bool = True,
-    ) -> Result[list[dict[str, Any]], RecoverableError]:
+    ) -> Result[list[dict[str, Any]], MemberNotFoundError | KeycloakOrgError]:
         del brief_representation
         if self._init_error is not None:
             return Err(self._init_error)
@@ -408,7 +410,7 @@ class KeycloakOrgClient:
 
     async def remove_member(
         self, org_id: str, user_id: str
-    ) -> Result[bool, RecoverableError]:
+    ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
             return Err(self._init_error)
         if self._admin is None:
@@ -427,7 +429,9 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def delete_user(self, user_id: str) -> Result[bool, RecoverableError]:
+    async def delete_user(
+        self, user_id: str
+    ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
             return Err(self._init_error)
         if self._admin is None:
@@ -450,7 +454,12 @@ class KeycloakOrgClient:
         self,
         email: str,
         exact: bool = True,
-    ) -> Result[dict[str, Any] | None, RecoverableError]:
+    ) -> Result[
+        dict[str, Any] | None,
+        KeycloakOrgBadRequestError
+        | KeycloakOrgForbiddenError
+        | KeycloakOrgError,
+    ]:
         if self._init_error is not None:
             return Err(self._init_error)
         if self._admin is None:
@@ -490,7 +499,13 @@ class KeycloakOrgClient:
         redirect_uri: str | None = None,
         first_name: str | None = None,
         last_name: str | None = None,
-    ) -> Result[bool, RecoverableError]:
+    ) -> Result[
+        bool,
+        OrgNotFoundError
+        | KeycloakOrgBadRequestError
+        | KeycloakOrgForbiddenError
+        | KeycloakOrgError,
+    ]:
         path = (
             f"{self._admin_base()}/organizations/{org_id}/members/invite-user"
         )
@@ -539,7 +554,14 @@ class KeycloakOrgClient:
         max_results: int | None = None,
         search: str | None = None,
         status: str | None = None,
-    ) -> Result[list[dict[str, Any]], RecoverableError]:
+    ) -> Result[
+        list[dict[str, Any]],
+        OrgNotFoundError
+        | KeycloakOrgBadRequestError
+        | KeycloakOrgForbiddenError
+        | KeycloakOrgConflictError
+        | KeycloakOrgError,
+    ]:
         path = f"{self._admin_base()}/organizations/{org_id}/invitations"
         query: dict[str, Any] = {}
         if email:
@@ -577,7 +599,13 @@ class KeycloakOrgClient:
 
     async def get_invitation(
         self, org_id: str, invitation_id: str
-    ) -> Result[dict[str, Any], RecoverableError]:
+    ) -> Result[
+        dict[str, Any],
+        InvitationNotFoundError
+        | KeycloakOrgBadRequestError
+        | KeycloakOrgForbiddenError
+        | KeycloakOrgError,
+    ]:
         path = f"{self._admin_base()}/organizations/{org_id}/invitations/{invitation_id}"
         response_res = await self._raw_request("get", path)
         if response_res.is_err():
@@ -601,7 +629,13 @@ class KeycloakOrgClient:
 
     async def delete_invitation(
         self, org_id: str, invitation_id: str
-    ) -> Result[bool, RecoverableError]:
+    ) -> Result[
+        bool,
+        InvitationNotFoundError
+        | KeycloakOrgBadRequestError
+        | KeycloakOrgForbiddenError
+        | KeycloakOrgError,
+    ]:
         path = f"{self._admin_base()}/organizations/{org_id}/invitations/{invitation_id}"
         response_res = await self._raw_request("delete", path)
         if response_res.is_err():
@@ -620,7 +654,13 @@ class KeycloakOrgClient:
 
     async def resend_invitation(
         self, org_id: str, invitation_id: str
-    ) -> Result[bool, RecoverableError]:
+    ) -> Result[
+        bool,
+        InvitationNotFoundError
+        | KeycloakOrgBadRequestError
+        | KeycloakOrgForbiddenError
+        | KeycloakOrgError,
+    ]:
         path = (
             f"{self._admin_base()}/organizations/{org_id}"
             f"/invitations/{invitation_id}/resend"
@@ -642,7 +682,7 @@ class KeycloakOrgClient:
 
     async def get_user_attributes(
         self, user_id: str
-    ) -> Result[dict[str, Any], RecoverableError]:
+    ) -> Result[dict[str, Any], MemberNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
             return Err(self._init_error)
         if self._admin is None:
@@ -670,7 +710,7 @@ class KeycloakOrgClient:
         user_id: str,
         key: str,
         values: list[str],
-    ) -> Result[bool, RecoverableError]:
+    ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
             return Err(self._init_error)
         if self._admin is None:

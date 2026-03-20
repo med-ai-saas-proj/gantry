@@ -1,7 +1,7 @@
 """Factory functions for Project module singletons."""
 
 from src.db.factories import getSessionManager
-from src.shared.utils.logger import getLogger
+from src.shared.logging.logger import getLogger
 from src.management.organization.factories import getKeycloakOrgClient
 
 from .services import ProjectService
