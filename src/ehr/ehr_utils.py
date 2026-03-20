@@ -1,5 +1,5 @@
 from src.shared.utils import dict_utils
-from src.shared.utils.logger import LOGGER
+from src.shared.logging.logger import LOGGER
 
 from .dtos import EHRFormat
 from .vn_moh import toDateTime

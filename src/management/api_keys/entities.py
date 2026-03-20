@@ -8,3 +8,4 @@ class ApiKeyInfo(TypedDict):
     user_id: str
     project_id: int
     org_id: str
+    project_uid: str

@@ -1,5 +1,5 @@
-from . import request_id_utils
-from ..settings import AppStage, getAppSetting
+from ..utils import request_id_utils
+from ..settings import getAppSetting
 
 import time
 import logging
@@ -70,10 +70,11 @@ def configure_default_logging(
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(min_level)
 
-    if settings.stage == AppStage.PROD:
-        processors += [orjson_renderer]
-    else:
-        processors += [structlog.dev.ConsoleRenderer()]
+    # if settings.stage == AppStage.PROD:
+    #     processors += [orjson_renderer]
+    # else:
+    #     processors += [structlog.dev.ConsoleRenderer()]
+    processors += [orjson_renderer]
 
     return structlog.wrap_logger(
         logger,
@@ -91,3 +92,12 @@ def getLogger() -> BoundLogger:
 
 
 LOGGER: BoundLogger = getLogger()
+
+
+def getServiceLogger(
+    org_id: str,
+    project_id: str | None = None,
+) -> BoundLogger:
+    if project_id:
+        return LOGGER.bind(projectId=project_id, orgId=org_id)
+    return LOGGER.bind(orgId=org_id)

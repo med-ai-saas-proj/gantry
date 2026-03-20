@@ -1,7 +1,7 @@
 """Factory functions for the Organization module singletons."""
 
 from src.db.factories import getSessionManager
-from src.shared.utils.logger import getLogger
+from src.shared.logging.logger import getLogger
 from src.management.auth.settings import getAuthSettings
 
 from .services import OrgService

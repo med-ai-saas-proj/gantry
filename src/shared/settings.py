@@ -15,8 +15,10 @@ class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(case_sensitive=False)
     stage: AppStage = Field(AppStage.DEV)
     debug: bool = Field(False)
-    otlp_endpoint: str = Field("localhost:4317")
     allowed_origins: str = Field("*")
+
+    app_name: str = Field("Med-AI-SaaS")
+    app_version: str = Field("1.0.0")
 
 
 @lru_cache(1)

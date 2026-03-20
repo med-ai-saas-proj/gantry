@@ -1,7 +1,6 @@
 """This file contain definition of chat's routers."""
 
-from src.shared.utils.logger import LOGGER
-from src.management.auth.dependencies import UserInfo, getUserInfo
+from src.shared.logging.logger import LOGGER, getServiceLogger
 from src.shared.custom_types.responses.sse import SSEResponse
 
 from .dtos import ChatInput
@@ -28,7 +27,10 @@ async def chat(
     chat_service: Annotated[ChatService, Depends(getChatService)],
 ):
     """Just the good old chatbot."""
-    LOGGER.debug("api_key_info", api_key_info=api_key_info)
+    getServiceLogger(
+        api_key_info["org_id"],
+        api_key_info["project_uid"],
+    ).debug("api_key_info", api_key_info=api_key_info)
 
     if input.stream:
         return SSEResponse(
