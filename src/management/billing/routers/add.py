@@ -1,17 +1,16 @@
 """Billing API routes."""
 
-from src.management.api_keys.dependencies import requiredPermissions
 from src.management.api_keys.entities import ApiKeyInfo
+from src.management.api_keys.dependencies import requiredPermissions
 
 from ..dtos import BillingPing, HoldRequest, ReleaseRequest
+from .router import billing_router
 from ..factories import BillingService, getBillingService
 
 from uuid import UUID
 from typing import Annotated
 
 from fastapi import Body, Depends
-
-from .router import billing_router
 
 
 @billing_router.post("/hold")
@@ -43,10 +42,11 @@ async def release(
 ) -> bool:
     return (await billing_service.release(hold_uuid, body.real_amount)).unwrap()
 
+
 @billing_router.post(
-        "/",
-        description="Directly create a transaction without a hold. For use cases where the cost is known upfront and there's no need to reserve funds in advance (e.g. one-time charges, fixed-price services, etc.)."
-        )
+    "/",
+    description="Directly create a transaction without a hold. For use cases where the cost is known upfront and there's no need to reserve funds in advance (e.g. one-time charges, fixed-price services, etc.).",
+)
 async def direct_charge(
     apikey_info: Annotated[
         ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
@@ -55,4 +55,3 @@ async def direct_charge(
     billing_service: Annotated[BillingService, Depends(getBillingService)],
 ):
     pass
-

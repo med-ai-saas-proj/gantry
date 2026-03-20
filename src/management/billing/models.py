@@ -1,39 +1,34 @@
-from datetime import date, datetime
+from src.db.base import BaseTimescaleSQLModel
+from src.db.utils import WithID, WithClientUUIDv7, WithCreateUpdateTimestamp
+
 import enum
-
-from src.db.base import BaseSQLModel
-from src.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
-
 from decimal import Decimal
+from datetime import date, datetime
 
 from sqlalchemy import (
     Date,
-    DateTime,
     Enum,
-    ForeignKey,
     Index,
-    Integer,
     String,
     Numeric,
+    DateTime,
     BigInteger,
+    ForeignKey,
     UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 
-from src.management.projects.models import Project
 
-
-class BillingBaseSQLModel(BaseSQLModel):
+class BillingBaseSQLModel(BaseTimescaleSQLModel):
     """Base SQL Model for the billing module."""
 
     __abstract__ = True
     __table_args__ = {"schema": "Billing"}
 
 
-class BillingTransaction(
-    WithCreateUpdateTimestamp, WithUUID, BillingBaseSQLModel, WithID
-):
+class BillingTransaction(WithClientUUIDv7, BillingBaseSQLModel, WithID):
     """Individual charge record for each API call.
 
     All amounts are in USD. Currency conversion is handled by the payment
@@ -47,9 +42,25 @@ class BillingTransaction(
 
     __tablename__ = "BillingTransactions"
 
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        # default=datetime.now(UTC).replace(tzinfo=None),
+        server_default=func.now(),
+        nullable=False,
+        primary_key=True,
+        init=False,
+    )
+
     # apikey_id is enough, project_id and org_id can be derived from it
     apikey_id: Mapped[int] = mapped_column(
         BigInteger, nullable=False, index=True
+    )
+    # for quick access patterns, we also store project_id and org_id here (denormalization)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, nullable=True, index=True
+    )
+    organization_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, index=True
     )
 
     # Numeric avoids float rounding — critical for billing.
@@ -63,41 +74,8 @@ class BillingTransaction(
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
-class UsageAggregate(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
-    __tablename__ = "ProjectMonthlyAggregates"
-
-    organization_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
-    project_id: Mapped[int] = mapped_column(BigInteger, nullable=True, index=True)
-
-    # "2026-02" — always calendar month, always UTC
-    billing_period: Mapped[date] = mapped_column(Date, nullable=False)
-
-    total_amount: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False, default=Decimal("0")
-    )
-    # False = open, True = finalized
-    is_finalized: Mapped[bool] = mapped_column(nullable=False, default=False)
-    
-    __table_args__ = (
-        Index(
-            "ix_aggregates_project_period",
-            organization_id,
-            project_id,
-            billing_period,
-            unique=True,
-        ),
-        Index(
-            "ix_aggregates_org_period",
-            organization_id,
-            billing_period,
-            unique=True,
-            postgresql_where=project_id.is_(None)  # global default record
-        ),
-    )
-
-
 class Credit(
-    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
+    WithCreateUpdateTimestamp, WithID, WithClientUUIDv7, BillingBaseSQLModel
 ):
     __tablename__ = "Credits"
 
@@ -118,23 +96,32 @@ class Credit(
         Numeric(precision=18, scale=8), nullable=False, default=Decimal("0")
     )
 
-class BillingSource(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
+
+class BillingSource(
+    WithCreateUpdateTimestamp, WithID, WithClientUUIDv7, BillingBaseSQLModel
+):
     __tablename__ = "BillingSources"
 
     organization_id: Mapped[str] = mapped_column(
         String(128), nullable=False, index=True
     )
 
-    source_type: Mapped[str] = mapped_column(String(64), nullable=False)  # e.g. "stripe", "paypal"
-    provider_id: Mapped[str] = mapped_column(String(128), nullable=False)  # e.g. Stripe customer ID
+    source_type: Mapped[str] = mapped_column(
+        String(64), nullable=False
+    )  # e.g. "stripe", "paypal"
+    provider_id: Mapped[str] = mapped_column(
+        String(128), nullable=False
+    )  # e.g. Stripe customer ID
 
     __table_args__ = (
-        UniqueConstraint(organization_id, source_type, name="uq_billing_source"),
-     )
+        UniqueConstraint(
+            organization_id, source_type, name="uq_billing_source"
+        ),
+    )
 
 
 class BillingInvoice(
-    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
+    WithCreateUpdateTimestamp, WithID, WithClientUUIDv7, BillingBaseSQLModel
 ):
     __tablename__ = "BillingInvoices"
 
@@ -142,7 +129,9 @@ class BillingInvoice(
         String(128), nullable=False, index=True
     )
 
-    billing_period: Mapped[date] = mapped_column(Date, nullable=False, unique=True)
+    billing_period: Mapped[date] = mapped_column(
+        Date, nullable=False, unique=True
+    )
 
     total_amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=18, scale=8), nullable=False
@@ -156,14 +145,14 @@ class BillingInvoice(
 
 
 class BillingInvoiceLineItem(
-    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
+    WithCreateUpdateTimestamp, WithID, WithClientUUIDv7, BillingBaseSQLModel
 ):
     __tablename__ = "BillingInvoiceLineItems"
 
     invoice_id: Mapped[int] = mapped_column(
         BigInteger,
-        ForeignKey(BillingInvoice.id, ondelete="CASCADE"), 
-        nullable=False, 
+        ForeignKey(BillingInvoice.id, ondelete="CASCADE"),
+        nullable=False,
         index=True,
     )
 
@@ -173,17 +162,17 @@ class BillingInvoiceLineItem(
         Numeric(precision=18, scale=8), nullable=False
     )
     project_id: Mapped[int | None] = mapped_column(
-        BigInteger, 
-        ForeignKey(Project.id, ondelete="SET NULL"),
-        nullable=True, index=True
-    ) # optional link to project
+        BigInteger, nullable=True, index=True
+    )  # optional link to project
+
 
 class SpendingLimitType(str, enum.Enum):
     MONTHLY = "monthly"
     DAILY = "daily"
 
+
 class SpendingLimit(
-    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
+    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel, WithClientUUIDv7
 ):
     __tablename__ = "SpendingLimits"
 
@@ -191,13 +180,11 @@ class SpendingLimit(
         String(128), nullable=False, index=True
     )
     project_id: Mapped[int] = mapped_column(
-        BigInteger, 
-        ForeignKey(Project.id, ondelete="CASCADE"),
-        nullable=True, unique=True, index=True
+        BigInteger, nullable=True, unique=True, index=True
     )
 
     limit_type: Mapped[SpendingLimitType] = mapped_column(
-        Enum(SpendingLimitType), nullable=False
+        Enum(SpendingLimitType, schema="Billing"), nullable=False
     )
     limit: Mapped[Decimal | None] = mapped_column(
         Numeric(precision=18, scale=8), nullable=True
@@ -209,6 +196,6 @@ class SpendingLimit(
             "ix_spending_limits_org",
             organization_id,
             unique=True,
-            postgresql_where=project_id.is_(None)  # global default record
+            postgresql_where=project_id.is_(None),  # global default record
         ),
-     )
+    )

@@ -38,6 +38,18 @@ class WithUUID(MappedAsDataclass, kw_only=True):
     )
 
 
+class WithClientUUIDv7(MappedAsDataclass, kw_only=True):
+    uuid: Mapped[PythonUUID] = mapped_column(
+        Uuid,
+        unique=True,
+        index=True,
+        nullable=False,
+        default_factory=uuid7,
+        sort_order=-998,
+        init=False,
+    )
+
+
 class WithClientUUID(MappedAsDataclass, kw_only=True):
     uuid: Mapped[PythonUUID] = mapped_column(
         Uuid,

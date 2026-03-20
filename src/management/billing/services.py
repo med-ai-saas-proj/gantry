@@ -39,7 +39,6 @@ from src.shared.custom_types.error_exception import RecoverableError
 
 from .dtos import BillingPing, ScaledAmount
 from .repositories import (
-    UsageAggregateRepository,
     SpendingLimitRepository,
 )
 
@@ -121,13 +120,11 @@ class BillingService:
         logger: BoundLogger,
         session_manager: AsyncSessionManager,
         redis: Redis,
-        monthly_agg_repo: UsageAggregateRepository,
         spending_limit_repo: SpendingLimitRepository,
     ) -> None:
         self.logger = logger
         self.session_manager = session_manager
         self.redis = redis
-        self.usage_agg_repo = monthly_agg_repo
         self.spending_limit_repo = spending_limit_repo
 
     # -----------------------------------------------------------------------
@@ -160,11 +157,11 @@ class BillingService:
 
             # Returns None if project_limit would be exceeded OR period finalized.
             agg = await self.usage_agg_repo.holdAggregate(
-                session, 
-                project_id, 
+                session,
+                project_id,
                 org_id,
-                billing_period, 
-                hold_amount, 
+                billing_period,
+                hold_amount,
                 project_limit,
                 org_limit,
             )
@@ -237,7 +234,7 @@ class BillingService:
                     hold_uuid=str(hold_uuid),
                     project_id=project_id,
                     billing_period=billing_period,
-                    org_id=org_id
+                    org_id=org_id,
                 )
                 return Err(AggregateFinalized())
 

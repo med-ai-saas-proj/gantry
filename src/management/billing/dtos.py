@@ -1,9 +1,9 @@
 """DTOs for the billing module."""
 
-from datetime import datetime
 from re import U
-from typing import TypedDict
 from uuid import UUID
+from typing import TypedDict
+from datetime import datetime
 
 from pydantic import BaseModel
 
@@ -41,8 +41,9 @@ class ReleaseRequest(BaseModel):
 
 
 class ManualPaymentResponse(BaseModel):
-    hosted_invoice_url: str # URL to hosted payment page on the payment gateway (e.g. Stripe Checkout) where the user can complete the payment
-    
+    hosted_invoice_url: str  # URL to hosted payment page on the payment gateway (e.g. Stripe Checkout) where the user can complete the payment
+
+
 class TransactionInfo(BaseModel):
     transaction_id: UUID
     amount: ScaledAmount
@@ -50,18 +51,21 @@ class TransactionInfo(BaseModel):
     project_id: int
     details: dict
 
+
 class InvoiceInfo(BaseModel):
     invoice_id: str
     amount_due: ScaledAmount
     due_date: datetime
-    
+
+
 class StripeInvoiceInfo(BaseModel):
     invoice_id: str
     amount_due: ScaledAmount
     due_date: datetime
     hosted_invoice_url: str
 
-type InvoiceDetailInfo = StripeInvoiceInfo # can be extended to support multiple payment gateways with different invoice formats in the future
+
+type InvoiceDetailInfo = StripeInvoiceInfo  # can be extended to support multiple payment gateways with different invoice formats in the future
 
 
 class SpendingLimitInfo(BaseModel):
@@ -71,8 +75,13 @@ class SpendingLimitInfo(BaseModel):
 
 
 class UpdateSpendingLimitRequest(BaseModel):
-    new_limit: ScaledAmount | None = None # if null, will remove spending limit and allow all charges to go through regardless of amount
-    project_uid: UUID | None = None # if null, will apply to whole organization instead of specific project
+    new_limit: ScaledAmount | None = (
+        None  # if null, will remove spending limit and allow all charges to go through regardless of amount
+    )
+    project_uid: UUID | None = (
+        None  # if null, will apply to whole organization instead of specific project
+    )
+
 
 class CreditInfo(BaseModel):
     credit_id: UUID
@@ -84,6 +93,7 @@ class CreditInfo(BaseModel):
     exp_month: int
     exp_year: int
     note: str | None = None
+
 
 class AddCreditRequest(BaseModel):
     amount: ScaledAmount

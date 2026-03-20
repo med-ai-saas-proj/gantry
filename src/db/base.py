@@ -17,4 +17,9 @@ class BaseSQLModel(MappedAsDataclass, DeclarativeBase, kw_only=True):
     """This should be the base of all SQL model."""
 
     metadata = MetaData(naming_convention=naming_convention)
-    pass
+
+
+class BaseTimescaleSQLModel(MappedAsDataclass, DeclarativeBase, kw_only=True):
+    """Base model for timescaleDB."""
+
+    metadata = MetaData(naming_convention=naming_convention)
