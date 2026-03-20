@@ -1,8 +1,13 @@
 from .uuid_utils import uuid7
-from ..initialize.request_id import (
-    REQUEST_ID_VARS,
-    REQUEST_ID_CONTEXTVAR,
+
+import contextvars
+from typing import Any
+
+
+REQUEST_ID_CONTEXTVAR = contextvars.ContextVar[Any](
+    "request_id_contextvar", default=None
 )
+REQUEST_ID_VARS = {}
 
 
 def get() -> str | None:

@@ -2,7 +2,7 @@ services:
   otelcol:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: otel-collector
-    command: [ "--config=/etc/otel-collector-config.yml" ]
+    command: ["--config=/etc/otel-collector-config.yml"]
     volumes:
       - ./asset/otel/otel-collector-config.yaml:/etc/otel-collector-config.yml:ro
     ports:
@@ -10,7 +10,15 @@ services:
       - "4318:4318" # OTLP HTTP receiver port
       - "13133:13133" # Health check port
     healthcheck:
-      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:13133/" ]
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost:13133/",
+        ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -19,23 +27,39 @@ services:
       - prometheus
       - loki
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
 
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.enable-remote-write-receiver'
-      - '--enable-feature=exemplar-storage'
-      - '--enable-feature=native-histograms'
-      - '--storage.tsdb.retention.time=7d' # Retention period for metrics
-      - '--storage.tsdb.retention.size=100MB' # Retention size limit for metrics
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-remote-write-receiver"
+      - "--enable-feature=exemplar-storage"
+      - "--enable-feature=native-histograms"
+      - "--storage.tsdb.retention.time=7d" # Retention period for metrics
+      - "--storage.tsdb.retention.size=100MB" # Retention size limit for metrics
     volumes:
       - prometheus_data:/prometheus
     ports:
       - "9090:9090" # Prometheus UI and API
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
 
   loki:
     image: grafana/loki:latest
@@ -48,12 +72,20 @@ services:
     ports:
       - "3100:3100" # Loki API
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
 
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: jaeger
     command:
-      - "--badger.span-store-ttl=168h"  # Retention period for traces and spans
+      - "--badger.span-store-ttl=168h" # Retention period for traces and spans
     user: root # to fix permission issues with badger storage (/badger/data, /badger/key)
     environment:
       - COLLECTOR_OTLP_ENABLED=true
@@ -66,6 +98,14 @@ services:
     ports:
       - "16686:16686" # Jaeger UI
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
 
   grafana:
     image: grafana/grafana:latest
@@ -77,8 +117,16 @@ services:
       - grafana_data:/var/lib/grafana
       - ./asset/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
     ports:
-      - "3000:3000"
+      - "3001:3000"
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 500M
+        reservations:
+          cpus: "0.1"
+          memory: 300M
 
   timescale_db:
     image: timescale/timescaledb:latest-pg17

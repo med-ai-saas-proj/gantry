@@ -34,6 +34,7 @@ from typing import Literal, Sequence, Awaitable, cast
 from datetime import UTC, datetime
 from dataclasses import asdict
 
+from pyrusult import Ok, Err, Result
 from pydantic_ai import (
     AudioUrl,
     ImageUrl,
@@ -53,7 +54,6 @@ from pydantic_ai import (
     BuiltinToolCallPart,
     BuiltinToolReturnPart,
 )
-from safe_result import Ok, Err, Result
 from redis.asyncio import Redis
 
 

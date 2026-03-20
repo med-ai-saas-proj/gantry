@@ -45,6 +45,14 @@ class StreamOptions(BaseDTO):
     response_type: StreamFormat = StreamFormat.default
 
 
+class GenerationConfig(BaseDTO):
+    """Generation config."""
+
+    max_tokens: Annotated[
+        int, Field(description="Limit for model output", ge=1)
+    ] = 16000
+
+
 class GenerationInput(BaseDTO):
     """Input for endpoints that use LLM to generate responses."""
 
@@ -61,6 +69,9 @@ class GenerationInput(BaseDTO):
     model: Annotated[
         str, Field(description="Model ID used to generate the response.")
     ]
+    generation_config: Annotated[
+        GenerationConfig, Field(description="Model's generation config")
+    ] = GenerationConfig()
     stream: Annotated[
         bool,
         Field(

@@ -35,6 +35,7 @@ from typing import (
     cast,
 )
 
+from pyrusult import Ok, Err, Result, ResultStatus
 from pydantic_ai import (
     AudioUrl,
     ImageUrl,
@@ -46,7 +47,6 @@ from pydantic_ai import (
     AgentStreamEvent,
     AgentRunResultEvent,
 )
-from safe_result import Ok, Err, Result
 
 
 DATA_URL_BASE64_RE = re.compile(
@@ -153,7 +153,7 @@ class ConversationSession:
                         result = self.extractFileContentFromUrl(
                             root_message.url
                         )
-                        if result.is_ok():
+                        if result.status == ResultStatus.Ok:
                             mime_type, file_data = result.unwrap()
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
@@ -188,7 +188,7 @@ class ConversationSession:
                     root_message = message.root
                     if isinstance(root_message, AudioURLInput):
                         res = self.extractFileContentFromUrl(root_message.url)
-                        if res.is_ok():
+                        if res.status == ResultStatus.Ok:
                             mime_type, file_data = res.unwrap()
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
@@ -223,7 +223,7 @@ class ConversationSession:
                     root_message = message.root
                     if isinstance(root_message, VideoURLInput):
                         res = self.extractFileContentFromUrl(root_message.url)
-                        if res.is_ok():
+                        if res.status == ResultStatus.Ok:
                             mime_type, file_data = res.unwrap()
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
@@ -258,7 +258,7 @@ class ConversationSession:
                     root_message = message.root
                     if isinstance(root_message, DocumentURLInput):
                         res = self.extractFileContentFromUrl(root_message.url)
-                        if res.is_ok():
+                        if res.status == ResultStatus.Ok:
                             mime_type, file_data = res.unwrap()
                             file_id = await self.addUploadFile(
                                 file_data, mime_type

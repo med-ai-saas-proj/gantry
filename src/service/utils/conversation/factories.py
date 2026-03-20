@@ -1,4 +1,5 @@
-from src.db.factories import getRedis, getSessionManager, getRedisLockManager
+from src.db.factories import getRedis, getSessionManager
+from src.shared.logging.logger import getLogger
 from src.service.utils.file_storage.factories import getFileStorageService
 
 from .services import ConversationService
@@ -27,5 +28,8 @@ def getConversationService():
 def getConversationManager():
     """Returns a cached instance of the ConversationManager."""
     return ConversationManager(
-        getConversationService(), getRedisLockManager(), getFileStorageService()
+        getLogger(),
+        getRedis(),
+        getConversationService(),
+        getFileStorageService(),
     )
