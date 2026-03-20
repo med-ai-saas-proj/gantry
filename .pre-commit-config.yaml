@@ -3,8 +3,8 @@ repos:
     hooks:
       - id: tidy
         name: Format & sort imports
-        entry: ./scripts/tidy.sh
-        language: script
+        entry: sh -c "./scripts/tidy.sh"
+        language: system
         files: ^.*\.py$
 
       - id: update-example-env-files

@@ -33,14 +33,13 @@ Flow (see architecture diagram):
     TODO(BILL-008): INSERT BillingTransaction into TimescaleDB.
 """
 
-import asyncio
-
 from src.db.factories import AsyncSessionManager
+from src.management.billing.models import SpendingLimitType
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .dtos import BillingPing, ScaledAmount
 from .repositories import (
-    MonthlyAggregateRepository,
+    UsageAggregateRepository,
     SpendingLimitRepository,
 )
 
@@ -122,13 +121,13 @@ class BillingService:
         logger: BoundLogger,
         session_manager: AsyncSessionManager,
         redis: Redis,
-        monthly_agg_repo: MonthlyAggregateRepository,
+        monthly_agg_repo: UsageAggregateRepository,
         spending_limit_repo: SpendingLimitRepository,
     ) -> None:
         self.logger = logger
         self.session_manager = session_manager
         self.redis = redis
-        self.monthly_agg_repo = monthly_agg_repo
+        self.usage_agg_repo = monthly_agg_repo
         self.spending_limit_repo = spending_limit_repo
 
     # -----------------------------------------------------------------------
@@ -148,25 +147,19 @@ class BillingService:
         hold_amount = _to_decimal(ping["amount"])
 
         async with self.session_manager.get_session() as session:
-            proj_limit_row, org_limit_row = await asyncio.gather(
-                self.spending_limit_repo.getForProject(
-                    session, project_id
-                ),
-                self.spending_limit_repo.getForOrg(session, org_id)
+            spending_limit_rows = await self.spending_limit_repo.get(
+                session, org_id, project_id, SpendingLimitType.MONTHLY
             )
-            project_limit: Decimal | None = (
-                proj_limit_row.monthly_limit
-                if proj_limit_row is not None
-                else None
-            )
-            org_limit: Decimal | None = (
-                org_limit_row.monthly_limit
-                if org_limit_row is not None
-                else None
-            )
+            project_limit = None
+            org_limit = None
+            for row in spending_limit_rows:
+                if row.project_id == project_id:
+                    project_limit = row.limit
+                elif row.project_id is None:
+                    org_limit = row.limit
 
             # Returns None if project_limit would be exceeded OR period finalized.
-            agg = await self.monthly_agg_repo.holdAggregate(
+            agg = await self.usage_agg_repo.holdAggregate(
                 session, 
                 project_id, 
                 org_id,
@@ -234,7 +227,7 @@ class BillingService:
         delta = real - hold_amount
 
         async with self.session_manager.get_session() as session:
-            agg = await self.monthly_agg_repo.releaseAggregate(
+            agg = await self.usage_agg_repo.releaseAggregate(
                 session, project_id, org_id, billing_period, delta
             )
             if agg is None:

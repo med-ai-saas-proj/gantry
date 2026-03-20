@@ -5,8 +5,7 @@ from src.shared.utils.logger import getLogger
 
 from .services import BillingService
 from .repositories import (
-    MonthlyAggregateRepository,
-    ProjectSpendingLimitRepository,
+    UsageAggregateRepository,
     SpendingLimitRepository,
 )
 
@@ -19,7 +18,6 @@ def getBillingService() -> BillingService:
         logger=getLogger(),
         session_manager=getSessionManager(),
         redis=getRedis(),
-        monthly_agg_repo=MonthlyAggregateRepository(),
-        project_limit_repo=ProjectSpendingLimitRepository(),
+        monthly_agg_repo=UsageAggregateRepository(),
         spending_limit_repo=SpendingLimitRepository(),
     )

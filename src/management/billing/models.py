@@ -1,4 +1,5 @@
 from datetime import date, datetime
+import enum
 
 from src.db.base import BaseSQLModel
 from src.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
@@ -8,6 +9,7 @@ from decimal import Decimal
 from sqlalchemy import (
     Date,
     DateTime,
+    Enum,
     ForeignKey,
     Index,
     Integer,
@@ -61,32 +63,11 @@ class BillingTransaction(
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
-class ProjectMonthlyAggregate(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
-    """Pre-aggregated billing total per project per calendar month.
-
-    All amounts are in USD.
-
-    Period format: "2026-02" — calendar month, UTC boundary.
-
-    Caching strategy (TODO: implement in BILL-008):
-      - Current month's aggregate is cached in Redis under
-        key `billing:agg:{project_id}:{billing_period}` for hot reads/writes.
-      - Postgres is always the source of truth.
-      - Finalized (past) months are read directly from Postgres — they never change.
-    """
-
+class UsageAggregate(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
     __tablename__ = "ProjectMonthlyAggregates"
-    __table_args__ = (
-        Index(
-            "ix_project_monthly_aggregates_project_period",
-            "project_id",
-            "billing_period",
-            unique=True,
-        ),
-        {"schema": "Billing"},
-    )
 
-    project_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    organization_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    project_id: Mapped[int] = mapped_column(BigInteger, nullable=True, index=True)
 
     # "2026-02" — always calendar month, always UTC
     billing_period: Mapped[date] = mapped_column(Date, nullable=False)
@@ -96,38 +77,23 @@ class ProjectMonthlyAggregate(WithCreateUpdateTimestamp, WithID, BillingBaseSQLM
     )
     # False = open, True = finalized
     is_finalized: Mapped[bool] = mapped_column(nullable=False, default=False)
-
-class OrganizationMonthlyAggregate(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
-    """Pre-aggregated billing total per organization per calendar month.
-
-    All amounts are in USD.
-
-    Period format: "2026-02" — calendar month, UTC boundary.
-    """
-
-    __tablename__ = "OrganizationMonthlyAggregates"
+    
     __table_args__ = (
         Index(
-            "ix_organization_monthly_aggregates_organization_period",
-            "organization_id",
-            "billing_period",
+            "ix_aggregates_project_period",
+            organization_id,
+            project_id,
+            billing_period,
             unique=True,
         ),
-        {"schema": "Billing"},
+        Index(
+            "ix_aggregates_org_period",
+            organization_id,
+            billing_period,
+            unique=True,
+            postgresql_where=project_id.is_(None)  # global default record
+        ),
     )
-
-    organization_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, unique=True, index=True
-    )
-
-    # "2026-02" — always calendar month, always UTC
-    billing_period: Mapped[date] = mapped_column(Date, nullable=False)
-
-    total_amount: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False, default=Decimal("0")
-    )
-    # False = open, True = finalized
-    is_finalized: Mapped[bool] = mapped_column(nullable=False, default=False)
 
 
 class Credit(
@@ -212,6 +178,9 @@ class BillingInvoiceLineItem(
         nullable=True, index=True
     ) # optional link to project
 
+class SpendingLimitType(str, enum.Enum):
+    MONTHLY = "monthly"
+    DAILY = "daily"
 
 class SpendingLimit(
     WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
@@ -227,10 +196,10 @@ class SpendingLimit(
         nullable=True, unique=True, index=True
     )
 
-    monthly_limit: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=True
+    limit_type: Mapped[SpendingLimitType] = mapped_column(
+        Enum(SpendingLimitType), nullable=False
     )
-    daily_limit: Mapped[Decimal | None] = mapped_column(
+    limit: Mapped[Decimal | None] = mapped_column(
         Numeric(precision=18, scale=8), nullable=True
     )
 

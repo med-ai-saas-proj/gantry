@@ -3,8 +3,8 @@
 from src.db.repository import Repository
 
 from .models import (
-    OrganizationMonthlyAggregate,
-    ProjectMonthlyAggregate,
+    SpendingLimitType,
+    UsageAggregate,
     BillingTransaction,
     SpendingLimit
 )
@@ -14,7 +14,7 @@ from typing import Sequence
 from decimal import Decimal
 from datetime import datetime
 
-from sqlalchemy import and_, func, true, select, update
+from sqlalchemy import and_, func, or_, true, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 
@@ -103,24 +103,24 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
         return total if total is not None else Decimal("0")
 
 
-class MonthlyAggregateRepository:
-    """Repository for MonthlyAggregate records."""
+class UsageAggregateRepository:
+    """Repository for UsageAggregate records."""
 
     async def getAggregate(
         self,
         session: AsyncSession,
         project_id: int,
         billing_period: str,
-    ) -> ProjectMonthlyAggregate | None:
+    ) -> UsageAggregate | None:
         """Get an aggregate.
 
         Billing_period format: "YYYY-MM" (e.g., "2026-02").
         """
         stmt = (
-            select(ProjectMonthlyAggregate)
+            select(UsageAggregate)
             .where(
-                ProjectMonthlyAggregate.project_id == project_id,
-                ProjectMonthlyAggregate.billing_period == billing_period,
+                UsageAggregate.project_id == project_id,
+                UsageAggregate.billing_period == billing_period,
             )
             .limit(1)
         )
@@ -136,7 +136,7 @@ class MonthlyAggregateRepository:
         hold_amount: Decimal,
         project_limit: Decimal | None,
         org_limit: Decimal | None,
-    ) -> tuple[ProjectMonthlyAggregate | None, OrganizationMonthlyAggregate | None]:
+    ) -> Sequence[UsageAggregate] | None:
         """Upsert an aggregate row and atomically increment its total.
 
         - If the row doesn't exist yet: inserts it with total_amount = amount.
@@ -148,69 +148,65 @@ class MonthlyAggregateRepository:
         the caller doesn't need a prior getOrCreate round-trip.
         """
         if project_limit is not None and hold_amount > project_limit:
-            return None, None
+            return None
         if org_limit is not None and hold_amount > org_limit:
-            return None, None
-
-        proj_limit_where = (
-            ProjectMonthlyAggregate.total_amount + hold_amount <= project_limit
-            if project_limit is not None
-            else true()
-        )
-        org_limit_where = (
-            OrganizationMonthlyAggregate.total_amount + hold_amount <= org_limit
-            if org_limit is not None else true()
-        )
+            return None
 
         stmt1 = (
-            insert(ProjectMonthlyAggregate)
+            insert(UsageAggregate)
             .values(
+                organization_id=org_id,
                 project_id=project_id,
                 billing_period=billing_period,
                 total_amount=hold_amount,
                 is_finalized=False,
             )
             .on_conflict_do_update(
-                index_elements=["project_id", "billing_period"],
+                index_elements=["organization_id", "project_id", "billing_period"],
                 set_={
-                    "total_amount": ProjectMonthlyAggregate.total_amount + hold_amount,
+                    "total_amount": UsageAggregate.total_amount + hold_amount,
                     "updated_at": func.now(),
                 },
                 where=and_(
-                    ProjectMonthlyAggregate.is_finalized == False,
-                    proj_limit_where,
+                    UsageAggregate.is_finalized == False,
+                    (UsageAggregate.total_amount + hold_amount <= project_limit)
+                    if project_limit is not None
+                    else true(),
                 ),
             )
-            .returning(ProjectMonthlyAggregate)
+            .returning(UsageAggregate)
         )
         row1 = await session.execute(stmt1)
-        res1 = row1.scalar_one_or_none()
-        if res1 is None:
-            return None, None
         stmt2 = (
-            insert(OrganizationMonthlyAggregate)
+            insert(UsageAggregate)
             .values(
                 organization_id=org_id,
                 billing_period=billing_period,
                 total_amount=hold_amount,
                 is_finalized=False,
-            ).on_conflict_do_update(
+            )
+            .on_conflict_do_update(
                 index_elements=["organization_id", "billing_period"],
+                index_where=UsageAggregate.project_id.is_(None),
                 set_={
-                    "total_amount": OrganizationMonthlyAggregate.total_amount + hold_amount,
+                    "total_amount": UsageAggregate.total_amount + hold_amount,
                     "updated_at": func.now(),
                 },
                 where=and_(
-                    OrganizationMonthlyAggregate.is_finalized == False,
-                    org_limit_where,
+                    UsageAggregate.is_finalized == False,
+                    (UsageAggregate.total_amount + hold_amount <= org_limit)
+                    if org_limit is not None
+                    else true(),
                 ),
-            ).returning(OrganizationMonthlyAggregate)
+            )
+            .returning(UsageAggregate)
         )
         row2 = await session.execute(stmt2)
-        res2 = row2.scalar_one_or_none()
-        if res2 is None:
-            return res1, None
-        return res1, res2
+        agg1 = row1.scalar_one_or_none()
+        agg2 = row2.scalar_one_or_none()
+        if agg1 is None or agg2 is None:
+            return None
+        return [agg1, agg2]
 
     async def releaseAggregate(
         self,
@@ -219,7 +215,7 @@ class MonthlyAggregateRepository:
         org_id: str,
         billing_period: str,
         delta_amount: Decimal,
-    ) -> tuple[ProjectMonthlyAggregate, OrganizationMonthlyAggregate] | None:
+    ) -> Sequence[UsageAggregate] | None:
         """Adjust the aggregate total by delta_amount (may be negative).
 
         delta = real_cost − hold_amount. Negative when the hold over-estimated
@@ -229,17 +225,17 @@ class MonthlyAggregateRepository:
         (month-end race).
         """
         stmt1 = (
-            update(ProjectMonthlyAggregate)
+            update(UsageAggregate)
             .where(
-                ProjectMonthlyAggregate.project_id == project_id,
-                ProjectMonthlyAggregate.billing_period == billing_period,
-                ProjectMonthlyAggregate.is_finalized == False,
+                UsageAggregate.project_id == project_id,
+                UsageAggregate.billing_period == billing_period,
+                UsageAggregate.is_finalized == False,
             )
             .values(
-                total_amount=ProjectMonthlyAggregate.total_amount + delta_amount,
+                total_amount=UsageAggregate.total_amount + delta_amount,
                 updated_at=func.now(),
             )
-            .returning(ProjectMonthlyAggregate)
+            .returning(UsageAggregate)
         )
         result = await session.execute(stmt1)
         row1 = result.scalar_one_or_none()
@@ -247,21 +243,21 @@ class MonthlyAggregateRepository:
             return None
         
         stmt2 = (
-            update(OrganizationMonthlyAggregate)
+            update(UsageAggregate)
             .where(
-                OrganizationMonthlyAggregate.organization_id == org_id,
-                OrganizationMonthlyAggregate.billing_period == billing_period,
-                OrganizationMonthlyAggregate.is_finalized == False,
+                UsageAggregate.organization_id == org_id,
+                UsageAggregate.billing_period == billing_period,
+                UsageAggregate.is_finalized == False,
             ).values(
-                total_amount=OrganizationMonthlyAggregate.total_amount + delta_amount,
+                total_amount=UsageAggregate.total_amount + delta_amount,
                 updated_at=func.now(),
-            ).returning(OrganizationMonthlyAggregate)
+            ).returning(UsageAggregate)
         )
         result2 = await session.execute(stmt2)
         row2 = result2.scalar_one_or_none()
         if row2 is None:
             return None
-        return row1, row2
+        return [row1, row2]
 
     async def finalize(
         self,
@@ -269,42 +265,26 @@ class MonthlyAggregateRepository:
         project_id: int,
         org_id: str,
         billing_period: str,
-    ) -> tuple[ProjectMonthlyAggregate, OrganizationMonthlyAggregate] | None:
+    ) -> Sequence[UsageAggregate] | None:
         """Mark an aggregate as finalized (immutable).
 
         Returns None if it was already finalized or not found.
         """
         stmt = (
-            update(ProjectMonthlyAggregate)
+            update(UsageAggregate)
             .where(
-                ProjectMonthlyAggregate.project_id == project_id,
-                ProjectMonthlyAggregate.billing_period == billing_period,
-                ProjectMonthlyAggregate.is_finalized == False,
+                UsageAggregate.organization_id == org_id, 
+                or_(UsageAggregate.project_id.is_(None),
+                UsageAggregate.project_id == project_id,
+                    ),
+                UsageAggregate.billing_period == billing_period,
+                UsageAggregate.is_finalized == False,
             )
             .values(is_finalized=True, updated_at=func.now())
-            .returning(ProjectMonthlyAggregate)
+            .returning(UsageAggregate)
         )
-        result1 = await session.execute(stmt)
-        row1 = result1.scalar_one_or_none()
-        if row1 is None:
-            return None
-        
-        stmt2 = (
-            update(OrganizationMonthlyAggregate)
-            .where(
-                OrganizationMonthlyAggregate.organization_id == org_id,
-                OrganizationMonthlyAggregate.billing_period == billing_period,
-                OrganizationMonthlyAggregate.is_finalized == False,
-            )
-            .values(is_finalized=True, updated_at=func.now())
-            .returning(OrganizationMonthlyAggregate)
-        )
-        result2 = await session.execute(stmt2)
-        row2 = result2.scalar_one_or_none()
-        if row2 is None:
-            return None
-        
-        return row1, row2
+        result = await session.execute(stmt)
+        return result.scalars().all()
 
     async def getByProject(
         self,
@@ -312,12 +292,12 @@ class MonthlyAggregateRepository:
         project_id: int,
         skip: int = 0,
         limit: int = 100,
-    ) -> Sequence[ProjectMonthlyAggregate]:
+    ) -> Sequence[UsageAggregate]:
         """Get aggregates for a project, most recent period first."""
         stmt = (
-            select(ProjectMonthlyAggregate)
-            .where(ProjectMonthlyAggregate.project_id == project_id)
-            .order_by(ProjectMonthlyAggregate.billing_period.desc())
+            select(UsageAggregate)
+            .where(UsageAggregate.project_id == project_id)
+            .order_by(UsageAggregate.billing_period.desc())
         )
         if skip is not None:
             stmt = stmt.offset(skip)
@@ -332,12 +312,12 @@ class MonthlyAggregateRepository:
         org_id: str,
         skip: int = 0,
         limit: int = 100,
-    ) -> Sequence[OrganizationMonthlyAggregate]:
+    ) -> Sequence[UsageAggregate]:
         """Get aggregates for an organization, most recent period first."""
         stmt = (
-            select(OrganizationMonthlyAggregate)
-            .where(OrganizationMonthlyAggregate.organization_id == org_id)
-            .order_by(OrganizationMonthlyAggregate.billing_period.desc())
+            select(UsageAggregate)
+            .where(UsageAggregate.organization_id == org_id)
+            .order_by(UsageAggregate.billing_period.desc())
         )
         if skip is not None:
             stmt = stmt.offset(skip)
@@ -351,13 +331,13 @@ class MonthlyAggregateRepository:
         session: AsyncSession,
         project_id: int,
         billing_period: str,
-    ) -> ProjectMonthlyAggregate | None:
+    ) -> UsageAggregate | None:
         """Get the aggregate for a specific project and billing period."""
         stmt = (
-            select(ProjectMonthlyAggregate)
+            select(UsageAggregate)
             .where(
-                ProjectMonthlyAggregate.project_id == project_id,
-                ProjectMonthlyAggregate.billing_period == billing_period,
+                UsageAggregate.project_id == project_id,
+                UsageAggregate.billing_period == billing_period,
             )
             .limit(1)
         )
@@ -380,7 +360,8 @@ class SpendingLimitRepository(
         session: AsyncSession,
         org_id: str,
         project_id: int,
-    ) -> SpendingLimit | None:
+        limit_type: SpendingLimitType
+    ) -> Sequence[SpendingLimit]:
         """Get the spending limit record for an organization."""
         stmt = (
             select(SpendingLimit)
@@ -390,10 +371,10 @@ class SpendingLimitRepository(
                     (SpendingLimit.project_id == project_id)
                     | SpendingLimit.project_id.is_(None)  # global default
                 )
+                & (SpendingLimit.limit_type == limit_type)
             )
-            .limit(1)
         )
-        return await self.selectOne(session, stmt)
+        return await self.selectMany(session, stmt)
 
     async def upsert(
         self,
