@@ -1,1 +1,0 @@
-from src.shared.entities.base import BaseEntity

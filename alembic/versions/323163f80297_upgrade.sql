@@ -83,25 +83,21 @@ CREATE INDEX "ApiKeys_project_id_idx" ON "ApiKey"."ApiKeys" (project_id);
 
 ALTER TABLE "ApiKey"."ApiKeys" ADD CONSTRAINT "ApiKeys_project_id_fkey" FOREIGN KEY(project_id) REFERENCES "Project"."Projects" (id);
 
-CREATE
-             OR REPLACE FUNCTION "Conversation".generate_msg_seq()
-    RETURNS TRIGGER AS $$
-             BEGIN
-             SELECT COALESCE(MAX(seq_id), 0) + 1
-             INTO NEW.seq_id
-             FROM "Conversation"."Messages"
-             WHERE conversation_id = NEW.conversation_id;
-             RETURN NEW;
-             END;
-    $$
-             LANGUAGE plpgsql;;
+-- CREATE OR REPLACE FUNCTION "Conversation".generate_msg_seq()
+--     RETURNS TRIGGER AS $$
+--         BEGIN
+--             SELECT COALESCE(MAX(seq_id), 0) + 1
+--             INTO NEW.seq_id
+--             FROM "Conversation"."Messages"
+--             WHERE conversation_id = NEW.conversation_id;
+--             RETURN NEW;
+--         END;
+--     $$ LANGUAGE plpgsql;;
 
-CREATE TRIGGER trg_msg_seq
-                 BEFORE INSERT
-                 ON "Conversation"."Messages"
-                 FOR EACH ROW EXECUTE FUNCTION "Conversation".generate_msg_seq();;
+-- CREATE TRIGGER trg_msg_seq
+-- BEFORE INSERT ON "Conversation"."Messages"
+-- FOR EACH ROW EXECUTE FUNCTION "Conversation".generate_msg_seq();;
 
-UPDATE alembic_version SET version_num='323163f80297' WHERE alembic_version.version_num = 'a1b2c3d4e5f6';
+-- UPDATE alembic_version SET version_num='323163f80297' WHERE alembic_version.version_num = 'a1b2c3d4e5f6';
 
 COMMIT;
-

@@ -1,5 +1,6 @@
 from src.db.session import AsyncSessionManager
 from src.shared.utils.json_utils import json_serializer
+from src.shared.utils.uuid_utils import uuid7
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import FileRecord
@@ -13,7 +14,7 @@ import asyncio
 from typing import TYPE_CHECKING, BinaryIO
 from datetime import datetime
 
-from safe_result import Ok, Err, Result
+from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
 
 
@@ -89,7 +90,7 @@ class FileStorageService:
     ):
         """Upload a file and store its metadata."""
         if file_uid is None:
-            file_uid = uuid.uuid4()
+            file_uid = uuid7()
         file_path = (
             f"uploads/{file_uid}.{ext}" if ext else f"/uploads/{file_uid}"
         )
@@ -139,8 +140,8 @@ class FileStorageService:
     ) -> Result[bytes, FileNotFoundInSystemError]:
         """Retrieve file content by UUID."""
         res = await self.getFileInfo(file_uuid, project_id)
-        if isinstance(res, Err):
-            return res
+        if res.status == ResultStatus.Err:
+            return res.into()
         file_record = res.unwrap()
         file_content = await asyncio.to_thread(
             self._loadFileContentFromStorage,
@@ -153,8 +154,8 @@ class FileStorageService:
     ) -> Result[str, FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID."""
         res = await self.getFileInfo(file_uuid, project_id)
-        if isinstance(res, Err):
-            return res
+        if res.status == ResultStatus.Err:
+            return res.into()
         file_record = res.unwrap()
         url = self.storage_backend.generate_presigned_url(
             ClientMethod="get_object",
@@ -171,8 +172,8 @@ class FileStorageService:
     ) -> Result[tuple[str, FileRecord], FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID."""
         res = await self.getFileInfo(file_uuid, project_id)
-        if isinstance(res, Err):
-            return res
+        if res.status == ResultStatus.Err:
+            return res.into()
         file_record = res.unwrap()
         url = self.storage_backend.generate_presigned_url(
             ClientMethod="get_object",
@@ -192,18 +193,20 @@ class FileStorageService:
         cached_info = await self.redis.get(cache_key)
         if cached_info:
             json_data = json.loads(cached_info)
-            return Ok[FileRecord](
-                {
-                    "id": json_data["id"],
-                    "filename": json_data["filename"],
-                    "storage_path": json_data["storage_path"],
-                    "mime_type": json_data["mime_type"],
-                    "size": json_data["size"],
-                    "created_at": datetime.fromisoformat(
-                        json_data["created_at"]
-                    ),
-                    "extra_metadata": json_data["extra_metadata"],
-                }
+            return Ok(
+                FileRecord(
+                    {
+                        "id": json_data["id"],
+                        "filename": json_data["filename"],
+                        "storage_path": json_data["storage_path"],
+                        "mime_type": json_data["mime_type"],
+                        "size": json_data["size"],
+                        "created_at": datetime.fromisoformat(
+                            json_data["created_at"]
+                        ),
+                        "extra_metadata": json_data["extra_metadata"],
+                    }
+                )
             )
 
         async with self.session_manager.get_session() as session:
@@ -228,7 +231,7 @@ class FileStorageService:
             json.dumps(res, default=json_serializer),
             ex=self.file_storage_settings.redis_cache_expiry_seconds,
         )
-        return Ok[FileRecord](res)
+        return Ok(res)
 
     async def updateFileMetadata(
         self, file_uuid: uuid.UUID, project_id: int, extra_metadata: dict | None

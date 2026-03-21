@@ -59,7 +59,7 @@ class ChatService:
                     yield event
                 except Exception as e:
                     # current version pydantic ai not supported cancel
-                    print("Error yielding event", e)
+                    self.logger.warn("Errro yielding event", {"exception": e})
 
     async def chat(
         self,

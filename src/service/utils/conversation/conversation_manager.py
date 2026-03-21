@@ -1,6 +1,8 @@
+from src.shared.utils.uuid_utils import uuid7
 from src.management.api_keys.entities import ApiKeyInfo
 from src.service.utils.file_storage.utils import detect_file_type
 from src.service.utils.file_storage.services import FileStorageService
+from src.shared.utils.redis_auto_extend_lock import RedisAutoExtendAsyncLock
 
 from .types import FileUploadInfo
 from .services import ConversationService
@@ -15,19 +17,24 @@ from typing import Sequence
 from asyncio import QueueShutDown
 from contextlib import asynccontextmanager
 
-from aioredlock import Aioredlock
 from pydantic_ai import ModelMessage
+from redis.asyncio import Redis
+from structlog.stdlib import BoundLogger
 
 
 class ConversationManager:
+    CONVERSATION_LOCK_TIMEOUT_SEC = 30
+
     def __init__(
         self,
+        logger: BoundLogger,
+        redis_client: Redis,
         conversation_service: ConversationService,
-        redis_lock_manager: Aioredlock,
         file_service: FileStorageService,
     ):
+        self.logger = logger
+        self.redis_client = redis_client
         self.conversation_service = conversation_service
-        self.redis_lock_manager = redis_lock_manager
         self.file_service = file_service
 
     @asynccontextmanager
@@ -46,10 +53,13 @@ class ConversationManager:
             ).unwrap()
             conversation_id = metadata["conversation_id"]
         else:
-            conversation_uid = uuid.uuid4()
+            conversation_uid = uuid7()
 
-        async with await self.redis_lock_manager.lock(
-            f"conversation:{conversation_uid}"
+        async with RedisAutoExtendAsyncLock(
+            self.redis_client.lock(
+                f"conversation:{conversation_uid}",
+                timeout=self.CONVERSATION_LOCK_TIMEOUT_SEC,
+            )
         ) as lock:
             mess_history: Sequence[ModelMessage] = []
 
@@ -78,7 +88,7 @@ class ConversationManager:
             try:
                 yield conversation_session
             except Exception as e:
-                print(f"An error occurred during conversion: {e}")
+                self.logger.warn("Errro yielding event", {"exception": e})
                 raise e
             finally:
                 new_message = conversation_session.new_messages
