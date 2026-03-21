@@ -38,10 +38,11 @@ db_uri = getDBSettings().timescale_connection_uri.encoded_string()
 
 def include_object(object, name, type_, reflected, compare_to):
     schema = getattr(object, "schema", None)
-    return not (schema and schema.startswith("_timescaledb")
+    return not ((schema and schema.startswith("_timescaledb")
             or schema == "information_schema"
-            or schema == "pg_catalog"
-            or name.startswith("timescaledb"))
+            or schema == "pg_catalog")
+            or name.startswith("timescaledb")
+            or getattr(object, "skip_autogenerate", None))
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.

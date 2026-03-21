@@ -28,6 +28,27 @@ class BillingBaseSQLModel(BaseTimescaleSQLModel):
     __table_args__ = {"schema": "Billing"}
 
 
+class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
+    """Daily aggregated billing data for efficient reporting.
+
+    MUST NOT BE INSERTED/UPDATED/DELETED BY APPLICATION CODE.
+    This is managed by a TimescaleDB continuous aggregate view.
+    """
+
+    __tablename__ = "daily_billing_summary"
+    __table_args__ = {"schema": "Billing", "skip_autogenerate": True}
+
+    bucket: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), primary_key=True
+    )
+    organization_id: Mapped[str] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    apikey_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 8))
+    transaction_count: Mapped[int] = mapped_column(BigInteger)
+
+
 class BillingTransaction(WithClientUUIDv7, BillingBaseSQLModel, WithID):
     """Individual charge record for each API call.
 

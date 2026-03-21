@@ -194,4 +194,10 @@ def downgrade() -> None:
     op.drop_index(op.f('BillingInvoices_organization_id_idx'), table_name='BillingInvoices', schema='Billing')
     op.drop_table('BillingInvoices', schema='Billing')
     # ### end Alembic commands ###
+    op.execute(
+        text("""DROP MATERIALIZED VIEW IF EXISTS "Billing".daily_billing_summary;""")
+    )
+    op.execute(
+        text("""DROP SCHEMA IF EXISTS "Billing" CASCADE;""")
+    )
 

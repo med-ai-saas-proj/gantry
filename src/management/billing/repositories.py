@@ -1,17 +1,48 @@
 """Billing repository layer."""
 
+from src.db.factories import getTimescaleSessionManager
 from src.db.repository import Repository
+from src.management.billing.models import (
+    SpendingLimit,
+    SpendingLimitType,
+    BillingTransaction,
+    TimescaleDBDailyBillingSummary,
+)
 
-from .models import SpendingLimit, SpendingLimitType, BillingTransaction
-
+import enum
 from uuid import UUID
-from typing import Sequence
+from typing import Sequence, TypedDict
 from decimal import Decimal
 from datetime import datetime
 
-from sqlalchemy import or_, and_, func, true, select, update
+from sqlalchemy import (
+    func,
+    text,
+    select,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
+
+
+class AggregatePeriod(str, enum.Enum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    YEARLY = "yearly"
+
+
+class BillingAggregateReport(TypedDict):
+    period_bucket: datetime
+    transaction_count: int
+    total_amount: Decimal
+
+
+bucket_map = {
+    AggregatePeriod.DAILY: "day",
+    AggregatePeriod.WEEKLY: "week",
+    AggregatePeriod.MONTHLY: "month",
+    AggregatePeriod.YEARLY: "year",
+}
 
 
 class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
@@ -29,33 +60,21 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
         self,
         session: AsyncSession,
         apikey_id: int,
+        project_id: int,
+        org_id: str,
         amount: Decimal,
         details: dict,
     ) -> BillingTransaction:
         """Persist the final charge record (called during RELEASE)."""
         tx = BillingTransaction(
             apikey_id=apikey_id,
+            project_id=project_id,
+            organization_id=org_id,
             amount=amount,
             details=details,
         )
         await self.add(session, tx)
         return tx
-
-    async def getByApiKey(
-        self,
-        session: AsyncSession,
-        apikey_id: int,
-        skip: int = 0,
-        limit: int = 100,
-    ) -> Sequence[BillingTransaction]:
-        """Get transactions for a single API key, newest first."""
-        stmt = (
-            select(BillingTransaction)
-            .where(BillingTransaction.apikey_id == apikey_id)
-            .order_by(BillingTransaction.created_at.desc())
-        )
-        stmt = self.buildFilterPagination(stmt, offset=skip, limit=limit)
-        return await self.selectMany(session, stmt)
 
     async def getByApiKeys(
         self,
@@ -77,25 +96,169 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
         stmt = self.buildFilterPagination(stmt, offset=skip, limit=limit)
         return await self.selectMany(session, stmt)
 
-    async def sumByApiKeysInPeriod(
+    async def getByOrganizations(
+        self,
+        session: AsyncSession,
+        org_ids: list[str],
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Sequence[BillingTransaction]:
+        """Get transactions for an organization, newest first."""
+        stmt = (
+            select(BillingTransaction)
+            .where(BillingTransaction.organization_id.in_(org_ids))
+            .order_by(BillingTransaction.created_at.desc())
+        )
+        stmt = self.buildFilterPagination(stmt, offset=skip, limit=limit)
+        return await self.selectMany(session, stmt)
+
+    async def getByProjects(
+        self,
+        session: AsyncSession,
+        project_ids: list[int],
+        skip: int = 0,
+        limit: int = 100,
+    ) -> Sequence[BillingTransaction]:
+        """Get transactions for a project, newest first."""
+        stmt = (
+            select(BillingTransaction)
+            .where(BillingTransaction.project_id.in_(project_ids))
+            .order_by(BillingTransaction.created_at.desc())
+        )
+        stmt = self.buildFilterPagination(stmt, offset=skip, limit=limit)
+        return await self.selectMany(session, stmt)
+
+    async def sumByPeriodByApiKeys(
         self,
         session: AsyncSession,
         apikey_ids: list[int],
-        period_start: datetime,
-        period_end: datetime,
-    ) -> Decimal:
-        """Sum committed transaction amounts over a time window.
-
-        period_start is inclusive, period_end is exclusive.
-        """
-        stmt = select(func.sum(BillingTransaction.amount)).where(
-            BillingTransaction.apikey_id.in_(apikey_ids),
-            BillingTransaction.created_at >= period_start,
-            BillingTransaction.created_at < period_end,
+        start_time: datetime,
+        end_time: datetime,
+        period: AggregatePeriod,
+        period_scale: int = 1,  # e.g. for period=weekly, period_scale=2 means 2-week aggregation buckets.
+    ) -> Sequence[BillingAggregateReport]:
+        """Sum the total amount for a set of API keys in a time period."""
+        bucket = func.public.time_bucket(
+            text(f"'{period_scale} {bucket_map[period]}'"),
+            TimescaleDBDailyBillingSummary.bucket,
+        ).label("period_bucket")
+        stmt = (
+            select(
+                bucket,
+                func.coalesce(
+                    func.sum(TimescaleDBDailyBillingSummary.transaction_count),
+                    0,
+                ).label("transaction_count"),
+                func.coalesce(
+                    func.sum(TimescaleDBDailyBillingSummary.total_amount),
+                    Decimal("0"),
+                ).label("total_amount"),
+            )
+            .where(
+                TimescaleDBDailyBillingSummary.apikey_id.in_(apikey_ids),
+                TimescaleDBDailyBillingSummary.bucket >= start_time,
+                TimescaleDBDailyBillingSummary.bucket < end_time,
+            )
+            .group_by(TimescaleDBDailyBillingSummary.apikey_id, bucket)
         )
         result = await session.execute(stmt)
-        total = result.scalar()
-        return total if total is not None else Decimal("0")
+        rows = result.all()
+        return [
+            {
+                "period_bucket": row.period_bucket,
+                "transaction_count": row.transaction_count,
+                "total_amount": row.total_amount,
+            }
+            for row in rows
+        ]
+
+    async def sumByPeriodByOrganizations(
+        self,
+        session: AsyncSession,
+        org_ids: list[str],
+        start_time: datetime,
+        end_time: datetime,
+        period: AggregatePeriod,
+        period_scale: int = 1,  # e.g. for period=weekly, period_scale=2 means 2-week aggregation buckets.
+    ) -> Sequence[BillingAggregateReport]:
+        """Sum the total amount for an organization in a time period."""
+        bucket = func.public.time_bucket(
+            text(f"'{period_scale} {bucket_map[period]}'"),
+            TimescaleDBDailyBillingSummary.bucket,
+        ).label("period_bucket")
+        stmt = (
+            select(
+                bucket,
+                func.coalesce(
+                    func.sum(TimescaleDBDailyBillingSummary.transaction_count),
+                    0,
+                ).label("transaction_count"),
+                func.coalesce(
+                    func.sum(TimescaleDBDailyBillingSummary.total_amount),
+                    Decimal("0"),
+                ).label("total_amount"),
+            )
+            .where(
+                TimescaleDBDailyBillingSummary.organization_id.in_(org_ids),
+                TimescaleDBDailyBillingSummary.bucket >= start_time,
+                TimescaleDBDailyBillingSummary.bucket < end_time,
+            )
+            .group_by(bucket)
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+        return [
+            {
+                "period_bucket": row.period_bucket,
+                "transaction_count": row.transaction_count,
+                "total_amount": row.total_amount,
+            }
+            for row in rows
+        ]
+
+    async def sumByPeriodByProjects(
+        self,
+        session: AsyncSession,
+        project_ids: list[int],
+        start_time: datetime,
+        end_time: datetime,
+        period: AggregatePeriod,
+        period_scale: int = 1,  # e.g. for period=weekly, period_scale=2 means 2-week aggregation buckets.
+    ) -> Sequence[BillingAggregateReport]:
+        """Sum the total amount for a project in a time period."""
+        bucket = func.public.time_bucket(
+            text(f"'{period_scale} {bucket_map[period]}'"),
+            TimescaleDBDailyBillingSummary.bucket,
+        ).label("period_bucket")
+        stmt = (
+            select(
+                bucket,
+                func.coalesce(
+                    func.sum(TimescaleDBDailyBillingSummary.transaction_count),
+                    0,
+                ).label("transaction_count"),
+                func.coalesce(
+                    func.sum(TimescaleDBDailyBillingSummary.total_amount),
+                    Decimal("0"),
+                ).label("total_amount"),
+            )
+            .where(
+                TimescaleDBDailyBillingSummary.project_id.in_(project_ids),
+                TimescaleDBDailyBillingSummary.bucket >= start_time,
+                TimescaleDBDailyBillingSummary.bucket < end_time,
+            )
+            .group_by(bucket)
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+        return [
+            {
+                "period_bucket": row.period_bucket,
+                "transaction_count": row.transaction_count,
+                "total_amount": row.total_amount,
+            }
+            for row in rows
+        ]
 
 
 class SpendingLimitRepository(Repository[SpendingLimit, int]):
@@ -171,3 +334,41 @@ class SpendingLimitRepository(Repository[SpendingLimit, int]):
             )
         result = await session.execute(stmt)
         return result.scalars().first()
+
+
+if __name__ == "__main__":
+    # For testing purposes only
+    import asyncio
+
+    async def test():
+        async with getTimescaleSessionManager().get_session() as session:
+            repo = BillingTransactionRepository()
+            await repo.addTransaction(
+                session=session,
+                apikey_id=1,
+                project_id=1,
+                org_id="org1",
+                amount=Decimal("10.5"),
+                details={"example": "data"},
+            )
+            await repo.addTransaction(
+                session=session,
+                apikey_id=2,
+                project_id=1,
+                org_id="org1",
+                amount=Decimal("20.0"),
+                details={"example": "data"},
+            )
+            await session.commit()
+        async with getTimescaleSessionManager().get_session() as session:
+            transactions = await repo.sumByPeriodByApiKeys(
+                session=session,
+                apikey_ids=[1, 2, 3],
+                start_time=datetime(2026, 1, 1),
+                end_time=datetime(2026, 12, 31),
+                period=AggregatePeriod.MONTHLY,
+                period_scale=1,
+            )
+            print(transactions)
+
+    asyncio.run(test())

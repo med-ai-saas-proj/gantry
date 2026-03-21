@@ -4,6 +4,7 @@ from src.management.auth.dependencies import getUserInfo
 from .router import billing_router
 from ..services import BillingService
 from ..factories import getBillingService
+from ..repositories import AggregatePeriod
 
 import enum
 from uuid import UUID
@@ -11,13 +12,6 @@ from typing import Annotated
 from datetime import datetime
 
 from fastapi import Depends
-
-
-class AggregatePeriod(str, enum.Enum):
-    DAILY = "daily"
-    WEEKLY = "weekly"
-    MONTHLY = "monthly"
-    YEARLY = "yearly"
 
 
 @billing_router.get(
