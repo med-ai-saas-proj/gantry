@@ -618,7 +618,7 @@ class OrgService:
             org_id, actor_user_id
         )
         if actor_perms_res.status == ResultStatus.Err:
-            return actor_perms_res
+            return actor_perms_res.into()
 
         if not has_permission(
             actor_perms_res.unwrap(),

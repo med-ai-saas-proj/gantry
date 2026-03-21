@@ -1,6 +1,8 @@
+from src.shared.utils.uuid_utils import uuid7
 from src.management.api_keys.entities import ApiKeyInfo
 from src.service.utils.file_storage.utils import detect_file_type
 from src.service.utils.file_storage.services import FileStorageService
+from src.shared.utils.redis_auto_extend_lock import RedisAutoExtendAsyncLock
 
 from .types import FileUploadInfo
 from .services import ConversationService
@@ -21,6 +23,8 @@ from structlog.stdlib import BoundLogger
 
 
 class ConversationManager:
+    CONVERSATION_LOCK_TIMEOUT_SEC = 30
+
     def __init__(
         self,
         logger: BoundLogger,
@@ -49,10 +53,13 @@ class ConversationManager:
             ).unwrap()
             conversation_id = metadata["conversation_id"]
         else:
-            conversation_uid = uuid.uuid4()
+            conversation_uid = uuid7()
 
-        async with self.redis_client.lock(
-            f"conversation:{conversation_uid}"
+        async with RedisAutoExtendAsyncLock(
+            self.redis_client.lock(
+                f"conversation:{conversation_uid}",
+                timeout=self.CONVERSATION_LOCK_TIMEOUT_SEC,
+            )
         ) as lock:
             mess_history: Sequence[ModelMessage] = []
 

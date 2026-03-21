@@ -1,5 +1,6 @@
 from src.db.session import AsyncSessionManager
 from src.shared.utils.json_utils import json_serializer
+from src.shared.utils.uuid_utils import uuid7
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .types import FileRecord
@@ -89,7 +90,7 @@ class FileStorageService:
     ):
         """Upload a file and store its metadata."""
         if file_uid is None:
-            file_uid = uuid.uuid4()
+            file_uid = uuid7()
         file_path = (
             f"uploads/{file_uid}.{ext}" if ext else f"/uploads/{file_uid}"
         )

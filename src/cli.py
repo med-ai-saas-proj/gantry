@@ -58,6 +58,9 @@ def initCentralSetting() -> type[BaseSettings]:
     return CentralSetting
 
 
+from fastuuid import uuid7, uuid7_bulk
+
+
 if __name__ == "__main__":
     os.environ["TEST2_FOO"] = "1"
     os.environ["TEST2_BAR"] = "asldfk"
@@ -67,5 +70,16 @@ if __name__ == "__main__":
     register({"prefix": "test", "setting": Test})
     register({"prefix": "test2", "setting": Test2})
     # print(Test())
-    print(initCentralSetting()())
+    # print(initCentralSetting()())
     # print(TestSubmodule())
+
+    prev = uuid7().bytes
+    for i in range(100):
+        now = uuid7().bytes
+        assert now > prev
+        prev = now
+
+    ls = uuid7_bulk(100)
+    print(ls)
+    for prev, next in zip(ls[:-1], ls[1:], strict=True):
+        assert prev.bytes < next.bytes

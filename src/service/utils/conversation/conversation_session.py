@@ -1,3 +1,4 @@
+from src.shared.utils.uuid_utils import uuid7
 from src.shared.custom_types.error_exception import RecoverableError
 from src.service.utils.agent.dtos.generation_output import ResponseStatus
 
@@ -124,7 +125,7 @@ class ConversationSession:
         mime_type: str,
     ) -> uuid.UUID:
         """Upload file and return file ID."""
-        file_id = uuid.uuid4()
+        file_id = uuid7()
         file_info = FileUploadInfo(
             file_id=file_id,
             file_data=file_data,
@@ -173,8 +174,8 @@ class ConversationSession:
                         _res = await self.file_service.getFileInfoAndUrl(
                             root_message.file_id, self.project_id
                         )
-                        if isinstance(_res, Err):
-                            return _res
+                        if _res.status == ResultStatus.Err:
+                            return _res.into()
                         file_url, metadata = _res.unwrap()
                         content = ImageUrl(
                             url=file_url,
@@ -208,8 +209,8 @@ class ConversationSession:
                         _res = await self.file_service.getFileInfoAndUrl(
                             root_message.file_id, self.project_id
                         )
-                        if isinstance(_res, Err):
-                            return _res
+                        if _res.status == ResultStatus.Err:
+                            return _res.into()
                         file_url, metadata = _res.unwrap()
                         content = AudioUrl(
                             url=file_url,
@@ -243,8 +244,8 @@ class ConversationSession:
                         _res = await self.file_service.getFileInfoAndUrl(
                             root_message.file_id, self.project_id
                         )
-                        if isinstance(_res, Err):
-                            return _res
+                        if _res.status == ResultStatus.Err:
+                            return _res.into()
                         file_url, metadata = _res.unwrap()
                         content = VideoUrl(
                             url=file_url,
@@ -281,8 +282,8 @@ class ConversationSession:
                         _res = await self.file_service.getFileInfoAndUrl(
                             root_message.file_id, self.project_id
                         )
-                        if isinstance(_res, Err):
-                            return _res
+                        if _res.status == ResultStatus.Err:
+                            return _res.into()
                         file_url, metadata = _res.unwrap()
                         content = DocumentUrl(
                             url=file_url,
