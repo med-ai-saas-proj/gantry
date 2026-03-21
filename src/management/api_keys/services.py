@@ -40,6 +40,14 @@ class InvalidAPIKey(RecoverableError):
     title = "Invalid API key"
     detail = "API key is invalid or not exists"
 
+    def __init__(
+        self,
+        from_exception: Exception | None = None,
+        message: str | None = None,
+    ):
+        super().__init__(from_exception)
+        self.message = message
+
 
 class InsufficientPermission(RecoverableError):
     """Raised when an insufficient permission is encountered."""
@@ -172,6 +180,42 @@ class ApiKeyService:
             await session.commit()
             return Ok[CreateAPIKeyOutputSuccess](
                 {"key": formatted_key, "hint": hint}
+            )
+
+    async def getApiKeysInfo(
+        self, api_key: list[str]
+    ) -> Result[list[ApiKeyInfo], InvalidAPIKey]:
+        async with self.session_manager.get_session() as session:
+            hashed_keys_map = {self._hash_api_key(key): key for key in api_key}
+            keys = await self.api_key_repo.getByHashedKeys(
+                session,
+                list(hashed_keys_map.keys()),
+            )
+            existed_hashed_keys = {key.hashed_key for key in keys}
+            missing_hashed_keys = (
+                set(hashed_keys_map.keys()) - existed_hashed_keys
+            )
+            if missing_hashed_keys:
+                missing_keys_str = ", ".join(
+                    hashed_keys_map[hk] for hk in missing_hashed_keys
+                )
+                return Err(
+                    InvalidAPIKey(
+                        message=f"API keys not found: {missing_keys_str}"
+                    )
+                )
+            return Ok[list[ApiKeyInfo]](
+                [
+                    {
+                        "user_id": str(key.user_id),
+                        "project_id": key.project_id,
+                        "api_key_id": key.id,
+                        # In real implementation, org_id and project_uid should be fetched from db
+                        "project_uid": str(uuid.uuid4()),
+                        "org_id": "test_org1",
+                    }
+                    for key in keys
+                ]
             )
 
     async def verifyApiKey(

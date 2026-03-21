@@ -16,6 +16,7 @@ from decimal import Decimal
 from datetime import datetime
 
 from sqlalchemy import (
+    and_,
     func,
     text,
     select,
@@ -80,6 +81,7 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
         self,
         session: AsyncSession,
         apikey_ids: list[int],
+        org_id: str,
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[BillingTransaction]:
@@ -90,7 +92,12 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
         """
         stmt = (
             select(BillingTransaction)
-            .where(BillingTransaction.apikey_id.in_(apikey_ids))
+            .where(
+                and_(
+                    BillingTransaction.apikey_id.in_(apikey_ids),
+                    BillingTransaction.organization_id == org_id,
+                )
+            )
             .order_by(BillingTransaction.created_at.desc())
         )
         stmt = self.buildFilterPagination(stmt, offset=skip, limit=limit)
@@ -116,13 +123,19 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
         self,
         session: AsyncSession,
         project_ids: list[int],
+        org_id: str,
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[BillingTransaction]:
         """Get transactions for a project, newest first."""
         stmt = (
             select(BillingTransaction)
-            .where(BillingTransaction.project_id.in_(project_ids))
+            .where(
+                and_(
+                    BillingTransaction.project_id.in_(project_ids),
+                    BillingTransaction.organization_id == org_id,
+                )
+            )
             .order_by(BillingTransaction.created_at.desc())
         )
         stmt = self.buildFilterPagination(stmt, offset=skip, limit=limit)
@@ -132,6 +145,7 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
         self,
         session: AsyncSession,
         apikey_ids: list[int],
+        org_id: str,
         start_time: datetime,
         end_time: datetime,
         period: AggregatePeriod,
@@ -156,6 +170,7 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
             )
             .where(
                 TimescaleDBDailyBillingSummary.apikey_id.in_(apikey_ids),
+                TimescaleDBDailyBillingSummary.organization_id == org_id,
                 TimescaleDBDailyBillingSummary.bucket >= start_time,
                 TimescaleDBDailyBillingSummary.bucket < end_time,
             )
@@ -220,6 +235,7 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
         self,
         session: AsyncSession,
         project_ids: list[int],
+        org_id: str,
         start_time: datetime,
         end_time: datetime,
         period: AggregatePeriod,
@@ -244,6 +260,7 @@ class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
             )
             .where(
                 TimescaleDBDailyBillingSummary.project_id.in_(project_ids),
+                TimescaleDBDailyBillingSummary.organization_id == org_id,
                 TimescaleDBDailyBillingSummary.bucket >= start_time,
                 TimescaleDBDailyBillingSummary.bucket < end_time,
             )
@@ -364,6 +381,7 @@ if __name__ == "__main__":
             transactions = await repo.sumByPeriodByApiKeys(
                 session=session,
                 apikey_ids=[1, 2, 3],
+                org_id="org1",
                 start_time=datetime(2026, 1, 1),
                 end_time=datetime(2026, 12, 31),
                 period=AggregatePeriod.MONTHLY,

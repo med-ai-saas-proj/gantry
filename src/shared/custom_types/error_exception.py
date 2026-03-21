@@ -10,6 +10,7 @@ class RecoverableError(Exception):
     title: ClassVar[str]
     code: ClassVar[str]
     detail: ClassVar[str | None] = None
+    message: str | None = None
     _stack_frames: list[str] | None
     _from: Exception | None
 

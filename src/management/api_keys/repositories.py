@@ -4,6 +4,8 @@ from src.db.repository import Repository
 
 from .models import ApiKey, Permission
 
+from typing import Sequence
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +19,7 @@ class PermissionRepository(Repository[Permission, str]):
 
     async def getAllPermissions(
         self, session: AsyncSession, skip: int = 0, limit: int = 100
-    ) -> list[Permission]:
+    ) -> Sequence[Permission]:
         """Get all permissions with pagination."""
         stmt = (
             select(Permission)
@@ -79,14 +81,24 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         """Initialize ApiKeyRepository."""
         super().__init__(ApiKey, ApiKey.id)
 
-    async def getByHashedKey(self, session: AsyncSession, hashed_key: str):
+    async def getByHashedKey(
+        self, session: AsyncSession, hashed_key: str
+    ) -> ApiKey | None:
         stmt = select(ApiKey).where(ApiKey.hashed_key == hashed_key).limit(1)
         stmt = self.buildOptions(
             stmt, load_relations={ApiKey.permissions: None}
         )
         return await self.selectOne(session, stmt)
 
-    async def getByUserId(self, session: AsyncSession, user_id: str):
+    async def getByHashedKeys(
+        self, session: AsyncSession, hashed_keys: list[str]
+    ) -> Sequence[ApiKey]:
+        stmt = select(ApiKey).where(ApiKey.hashed_key.in_(hashed_keys))
+        return await self.selectMany(session, stmt)
+
+    async def getByUserId(
+        self, session: AsyncSession, user_id: str
+    ) -> Sequence[ApiKey]:
         """Get all API keys for a specific user."""
         stmt = select(ApiKey).where(ApiKey.user_id == user_id)
         stmt = self.buildOptions(
