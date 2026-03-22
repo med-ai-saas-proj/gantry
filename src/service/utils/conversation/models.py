@@ -95,5 +95,6 @@ class Message(WithID, WithUUID, ConversationBaseSQLModel):
             run_id=raw.get("run_id"),
         )
         mess.id = raw["id"]
+        mess.uuid = raw["uuid"]
         mess.seq_id = raw["seq_id"]
         return mess

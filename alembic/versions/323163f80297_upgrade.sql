@@ -62,6 +62,7 @@ CREATE UNIQUE INDEX "Files_uuid_idx" ON "FileStorage"."Files" (uuid);
 
 CREATE TABLE "Conversation"."Messages" (
     id BIGSERIAL NOT NULL,
+    uuid UUID NOT NULL,
     conversation_id BIGINT NOT NULL,
     seq_id BIGINT NOT NULL,
     kind VARCHAR(32),
@@ -76,6 +77,8 @@ CREATE TABLE "Conversation"."Messages" (
 CREATE INDEX "Messages_conversation_id_idx" ON "Conversation"."Messages" (conversation_id);
 
 CREATE INDEX "Messages_seq_id_idx" ON "Conversation"."Messages" (seq_id);
+
+CREATE INDEX "Messages_uuid_idx" ON "Conversation"."Messages" (uuid);
 
 ALTER TABLE "ApiKey"."ApiKeys" ADD COLUMN project_id BIGINT NOT NULL;
 

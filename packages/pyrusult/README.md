@@ -43,7 +43,6 @@ def test() -> Result[str, ExpeditionFailedError | ExpeditionAlmostSuccessError]:
     # res's type is Result[int, RuntimeError]
     res_ok = res.ok()
     assert res_ok is not None and res_ok == 66
-
     res = test_fn(16)
     # Pattern matching
     match res:

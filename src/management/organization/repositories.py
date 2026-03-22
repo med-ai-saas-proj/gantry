@@ -9,7 +9,7 @@ from .models import (
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
