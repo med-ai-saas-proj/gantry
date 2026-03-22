@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 from unittest.mock import Mock, AsyncMock
 
 # Third-party
-from safe_result import Ok, Err
+from pyrusult import Ok, Err, ResultStatus
 
 
 # Test environment bootstrap
@@ -47,6 +47,7 @@ __all__ = [
     "ProjectNotFoundError",
     "ProjectPermission",
     "ProjectService",
+    "ResultStatus",
     "SimpleNamespace",
     "UserAlreadyInProjectError",
     "UserNotInProjectError",

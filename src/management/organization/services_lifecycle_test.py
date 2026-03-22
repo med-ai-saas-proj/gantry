@@ -5,6 +5,7 @@ from .services_test_support import (
     Ok,
     Err,
     AsyncMock,
+    ResultStatus,
     OrgPermission,
     SimpleNamespace,
     OrgNotFoundError,
@@ -31,8 +32,8 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.removeUser("org-1", "owner")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, OwnerRemovalNotAllowedError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), OwnerRemovalNotAllowedError)
 
     async def test_request_delete_org_conflict_when_already_requested(self):
         """Requesting deletion twice should return conflict."""
@@ -47,8 +48,8 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.requestDeleteOrg("org-1")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, DeletionAlreadyRequestedError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), DeletionAlreadyRequestedError)
 
     async def test_request_delete_org_success(self):
         """Deletion request should return timestamps and commit."""
@@ -65,7 +66,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.requestDeleteOrg("org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().org_id, "org-1")
         self.session_manager.session.commit.assert_awaited()
 
@@ -79,8 +80,8 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.cancelDeleteOrg("org-1")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, DeletionRequestNotFoundError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), DeletionRequestNotFoundError)
 
     async def test_cancel_delete_org_success(self):
         """Cancel should delete pending request and commit."""
@@ -92,7 +93,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.cancelDeleteOrg("org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertTrue(res.unwrap())
         self.session_manager.session.commit.assert_awaited()
 
@@ -110,8 +111,8 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, OwnerPermissionRequiredError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), OwnerPermissionRequiredError)
 
     async def test_update_org_info_requires_owner(self):
         """Non-owner should not be able to update organization metadata."""
@@ -127,8 +128,8 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, OwnerPermissionRequiredError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), OwnerPermissionRequiredError)
 
     async def test_update_org_info_owner_success(self):
         """Organization owner should be able to rename the organization."""
@@ -148,7 +149,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().owner_id, "u-owner")
 
     async def test_get_org_info_without_owner_returns_owner_id_none(self):
@@ -168,7 +169,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.getOrgInfo("org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertIsNone(res.unwrap().owner_id)
 
     async def test_get_org_info_with_owner_success(self):
@@ -184,7 +185,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.getOrgInfo("org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().owner_id, "u1")
 
     async def test_get_settings_success(self):
@@ -200,7 +201,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.getSettings("org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().rate_limit, 100)
         self.assertEqual(res.unwrap().extra, {"a": 1})
 
@@ -288,7 +289,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.getUsers("org-1", limit=20, offset=0)
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().total, 2)
 
     async def test_remove_user_success_deletes_member_record_and_user(self):
@@ -303,7 +304,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.removeUser("org-1", "u-member")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         service.kc.removeMember.assert_awaited_once_with("org-1", "u-member")
         service.kc.deleteUser.assert_awaited_once_with("u-member")
 
@@ -327,7 +328,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().extra, {"a.b": 1, "x": 2})
         service.settings_repo.upsert.assert_awaited_once()
 
@@ -342,7 +343,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
             return_value=Err(_DummyError("org lookup failed"))
         )
         ensure_err = await service._ensureUserInOrg("org-1", "u1")
-        self.assertTrue(ensure_err.is_err())
+        self.assertTrue(ensure_err.status == ResultStatus.Err)
 
         # _get_member_permissions -> attribute error
         service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
@@ -350,14 +351,14 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
             return_value=Err(_DummyError("attr failed"))
         )
         member_perm_err = await service._getMemberPermissions("org-1", "u1")
-        self.assertTrue(member_perm_err.is_err())
+        self.assertTrue(member_perm_err.status == ResultStatus.Err)
 
         # _get_org_owner_id -> member page error, skip blank ids, attr error
         service.kc.getOrgMembers = AsyncMock(
             return_value=Err(_DummyError("member page failed"))
         )
         owner_page_err = await service._getOrgOwnerId("org-1")
-        self.assertTrue(owner_page_err.is_err())
+        self.assertTrue(owner_page_err.status == ResultStatus.Err)
 
         service.kc.getOrgMembers = AsyncMock(
             side_effect=[
@@ -369,21 +370,21 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
             return_value=Err(_DummyError("owner attr failed"))
         )
         owner_attr_err = await service._getOrgOwnerId("org-1")
-        self.assertTrue(owner_attr_err.is_err())
+        self.assertTrue(owner_attr_err.status == ResultStatus.Err)
 
         # _sync_metadata_from_keycloak -> org error and owner error
         service.kc.getOrg = AsyncMock(
             return_value=Err(_DummyError("org failed"))
         )
         org_info_err = await service.getOrgInfo("org-1")
-        self.assertTrue(org_info_err.is_err())
+        self.assertTrue(org_info_err.status == ResultStatus.Err)
 
         service.kc.getOrg = AsyncMock(return_value=Ok({"id": "org-1"}))
         service._getOrgOwnerId = AsyncMock(
             return_value=Err(_DummyError("owner failed"))
         )
         owner_info_err = await service.getOrgInfo("org-1")
-        self.assertTrue(owner_info_err.is_err())
+        self.assertTrue(owner_info_err.status == ResultStatus.Err)
 
         # request_delete_org/get_settings/update_settings -> org not found
         service._ensureOrgExists = AsyncMock(
@@ -392,9 +393,9 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         delete_req_err = await service.requestDeleteOrg("org-1")
         get_settings_err = await service.getSettings("org-1")
         update_settings_err = await service.updateSettings("org-1", 10, {})
-        self.assertTrue(delete_req_err.is_err())
-        self.assertTrue(get_settings_err.is_err())
-        self.assertTrue(update_settings_err.is_err())
+        self.assertTrue(delete_req_err.status == ResultStatus.Err)
+        self.assertTrue(get_settings_err.status == ResultStatus.Err)
+        self.assertTrue(update_settings_err.status == ResultStatus.Err)
 
         # update_org_info -> owner lookup error, get_org error, update_org error
         service._getOrgOwnerId = AsyncMock(
@@ -403,7 +404,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         update_owner_err = await service.updateOrgInfo(
             "org-1", "u1", "new-name"
         )
-        self.assertTrue(update_owner_err.is_err())
+        self.assertTrue(update_owner_err.status == ResultStatus.Err)
 
         service._getOrgOwnerId = AsyncMock(return_value=Ok("u1"))
         service.kc.getOrg = AsyncMock(
@@ -412,7 +413,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         update_get_org_err = await service.updateOrgInfo(
             "org-1", "u1", "new-name"
         )
-        self.assertTrue(update_get_org_err.is_err())
+        self.assertTrue(update_get_org_err.status == ResultStatus.Err)
 
         service.kc.getOrg = AsyncMock(return_value=Ok({"id": "org-1"}))
         service.kc.updateOrg = AsyncMock(
@@ -421,27 +422,27 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         update_write_err = await service.updateOrgInfo(
             "org-1", "u1", "new-name"
         )
-        self.assertTrue(update_write_err.is_err())
+        self.assertTrue(update_write_err.status == ResultStatus.Err)
 
         # get_users/remove_user/invitation read+write paths
         service.kc.getOrgMembers = AsyncMock(
             return_value=Err(_DummyError("get members failed"))
         )
         users_err = await service.getUsers("org-1")
-        self.assertTrue(users_err.is_err())
+        self.assertTrue(users_err.status == ResultStatus.Err)
 
         service._getOrgOwnerId = AsyncMock(
             return_value=Err(_DummyError("owner remove failed"))
         )
         remove_owner_err = await service.removeUser("org-1", "u2")
-        self.assertTrue(remove_owner_err.is_err())
+        self.assertTrue(remove_owner_err.status == ResultStatus.Err)
 
         service._getOrgOwnerId = AsyncMock(return_value=Ok("owner"))
         service.kc.removeMember = AsyncMock(
             return_value=Err(_DummyError("remove failed"))
         )
         remove_member_err = await service.removeUser("org-1", "u2")
-        self.assertTrue(remove_member_err.is_err())
+        self.assertTrue(remove_member_err.status == ResultStatus.Err)
 
         service.kc.getInvitations = AsyncMock(
             return_value=Err(_DummyError("list invites failed"))
@@ -449,16 +450,20 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         service.kc.getInvitation = AsyncMock(
             return_value=Err(_DummyError("get invite failed"))
         )
-        self.assertTrue((await service.getInvitations("org-1")).is_err())
         self.assertTrue(
-            (await service.getInvitation("org-1", "inv-1")).is_err()
+            (await service.getInvitations("org-1")).status == ResultStatus.Err
+        )
+        self.assertTrue(
+            (await service.getInvitation("org-1", "inv-1")).status
+            == ResultStatus.Err
         )
 
         service.kc.findUserByEmail = AsyncMock(
             return_value=Err(_DummyError("find failed"))
         )
         self.assertTrue(
-            (await service.createInvitation("org-1", "a@test")).is_err()
+            (await service.createInvitation("org-1", "a@test")).status
+            == ResultStatus.Err
         )
 
         service.kc.findUserByEmail = AsyncMock(return_value=Ok({"id": "u1"}))
@@ -466,7 +471,8 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
             return_value=Err(_DummyError("member orgs failed"))
         )
         self.assertTrue(
-            (await service.createInvitation("org-1", "a@test")).is_err()
+            (await service.createInvitation("org-1", "a@test")).status
+            == ResultStatus.Err
         )
 
         service.kc.findUserByEmail = AsyncMock(return_value=Ok(None))
@@ -474,7 +480,8 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
             return_value=Err(_DummyError("invite failed"))
         )
         self.assertTrue(
-            (await service.createInvitation("org-1", "a@test")).is_err()
+            (await service.createInvitation("org-1", "a@test")).status
+            == ResultStatus.Err
         )
 
         # ensure_can_read/update_user_permissions -> target/actor/write errors
@@ -484,7 +491,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         read_target_err = await service.ensureCanReadUserPermissions(
             "org-1", "u1", "u2"
         )
-        self.assertTrue(read_target_err.is_err())
+        self.assertTrue(read_target_err.status == ResultStatus.Err)
 
         service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
         service._getMemberPermissions = AsyncMock(
@@ -493,7 +500,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         read_actor_err = await service.ensureCanReadUserPermissions(
             "org-1", "u1", "u2"
         )
-        self.assertTrue(read_actor_err.is_err())
+        self.assertTrue(read_actor_err.status == ResultStatus.Err)
 
         service._getOrgOwnerId = AsyncMock(
             return_value=Err(_DummyError("owner failed"))
@@ -501,7 +508,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         update_owner_lookup_err = await service.updateUserPermissions(
             "org-1", "u1", "u2", [OrgPermission.SETTINGS_READ.value]
         )
-        self.assertTrue(update_owner_lookup_err.is_err())
+        self.assertTrue(update_owner_lookup_err.status == ResultStatus.Err)
 
         service._getOrgOwnerId = AsyncMock(return_value=Ok("owner"))
         service._getMemberPermissions = AsyncMock(
@@ -510,7 +517,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         update_actor_perm_err = await service.updateUserPermissions(
             "org-1", "u1", "u2", [OrgPermission.SETTINGS_READ.value]
         )
-        self.assertTrue(update_actor_perm_err.is_err())
+        self.assertTrue(update_actor_perm_err.status == ResultStatus.Err)
 
         service._getMemberPermissions = AsyncMock(
             return_value=Ok([OrgPermission.OWNER.value])
@@ -521,7 +528,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         update_target_err = await service.updateUserPermissions(
             "org-1", "owner", "u2", [OrgPermission.SETTINGS_READ.value]
         )
-        self.assertTrue(update_target_err.is_err())
+        self.assertTrue(update_target_err.status == ResultStatus.Err)
 
         service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
         service.kc.setUserAttribute = AsyncMock(
@@ -530,4 +537,4 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         update_write_attr_err = await service.updateUserPermissions(
             "org-1", "owner", "u2", [OrgPermission.SETTINGS_READ.value]
         )
-        self.assertTrue(update_write_attr_err.is_err())
+        self.assertTrue(update_write_attr_err.status == ResultStatus.Err)

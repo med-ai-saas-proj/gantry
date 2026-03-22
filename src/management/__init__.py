@@ -12,7 +12,6 @@ import asyncio
 import contextlib
 
 from fastapi import FastAPI, APIRouter
-from scalar_fastapi import get_scalar_api_reference
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -44,7 +43,7 @@ async def lifespan(app: FastAPI):
 management_app = FastAPI(
     title="Venera API platform",
     openapi_url="/docs/openapi.json",
-    docs_url=None,
+    docs_url="/docs",
     lifespan=lifespan,
     responses={
         400: {"model": ProblemDetails},
@@ -74,11 +73,3 @@ v1_router.include_router(logging_router)
 
 # management_app.include_router(api_router)
 management_app.include_router(v1_router)
-
-
-@management_app.get("/docs", include_in_schema=False)
-async def scalar_html():
-    return get_scalar_api_reference(
-        openapi_url=(management_app.openapi_url or "").lstrip("/"),
-        title=management_app.title,
-    )

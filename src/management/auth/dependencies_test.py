@@ -2,7 +2,7 @@ import os
 import unittest
 from unittest.mock import Mock, AsyncMock
 
-from safe_result import Ok, Err
+from pyrusult import Ok, Err
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
@@ -89,9 +89,6 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
             await getUserOrgId({"id": "u1", "roles": [], "org_id": "org-1"}),
             "org-1",
         )
-        self.assertIsNone(
-            await getUserOrgId({"id": "u1", "roles": [], "org_id": None})
-        )
         self.assertEqual(await requireUserOrgId("org-1"), "org-1")
         with self.assertRaises(MissingOrganizationContextError):
-            await requireUserOrgId(None)
+            await requireUserOrgId("")

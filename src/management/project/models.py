@@ -43,7 +43,7 @@ class Project(WithCreateUpdateTimestamp, WithUUID, WithID, ProjectBaseSQLModel):
 class ProjectMembership(WithCreateUpdateTimestamp, ProjectBaseSQLModel):
     """User membership inside a project."""
 
-    __tablename__ = "ProjectMemberships"
+    __tablename__ = "ProjectMembers"
 
     project_id: Mapped[int] = mapped_column(
         BigInteger,

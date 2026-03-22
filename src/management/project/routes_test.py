@@ -14,7 +14,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, AsyncMock
 
-from safe_result import Ok
+from pyrusult import Ok
 
 
 class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):

@@ -5,6 +5,7 @@ from .services_test_support import (
     Ok,
     Err,
     AsyncMock,
+    ResultStatus,
     SimpleNamespace,
     ProjectPermission,
     ProjectArchivedError,
@@ -91,7 +92,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service._getProjectOrErr("proj-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap()[0], 10)
 
     async def test_set_project_permissions_replaces_only_one_project_slice(
@@ -123,7 +124,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         service.kc.setUserAttribute.assert_awaited_once_with(
             "u1",
             PROJECT_PERMISSIONS_ATTR,
@@ -149,7 +150,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service._setProjectPermissions("u1", "proj-1", [])
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         service.kc.setUserAttribute.assert_awaited_once_with(
             "u1",
             PROJECT_PERMISSIONS_ATTR,
@@ -168,7 +169,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         ok_res = await service._ensureUserInOrg("u1", "org-1")
 
         # Assert
-        self.assertTrue(ok_res.is_ok())
+        self.assertTrue(ok_res.status == ResultStatus.Ok)
 
         # Arrange
         service.kc.getMemberOrganizations = AsyncMock(
@@ -179,7 +180,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         err_res = await service._ensureUserInOrg("u1", "org-1")
 
         # Assert
-        self.assertTrue(err_res.is_err())
+        self.assertTrue(err_res.status == ResultStatus.Err)
 
     async def test_get_project_or_err_not_found(self):
         """Unknown project uuid should return project_not_found."""
@@ -191,8 +192,8 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service._getProjectOrErr("missing")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, ProjectNotFoundError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), ProjectNotFoundError)
 
     def test_ensure_project_active_helper(self):
         """Archived project should be rejected by helper."""
@@ -204,9 +205,9 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         err_res = service._ensureProjectActive(SimpleNamespace(archived=True))
 
         # Assert
-        self.assertTrue(ok_res.is_ok())
-        self.assertTrue(err_res.is_err())
-        self.assertIsInstance(err_res.error, ProjectArchivedError)
+        self.assertTrue(ok_res.status == ResultStatus.Ok)
+        self.assertTrue(err_res.status == ResultStatus.Err)
+        self.assertIsInstance(err_res.err(), ProjectArchivedError)
 
     async def test_authorize_project_permission_denied(self):
         """Authorization should fail when member lacks required permission."""
@@ -226,8 +227,8 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(result.is_err())
-        self.assertIsInstance(result.error, InsufficientProjectPermissionError)
+        self.assertTrue(result.status == ResultStatus.Err)
+        self.assertIsInstance(result.err(), InsufficientProjectPermissionError)
 
     async def test_authorize_project_permission_owner_inherits_children(self):
         """Project owner should be authorized for child permissions."""
@@ -249,7 +250,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(result.is_ok())
+        self.assertTrue(result.status == ResultStatus.Ok)
 
     async def test_project_owner_can_read_other_user_permissions_via_inherited_rw(
         self,
@@ -273,7 +274,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(result.is_ok())
+        self.assertTrue(result.status == ResultStatus.Ok)
 
     async def test_create_project_requires_projects_create(self):
         """Create project should fail if actor lacks projects.create scope."""
@@ -285,8 +286,8 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.createProject("u1", "org-1", "p1", None)
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, InsufficientProjectPermissionError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), InsufficientProjectPermissionError)
 
     async def test_create_project_success_sets_owner_permission_attribute(self):
         """Creating a project should add owner permission in flat attr form."""
@@ -312,7 +313,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.createProject("u1", "org-1", "p1", None)
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         service._setProjectPermissions.assert_awaited_once_with(
             "u1", "proj-1", ["project.owner"]
         )
@@ -344,7 +345,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.createProject("u1", "org-1", "p1", None)
 
         # Assert
-        self.assertTrue(res.is_err())
+        self.assertTrue(res.status == ResultStatus.Err)
         self.session_manager.session.commit.assert_not_awaited()
 
     async def test_create_project_propagates_org_wide_permission_lookup_error(
@@ -361,7 +362,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.createProject("u1", "org-1", "p1", None)
 
         # Assert
-        self.assertTrue(res.is_err())
+        self.assertTrue(res.status == ResultStatus.Err)
 
     async def test_list_user_projects_org_membership_error(self):
         """List by organization should fail if actor not in org."""
@@ -375,7 +376,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.listUserProjects("u1", "org-1")
 
         # Assert
-        self.assertTrue(res.is_err())
+        self.assertTrue(res.status == ResultStatus.Err)
 
     async def test_list_user_projects_success(self):
         """List user projects should map repository rows to DTO."""
@@ -397,7 +398,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.listUserProjects("u1", None)
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().total, 1)
         self.assertEqual(res.unwrap().results[0].name, "P1")
 
@@ -412,7 +413,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.listUserProjects("u1", "org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         service._ensureUserInOrg.assert_awaited_once_with("u1", "org-1")
 
     async def test_has_org_wide_permission_true_and_false(self):
@@ -438,7 +439,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(true_res.is_ok())
+        self.assertTrue(true_res.status == ResultStatus.Ok)
         self.assertTrue(true_res.unwrap())
 
         # Arrange
@@ -455,7 +456,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(false_res.is_ok())
+        self.assertTrue(false_res.status == ResultStatus.Ok)
         self.assertFalse(false_res.unwrap())
 
     async def test_has_org_wide_permission_uses_project_uuids_for_each_joined_project(
@@ -482,7 +483,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertTrue(res.unwrap())
         self.assertEqual(
             service._getPermissionsFromAttrs.await_args_list,
@@ -513,7 +514,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.listOrgProjects("u1", "org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().total, 1)
 
     async def test_list_org_projects_denied_without_org_wide_permission(self):
@@ -526,5 +527,5 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.listOrgProjects("u1", "org-1")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, InsufficientProjectPermissionError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), InsufficientProjectPermissionError)

@@ -31,8 +31,8 @@ class WithUUID(MappedAsDataclass, kw_only=True):
         unique=True,
         index=True,
         nullable=False,
-        # default_factory=uuid7,
-        server_default=text("uuidv7()"),
+        default_factory=uuid7,
+        # server_default=text("uuidv7()"),
         sort_order=-998,
         init=False,
     )

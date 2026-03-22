@@ -29,14 +29,14 @@ class ExporterProtocol(str, Enum):
 class OtelSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="otel_", case_sensitive=False)
 
-    exporter_otlp_endpoint: HttpUrl = "http://localhost:4317"
+    exporter_otlp_endpoint: HttpUrl = HttpUrl("http://localhost:4317")
     exporter_otlp_protocol: ExporterProtocol = ExporterProtocol.grpc
 
-    traces: TracesType = "otlp"
-    metrics: MetricsType = "otlp"
-    logs: LogsType = "otlp"
+    traces: TracesType = TracesType.disabled
+    metrics: MetricsType = MetricsType.disabled
+    logs: LogsType = LogsType.disabled
 
-    prometheus_port: int = 8001
+    prometheus_port: int = 9000
 
     # OTEL defaults envvars
     # Traces

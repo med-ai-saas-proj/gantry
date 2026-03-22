@@ -15,7 +15,7 @@ from typing import Any, Callable
 
 import jwt
 from jwt import PyJWKClient
-from safe_result import Ok, Err, Result
+from pyrusult import Ok, Err, Result
 
 
 class UnauthorizedError(RecoverableError):

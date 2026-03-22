@@ -11,7 +11,7 @@ from typing import Any
 from urllib.parse import urljoin
 
 from keycloak import KeycloakAdmin, KeycloakOpenIDConnection
-from safe_result import Ok, Err, Result
+from pyrusult import Ok, Err, Result, ResultStatus
 from keycloak.exceptions import KeycloakError
 
 
@@ -53,6 +53,15 @@ class KeycloakOrgConflictError(RecoverableError):
     code = "keycloak_org_conflict"
     title = "Conflict"
     detail = "Keycloak organization request conflicts with current state."
+
+
+type KeycloakPossibleError = (
+    KeycloakOrgBadRequestError
+    | KeycloakOrgForbiddenError
+    | KeycloakOrgConflictError
+    | KeycloakOrgConfigError
+    | KeycloakOrgError
+)
 
 
 class OrgNotFoundError(RecoverableError):
@@ -215,14 +224,14 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    def _mapStatusError(
+    def _mapStatusError[T, U](
         self,
         status_code: int,
         *,
-        not_found_error: RecoverableError | None = None,
-        extra_error_map: dict[int, RecoverableError] | None = None,
+        not_found_error: T | None = None,
+        extra_error_map: dict[int, U] | None = None,
         include_conflict: bool = True,
-    ) -> RecoverableError:
+    ) -> T | U | KeycloakPossibleError:
         if extra_error_map is not None and status_code in extra_error_map:
             return extra_error_map[status_code]
         if status_code == 400:
@@ -235,14 +244,14 @@ class KeycloakOrgClient:
             return KeycloakOrgConflictError()
         return KeycloakOrgError()
 
-    def _mapKeycloakError(
+    def _mapKeycloakError[T, U](
         self,
         exc: KeycloakError,
         *,
-        not_found_error: RecoverableError | None = None,
-        extra_error_map: dict[int, RecoverableError] | None = None,
+        not_found_error: T | None = None,
+        extra_error_map: dict[int, U] | None = None,
         include_conflict: bool = True,
-    ) -> RecoverableError:
+    ) -> KeycloakPossibleError | T | U:
         response_code = getattr(exc, "response_code", None)
         if isinstance(response_code, int):
             return self._mapStatusError(
@@ -499,13 +508,7 @@ class KeycloakOrgClient:
         redirect_uri: str | None = None,
         first_name: str | None = None,
         last_name: str | None = None,
-    ) -> Result[
-        bool,
-        OrgNotFoundError
-        | KeycloakOrgBadRequestError
-        | KeycloakOrgForbiddenError
-        | KeycloakOrgError,
-    ]:
+    ) -> Result[bool, KeycloakPossibleError | OrgNotFoundError]:
         path = f"{self._adminBase()}/organizations/{org_id}/members/invite-user"
         form: dict[str, str] = {"email": email}
         if client_id:
@@ -523,7 +526,7 @@ class KeycloakOrgClient:
             data=form,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        if response_res.is_err():
+        if response_res.status == ResultStatus.Err:
             return response_res
 
         response = response_res.unwrap()
@@ -578,7 +581,7 @@ class KeycloakOrgClient:
             query["status"] = status
 
         response_res = await self._rawRequest("get", path, params=query)
-        if response_res.is_err():
+        if response_res.status == ResultStatus.Err:
             return response_res
 
         response = response_res.unwrap()
@@ -598,15 +601,12 @@ class KeycloakOrgClient:
     async def getInvitation(
         self, org_id: str, invitation_id: str
     ) -> Result[
-        dict[str, Any],
-        InvitationNotFoundError
-        | KeycloakOrgBadRequestError
-        | KeycloakOrgForbiddenError
-        | KeycloakOrgError,
+        dict[str, Any], KeycloakPossibleError | InvitationNotFoundError
     ]:
         path = f"{self._adminBase()}/organizations/{org_id}/invitations/{invitation_id}"
         response_res = await self._rawRequest("get", path)
-        if response_res.is_err():
+        if response_res.status == ResultStatus.Err:
+            # return Err(KeycloakOrgError())
             return response_res
 
         response = response_res.unwrap()
@@ -629,14 +629,11 @@ class KeycloakOrgClient:
         self, org_id: str, invitation_id: str
     ) -> Result[
         bool,
-        InvitationNotFoundError
-        | KeycloakOrgBadRequestError
-        | KeycloakOrgForbiddenError
-        | KeycloakOrgError,
+        KeycloakPossibleError | InvitationNotFoundError,
     ]:
         path = f"{self._adminBase()}/organizations/{org_id}/invitations/{invitation_id}"
         response_res = await self._rawRequest("delete", path)
-        if response_res.is_err():
+        if response_res.status == ResultStatus.Err:
             return response_res
 
         response = response_res.unwrap()
@@ -664,7 +661,7 @@ class KeycloakOrgClient:
             f"/invitations/{invitation_id}/resend"
         )
         response_res = await self._rawRequest("post", path)
-        if response_res.is_err():
+        if response_res.status == ResultStatus.Err:
             return response_res
 
         response = response_res.unwrap()

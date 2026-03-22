@@ -5,6 +5,7 @@ from .services_test_support import (
     Err,
     Mock,
     AsyncMock,
+    ResultStatus,
     OrgPermission,
     SimpleNamespace,
     OrgNotFoundError,
@@ -47,7 +48,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         res = await service._ensureOrgExists("org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
 
     def test_extract_user_permissions_supports_string_and_list(self):
         """Extractor should normalize string/list and ignore invalid types."""
@@ -94,8 +95,8 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         res = await service._ensureUserInOrg("org-1", "u1")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, MultipleOrganizationMembershipError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), MultipleOrganizationMembershipError)
 
     async def test_ensure_user_in_org_success_and_missing_org(self):
         """Membership helper should return Ok for same org and Err for different org."""
@@ -109,7 +110,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         ok_res = await service._ensureUserInOrg("org-1", "u1")
 
         # Assert
-        self.assertTrue(ok_res.is_ok())
+        self.assertTrue(ok_res.status == ResultStatus.Ok)
 
         # Arrange
         service.kc.getMemberOrganizations = AsyncMock(
@@ -120,7 +121,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         missing_res = await service._ensureUserInOrg("org-1", "u1")
 
         # Assert
-        self.assertTrue(missing_res.is_err())
+        self.assertTrue(missing_res.status == ResultStatus.Err)
 
     async def test_ensure_can_read_user_permissions_self_allowed(self):
         """User should always be able to read their own org permissions."""
@@ -136,7 +137,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
 
     async def test_ensure_can_read_user_permissions_other_user_requires_rw(
         self,
@@ -157,9 +158,9 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
+        self.assertTrue(res.status == ResultStatus.Err)
         self.assertIsInstance(
-            res.error, ReadOwnPermissionsOrManageRequiredError
+            res.err(), ReadOwnPermissionsOrManageRequiredError
         )
 
     async def test_ensure_can_read_user_permissions_other_user_allowed_with_rw(
@@ -181,7 +182,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
 
     async def test_owner_can_read_other_user_permissions_via_inherited_rw(self):
         """Organization owner should read another user's permissions via inheritance."""
@@ -200,7 +201,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
 
     async def test_update_user_permissions_rejects_invalid(self):
         """Service must reject unknown org permission values."""
@@ -216,8 +217,8 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, InvalidPermissionError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), InvalidPermissionError)
 
     async def test_update_user_permissions_owner_permission_immutable(self):
         """Owner cannot lose organization.owner permission."""
@@ -238,8 +239,8 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, OwnerPermissionImmutableError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), OwnerPermissionImmutableError)
 
     async def test_update_user_permissions_owner_transfer_not_allowed(self):
         """Cannot assign organization.owner to a non-owner user."""
@@ -260,8 +261,8 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, OwnerTransferNotAllowedError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), OwnerTransferNotAllowedError)
 
     async def test_update_user_permissions_grant_rw_requires_owner(self):
         """Only org owner can grant users.permissions.read_write."""
@@ -282,8 +283,8 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, OwnerRequiredForGrantError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), OwnerRequiredForGrantError)
 
     async def test_update_user_permissions_success(self):
         """Valid permission update should persist via Keycloak attribute."""
@@ -305,7 +306,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(
             res.unwrap().permissions, [OrgPermission.SETTINGS_READ.value]
         )
@@ -331,7 +332,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(
             res.unwrap().permissions,
             [OrgPermission.USERS_GET_ALL.value],
@@ -349,7 +350,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         res = await service.getUserPermissions("org-1", "u-member")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(
             res.unwrap().permissions,
             [OrgPermission.SETTINGS_READ.value],
@@ -368,7 +369,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         res = await service._getMemberPermissions("org-1", "u1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap(), [OrgPermission.OWNER.value])
 
     async def test_get_member_permissions_propagates_membership_error(self):
@@ -383,7 +384,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         res = await service._getMemberPermissions("org-1", "u1")
 
         # Assert
-        self.assertTrue(res.is_err())
+        self.assertTrue(res.status == ResultStatus.Err)
 
     async def test_get_user_permissions_target_not_in_org(self):
         """Reading org permissions should fail if target is outside org."""
@@ -397,5 +398,5 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         res = await service.getUserPermissions("org-1", "u-missing")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, OrgNotFoundError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), OrgNotFoundError)

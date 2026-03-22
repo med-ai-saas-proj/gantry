@@ -1,5 +1,6 @@
 from src.db.session import AsyncSessionManager
 from src.shared.utils.json_utils import json_serializer
+from src.shared.utils.uuid_utils import uuid7
 from src.shared.custom_types.error_exception import RecoverableError
 
 from .dtos import RequestMessage, ResponseMessage
@@ -34,6 +35,7 @@ from typing import Literal, Sequence, Awaitable, cast
 from datetime import UTC, datetime
 from dataclasses import asdict
 
+from pyrusult import Ok, Err, Result, ResultStatus
 from pydantic_ai import (
     AudioUrl,
     ImageUrl,
@@ -53,7 +55,6 @@ from pydantic_ai import (
     BuiltinToolCallPart,
     BuiltinToolReturnPart,
 )
-from safe_result import Ok, Err, Result
 from redis.asyncio import Redis
 
 
@@ -638,8 +639,8 @@ class ConversationService:
         msgs: Sequence[RequestMessage | ResponseMessage],
     ) -> Result[None, ConversationNotFoundError]:
         res = await self.getConversationMetadata(conversation_uid, project_id)
-        if isinstance(res, Err):
-            return res
+        if res.status == ResultStatus.Err:
+            return res.into()
         metadata = res.unwrap()
         await self._storeConversationMessages(
             metadata["conversation_id"],
@@ -769,7 +770,7 @@ class ConversationService:
         extra_metadata: dict | None,
         messages: Sequence[RequestMessage | ResponseMessage] | None,
     ):
-        conversation_uid = uuid.uuid4()
+        conversation_uid = uuid7()
         await self._storeConversationMessages(
             conversation_id=None,
             conversation_uid=conversation_uid,

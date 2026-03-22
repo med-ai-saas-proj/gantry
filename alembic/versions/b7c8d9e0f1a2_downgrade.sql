@@ -7,7 +7,7 @@ ALTER TABLE "Organization"."Settings"
 ALTER TABLE "Organization"."Settings"
     ALTER COLUMN extra SET DEFAULT '{}';
 
-DROP TABLE IF EXISTS "Project"."ProjectMemberships";
+DROP TABLE IF EXISTS "Project"."ProjectMembers";
 DROP TABLE IF EXISTS "Project"."Projects";
 DROP SCHEMA IF EXISTS "Project";
 

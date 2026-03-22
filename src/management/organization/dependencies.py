@@ -68,7 +68,7 @@ class _KeycloakOrgError(RecoverableError):
     detail = "Could not fetch organisation permissions from Keycloak."
 
 
-def _raise_permission_fetch_error(err: Exception) -> None:
+def _raise_permission_fetch_error(err: Exception):
     err_status = getattr(err, "status", 500)
     err_code = getattr(err, "code", "")
     if err_status >= 500:
@@ -78,12 +78,12 @@ def _raise_permission_fetch_error(err: Exception) -> None:
             "Could not fetch organisation permissions from Keycloak. "
             f"{err_detail}"
         )
-        raise wrapped
+        return wrapped
 
     if err_code in {"member_not_found", "user_not_in_organization"}:
-        raise _InsufficientOrgPermission()
+        return _InsufficientOrgPermission()
 
-    raise err
+    return err
 
 
 async def _get_permissions_or_raise(
@@ -92,9 +92,11 @@ async def _get_permissions_or_raise(
     user_id: str,
 ) -> list[str]:
     perms_res = await org_service.getUserPermissions(org_id, user_id)
-    if perms_res.is_err():
-        _raise_permission_fetch_error(perms_res.error)
-    return perms_res.unwrap().permissions
+    return (
+        perms_res.map(lambda r: r.permissions)
+        .map_err(_raise_permission_fetch_error)
+        .unwrap()
+    )
 
 
 def requiredOrgPermission(permission: OrgPermission):

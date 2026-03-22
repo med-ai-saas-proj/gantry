@@ -1,6 +1,8 @@
 import os
 import unittest
 
+from pyrusult import ResultStatus
+
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
@@ -34,7 +36,7 @@ class TestAuthService(unittest.TestCase):
             }
         )
 
-        self.assertTrue(result.is_ok())
+        self.assertTrue(result.status == ResultStatus.Ok)
         self.assertEqual(result.unwrap()["org_id"], "org-1")
         self.assertEqual(result.unwrap()["roles"], ["r1", "r2", "r3"])
 
@@ -49,7 +51,7 @@ class TestAuthService(unittest.TestCase):
             }
         )
 
-        self.assertTrue(result.is_ok())
+        self.assertTrue(result.status == ResultStatus.Ok)
         self.assertEqual(result.unwrap()["org_id"], "org-1")
 
     def test_map_claims_rejects_regular_user_without_organization_claim(self):
@@ -64,8 +66,8 @@ class TestAuthService(unittest.TestCase):
             }
         )
 
-        self.assertTrue(result.is_err())
-        self.assertIsInstance(result.error, MissingOrganizationClaimError)
+        self.assertTrue(result.status == ResultStatus.Err)
+        self.assertIsInstance(result.err(), MissingOrganizationClaimError)
 
     def test_map_claims_rejects_missing_organization_claim(self):
         result = self.service._mapClaimsToAuthInfo(
@@ -77,5 +79,5 @@ class TestAuthService(unittest.TestCase):
             }
         )
 
-        self.assertTrue(result.is_err())
-        self.assertIsInstance(result.error, MissingOrganizationClaimError)
+        self.assertTrue(result.status == ResultStatus.Err)
+        self.assertIsInstance(result.err(), MissingOrganizationClaimError)

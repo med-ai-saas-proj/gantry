@@ -5,6 +5,7 @@ from .services_test_support import (
     Ok,
     Err,
     AsyncMock,
+    ResultStatus,
     SimpleNamespace,
     ProjectPermission,
     ProjectArchivedError,
@@ -32,8 +33,8 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, InvalidProjectPermissionError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), InvalidProjectPermissionError)
 
     async def test_update_user_permissions_owner_required_for_rw_grant(self):
         """Only project owner can grant users.permissions.read_write."""
@@ -59,8 +60,8 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, OwnerRequiredForGrantError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), OwnerRequiredForGrantError)
 
     async def test_update_user_permissions_target_not_in_project(self):
         """Updating permissions should fail if target is not a project member."""
@@ -81,8 +82,8 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, UserNotInProjectError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), UserNotInProjectError)
 
     async def test_update_user_permissions_success(self):
         """Valid permission update should persist and return updated set."""
@@ -123,7 +124,7 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().permissions, ["project.settings.write"])
         service.kc.getUserAttributes.assert_awaited_once_with("target")
         service.kc.setUserAttribute.assert_awaited_once_with(
@@ -164,7 +165,7 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().permissions, ["project.users.get_all"])
 
     async def test_update_user_permissions_cannot_remove_last_owner(self):
@@ -195,8 +196,8 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, LastOwnerRemovalNotAllowedError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), LastOwnerRemovalNotAllowedError)
 
     async def test_update_user_permissions_remove_owner_succeeds_with_multiple_owners(
         self,
@@ -227,7 +228,7 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
 
     async def test_update_user_permissions_propagates_target_perm_and_owner_count_errors(
         self,
@@ -255,7 +256,7 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(target_perm_err.is_err())
+        self.assertTrue(target_perm_err.status == ResultStatus.Err)
 
         # Arrange
         service._getPermissionsFromAttrs = AsyncMock(
@@ -271,7 +272,7 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(owner_count_err.is_err())
+        self.assertTrue(owner_count_err.status == ResultStatus.Err)
 
     async def test_update_user_permissions_archived_project_denied(self):
         """Archived project should reject permission updates."""
@@ -288,5 +289,5 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, ProjectArchivedError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), ProjectArchivedError)

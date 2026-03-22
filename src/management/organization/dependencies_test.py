@@ -3,7 +3,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, AsyncMock
 
-from safe_result import Ok, Err
+from pyrusult import Ok, Err
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
@@ -61,19 +61,17 @@ class TestOrganizationDependencies(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_permission_helpers(self):
-        with self.assertRaises(_InsufficientOrgPermission):
-            _raise_permission_fetch_error(_MemberMissingErr())
+        member_missing = _raise_permission_fetch_error(_MemberMissingErr())
+        self.assertIsInstance(member_missing, _InsufficientOrgPermission)
 
-        with self.assertRaises(Exception) as upstream_ctx:
-            _raise_permission_fetch_error(ValueError("plain"))
-        self.assertEqual(getattr(upstream_ctx.exception, "status", None), 502)
+        upstream_err = _raise_permission_fetch_error(ValueError("plain"))
+        self.assertEqual(getattr(upstream_err, "status", None), 502)
 
-        with self.assertRaises(Exception) as wrapped_ctx:
-            _raise_permission_fetch_error(_DummyErr())
-        self.assertEqual(getattr(wrapped_ctx.exception, "status", None), 502)
+        wrapped_err = _raise_permission_fetch_error(_DummyErr())
+        self.assertEqual(getattr(wrapped_err, "status", None), 502)
 
-        with self.assertRaises(_UpstreamClientErr):
-            _raise_permission_fetch_error(_UpstreamClientErr())
+        passthrough_err = _raise_permission_fetch_error(_UpstreamClientErr())
+        self.assertIsInstance(passthrough_err, _UpstreamClientErr)
 
     async def test_get_permissions_or_raise_and_required_permission(self):
         org_service = Mock()

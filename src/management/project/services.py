@@ -29,7 +29,7 @@ from .repositories import ProjectRepository, ProjectMembershipRepository
 
 from typing import Any
 
-from safe_result import Ok, Err, Result
+from pyrusult import Ok, Err, Result, ResultStatus
 from structlog.stdlib import BoundLogger
 
 
@@ -118,8 +118,8 @@ class ProjectService:
     ]:
         """Verify that the user belongs to the owning organization."""
         orgs_res = await self.kc.getMemberOrganizations(user_id)
-        if orgs_res.is_err():
-            return orgs_res
+        if orgs_res.status == ResultStatus.Err:
+            return orgs_res.into()
         for org in orgs_res.unwrap():
             if str(org.get("id", "")) == org_id:
                 return Ok(None)
@@ -186,10 +186,10 @@ class ProjectService:
     ) -> Result[list[str], MemberNotFoundError | KeycloakOrgError]:
         """Load project permissions for one user directly from Keycloak attrs."""
         attrs_res = await self.kc.getUserAttributes(user_id)
-        if attrs_res.is_err():
-            return attrs_res
-        return Ok(
-            self._extractProjectPermissions(attrs_res.unwrap(), project_uuid)
+        return attrs_res.map(
+            lambda unwrapped: self._extractProjectPermissions(
+                unwrapped, project_uuid
+            )
         )
 
     async def _setProjectPermissions(
@@ -200,7 +200,7 @@ class ProjectService:
     ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
         """Replace one project's permission slice inside the shared attr list."""
         attrs_res = await self.kc.getUserAttributes(user_id)
-        if attrs_res.is_err():
+        if attrs_res.status == ResultStatus.Err:
             return attrs_res
 
         attrs = attrs_res.unwrap()
@@ -267,7 +267,7 @@ class ProjectService:
             perms_res = await self._getPermissionsFromAttrs(
                 member_user_id, project_uuid
             )
-            if perms_res.is_err():
+            if perms_res.status == ResultStatus.Err:
                 return perms_res
             if ProjectPermission.OWNER.value in perms_res.unwrap():
                 owner_count += 1
@@ -290,17 +290,17 @@ class ProjectService:
     ]:
         """Authorize one project permission for the given user and project."""
         project_res = await self._getProjectOrErr(project_uuid)
-        if project_res.is_err():
+        if project_res.status == ResultStatus.Err:
             return project_res
         project_id, _, project_info = project_res.unwrap()
         if not allow_archived:
             active_res = self._ensureProjectActive(project_info)
-            if active_res.is_err():
+            if active_res.status == ResultStatus.Err:
                 return active_res
         perms_res = await self._getMemberPermissions(
             project_id, project_uuid, user_id
         )
-        if perms_res.is_err():
+        if perms_res.status == ResultStatus.Err:
             return perms_res
         if not has_permission(perms_res.unwrap(), required):
             return Err(InsufficientProjectPermissionError())
@@ -319,7 +319,7 @@ class ProjectService:
             member_res = await self._ensureUserInOrg(
                 actor_user_id, organization_id
             )
-            if member_res.is_err():
+            if member_res.status == ResultStatus.Err:
                 return member_res
 
         async with self.session_manager.get_session() as session:
@@ -360,7 +360,7 @@ class ProjectService:
                 actor_user_id,
                 project_uuid,
             )
-            if perms_res.is_err():
+            if perms_res.status == ResultStatus.Err:
                 return perms_res
             if has_permission(perms_res.unwrap(), required):
                 return Ok(True)
@@ -380,7 +380,7 @@ class ProjectService:
         authz_res = await self._hasOrgWideProjectPermission(
             actor_user_id, organization_id, ProjectPermission.PROJECTS_GET_ALL
         )
-        if authz_res.is_err():
+        if authz_res.status == ResultStatus.Err:
             return authz_res
         if not authz_res.unwrap():
             return Err(InsufficientProjectPermissionError())
@@ -421,7 +421,7 @@ class ProjectService:
         authz_res = await self._hasOrgWideProjectPermission(
             actor_user_id, organization_id, ProjectPermission.PROJECTS_CREATE
         )
-        if authz_res.is_err():
+        if authz_res.status == ResultStatus.Err:
             return authz_res
         if not authz_res.unwrap():
             return Err(InsufficientProjectPermissionError())
@@ -443,7 +443,7 @@ class ProjectService:
                 str(project.uuid),
                 [ProjectPermission.OWNER.value],
             )
-            if set_res.is_err():
+            if set_res.status == ResultStatus.Err:
                 return set_res
             output = ProjectInfoResponse(
                 id=str(project.uuid),
@@ -470,11 +470,11 @@ class ProjectService:
     ]:
         """List project members by intersecting project and org membership."""
         project_res = await self._getProjectOrErr(project_uuid)
-        if project_res.is_err():
+        if project_res.status == ResultStatus.Err:
             return project_res
         project_id, org_id, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
-        if active_res.is_err():
+        if active_res.status == ResultStatus.Err:
             return active_res
 
         async with self.session_manager.get_session() as session:
@@ -489,7 +489,7 @@ class ProjectService:
             max_results=1000,
             search=q,
         )
-        if users_res.is_err():
+        if users_res.status == ResultStatus.Err:
             return users_res
         users = users_res.unwrap()
 
@@ -523,15 +523,15 @@ class ProjectService:
     ]:
         """Add an organization member to the project with empty project perms."""
         project_res = await self._getProjectOrErr(project_uuid)
-        if project_res.is_err():
+        if project_res.status == ResultStatus.Err:
             return project_res
         project_id, org_id, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
-        if active_res.is_err():
+        if active_res.status == ResultStatus.Err:
             return active_res
 
         in_org_res = await self._ensureUserInOrg(target_user_id, org_id)
-        if in_org_res.is_err():
+        if in_org_res.status == ResultStatus.Err:
             return in_org_res
 
         async with self.session_manager.get_session() as session:
@@ -550,7 +550,7 @@ class ProjectService:
                 project_uuid,
                 [],
             )
-            if set_res.is_err():
+            if set_res.status == ResultStatus.Err:
                 return set_res
             await session.commit()
             return Ok(True)
@@ -570,11 +570,11 @@ class ProjectService:
     ]:
         """Remove a project member while preserving the last-owner invariant."""
         project_res = await self._getProjectOrErr(project_uuid)
-        if project_res.is_err():
+        if project_res.status == ResultStatus.Err:
             return project_res
         project_id, _, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
-        if active_res.is_err():
+        if active_res.status == ResultStatus.Err:
             return active_res
 
         async with self.session_manager.get_session() as session:
@@ -587,13 +587,13 @@ class ProjectService:
             perms_res = await self._getPermissionsFromAttrs(
                 target_user_id, project_uuid
             )
-            if perms_res.is_err():
+            if perms_res.status == ResultStatus.Err:
                 return perms_res
             if ProjectPermission.OWNER.value in perms_res.unwrap():
                 owner_count_res = await self._countProjectOwners(
                     project_id, project_uuid
                 )
-                if owner_count_res.is_err():
+                if owner_count_res.status == ResultStatus.Err:
                     return owner_count_res
                 if owner_count_res.unwrap() <= 1:
                     return Err(LastOwnerRemovalNotAllowedError())
@@ -606,7 +606,7 @@ class ProjectService:
                 project_uuid,
                 [],
             )
-            if clear_res.is_err():
+            if clear_res.status == ResultStatus.Err:
                 return clear_res
             await session.commit()
             return Ok(True)
@@ -625,17 +625,17 @@ class ProjectService:
     ]:
         """Return project-scoped permissions for one project member."""
         project_res = await self._getProjectOrErr(project_uuid)
-        if project_res.is_err():
+        if project_res.status == ResultStatus.Err:
             return project_res
         project_id, _, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
-        if active_res.is_err():
+        if active_res.status == ResultStatus.Err:
             return active_res
 
         perms_res = await self._getMemberPermissions(
             project_id, project_uuid, target_user_id
         )
-        if perms_res.is_err():
+        if perms_res.status == ResultStatus.Err:
             return perms_res
 
         return Ok(
@@ -666,17 +666,17 @@ class ProjectService:
             return Err(InvalidProjectPermissionError())
 
         project_res = await self._getProjectOrErr(project_uuid)
-        if project_res.is_err():
+        if project_res.status == ResultStatus.Err:
             return project_res
         project_id, _, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
-        if active_res.is_err():
+        if active_res.status == ResultStatus.Err:
             return active_res
 
         actor_perms_res = await self._getMemberPermissions(
             project_id, project_uuid, actor_user_id
         )
-        if actor_perms_res.is_err():
+        if actor_perms_res.status == ResultStatus.Err:
             return actor_perms_res
         actor_perms = actor_perms_res.unwrap()
 
@@ -696,7 +696,7 @@ class ProjectService:
             target_perms_res = await self._getPermissionsFromAttrs(
                 target_user_id, project_uuid
             )
-            if target_perms_res.is_err():
+            if target_perms_res.status == ResultStatus.Err:
                 return target_perms_res
             is_removing_owner = (
                 ProjectPermission.OWNER.value in target_perms_res.unwrap()
@@ -706,7 +706,7 @@ class ProjectService:
                 owner_count_res = await self._countProjectOwners(
                     project_id, project_uuid
                 )
-                if owner_count_res.is_err():
+                if owner_count_res.status == ResultStatus.Err:
                     return owner_count_res
                 if owner_count_res.unwrap() <= 1:
                     return Err(LastOwnerRemovalNotAllowedError())
@@ -716,7 +716,7 @@ class ProjectService:
                 project_uuid,
                 permissions,
             )
-            if set_res.is_err():
+            if set_res.status == ResultStatus.Err:
                 return set_res
             return Ok(ProjectUserPermissionsResponse(permissions=permissions))
 

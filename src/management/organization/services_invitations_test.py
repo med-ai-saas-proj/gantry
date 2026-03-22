@@ -4,6 +4,7 @@ from .services_test_support import (
     Ok,
     Err,
     AsyncMock,
+    ResultStatus,
     OrgPermission,
     SimpleNamespace,
     OrgNotFoundError,
@@ -32,8 +33,8 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         res = await service.createInvitation("org-1", "x@example.com")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, UserAlreadyInOrganizationError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), UserAlreadyInOrganizationError)
 
     async def test_create_invitation_conflict_when_user_in_other_org(self):
         """Inviting user from another org should return conflict."""
@@ -48,8 +49,8 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         res = await service.createInvitation("org-1", "x@example.com")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, UserAlreadyInAnotherOrganizationError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), UserAlreadyInAnotherOrganizationError)
 
     async def test_create_invitation_success_for_new_email(self):
         """Inviting new email should call Keycloak invite endpoint."""
@@ -62,7 +63,7 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         res = await service.createInvitation("org-1", "new@example.com")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         service.kc.inviteUser.assert_awaited_once()
 
     async def test_create_invitation_existing_user_without_orgs_is_allowed(
@@ -79,7 +80,7 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         res = await service.createInvitation("org-1", "existing@example.com")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         service.kc.inviteUser.assert_awaited_once()
 
     async def test_get_invitations_maps_keycloak_payload(self):
@@ -102,7 +103,7 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         res = await service.getInvitations("org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().results[0].id, "inv-1")
 
     async def test_get_invitation_maps_single_invitation(self):
@@ -123,7 +124,7 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         res = await service.getInvitation("org-1", "inv-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().email, "a@test")
 
     async def test_delete_and_resend_invitation_delegate_to_keycloak(self):
@@ -138,8 +139,8 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         resend_res = await service.resendInvitation("org-1", "inv-1")
 
         # Assert
-        self.assertTrue(delete_res.is_ok())
-        self.assertTrue(resend_res.is_ok())
+        self.assertTrue(delete_res.status == ResultStatus.Ok)
+        self.assertTrue(resend_res.status == ResultStatus.Ok)
 
     async def test_get_org_owner_id_requires_exactly_one_owner(self):
         """Owner lookup should reject zero-owner and multi-owner states."""
@@ -151,10 +152,10 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         no_owner_res = await service._getOrgOwnerId("org-1")
 
         # Assert
-        self.assertTrue(no_owner_res.is_err())
+        self.assertTrue(no_owner_res.status == ResultStatus.Err)
         from src.management.organization.services import OwnerNotFoundError
 
-        self.assertIsInstance(no_owner_res.error, OwnerNotFoundError)
+        self.assertIsInstance(no_owner_res.err(), OwnerNotFoundError)
 
         # Arrange
         service.kc.getOrgMembers = AsyncMock(
@@ -174,10 +175,10 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         multi_owner_res = await service._getOrgOwnerId("org-1")
 
         # Assert
-        self.assertTrue(multi_owner_res.is_err())
+        self.assertTrue(multi_owner_res.status == ResultStatus.Err)
         from src.management.organization.services import MultipleOwnersError
 
-        self.assertIsInstance(multi_owner_res.error, MultipleOwnersError)
+        self.assertIsInstance(multi_owner_res.err(), MultipleOwnersError)
 
     async def test_get_org_owner_id_single_owner_success(self):
         """Owner lookup should return the single owner id."""
@@ -194,7 +195,7 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         res = await service._getOrgOwnerId("org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap(), "u1")
 
     async def test_get_org_owner_id_supports_paging_and_non_owner_members(self):
@@ -220,5 +221,5 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         res = await service._getOrgOwnerId("org-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap(), "owner")

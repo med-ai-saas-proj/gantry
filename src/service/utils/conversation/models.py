@@ -1,6 +1,7 @@
 from src.db.base import BaseSQLModel
 from src.db.utils import (
     WithID,
+    WithUUID,
     WithClientUUID,
     WithCreateUpdateTimestamp,
 )
@@ -58,7 +59,7 @@ class Conversation(
 #     args: Any
 
 
-class Message(WithID, ConversationBaseSQLModel):
+class Message(WithID, WithUUID, ConversationBaseSQLModel):
     """Represents a message in a conversation."""
 
     __tablename__ = "Messages"
@@ -94,18 +95,6 @@ class Message(WithID, ConversationBaseSQLModel):
             run_id=raw.get("run_id"),
         )
         mess.id = raw["id"]
+        mess.uuid = raw["uuid"]
         mess.seq_id = raw["seq_id"]
         return mess
-
-
-class MessageDict(TypedDict):
-    """Represents the raw dictionary form of a Message"""
-
-    id: int
-    seq_id: int
-    conversation_id: int
-    kind: str
-    parts: list[MessagePart]
-    timestamp: datetime
-    model_name: str | None
-    run_id: str | None

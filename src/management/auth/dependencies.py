@@ -14,6 +14,7 @@ from .factories import AuthService, getAuthService
 from typing import Annotated
 
 from fastapi import Depends, Security
+from pyrusult import ResultStatus
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
@@ -61,7 +62,7 @@ async def getUserInfo(
         return user_info
 
     orgs_res = await kc_org_client.getMemberOrganizations(user_info["id"])
-    if orgs_res.is_err():
+    if orgs_res.status == ResultStatus.Err:
         return user_info
 
     for org in orgs_res.unwrap():
@@ -77,13 +78,13 @@ async def getUserInfo(
 
 async def getUserOrgId(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-) -> str | None:
+) -> str:
     """Return the authenticated user's organization id from token context."""
     return user_info["org_id"]
 
 
 async def requireUserOrgId(
-    org_id: Annotated[str | None, Depends(getUserOrgId)],
+    org_id: Annotated[str, Depends(getUserOrgId)],
 ) -> str:
     """Return token org id, failing if the token has no organization context."""
     if not org_id:

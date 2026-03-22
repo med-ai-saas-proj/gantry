@@ -34,7 +34,7 @@ from .keycloak_client import (
 from typing import Any
 from datetime import UTC, datetime, timedelta
 
-from safe_result import Ok, Err, Result
+from pyrusult import Ok, Err, Result, ResultStatus
 from structlog.stdlib import BoundLogger
 
 
@@ -189,8 +189,8 @@ class OrgService:
     ]:
         """Verify the user belongs to exactly this organization."""
         orgs_res = await self.kc.getMemberOrganizations(user_id)
-        if orgs_res.is_err():
-            return orgs_res
+        if orgs_res.status == ResultStatus.Err:
+            return orgs_res.into()
 
         orgs = orgs_res.unwrap()
         unique_org_ids = {
@@ -239,12 +239,12 @@ class OrgService:
     ]:
         """Load organization permissions for a confirmed organization member."""
         member_res = await self._ensureUserInOrg(org_id, user_id)
-        if member_res.is_err():
-            return member_res
+        if member_res.status == ResultStatus.Err:
+            return member_res.into()
 
         attrs_res = await self.kc.getUserAttributes(user_id)
-        if attrs_res.is_err():
-            return attrs_res
+        if attrs_res.status == ResultStatus.Err:
+            return attrs_res.into()
         attrs = attrs_res.unwrap()
         return Ok(self._extractUserPermissions(attrs))
 
@@ -267,8 +267,8 @@ class OrgService:
             members_res = await self.kc.getOrgMembers(
                 org_id, first=first, max_results=max_results
             )
-            if members_res.is_err():
-                return members_res
+            if members_res.status == ResultStatus.Err:
+                return members_res.into()
             members = members_res.unwrap()
             if not members:
                 break
@@ -278,8 +278,8 @@ class OrgService:
                 if not member_id:
                     continue
                 attrs_res = await self.kc.getUserAttributes(member_id)
-                if attrs_res.is_err():
-                    return attrs_res
+                if attrs_res.status == ResultStatus.Err:
+                    return attrs_res.into()
                 perms = self._extractUserPermissions(attrs_res.unwrap())
                 if OrgPermission.OWNER.value in perms:
                     owners.append(member_id)
@@ -307,14 +307,14 @@ class OrgService:
     ]:
         """Build organization metadata from Keycloak plus owner resolution."""
         org_res = await self.kc.getOrg(org_id)
-        if org_res.is_err():
-            return org_res
+        if org_res.status == ResultStatus.Err:
+            return org_res.into()
         org = org_res.unwrap()
         name = str(org.get("name") or org_id)
 
         owner_id_res = await self._getOrgOwnerId(org_id)
-        if owner_id_res.is_err():
-            if isinstance(owner_id_res.error, OwnerNotFoundError):
+        if owner_id_res.status == ResultStatus.Err:
+            if isinstance(owner_id_res.err(), OwnerNotFoundError):
                 return Ok(
                     OrgInfoResponse(
                         id=str(org.get("id") or org_id),
@@ -322,7 +322,7 @@ class OrgService:
                         owner_id=None,
                     )
                 )
-            return owner_id_res
+            return owner_id_res.into()
         return Ok(
             OrgInfoResponse(
                 id=str(org.get("id") or org_id),
@@ -340,8 +340,8 @@ class OrgService:
     ]:
         """Create a delayed deletion request for an existing organization."""
         org_res = await self._ensureOrgExists(org_id)
-        if org_res.is_err():
-            return org_res
+        if org_res.status == ResultStatus.Err:
+            return org_res.into()
 
         async with self.session_manager.get_session() as session:
             existing = await self.deletion_repo.getByOrgId(session, org_id)
@@ -393,16 +393,16 @@ class OrgService:
             for req in due_requests:
                 org_id = req.org_id
                 delete_res = await self.kc.deleteOrg(org_id)
-                if delete_res.is_err() and not isinstance(
-                    delete_res.error, OrgNotFoundError
+                if delete_res.status == ResultStatus.Err and not isinstance(
+                    delete_res.err(), OrgNotFoundError
                 ):
                     self.logger.warning(
                         "org_delete_worker_failed",
                         org_id=org_id,
                         error=getattr(
-                            delete_res.error,
+                            delete_res.err(),
                             "detail",
-                            str(delete_res.error),
+                            str(delete_res.err()),
                         ),
                     )
                     continue
@@ -449,22 +449,22 @@ class OrgService:
     ]:
         """Rename an organization after owner checks pass."""
         owner_id_res = await self._getOrgOwnerId(org_id)
-        if owner_id_res.is_err():
-            return owner_id_res
+        if owner_id_res.status == ResultStatus.Err:
+            return owner_id_res.into()
         owner_id = owner_id_res.unwrap()
         if owner_id != actor_user_id:
             return Err(OwnerPermissionRequiredError())
 
         current_org_res = await self.kc.getOrg(org_id)
-        if current_org_res.is_err():
-            return current_org_res
+        if current_org_res.status == ResultStatus.Err:
+            return current_org_res.into()
         current_org = current_org_res.unwrap()
         payload = dict(current_org)
         payload["name"] = name
 
         update_res = await self.kc.updateOrg(org_id, payload)
-        if update_res.is_err():
-            return update_res
+        if update_res.status == ResultStatus.Err:
+            return update_res.into()
 
         return Ok(
             OrgInfoResponse(
@@ -480,8 +480,8 @@ class OrgService:
     ) -> Result[OrgSettingsResponse, OrgNotFoundError | KeycloakOrgError]:
         """Fetch organization settings, creating an empty row when missing."""
         org_res = await self._ensureOrgExists(org_id)
-        if org_res.is_err():
-            return org_res
+        if org_res.status == ResultStatus.Err:
+            return org_res.into()
 
         async with self.session_manager.get_session() as session:
             settings = await self.settings_repo.getOrCreate(session, org_id)
@@ -500,8 +500,8 @@ class OrgService:
     ) -> Result[OrgSettingsResponse, OrgNotFoundError | KeycloakOrgError]:
         """Persist organization settings after flattening nested extra data."""
         org_res = await self._ensureOrgExists(org_id)
-        if org_res.is_err():
-            return org_res
+        if org_res.status == ResultStatus.Err:
+            return org_res.into()
 
         flattened_extra = self._flattenSettings(extra)
 
@@ -528,12 +528,12 @@ class OrgService:
         members_res = await self.kc.getOrgMembers(
             org_id, first=offset, max_results=limit, search=q
         )
-        if members_res.is_err():
-            return members_res
+        if members_res.status == ResultStatus.Err:
+            return members_res.into()
         members = members_res.unwrap()
 
         count_res = await self.kc.getOrgMemberCount(org_id)
-        total = count_res.unwrap() if count_res.is_ok() else len(members)
+        total = count_res.unwrap_or(len(members))
 
         results = [
             OrgUserResponse(
@@ -558,13 +558,13 @@ class OrgService:
     ]:
         """Remove a non-owner member from the organization and delete the user."""
         owner_id_res = await self._getOrgOwnerId(org_id)
-        if owner_id_res.is_err():
-            return owner_id_res
+        if owner_id_res.status == ResultStatus.Err:
+            return owner_id_res.into()
         if user_id == owner_id_res.unwrap():
             return Err(OwnerRemovalNotAllowedError())
 
         remove_res = await self.kc.removeMember(org_id, user_id)
-        if remove_res.is_err():
+        if remove_res.status == ResultStatus.Err:
             return remove_res
         return await self.kc.deleteUser(user_id)
 
@@ -574,8 +574,8 @@ class OrgService:
     ) -> Result[InvitationListResponse, OrgNotFoundError | KeycloakOrgError]:
         """List pending invitations for an organization."""
         inv_res = await self.kc.getInvitations(org_id)
-        if inv_res.is_err():
-            return inv_res
+        if inv_res.status == ResultStatus.Err:
+            return inv_res.into()
         raw_list = inv_res.unwrap()
 
         results = []
@@ -595,8 +595,8 @@ class OrgService:
     ) -> Result[InvitationResponse, InvitationNotFoundError | KeycloakOrgError]:
         """Fetch one invitation and map it into the public DTO."""
         inv_res = await self.kc.getInvitation(org_id, invitation_id)
-        if inv_res.is_err():
-            return inv_res
+        if inv_res.status == ResultStatus.Err:
+            return inv_res.into()
         inv = inv_res.unwrap()
 
         return Ok(
@@ -621,14 +621,14 @@ class OrgService:
     ]:
         """Invite a user after enforcing the one-user-one-org invariant."""
         existing_user_res = await self.kc.findUserByEmail(email)
-        if existing_user_res.is_err():
-            return existing_user_res
+        if existing_user_res.status == ResultStatus.Err:
+            return existing_user_res.into()
         existing_user = existing_user_res.unwrap()
         if existing_user and existing_user.get("id"):
             existing_user_id = str(existing_user["id"])
             orgs_res = await self.kc.getMemberOrganizations(existing_user_id)
-            if orgs_res.is_err():
-                return orgs_res
+            if orgs_res.status == ResultStatus.Err:
+                return orgs_res.into()
 
             org_ids = _extract_org_ids(orgs_res.unwrap())
             if org_id in org_ids:
@@ -643,7 +643,7 @@ class OrgService:
             client_id=settings.invite_client_id,
             redirect_uri=settings.invite_redirect_uri,
         )
-        if invite_res.is_err():
+        if invite_res.status == ResultStatus.Err:
             return invite_res
         return Ok(True)
 
@@ -676,8 +676,8 @@ class OrgService:
     ]:
         """Authorize reading organization permissions for the target user."""
         target_member_res = await self._ensureUserInOrg(org_id, target_user_id)
-        if target_member_res.is_err():
-            return target_member_res
+        if target_member_res.status == ResultStatus.Err:
+            return target_member_res.into()
 
         if actor_user_id == target_user_id:
             return Ok(None)
@@ -685,8 +685,8 @@ class OrgService:
         actor_perms_res = await self._getMemberPermissions(
             org_id, actor_user_id
         )
-        if actor_perms_res.is_err():
-            return actor_perms_res
+        if actor_perms_res.status == ResultStatus.Err:
+            return actor_perms_res.into()
 
         if not has_permission(
             actor_perms_res.unwrap(),
@@ -707,8 +707,8 @@ class OrgService:
     ]:
         """Return normalized organization permissions for one user."""
         perms_res = await self._getMemberPermissions(org_id, user_id)
-        if perms_res.is_err():
-            return perms_res
+        if perms_res.status == ResultStatus.Err:
+            return perms_res.into()
         return Ok(UserPermissionsResponse(permissions=perms_res.unwrap()))
 
     async def updateUserPermissions(
@@ -738,8 +738,8 @@ class OrgService:
             return Err(InvalidPermissionError())
 
         owner_id_res = await self._getOrgOwnerId(org_id)
-        if owner_id_res.is_err():
-            return owner_id_res
+        if owner_id_res.status == ResultStatus.Err:
+            return owner_id_res.into()
         owner_id = owner_id_res.unwrap()
 
         if user_id == owner_id and OrgPermission.OWNER.value not in permissions:
@@ -750,8 +750,8 @@ class OrgService:
         actor_perms_res = await self._getMemberPermissions(
             org_id, actor_user_id
         )
-        if actor_perms_res.is_err():
-            return actor_perms_res
+        if actor_perms_res.status == ResultStatus.Err:
+            return actor_perms_res.into()
         actor_perms = actor_perms_res.unwrap()
 
         if (
@@ -761,13 +761,13 @@ class OrgService:
             return Err(OwnerRequiredForGrantError())
 
         target_member_res = await self._ensureUserInOrg(org_id, user_id)
-        if target_member_res.is_err():
-            return target_member_res
+        if target_member_res.status == ResultStatus.Err:
+            return target_member_res.into()
 
         set_res = await self.kc.setUserAttribute(
             user_id, _ORG_PERM_ATTR, permissions
         )
-        if set_res.is_err():
-            return set_res
+        if set_res.status == ResultStatus.Err:
+            return set_res.into()
 
         return Ok(UserPermissionsResponse(permissions=permissions))

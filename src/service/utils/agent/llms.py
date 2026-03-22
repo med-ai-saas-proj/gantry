@@ -4,8 +4,8 @@ from enum import Enum
 from typing import Any, TypedDict, NotRequired
 
 from pydantic import SecretStr
+from pyrusult import Ok, Err, Result
 from pydantic_ai import ModelSettings
-from safe_result import Ok, Err, Result
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic_ai.models import Model, infer_model
 from pydantic_ai.providers import infer_provider_class
@@ -54,8 +54,6 @@ available_models: dict[AvailableModels, Model] = {
     name: createModel(config)
     for name, config in models_settings.configs.items()
 }
-
-print(available_models)
 
 
 class ModelNotFoundError(UnrecoverableError):

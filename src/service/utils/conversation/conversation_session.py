@@ -1,3 +1,4 @@
+from src.shared.utils.uuid_utils import uuid7
 from src.shared.custom_types.error_exception import RecoverableError
 from src.service.utils.agent.dtos.generation_output import ResponseStatus
 
@@ -35,6 +36,7 @@ from typing import (
     cast,
 )
 
+from pyrusult import Ok, Err, Result, ResultStatus
 from pydantic_ai import (
     AudioUrl,
     ImageUrl,
@@ -46,7 +48,6 @@ from pydantic_ai import (
     AgentStreamEvent,
     AgentRunResultEvent,
 )
-from safe_result import Ok, Err, Result
 
 
 DATA_URL_BASE64_RE = re.compile(
@@ -124,7 +125,7 @@ class ConversationSession:
         mime_type: str,
     ) -> uuid.UUID:
         """Upload file and return file ID."""
-        file_id = uuid.uuid4()
+        file_id = uuid7()
         file_info = FileUploadInfo(
             file_id=file_id,
             file_data=file_data,
@@ -153,7 +154,7 @@ class ConversationSession:
                         result = self.extractFileContentFromUrl(
                             root_message.url
                         )
-                        if result.is_ok():
+                        if result.status == ResultStatus.Ok:
                             mime_type, file_data = result.unwrap()
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
@@ -173,8 +174,8 @@ class ConversationSession:
                         _res = await self.file_service.getFileInfoAndUrl(
                             root_message.file_id, self.project_id
                         )
-                        if isinstance(_res, Err):
-                            return _res
+                        if _res.status == ResultStatus.Err:
+                            return _res.into()
                         file_url, metadata = _res.unwrap()
                         content = ImageUrl(
                             url=file_url,
@@ -188,7 +189,7 @@ class ConversationSession:
                     root_message = message.root
                     if isinstance(root_message, AudioURLInput):
                         res = self.extractFileContentFromUrl(root_message.url)
-                        if res.is_ok():
+                        if res.status == ResultStatus.Ok:
                             mime_type, file_data = res.unwrap()
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
@@ -208,8 +209,8 @@ class ConversationSession:
                         _res = await self.file_service.getFileInfoAndUrl(
                             root_message.file_id, self.project_id
                         )
-                        if isinstance(_res, Err):
-                            return _res
+                        if _res.status == ResultStatus.Err:
+                            return _res.into()
                         file_url, metadata = _res.unwrap()
                         content = AudioUrl(
                             url=file_url,
@@ -223,7 +224,7 @@ class ConversationSession:
                     root_message = message.root
                     if isinstance(root_message, VideoURLInput):
                         res = self.extractFileContentFromUrl(root_message.url)
-                        if res.is_ok():
+                        if res.status == ResultStatus.Ok:
                             mime_type, file_data = res.unwrap()
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
@@ -243,8 +244,8 @@ class ConversationSession:
                         _res = await self.file_service.getFileInfoAndUrl(
                             root_message.file_id, self.project_id
                         )
-                        if isinstance(_res, Err):
-                            return _res
+                        if _res.status == ResultStatus.Err:
+                            return _res.into()
                         file_url, metadata = _res.unwrap()
                         content = VideoUrl(
                             url=file_url,
@@ -258,7 +259,7 @@ class ConversationSession:
                     root_message = message.root
                     if isinstance(root_message, DocumentURLInput):
                         res = self.extractFileContentFromUrl(root_message.url)
-                        if res.is_ok():
+                        if res.status == ResultStatus.Ok:
                             mime_type, file_data = res.unwrap()
                             file_id = await self.addUploadFile(
                                 file_data, mime_type
@@ -281,8 +282,8 @@ class ConversationSession:
                         _res = await self.file_service.getFileInfoAndUrl(
                             root_message.file_id, self.project_id
                         )
-                        if isinstance(_res, Err):
-                            return _res
+                        if _res.status == ResultStatus.Err:
+                            return _res.into()
                         file_url, metadata = _res.unwrap()
                         content = DocumentUrl(
                             url=file_url,

@@ -5,6 +5,7 @@ from .services_test_support import (
     Ok,
     Err,
     AsyncMock,
+    ResultStatus,
     SimpleNamespace,
     ProjectPermission,
     ProjectArchivedError,
@@ -38,8 +39,8 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.addUserToProject("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, UserAlreadyInProjectError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), UserAlreadyInProjectError)
 
     async def test_add_user_success(self):
         """Adding new user should create membership and commit."""
@@ -61,7 +62,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.addUserToProject("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.membership_repo = service.membership_repo
         self.membership_repo.upsertMembership.assert_awaited_once()
         service.kc.getUserAttributes.assert_awaited_once_with("u2")
@@ -85,8 +86,8 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.addUserToProject("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, ProjectArchivedError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), ProjectArchivedError)
 
     async def test_add_user_target_must_belong_to_org(self):
         """Adding user should fail if target user is outside the organization."""
@@ -104,7 +105,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.addUserToProject("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_err())
+        self.assertTrue(res.status == ResultStatus.Err)
 
     async def test_remove_last_owner_blocked(self):
         """Service must block removing the last project owner."""
@@ -131,8 +132,8 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.removeUserFromProject("proj-1", "u-owner")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, LastOwnerRemovalNotAllowedError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), LastOwnerRemovalNotAllowedError)
 
     async def test_count_project_owners_counts_owner_permissions_only(self):
         """Owner counting should use project-scoped attrs for each member id."""
@@ -157,7 +158,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service._countProjectOwners(10, "proj-1")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap(), 2)
         self.assertEqual(
             service._getPermissionsFromAttrs.await_args_list,
@@ -198,7 +199,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.removeUserFromProject("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         service.membership_repo.deleteMembership.assert_awaited_once()
         service.kc.getUserAttributes.assert_awaited_once_with("u2")
         service.kc.setUserAttribute.assert_awaited_once_with(
@@ -231,7 +232,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.removeUserFromProject("proj-1", "u-owner")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
 
     async def test_remove_user_propagates_permission_and_owner_count_errors(
         self,
@@ -254,7 +255,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         perm_err = await service.removeUserFromProject("proj-1", "u-owner")
 
         # Assert
-        self.assertTrue(perm_err.is_err())
+        self.assertTrue(perm_err.status == ResultStatus.Err)
 
         # Arrange
         service._getPermissionsFromAttrs = AsyncMock(
@@ -268,7 +269,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         count_err = await service.removeUserFromProject("proj-1", "u-owner")
 
         # Assert
-        self.assertTrue(count_err.is_err())
+        self.assertTrue(count_err.status == ResultStatus.Err)
 
     async def test_remove_user_archived_project_denied(self):
         """Archived project should block membership removal."""
@@ -283,8 +284,8 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.removeUserFromProject("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, ProjectArchivedError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), ProjectArchivedError)
 
     async def test_remove_user_missing_membership_returns_not_found(self):
         """Removing absent membership should return user_not_in_project."""
@@ -300,8 +301,8 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.removeUserFromProject("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, UserNotInProjectError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), UserNotInProjectError)
 
     async def test_get_user_permissions_success(self):
         """Get user permissions should return current permission list."""
@@ -319,7 +320,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.getUserPermissions("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().permissions, ["project.settings.read"])
 
     async def test_get_user_permissions_project_isolation(self):
@@ -350,7 +351,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.getUserPermissions("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().permissions, ["project.settings.read"])
 
     async def test_get_user_permissions_archived_project_denied(self):
@@ -366,8 +367,8 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.getUserPermissions("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, ProjectArchivedError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), ProjectArchivedError)
 
     async def test_get_user_permissions_propagates_member_permission_error(
         self,
@@ -387,4 +388,4 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         res = await service.getUserPermissions("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.is_err())
+        self.assertTrue(res.status == ResultStatus.Err)

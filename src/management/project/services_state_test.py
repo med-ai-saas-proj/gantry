@@ -5,6 +5,7 @@ from .services_test_support import (
     Ok,
     Err,
     AsyncMock,
+    ResultStatus,
     SimpleNamespace,
     ProjectPermission,
     ProjectArchivedError,
@@ -47,7 +48,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         res = await service.listProjectUsers("proj-1", offset=1, limit=1, q="o")
 
         # Assert
-        self.assertTrue(res.is_ok())
+        self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().total, 2)
         self.assertEqual(len(res.unwrap().results), 1)
         self.assertEqual(res.unwrap().results[0].id, "u2")
@@ -71,7 +72,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         res = await service.listProjectUsers("proj-1")
 
         # Assert
-        self.assertTrue(res.is_err())
+        self.assertTrue(res.status == ResultStatus.Err)
 
     async def test_list_project_users_archived_project_denied(self):
         """Archived project should reject user listing."""
@@ -86,8 +87,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
         res = await service.listProjectUsers("proj-1")
 
         # Assert
-        self.assertTrue(res.is_err())
-        self.assertIsInstance(res.error, ProjectArchivedError)
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), ProjectArchivedError)
 
     async def test_authorize_project_permission_archived_project_denied(self):
         """Archived project should reject permission-based access."""
@@ -106,8 +107,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(result.is_err())
-        self.assertIsInstance(result.error, ProjectArchivedError)
+        self.assertTrue(result.status == ResultStatus.Err)
+        self.assertIsInstance(result.err(), ProjectArchivedError)
 
     async def test_authorize_project_permission_archived_allowed_for_unarchive_flow(
         self,
@@ -132,7 +133,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertTrue(result.is_ok())
+        self.assertTrue(result.status == ResultStatus.Ok)
 
     async def test_set_project_archived_success_not_found_and_state_transitions(
         self,
@@ -146,8 +147,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
         not_found = await service.setProjectArchived("missing", True)
 
         # Assert
-        self.assertTrue(not_found.is_err())
-        self.assertIsInstance(not_found.error, ProjectNotFoundError)
+        self.assertTrue(not_found.status == ResultStatus.Err)
+        self.assertIsInstance(not_found.err(), ProjectNotFoundError)
 
         # Arrange
         service.project_repo.getByUuid = AsyncMock(
@@ -161,7 +162,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         ok_res = await service.setProjectArchived("p1", True)
 
         # Assert
-        self.assertTrue(ok_res.is_ok())
+        self.assertTrue(ok_res.status == ResultStatus.Ok)
         self.assertTrue(ok_res.unwrap().archived)
 
         # Arrange
@@ -176,7 +177,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         archived_res = await service.setProjectArchived("p1", False)
 
         # Assert
-        self.assertTrue(archived_res.is_ok())
+        self.assertTrue(archived_res.status == ResultStatus.Ok)
         self.assertFalse(archived_res.unwrap().archived)
 
         # Arrange
@@ -191,8 +192,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
         already_archived = await service.setProjectArchived("p1", True)
 
         # Assert
-        self.assertTrue(already_archived.is_err())
-        self.assertIsInstance(already_archived.error, ProjectArchivedError)
+        self.assertTrue(already_archived.status == ResultStatus.Err)
+        self.assertIsInstance(already_archived.err(), ProjectArchivedError)
 
     async def test_misc_project_error_propagation_paths(self):
         """Project service should propagate upstream collaborator errors on edge paths."""
@@ -204,17 +205,22 @@ class TestProjectServiceState(BaseProjectServiceTest):
             return_value=Err(_DummyError("org lookup failed"))
         )
         self.assertTrue(
-            (await service._ensureUserInOrg("u1", "org-1")).is_err()
+            (await service._ensureUserInOrg("u1", "org-1")).status
+            == ResultStatus.Err
         )
 
         service.project_repo.getByUuid = AsyncMock(return_value=None)
-        self.assertTrue((await service._getProjectOrErr("missing")).is_err())
+        self.assertTrue(
+            (await service._getProjectOrErr("missing")).status
+            == ResultStatus.Err
+        )
 
         service.kc.getUserAttributes = AsyncMock(
             return_value=Err(_DummyError("attr failed"))
         )
         self.assertTrue(
-            (await service._getPermissionsFromAttrs("u1", "proj-1")).is_err()
+            (await service._getPermissionsFromAttrs("u1", "proj-1")).status
+            == ResultStatus.Err
         )
 
         # _set_project_permissions string/non-list branches and attr error
@@ -227,23 +233,27 @@ class TestProjectServiceState(BaseProjectServiceTest):
         )
         service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
         self.assertTrue(
-            (await service._setProjectPermissions("u1", "proj-1", [])).is_err()
+            (await service._setProjectPermissions("u1", "proj-1", [])).status
+            == ResultStatus.Err
         )
         self.assertTrue(
-            (await service._setProjectPermissions("u1", "proj-1", [])).is_ok()
+            (await service._setProjectPermissions("u1", "proj-1", [])).status
+            == ResultStatus.Ok
         )
         self.assertTrue(
             (
                 await service._setProjectPermissions(
                     "u1", "proj-1", ["project.settings.read"]
                 )
-            ).is_ok()
+            ).status
+            == ResultStatus.Ok
         )
 
         # _get_member_permissions / _count_project_owners / authorize_project_permission
         service.membership_repo.getMembership = AsyncMock(return_value=None)
         self.assertTrue(
-            (await service._getMemberPermissions(10, "proj-1", "u1")).is_err()
+            (await service._getMemberPermissions(10, "proj-1", "u1")).status
+            == ResultStatus.Err
         )
 
         service.membership_repo.listMembers = AsyncMock(
@@ -253,7 +263,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
             return_value=Err(_DummyError("count failed"))
         )
         self.assertTrue(
-            (await service._countProjectOwners(10, "proj-1")).is_err()
+            (await service._countProjectOwners(10, "proj-1")).status
+            == ResultStatus.Err
         )
 
         service._getProjectOrErr = AsyncMock(
@@ -264,7 +275,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
                 await service.authorizeProjectPermission(
                     "proj-1", "u1", ProjectPermission.USERS_GET_ALL
                 )
-            ).is_err()
+            ).status
+            == ResultStatus.Err
         )
 
         active_info = SimpleNamespace(archived=False)
@@ -279,7 +291,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
                 await service.authorizeProjectPermission(
                     "proj-1", "u1", ProjectPermission.USERS_GET_ALL
                 )
-            ).is_err()
+            ).status
+            == ResultStatus.Err
         )
 
         # _has_org_wide_project_permission / list_org_projects
@@ -294,34 +307,45 @@ class TestProjectServiceState(BaseProjectServiceTest):
                 await service._hasOrgWideProjectPermission(
                     "u1", "org-1", ProjectPermission.PROJECTS_CREATE
                 )
-            ).is_err()
+            ).status
+            == ResultStatus.Err
         )
 
         service._hasOrgWideProjectPermission = AsyncMock(
             return_value=Err(_DummyError("authz failed"))
         )
-        self.assertTrue((await service.listOrgProjects("u1", "org-1")).is_err())
+        self.assertTrue(
+            (await service.listOrgProjects("u1", "org-1")).status
+            == ResultStatus.Err
+        )
 
         # create/list/add/remove/get/update not-found or downstream write errors
         service._getProjectOrErr = AsyncMock(
             return_value=Err(_DummyError("project failed"))
         )
-        self.assertTrue((await service.listProjectUsers("proj-1")).is_err())
         self.assertTrue(
-            (await service.addUserToProject("proj-1", "u2")).is_err()
+            (await service.listProjectUsers("proj-1")).status
+            == ResultStatus.Err
         )
         self.assertTrue(
-            (await service.removeUserFromProject("proj-1", "u2")).is_err()
+            (await service.addUserToProject("proj-1", "u2")).status
+            == ResultStatus.Err
         )
         self.assertTrue(
-            (await service.getUserPermissions("proj-1", "u2")).is_err()
+            (await service.removeUserFromProject("proj-1", "u2")).status
+            == ResultStatus.Err
+        )
+        self.assertTrue(
+            (await service.getUserPermissions("proj-1", "u2")).status
+            == ResultStatus.Err
         )
         self.assertTrue(
             (
                 await service.updateUserPermissions(
                     "proj-1", "actor", "target", ["project.settings.read"]
                 )
-            ).is_err()
+            ).status
+            == ResultStatus.Err
         )
 
         # add/remove/update downstream write failures
@@ -337,7 +361,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
             return_value=Err(_DummyError("set attrs failed"))
         )
         self.assertTrue(
-            (await service.addUserToProject("proj-1", "u2")).is_err()
+            (await service.addUserToProject("proj-1", "u2")).status
+            == ResultStatus.Err
         )
 
         service.membership_repo.getMembership = AsyncMock(
@@ -346,7 +371,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
         service._getPermissionsFromAttrs = AsyncMock(return_value=Ok([]))
         service.membership_repo.deleteMembership = AsyncMock(return_value=True)
         self.assertTrue(
-            (await service.removeUserFromProject("proj-1", "u2")).is_err()
+            (await service.removeUserFromProject("proj-1", "u2")).status
+            == ResultStatus.Err
         )
 
         service._getMemberPermissions = AsyncMock(
@@ -357,7 +383,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
                 await service.updateUserPermissions(
                     "proj-1", "actor", "target", ["project.settings.read"]
                 )
-            ).is_err()
+            ).status
+            == ResultStatus.Err
         )
 
         service._getMemberPermissions = AsyncMock(
@@ -374,7 +401,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
                 await service.updateUserPermissions(
                     "proj-1", "actor", "target", ["project.settings.read"]
                 )
-            ).is_err()
+            ).status
+            == ResultStatus.Err
         )
 
         service._getPermissionsFromAttrs = AsyncMock(
@@ -388,7 +416,8 @@ class TestProjectServiceState(BaseProjectServiceTest):
                 await service.updateUserPermissions(
                     "proj-1", "actor", "target", []
                 )
-            ).is_err()
+            ).status
+            == ResultStatus.Err
         )
 
         service._getPermissionsFromAttrs = AsyncMock(return_value=Ok([]))
@@ -400,5 +429,6 @@ class TestProjectServiceState(BaseProjectServiceTest):
                 await service.updateUserPermissions(
                     "proj-1", "actor", "target", ["project.settings.read"]
                 )
-            ).is_err()
+            ).status
+            == ResultStatus.Err
         )
