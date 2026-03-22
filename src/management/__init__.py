@@ -23,7 +23,7 @@ async def _org_delete_worker_loop():
     service = getOrgService()
     while True:
         try:  # noqa: SIM105
-            await service.process_due_deletions()
+            await service.processDueDeletions()
         except Exception:
             # Keep loop alive; failures are logged in service/global handlers.
             pass

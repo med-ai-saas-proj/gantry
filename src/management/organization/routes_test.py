@@ -25,12 +25,12 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
             cancel_before="2026-04-16T00:00:00",
         )
         settings = SimpleNamespace(rate_limit=10, extra={"theme": "dark"})
-        service.get_org_info = AsyncMock(return_value=Ok(info))
-        service.update_org_info = AsyncMock(return_value=Ok(info))
-        service.request_delete_org = AsyncMock(return_value=Ok(delete_req))
-        service.cancel_delete_org = AsyncMock(return_value=Ok(True))
-        service.get_settings = AsyncMock(return_value=Ok(settings))
-        service.update_settings = AsyncMock(return_value=Ok(settings))
+        service.getOrgInfo = AsyncMock(return_value=Ok(info))
+        service.updateOrgInfo = AsyncMock(return_value=Ok(info))
+        service.requestDeleteOrg = AsyncMock(return_value=Ok(delete_req))
+        service.cancelDeleteOrg = AsyncMock(return_value=Ok(True))
+        service.getSettings = AsyncMock(return_value=Ok(settings))
+        service.updateSettings = AsyncMock(return_value=Ok(settings))
 
         user_info = {"id": "u1", "roles": []}
         self.assertEqual(
@@ -74,18 +74,16 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
         invitations = SimpleNamespace(results=[])
         invitation = SimpleNamespace(id="inv-1", email="a@test")
         perms = SimpleNamespace(permissions=["organization.owner"])
-        service.get_users = AsyncMock(return_value=Ok(users))
-        service.remove_user = AsyncMock(return_value=Ok(True))
-        service.get_invitations = AsyncMock(return_value=Ok(invitations))
-        service.create_invitation = AsyncMock(return_value=Ok(True))
-        service.get_invitation = AsyncMock(return_value=Ok(invitation))
-        service.delete_invitation = AsyncMock(return_value=Ok(True))
-        service.resend_invitation = AsyncMock(return_value=Ok(True))
-        service.ensure_can_read_user_permissions = AsyncMock(
-            return_value=Ok(True)
-        )
-        service.get_user_permissions = AsyncMock(return_value=Ok(perms))
-        service.update_user_permissions = AsyncMock(return_value=Ok(perms))
+        service.getUsers = AsyncMock(return_value=Ok(users))
+        service.removeUser = AsyncMock(return_value=Ok(True))
+        service.getInvitations = AsyncMock(return_value=Ok(invitations))
+        service.createInvitation = AsyncMock(return_value=Ok(True))
+        service.getInvitation = AsyncMock(return_value=Ok(invitation))
+        service.deleteInvitation = AsyncMock(return_value=Ok(True))
+        service.resendInvitation = AsyncMock(return_value=Ok(True))
+        service.ensureCanReadUserPermissions = AsyncMock(return_value=Ok(True))
+        service.getUserPermissions = AsyncMock(return_value=Ok(perms))
+        service.updateUserPermissions = AsyncMock(return_value=Ok(perms))
 
         user_info = {"id": "u1", "roles": []}
         self.assertEqual(

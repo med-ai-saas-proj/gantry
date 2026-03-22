@@ -21,7 +21,7 @@ def requiredProjectPermission(
         user_info: Annotated[UserInfo, Depends(getUserInfo)],
         project_service: Annotated[ProjectService, Depends(getProjectService)],
     ) -> UserInfo:
-        authz_res = await project_service.authorize_project_permission(
+        authz_res = await project_service.authorizeProjectPermission(
             project_uuid=project_id,
             user_id=user_info["id"],
             required=permission,
@@ -42,7 +42,7 @@ def userHasRole(required_permissions: list[ProjectPermission]):
         project_service: Annotated[ProjectService, Depends(getProjectService)],
     ) -> UserInfo:
         for permission in required_permissions:
-            authz_res = await project_service.authorize_project_permission(
+            authz_res = await project_service.authorizeProjectPermission(
                 project_uuid=project_id,
                 user_id=user_info["id"],
                 required=permission,

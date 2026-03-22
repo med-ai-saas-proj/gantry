@@ -1,10 +1,10 @@
 """FastAPI dependencies for authentication and authorization."""
 
-from src.shared.custom_types.error_exception import RecoverableError
 from src.management.organization.factories import (
     KeycloakOrgClient,
     getKeycloakOrgClient,
 )
+from src.shared.custom_types.error_exception import RecoverableError
 
 from .roles import ManagementRole
 from .entities import UserInfo
@@ -60,7 +60,7 @@ async def getUserInfo(
     if not org_claim:
         return user_info
 
-    orgs_res = await kc_org_client.get_member_organizations(user_info["id"])
+    orgs_res = await kc_org_client.getMemberOrganizations(user_info["id"])
     if orgs_res.is_err():
         return user_info
 

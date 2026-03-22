@@ -41,10 +41,10 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Org existence helper should return Keycloak org payload."""
         # Arrange
         service = self._make_service()
-        service.kc.get_org = AsyncMock(return_value=Ok({"id": "org-1"}))
+        service.kc.getOrg = AsyncMock(return_value=Ok({"id": "org-1"}))
 
         # Act
-        res = await service._ensure_org_exists("org-1")
+        res = await service._ensureOrgExists("org-1")
 
         # Assert
         self.assertTrue(res.is_ok())
@@ -55,13 +55,13 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         service = self._make_service()
 
         # Act
-        from_string = service._extract_user_permissions(
+        from_string = service._extractUserPermissions(
             {"org_permissions": "organization.owner"}
         )
-        from_list = service._extract_user_permissions(
+        from_list = service._extractUserPermissions(
             {"org_permissions": ["organization.invite", 123]}
         )
-        from_invalid = service._extract_user_permissions(
+        from_invalid = service._extractUserPermissions(
             {"org_permissions": {"x": "y"}}
         )
 
@@ -77,7 +77,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         data = {"a": {"b": {"c": 1}}, "x": 2}
 
         # Act
-        flattened = service._flatten_settings(data)
+        flattened = service._flattenSettings(data)
 
         # Assert
         self.assertEqual(flattened, {"a.b.c": 1, "x": 2})
@@ -86,12 +86,12 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """User in multiple orgs should fail single-org invariant."""
         # Arrange
         service = self._make_service()
-        service.kc.get_member_organizations = AsyncMock(
+        service.kc.getMemberOrganizations = AsyncMock(
             return_value=Ok([{"id": "org-1"}, {"id": "org-2"}])
         )
 
         # Act
-        res = await service._ensure_user_in_org("org-1", "u1")
+        res = await service._ensureUserInOrg("org-1", "u1")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -101,23 +101,23 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Membership helper should return Ok for same org and Err for different org."""
         # Arrange
         service = self._make_service()
-        service.kc.get_member_organizations = AsyncMock(
+        service.kc.getMemberOrganizations = AsyncMock(
             return_value=Ok([{"id": "org-1"}])
         )
 
         # Act
-        ok_res = await service._ensure_user_in_org("org-1", "u1")
+        ok_res = await service._ensureUserInOrg("org-1", "u1")
 
         # Assert
         self.assertTrue(ok_res.is_ok())
 
         # Arrange
-        service.kc.get_member_organizations = AsyncMock(
+        service.kc.getMemberOrganizations = AsyncMock(
             return_value=Ok([{"id": "org-2"}])
         )
 
         # Act
-        missing_res = await service._ensure_user_in_org("org-1", "u1")
+        missing_res = await service._ensureUserInOrg("org-1", "u1")
 
         # Assert
         self.assertTrue(missing_res.is_err())
@@ -126,10 +126,10 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """User should always be able to read their own org permissions."""
         # Arrange
         service = self._make_service()
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(True))
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.ensure_can_read_user_permissions(
+        res = await service.ensureCanReadUserPermissions(
             org_id="org-1",
             actor_user_id="u1",
             target_user_id="u1",
@@ -144,13 +144,13 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Reading another user's permissions requires manage permission."""
         # Arrange
         service = self._make_service()
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(True))
-        service._get_member_permissions = AsyncMock(
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([OrgPermission.SETTINGS_READ.value])
         )
 
         # Act
-        res = await service.ensure_can_read_user_permissions(
+        res = await service.ensureCanReadUserPermissions(
             org_id="org-1",
             actor_user_id="u1",
             target_user_id="u2",
@@ -168,13 +168,13 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Reading another user's permissions should pass with manage permission."""
         # Arrange
         service = self._make_service()
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(True))
-        service._get_member_permissions = AsyncMock(
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([OrgPermission.USERS_PERMISSIONS_RW.value])
         )
 
         # Act
-        res = await service.ensure_can_read_user_permissions(
+        res = await service.ensureCanReadUserPermissions(
             org_id="org-1",
             actor_user_id="u1",
             target_user_id="u2",
@@ -187,13 +187,13 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Organization owner should read another user's permissions via inheritance."""
         # Arrange
         service = self._make_service()
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(True))
-        service._get_member_permissions = AsyncMock(
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([OrgPermission.OWNER.value])
         )
 
         # Act
-        res = await service.ensure_can_read_user_permissions(
+        res = await service.ensureCanReadUserPermissions(
             org_id="org-1",
             actor_user_id="u-owner",
             target_user_id="u-member",
@@ -208,7 +208,7 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         service = self._make_service()
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             org_id="org-1",
             actor_user_id="u1",
             user_id="u2",
@@ -223,14 +223,14 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Owner cannot lose organization.owner permission."""
         # Arrange
         service = self._make_service()
-        service._get_org_owner_id = AsyncMock(return_value=Ok("u1"))
-        service._get_member_permissions = AsyncMock(
+        service._getOrgOwnerId = AsyncMock(return_value=Ok("u1"))
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([OrgPermission.OWNER.value])
         )
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(True))
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             org_id="org-1",
             actor_user_id="u1",
             user_id="u1",
@@ -245,14 +245,14 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Cannot assign organization.owner to a non-owner user."""
         # Arrange
         service = self._make_service()
-        service._get_org_owner_id = AsyncMock(return_value=Ok("u-owner"))
-        service._get_member_permissions = AsyncMock(
+        service._getOrgOwnerId = AsyncMock(return_value=Ok("u-owner"))
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([OrgPermission.OWNER.value])
         )
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(True))
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             org_id="org-1",
             actor_user_id="u-owner",
             user_id="u-other",
@@ -267,14 +267,14 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Only org owner can grant users.permissions.read_write."""
         # Arrange
         service = self._make_service()
-        service._get_org_owner_id = AsyncMock(return_value=Ok("owner"))
-        service._get_member_permissions = AsyncMock(
+        service._getOrgOwnerId = AsyncMock(return_value=Ok("owner"))
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([OrgPermission.SETTINGS_READ.value])
         )
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(True))
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             org_id="org-1",
             actor_user_id="u-actor",
             user_id="u-target",
@@ -289,15 +289,15 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Valid permission update should persist via Keycloak attribute."""
         # Arrange
         service = self._make_service()
-        service._get_org_owner_id = AsyncMock(return_value=Ok("u-owner"))
-        service._get_member_permissions = AsyncMock(
+        service._getOrgOwnerId = AsyncMock(return_value=Ok("u-owner"))
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([OrgPermission.OWNER.value])
         )
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(True))
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             org_id="org-1",
             actor_user_id="u-owner",
             user_id="u-target",
@@ -309,21 +309,21 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         self.assertEqual(
             res.unwrap().permissions, [OrgPermission.SETTINGS_READ.value]
         )
-        service.kc.set_user_attribute.assert_awaited_once()
+        service.kc.setUserAttribute.assert_awaited_once()
 
     async def test_owner_can_update_other_user_permissions_in_org(self):
         """Organization owner should update another member's permissions."""
         # Arrange
         service = self._make_service()
-        service._get_org_owner_id = AsyncMock(return_value=Ok("u-owner"))
-        service._get_member_permissions = AsyncMock(
+        service._getOrgOwnerId = AsyncMock(return_value=Ok("u-owner"))
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([OrgPermission.OWNER.value])
         )
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(True))
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             org_id="org-1",
             actor_user_id="u-owner",
             user_id="u-member",
@@ -341,12 +341,12 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Reading org permissions should return the current member permission list."""
         # Arrange
         service = self._make_service()
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([OrgPermission.SETTINGS_READ.value])
         )
 
         # Act
-        res = await service.get_user_permissions("org-1", "u-member")
+        res = await service.getUserPermissions("org-1", "u-member")
 
         # Assert
         self.assertTrue(res.is_ok())
@@ -359,13 +359,13 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Direct member permission lookup should read org_permissions from attrs."""
         # Arrange
         service = self._make_service()
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(True))
-        service.kc.get_user_attributes = AsyncMock(
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
+        service.kc.getUserAttributes = AsyncMock(
             return_value=Ok({"org_permissions": [OrgPermission.OWNER.value]})
         )
 
         # Act
-        res = await service._get_member_permissions("org-1", "u1")
+        res = await service._getMemberPermissions("org-1", "u1")
 
         # Assert
         self.assertTrue(res.is_ok())
@@ -375,12 +375,12 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Direct member permission lookup should stop when org membership check fails."""
         # Arrange
         service = self._make_service()
-        service._ensure_user_in_org = AsyncMock(
+        service._ensureUserInOrg = AsyncMock(
             return_value=Err(_DummyError("not in org"))
         )
 
         # Act
-        res = await service._get_member_permissions("org-1", "u1")
+        res = await service._getMemberPermissions("org-1", "u1")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -389,12 +389,12 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         """Reading org permissions should fail if target is outside org."""
         # Arrange
         service = self._make_service()
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Err(OrgNotFoundError())
         )
 
         # Act
-        res = await service.get_user_permissions("org-1", "u-missing")
+        res = await service.getUserPermissions("org-1", "u-missing")
 
         # Assert
         self.assertTrue(res.is_err())

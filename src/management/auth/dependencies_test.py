@@ -1,18 +1,19 @@
 import os
 import unittest
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import Mock, AsyncMock
 
-from safe_result import Err, Ok
+from safe_result import Ok, Err
+
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
+from src.management.auth.services import MissingOrganizationClaimError
 from src.management.auth.dependencies import (
     MissingOrganizationContextError,
     getUserInfo,
     getUserOrgId,
     requireUserOrgId,
 )
-from src.management.auth.services import MissingOrganizationClaimError
 
 
 class _DummyErr(Exception):
@@ -32,7 +33,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
             }
         )
         kc_org_client = Mock()
-        kc_org_client.get_member_organizations = AsyncMock(
+        kc_org_client.getMemberOrganizations = AsyncMock(
             return_value=Ok(
                 [
                     {
@@ -49,7 +50,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             user_info["org_id"], "11111111-1111-1111-1111-111111111111"
         )
-        kc_org_client.get_member_organizations.assert_awaited_once_with("u1")
+        kc_org_client.getMemberOrganizations.assert_awaited_once_with("u1")
 
     async def test_get_user_info_resolves_org_name_claim_to_org_id(self):
         auth_service = Mock()
@@ -63,7 +64,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
             }
         )
         kc_org_client = Mock()
-        kc_org_client.get_member_organizations = AsyncMock(
+        kc_org_client.getMemberOrganizations = AsyncMock(
             return_value=Ok(
                 [{"id": "org-1", "name": "org-name", "alias": "org-alias"}]
             )

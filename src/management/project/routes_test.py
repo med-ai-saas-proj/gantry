@@ -20,9 +20,9 @@ from safe_result import Ok
 class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
     async def test_list_and_create_routes(self):
         service = Mock()
-        service.list_org_projects = AsyncMock(return_value=Ok("org-projects"))
-        service.list_user_projects = AsyncMock(return_value=Ok("user-projects"))
-        service.create_project = AsyncMock(return_value=Ok("created"))
+        service.listOrgProjects = AsyncMock(return_value=Ok("org-projects"))
+        service.listUserProjects = AsyncMock(return_value=Ok("user-projects"))
+        service.createProject = AsyncMock(return_value=Ok("created"))
 
         self.assertEqual(
             (await routes.list_project_permissions()).permissions,
@@ -56,12 +56,12 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
 
     async def test_membership_and_permission_routes(self):
         service = Mock()
-        service.list_project_users = AsyncMock(return_value=Ok("users"))
-        service.add_user_to_project = AsyncMock(return_value=Ok(True))
-        service.remove_user_from_project = AsyncMock(return_value=Ok(True))
-        service.authorize_project_permission = AsyncMock(return_value=Ok(True))
-        service.get_user_permissions = AsyncMock(return_value=Ok("perms"))
-        service.update_user_permissions = AsyncMock(return_value=Ok("updated"))
+        service.listProjectUsers = AsyncMock(return_value=Ok("users"))
+        service.addUserToProject = AsyncMock(return_value=Ok(True))
+        service.removeUserFromProject = AsyncMock(return_value=Ok(True))
+        service.authorizeProjectPermission = AsyncMock(return_value=Ok(True))
+        service.getUserPermissions = AsyncMock(return_value=Ok("perms"))
+        service.updateUserPermissions = AsyncMock(return_value=Ok("updated"))
 
         self.assertEqual(
             await routes.get_project_users(
@@ -124,7 +124,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         service = Mock()
         archive_res = SimpleNamespace(project_id="proj-1", archived=True)
         unarchive_res = SimpleNamespace(project_id="proj-1", archived=False)
-        service.set_project_archived = AsyncMock(
+        service.setProjectArchived = AsyncMock(
             side_effect=[Ok(archive_res), Ok(unarchive_res)]
         )
 

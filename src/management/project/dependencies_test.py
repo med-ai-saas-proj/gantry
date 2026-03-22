@@ -23,7 +23,7 @@ class TestProjectDependencies(unittest.IsolatedAsyncioTestCase):
         self,
     ):
         service = Mock()
-        service.authorize_project_permission = AsyncMock(return_value=Ok(True))
+        service.authorizeProjectPermission = AsyncMock(return_value=Ok(True))
         dependency = requiredProjectPermission(
             ProjectPermission.USERS_GET_ALL,
             allow_archived=True,
@@ -33,7 +33,7 @@ class TestProjectDependencies(unittest.IsolatedAsyncioTestCase):
         result = await dependency("proj-1", user_info, service)
 
         self.assertEqual(result, user_info)
-        service.authorize_project_permission.assert_awaited_once_with(
+        service.authorizeProjectPermission.assert_awaited_once_with(
             project_uuid="proj-1",
             user_id="u1",
             required=ProjectPermission.USERS_GET_ALL,
@@ -42,7 +42,7 @@ class TestProjectDependencies(unittest.IsolatedAsyncioTestCase):
 
     async def test_required_project_permission_propagates_error(self):
         service = Mock()
-        service.authorize_project_permission = AsyncMock(
+        service.authorizeProjectPermission = AsyncMock(
             return_value=Err(_DummyError("denied"))
         )
         dependency = requiredProjectPermission(ProjectPermission.OWNER)
@@ -52,7 +52,7 @@ class TestProjectDependencies(unittest.IsolatedAsyncioTestCase):
 
     async def test_user_has_role_checks_all_permissions_in_order(self):
         service = Mock()
-        service.authorize_project_permission = AsyncMock(return_value=Ok(True))
+        service.authorizeProjectPermission = AsyncMock(return_value=Ok(True))
         dependency = userHasRole(
             [
                 ProjectPermission.USERS_GET_ALL,
@@ -65,6 +65,6 @@ class TestProjectDependencies(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, user_info)
         self.assertEqual(
-            service.authorize_project_permission.await_count,
+            service.authorizeProjectPermission.await_count,
             2,
         )

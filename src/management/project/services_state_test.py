@@ -24,16 +24,16 @@ class TestProjectServiceState(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service.membership_repo.list_members = AsyncMock(
+        service.membership_repo.listMembers = AsyncMock(
             return_value=[
                 SimpleNamespace(user_id="u1"),
                 SimpleNamespace(user_id="u2"),
             ]
         )
-        service.kc.get_org_members = AsyncMock(
+        service.kc.getOrgMembers = AsyncMock(
             return_value=Ok(
                 [
                     {"id": "u1", "username": "one", "email": "1@test"},
@@ -44,9 +44,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         )
 
         # Act
-        res = await service.list_project_users(
-            "proj-1", offset=1, limit=1, q="o"
-        )
+        res = await service.listProjectUsers("proj-1", offset=1, limit=1, q="o")
 
         # Assert
         self.assertTrue(res.is_ok())
@@ -59,18 +57,18 @@ class TestProjectServiceState(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service.membership_repo.list_members = AsyncMock(
+        service.membership_repo.listMembers = AsyncMock(
             return_value=[SimpleNamespace(user_id="u1")]
         )
-        service.kc.get_org_members = AsyncMock(
+        service.kc.getOrgMembers = AsyncMock(
             return_value=Err(_DummyError("kc list failed"))
         )
 
         # Act
-        res = await service.list_project_users("proj-1")
+        res = await service.listProjectUsers("proj-1")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -80,12 +78,12 @@ class TestProjectServiceState(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         archived_info = SimpleNamespace(archived=True)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", archived_info))
         )
 
         # Act
-        res = await service.list_project_users("proj-1")
+        res = await service.listProjectUsers("proj-1")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -96,12 +94,12 @@ class TestProjectServiceState(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         archived_info = SimpleNamespace(archived=True)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((1, "org-1", archived_info))
         )
 
         # Act
-        result = await service.authorize_project_permission(
+        result = await service.authorizeProjectPermission(
             "project-uuid",
             "u1",
             ProjectPermission.USERS_GET_ALL,
@@ -118,15 +116,15 @@ class TestProjectServiceState(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         archived_info = SimpleNamespace(archived=True)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((1, "org-1", archived_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([ProjectPermission.OWNER.value])
         )
 
         # Act
-        result = await service.authorize_project_permission(
+        result = await service.authorizeProjectPermission(
             "project-uuid",
             "u1",
             ProjectPermission.OWNER,
@@ -142,17 +140,17 @@ class TestProjectServiceState(BaseProjectServiceTest):
         """Archive setter should support success and guard failure branches."""
         # Arrange
         service = self._make_service()
-        service.project_repo.get_by_uuid = AsyncMock(return_value=None)
+        service.project_repo.getByUuid = AsyncMock(return_value=None)
 
         # Act
-        not_found = await service.set_project_archived("missing", True)
+        not_found = await service.setProjectArchived("missing", True)
 
         # Assert
         self.assertTrue(not_found.is_err())
         self.assertIsInstance(not_found.error, ProjectNotFoundError)
 
         # Arrange
-        service.project_repo.get_by_uuid = AsyncMock(
+        service.project_repo.getByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid="p1",
                 is_archived=False,
@@ -160,14 +158,14 @@ class TestProjectServiceState(BaseProjectServiceTest):
         )
 
         # Act
-        ok_res = await service.set_project_archived("p1", True)
+        ok_res = await service.setProjectArchived("p1", True)
 
         # Assert
         self.assertTrue(ok_res.is_ok())
         self.assertTrue(ok_res.unwrap().archived)
 
         # Arrange
-        service.project_repo.get_by_uuid = AsyncMock(
+        service.project_repo.getByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid="p1",
                 is_archived=True,
@@ -175,14 +173,14 @@ class TestProjectServiceState(BaseProjectServiceTest):
         )
 
         # Act
-        archived_res = await service.set_project_archived("p1", False)
+        archived_res = await service.setProjectArchived("p1", False)
 
         # Assert
         self.assertTrue(archived_res.is_ok())
         self.assertFalse(archived_res.unwrap().archived)
 
         # Arrange
-        service.project_repo.get_by_uuid = AsyncMock(
+        service.project_repo.getByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid="p1",
                 is_archived=True,
@@ -190,7 +188,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         )
 
         # Act
-        already_archived = await service.set_project_archived("p1", True)
+        already_archived = await service.setProjectArchived("p1", True)
 
         # Assert
         self.assertTrue(already_archived.is_err())
@@ -202,208 +200,204 @@ class TestProjectServiceState(BaseProjectServiceTest):
         service = self._make_service()
 
         # _ensure_user_in_org / _get_project_or_err / _get_permissions_from_attrs
-        service.kc.get_member_organizations = AsyncMock(
+        service.kc.getMemberOrganizations = AsyncMock(
             return_value=Err(_DummyError("org lookup failed"))
         )
         self.assertTrue(
-            (await service._ensure_user_in_org("u1", "org-1")).is_err()
+            (await service._ensureUserInOrg("u1", "org-1")).is_err()
         )
 
-        service.project_repo.get_by_uuid = AsyncMock(return_value=None)
-        self.assertTrue((await service._get_project_or_err("missing")).is_err())
+        service.project_repo.getByUuid = AsyncMock(return_value=None)
+        self.assertTrue((await service._getProjectOrErr("missing")).is_err())
 
-        service.kc.get_user_attributes = AsyncMock(
+        service.kc.getUserAttributes = AsyncMock(
             return_value=Err(_DummyError("attr failed"))
         )
         self.assertTrue(
-            (await service._get_permissions_from_attrs("u1", "proj-1")).is_err()
+            (await service._getPermissionsFromAttrs("u1", "proj-1")).is_err()
         )
 
         # _set_project_permissions string/non-list branches and attr error
-        service.kc.get_user_attributes = AsyncMock(
+        service.kc.getUserAttributes = AsyncMock(
             side_effect=[
                 Err(_DummyError("get attrs failed")),
                 Ok({PROJECT_PERMISSIONS_ATTR: "proj-1:project.owner"}),
                 Ok({PROJECT_PERMISSIONS_ATTR: {"bad": "shape"}}),
             ]
         )
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
         self.assertTrue(
-            (
-                await service._set_project_permissions("u1", "proj-1", [])
-            ).is_err()
+            (await service._setProjectPermissions("u1", "proj-1", [])).is_err()
         )
         self.assertTrue(
-            (await service._set_project_permissions("u1", "proj-1", [])).is_ok()
+            (await service._setProjectPermissions("u1", "proj-1", [])).is_ok()
         )
         self.assertTrue(
             (
-                await service._set_project_permissions(
+                await service._setProjectPermissions(
                     "u1", "proj-1", ["project.settings.read"]
                 )
             ).is_ok()
         )
 
         # _get_member_permissions / _count_project_owners / authorize_project_permission
-        service.membership_repo.get_membership = AsyncMock(return_value=None)
+        service.membership_repo.getMembership = AsyncMock(return_value=None)
         self.assertTrue(
-            (await service._get_member_permissions(10, "proj-1", "u1")).is_err()
+            (await service._getMemberPermissions(10, "proj-1", "u1")).is_err()
         )
 
-        service.membership_repo.list_members = AsyncMock(
+        service.membership_repo.listMembers = AsyncMock(
             return_value=[SimpleNamespace(user_id="u1")]
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Err(_DummyError("count failed"))
         )
         self.assertTrue(
-            (await service._count_project_owners(10, "proj-1")).is_err()
+            (await service._countProjectOwners(10, "proj-1")).is_err()
         )
 
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Err(_DummyError("project failed"))
         )
         self.assertTrue(
             (
-                await service.authorize_project_permission(
+                await service.authorizeProjectPermission(
                     "proj-1", "u1", ProjectPermission.USERS_GET_ALL
                 )
             ).is_err()
         )
 
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((1, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Err(_DummyError("member perm failed"))
         )
         self.assertTrue(
             (
-                await service.authorize_project_permission(
+                await service.authorizeProjectPermission(
                     "proj-1", "u1", ProjectPermission.USERS_GET_ALL
                 )
             ).is_err()
         )
 
         # _has_org_wide_project_permission / list_org_projects
-        service.project_repo.list_by_member = AsyncMock(
+        service.project_repo.listByMember = AsyncMock(
             return_value=[SimpleNamespace(uuid="proj-1")]
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Err(_DummyError("org wide failed"))
         )
         self.assertTrue(
             (
-                await service._has_org_wide_project_permission(
+                await service._hasOrgWideProjectPermission(
                     "u1", "org-1", ProjectPermission.PROJECTS_CREATE
                 )
             ).is_err()
         )
 
-        service._has_org_wide_project_permission = AsyncMock(
+        service._hasOrgWideProjectPermission = AsyncMock(
             return_value=Err(_DummyError("authz failed"))
         )
-        self.assertTrue(
-            (await service.list_org_projects("u1", "org-1")).is_err()
-        )
+        self.assertTrue((await service.listOrgProjects("u1", "org-1")).is_err())
 
         # create/list/add/remove/get/update not-found or downstream write errors
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Err(_DummyError("project failed"))
         )
-        self.assertTrue((await service.list_project_users("proj-1")).is_err())
+        self.assertTrue((await service.listProjectUsers("proj-1")).is_err())
         self.assertTrue(
-            (await service.add_user_to_project("proj-1", "u2")).is_err()
+            (await service.addUserToProject("proj-1", "u2")).is_err()
         )
         self.assertTrue(
-            (await service.remove_user_from_project("proj-1", "u2")).is_err()
+            (await service.removeUserFromProject("proj-1", "u2")).is_err()
         )
         self.assertTrue(
-            (await service.get_user_permissions("proj-1", "u2")).is_err()
+            (await service.getUserPermissions("proj-1", "u2")).is_err()
         )
         self.assertTrue(
             (
-                await service.update_user_permissions(
+                await service.updateUserPermissions(
                     "proj-1", "actor", "target", ["project.settings.read"]
                 )
             ).is_err()
         )
 
         # add/remove/update downstream write failures
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(None))
-        service.membership_repo.get_membership = AsyncMock(return_value=None)
-        service.membership_repo.upsert_membership = AsyncMock(
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(None))
+        service.membership_repo.getMembership = AsyncMock(return_value=None)
+        service.membership_repo.upsertMembership = AsyncMock(
             return_value=SimpleNamespace()
         )
-        service.kc.get_user_attributes = AsyncMock(
+        service.kc.getUserAttributes = AsyncMock(
             return_value=Err(_DummyError("set attrs failed"))
         )
         self.assertTrue(
-            (await service.add_user_to_project("proj-1", "u2")).is_err()
+            (await service.addUserToProject("proj-1", "u2")).is_err()
         )
 
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="u2")
         )
-        service._get_permissions_from_attrs = AsyncMock(return_value=Ok([]))
-        service.membership_repo.delete_membership = AsyncMock(return_value=True)
+        service._getPermissionsFromAttrs = AsyncMock(return_value=Ok([]))
+        service.membership_repo.deleteMembership = AsyncMock(return_value=True)
         self.assertTrue(
-            (await service.remove_user_from_project("proj-1", "u2")).is_err()
+            (await service.removeUserFromProject("proj-1", "u2")).is_err()
         )
 
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Err(_DummyError("actor perms failed"))
         )
         self.assertTrue(
             (
-                await service.update_user_permissions(
+                await service.updateUserPermissions(
                     "proj-1", "actor", "target", ["project.settings.read"]
                 )
             ).is_err()
         )
 
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="target")
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Err(_DummyError("target perms failed"))
         )
         self.assertTrue(
             (
-                await service.update_user_permissions(
+                await service.updateUserPermissions(
                     "proj-1", "actor", "target", ["project.settings.read"]
                 )
             ).is_err()
         )
 
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service._count_project_owners = AsyncMock(
+        service._countProjectOwners = AsyncMock(
             return_value=Err(_DummyError("count failed"))
         )
         self.assertTrue(
             (
-                await service.update_user_permissions(
+                await service.updateUserPermissions(
                     "proj-1", "actor", "target", []
                 )
             ).is_err()
         )
 
-        service._get_permissions_from_attrs = AsyncMock(return_value=Ok([]))
-        service.kc.get_user_attributes = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(return_value=Ok([]))
+        service.kc.getUserAttributes = AsyncMock(
             return_value=Err(_DummyError("write failed"))
         )
         self.assertTrue(
             (
-                await service.update_user_permissions(
+                await service.updateUserPermissions(
                     "proj-1", "actor", "target", ["project.settings.read"]
                 )
             ).is_err()

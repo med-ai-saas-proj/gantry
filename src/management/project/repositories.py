@@ -9,6 +9,7 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert
 
 
 class ProjectRepository(Repository[Project, int]):
@@ -32,10 +33,9 @@ class ProjectRepository(Repository[Project, int]):
         project.uuid = uuid7()
         session.add(project)
         await session.flush()
-        await session.refresh(project)
         return project
 
-    async def get_by_uuid(
+    async def getByUuid(
         self, session: AsyncSession, project_uuid: str
     ) -> Project | None:
         try:
@@ -45,7 +45,7 @@ class ProjectRepository(Repository[Project, int]):
         stmt = select(Project).where(Project.uuid == parsed).limit(1)
         return await self.selectOne(session, stmt)
 
-    async def list_by_org(
+    async def listByOrg(
         self,
         session: AsyncSession,
         organization_id: str,
@@ -57,7 +57,7 @@ class ProjectRepository(Repository[Project, int]):
         )
         return list(await self.selectMany(session, stmt))
 
-    async def list_by_member(
+    async def listByMember(
         self,
         session: AsyncSession,
         user_id: str,
@@ -83,7 +83,7 @@ class ProjectMembershipRepository(Repository[ProjectMembership, int]):
     def __init__(self):
         super().__init__(ProjectMembership, ProjectMembership.project_id)
 
-    async def get_membership(
+    async def getMembership(
         self,
         session: AsyncSession,
         project_id: int,
@@ -97,37 +97,44 @@ class ProjectMembershipRepository(Repository[ProjectMembership, int]):
         )
         return await self.selectOne(session, stmt)
 
-    async def upsert_membership(
+    async def upsertMembership(
         self,
         session: AsyncSession,
         project_id: int,
         user_id: str,
     ) -> ProjectMembership:
-        existing = await self.get_membership(session, project_id, user_id)
-        if existing is None:
-            existing = ProjectMembership(
+        stmt = (
+            insert(ProjectMembership)
+            .values(
                 project_id=project_id,
                 user_id=user_id,
             )
-            session.add(existing)
-        await session.flush()
-        await session.refresh(existing)
-        return existing
+            .on_conflict_do_update(
+                index_elements=[
+                    ProjectMembership.project_id,
+                    ProjectMembership.user_id,
+                ],
+                set_={"updated_at": func.now()},
+            )
+            .returning(ProjectMembership)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one()
 
-    async def delete_membership(
+    async def deleteMembership(
         self,
         session: AsyncSession,
         project_id: int,
         user_id: str,
     ) -> bool:
-        existing = await self.get_membership(session, project_id, user_id)
+        existing = await self.getMembership(session, project_id, user_id)
         if existing is None:
             return False
         await session.delete(existing)
         await session.flush()
         return True
 
-    async def list_members(
+    async def listMembers(
         self,
         session: AsyncSession,
         project_id: int,
@@ -139,7 +146,7 @@ class ProjectMembershipRepository(Repository[ProjectMembership, int]):
         )
         return list(await self.selectMany(session, stmt))
 
-    async def list_memberships_for_user_in_org(
+    async def listMembershipsForUserInOrg(
         self,
         session: AsyncSession,
         user_id: str,
@@ -153,9 +160,7 @@ class ProjectMembershipRepository(Repository[ProjectMembership, int]):
         )
         return list(await self.selectMany(session, stmt))
 
-    async def count_members(
-        self, session: AsyncSession, project_id: int
-    ) -> int:
+    async def countMembers(self, session: AsyncSession, project_id: int) -> int:
         stmt = (
             select(func.count())
             .select_from(ProjectMembership)

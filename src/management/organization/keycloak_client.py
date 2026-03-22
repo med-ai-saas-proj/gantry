@@ -132,10 +132,10 @@ class KeycloakOrgClient:
             self._admin = None
             self._init_error = KeycloakOrgError(from_exception=exc)
 
-    def _admin_base(self) -> str:
+    def _adminBase(self) -> str:
         return f"/admin/realms/{self.realm}"
 
-    def _parse_response_json(self, response: Any) -> Any:
+    def _parseResponseJson(self, response: Any) -> Any:
         if not getattr(response, "content", b""):
             return None
         try:
@@ -143,7 +143,7 @@ class KeycloakOrgClient:
         except Exception:
             return None
 
-    async def _raw_request(
+    async def _rawRequest(
         self,
         method: str,
         path: str,
@@ -215,7 +215,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    def _map_status_error(
+    def _mapStatusError(
         self,
         status_code: int,
         *,
@@ -235,7 +235,7 @@ class KeycloakOrgClient:
             return KeycloakOrgConflictError()
         return KeycloakOrgError()
 
-    def _map_keycloak_error(
+    def _mapKeycloakError(
         self,
         exc: KeycloakError,
         *,
@@ -245,7 +245,7 @@ class KeycloakOrgClient:
     ) -> RecoverableError:
         response_code = getattr(exc, "response_code", None)
         if isinstance(response_code, int):
-            return self._map_status_error(
+            return self._mapStatusError(
                 response_code,
                 not_found_error=not_found_error,
                 extra_error_map=extra_error_map,
@@ -253,7 +253,7 @@ class KeycloakOrgClient:
             )
         return KeycloakOrgError(from_exception=exc)
 
-    async def get_org(
+    async def getOrg(
         self, org_id: str
     ) -> Result[dict[str, Any], OrgNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
@@ -268,7 +268,7 @@ class KeycloakOrgClient:
             return Err(KeycloakOrgError())
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     not_found_error=OrgNotFoundError(),
                 )
@@ -276,7 +276,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def update_org(
+    async def updateOrg(
         self,
         org_id: str,
         payload: dict[str, Any],
@@ -291,7 +291,7 @@ class KeycloakOrgClient:
             return Ok(True)
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     not_found_error=OrgNotFoundError(),
                 )
@@ -299,7 +299,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def delete_org(
+    async def deleteOrg(
         self, org_id: str
     ) -> Result[bool, OrgNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
@@ -312,7 +312,7 @@ class KeycloakOrgClient:
             return Ok(True)
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     not_found_error=OrgNotFoundError(),
                 )
@@ -320,7 +320,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def get_org_members(
+    async def getOrgMembers(
         self,
         org_id: str,
         first: int = 0,
@@ -351,7 +351,7 @@ class KeycloakOrgClient:
             return Err(KeycloakOrgError())
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     not_found_error=OrgNotFoundError(),
                 )
@@ -359,7 +359,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def get_org_member_count(
+    async def getOrgMemberCount(
         self, org_id: str
     ) -> Result[int, OrgNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
@@ -374,7 +374,7 @@ class KeycloakOrgClient:
             return Err(KeycloakOrgError())
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     not_found_error=OrgNotFoundError(),
                 )
@@ -382,7 +382,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def get_member_organizations(
+    async def getMemberOrganizations(
         self,
         user_id: str,
         brief_representation: bool = True,
@@ -400,7 +400,7 @@ class KeycloakOrgClient:
             return Err(KeycloakOrgError())
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     not_found_error=MemberNotFoundError(),
                 )
@@ -408,7 +408,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def remove_member(
+    async def removeMember(
         self, org_id: str, user_id: str
     ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
@@ -421,7 +421,7 @@ class KeycloakOrgClient:
             return Ok(True)
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     not_found_error=MemberNotFoundError(),
                 )
@@ -429,7 +429,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def delete_user(
+    async def deleteUser(
         self, user_id: str
     ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
@@ -442,7 +442,7 @@ class KeycloakOrgClient:
             return Ok(True)
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     not_found_error=MemberNotFoundError(),
                 )
@@ -450,7 +450,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def find_user_by_email(
+    async def findUserByEmail(
         self,
         email: str,
         exact: bool = True,
@@ -483,7 +483,7 @@ class KeycloakOrgClient:
             return Ok(first)
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     include_conflict=False,
                 )
@@ -491,7 +491,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def invite_user(
+    async def inviteUser(
         self,
         org_id: str,
         email: str,
@@ -506,9 +506,7 @@ class KeycloakOrgClient:
         | KeycloakOrgForbiddenError
         | KeycloakOrgError,
     ]:
-        path = (
-            f"{self._admin_base()}/organizations/{org_id}/members/invite-user"
-        )
+        path = f"{self._adminBase()}/organizations/{org_id}/members/invite-user"
         form: dict[str, str] = {"email": email}
         if client_id:
             form["clientId"] = client_id
@@ -519,7 +517,7 @@ class KeycloakOrgClient:
         if last_name:
             form["lastName"] = last_name
 
-        response_res = await self._raw_request(
+        response_res = await self._rawRequest(
             "post",
             path,
             data=form,
@@ -538,13 +536,13 @@ class KeycloakOrgClient:
             return Ok(True)
 
         return Err(
-            self._map_status_error(
+            self._mapStatusError(
                 response.status_code,
                 not_found_error=OrgNotFoundError(),
             )
         )
 
-    async def get_invitations(
+    async def getInvitations(
         self,
         org_id: str,
         email: str | None = None,
@@ -562,7 +560,7 @@ class KeycloakOrgClient:
         | KeycloakOrgConflictError
         | KeycloakOrgError,
     ]:
-        path = f"{self._admin_base()}/organizations/{org_id}/invitations"
+        path = f"{self._adminBase()}/organizations/{org_id}/invitations"
         query: dict[str, Any] = {}
         if email:
             query["email"] = email
@@ -579,25 +577,25 @@ class KeycloakOrgClient:
         if status:
             query["status"] = status
 
-        response_res = await self._raw_request("get", path, params=query)
+        response_res = await self._rawRequest("get", path, params=query)
         if response_res.is_err():
             return response_res
 
         response = response_res.unwrap()
         if response.status_code != 200:
             return Err(
-                self._map_status_error(
+                self._mapStatusError(
                     response.status_code,
                     not_found_error=OrgNotFoundError(),
                 )
             )
 
-        payload = self._parse_response_json(response)
+        payload = self._parseResponseJson(response)
         if isinstance(payload, list):
             return Ok(payload)
         return Err(KeycloakOrgError())
 
-    async def get_invitation(
+    async def getInvitation(
         self, org_id: str, invitation_id: str
     ) -> Result[
         dict[str, Any],
@@ -606,15 +604,15 @@ class KeycloakOrgClient:
         | KeycloakOrgForbiddenError
         | KeycloakOrgError,
     ]:
-        path = f"{self._admin_base()}/organizations/{org_id}/invitations/{invitation_id}"
-        response_res = await self._raw_request("get", path)
+        path = f"{self._adminBase()}/organizations/{org_id}/invitations/{invitation_id}"
+        response_res = await self._rawRequest("get", path)
         if response_res.is_err():
             return response_res
 
         response = response_res.unwrap()
         if response.status_code != 200:
             return Err(
-                self._map_status_error(
+                self._mapStatusError(
                     response.status_code,
                     not_found_error=InvitationNotFoundError(),
                     extra_error_map={405: InvitationNotFoundError()},
@@ -622,12 +620,12 @@ class KeycloakOrgClient:
                 )
             )
 
-        payload = self._parse_response_json(response)
+        payload = self._parseResponseJson(response)
         if isinstance(payload, dict):
             return Ok(payload)
         return Err(KeycloakOrgError())
 
-    async def delete_invitation(
+    async def deleteInvitation(
         self, org_id: str, invitation_id: str
     ) -> Result[
         bool,
@@ -636,8 +634,8 @@ class KeycloakOrgClient:
         | KeycloakOrgForbiddenError
         | KeycloakOrgError,
     ]:
-        path = f"{self._admin_base()}/organizations/{org_id}/invitations/{invitation_id}"
-        response_res = await self._raw_request("delete", path)
+        path = f"{self._adminBase()}/organizations/{org_id}/invitations/{invitation_id}"
+        response_res = await self._rawRequest("delete", path)
         if response_res.is_err():
             return response_res
 
@@ -645,14 +643,14 @@ class KeycloakOrgClient:
         if response.status_code in (200, 204):
             return Ok(True)
         return Err(
-            self._map_status_error(
+            self._mapStatusError(
                 response.status_code,
                 not_found_error=InvitationNotFoundError(),
                 include_conflict=False,
             )
         )
 
-    async def resend_invitation(
+    async def resendInvitation(
         self, org_id: str, invitation_id: str
     ) -> Result[
         bool,
@@ -662,10 +660,10 @@ class KeycloakOrgClient:
         | KeycloakOrgError,
     ]:
         path = (
-            f"{self._admin_base()}/organizations/{org_id}"
+            f"{self._adminBase()}/organizations/{org_id}"
             f"/invitations/{invitation_id}/resend"
         )
-        response_res = await self._raw_request("post", path)
+        response_res = await self._rawRequest("post", path)
         if response_res.is_err():
             return response_res
 
@@ -673,14 +671,14 @@ class KeycloakOrgClient:
         if response.status_code in (200, 204):
             return Ok(True)
         return Err(
-            self._map_status_error(
+            self._mapStatusError(
                 response.status_code,
                 not_found_error=InvitationNotFoundError(),
                 include_conflict=False,
             )
         )
 
-    async def get_user_attributes(
+    async def getUserAttributes(
         self, user_id: str
     ) -> Result[dict[str, Any], MemberNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
@@ -696,7 +694,7 @@ class KeycloakOrgClient:
             return Ok({})
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     not_found_error=MemberNotFoundError(),
                     include_conflict=False,
@@ -705,7 +703,7 @@ class KeycloakOrgClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
-    async def set_user_attribute(
+    async def setUserAttribute(
         self,
         user_id: str,
         key: str,
@@ -727,7 +725,7 @@ class KeycloakOrgClient:
             return Ok(True)
         except KeycloakError as exc:
             return Err(
-                self._map_keycloak_error(
+                self._mapKeycloakError(
                     exc,
                     not_found_error=MemberNotFoundError(),
                     include_conflict=False,

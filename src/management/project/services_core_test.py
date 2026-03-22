@@ -26,7 +26,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         service = self._make_service()
 
         # Act
-        from_string = service._extract_project_permissions(
+        from_string = service._extractProjectPermissions(
             {
                 PROJECT_PERMISSIONS_ATTR: encode_project_permission(
                     "proj-1", "project.owner"
@@ -34,7 +34,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
             },
             "proj-1",
         )
-        from_list = service._extract_project_permissions(
+        from_list = service._extractProjectPermissions(
             {
                 PROJECT_PERMISSIONS_ATTR: [
                     encode_project_permission(
@@ -48,7 +48,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
             },
             "proj-1",
         )
-        from_invalid = service._extract_project_permissions(
+        from_invalid = service._extractProjectPermissions(
             {PROJECT_PERMISSIONS_ATTR: {"x": "y"}},
             "proj-1",
         )
@@ -64,7 +64,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         service = self._make_service()
 
         # Act
-        res = service._extract_project_permissions(
+        res = service._extractProjectPermissions(
             {PROJECT_PERMISSIONS_ATTR: ["bad-entry", "proj-1:project.owner"]},
             "proj-1",
         )
@@ -76,7 +76,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Known project uuid should map repository row into DTO tuple."""
         # Arrange
         service = self._make_service()
-        service.project_repo.get_by_uuid = AsyncMock(
+        service.project_repo.getByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 id=10,
                 uuid="proj-1",
@@ -88,7 +88,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Act
-        res = await service._get_project_or_err("proj-1")
+        res = await service._getProjectOrErr("proj-1")
 
         # Assert
         self.assertTrue(res.is_ok())
@@ -100,7 +100,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Updating one project should keep entries from other projects."""
         # Arrange
         service = self._make_service()
-        service.kc.get_user_attributes = AsyncMock(
+        service.kc.getUserAttributes = AsyncMock(
             return_value=Ok(
                 {
                     PROJECT_PERMISSIONS_ATTR: [
@@ -113,10 +113,10 @@ class TestProjectServiceCore(BaseProjectServiceTest):
                 }
             )
         )
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service._set_project_permissions(
+        res = await service._setProjectPermissions(
             "u1",
             "proj-1",
             ["project.users.get_all", "project.settings.write"],
@@ -124,7 +124,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
 
         # Assert
         self.assertTrue(res.is_ok())
-        service.kc.set_user_attribute.assert_awaited_once_with(
+        service.kc.setUserAttribute.assert_awaited_once_with(
             "u1",
             PROJECT_PERMISSIONS_ATTR,
             [
@@ -138,19 +138,19 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Project permission writes should ignore malformed non-string entries."""
         # Arrange
         service = self._make_service()
-        service.kc.get_user_attributes = AsyncMock(
+        service.kc.getUserAttributes = AsyncMock(
             return_value=Ok(
                 {PROJECT_PERMISSIONS_ATTR: [123, None, "proj-2:project.owner"]}
             )
         )
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service._set_project_permissions("u1", "proj-1", [])
+        res = await service._setProjectPermissions("u1", "proj-1", [])
 
         # Assert
         self.assertTrue(res.is_ok())
-        service.kc.set_user_attribute.assert_awaited_once_with(
+        service.kc.setUserAttribute.assert_awaited_once_with(
             "u1",
             PROJECT_PERMISSIONS_ATTR,
             [encode_project_permission("proj-2", "project.owner")],
@@ -160,23 +160,23 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Membership lookup should return Ok for matching org else error."""
         # Arrange
         service = self._make_service()
-        service.kc.get_member_organizations = AsyncMock(
+        service.kc.getMemberOrganizations = AsyncMock(
             return_value=Ok([{"id": "org-1"}])
         )
 
         # Act
-        ok_res = await service._ensure_user_in_org("u1", "org-1")
+        ok_res = await service._ensureUserInOrg("u1", "org-1")
 
         # Assert
         self.assertTrue(ok_res.is_ok())
 
         # Arrange
-        service.kc.get_member_organizations = AsyncMock(
+        service.kc.getMemberOrganizations = AsyncMock(
             return_value=Ok([{"id": "org-2"}])
         )
 
         # Act
-        err_res = await service._ensure_user_in_org("u1", "org-1")
+        err_res = await service._ensureUserInOrg("u1", "org-1")
 
         # Assert
         self.assertTrue(err_res.is_err())
@@ -185,10 +185,10 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Unknown project uuid should return project_not_found."""
         # Arrange
         service = self._make_service()
-        service.project_repo.get_by_uuid = AsyncMock(return_value=None)
+        service.project_repo.getByUuid = AsyncMock(return_value=None)
 
         # Act
-        res = await service._get_project_or_err("missing")
+        res = await service._getProjectOrErr("missing")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -200,8 +200,8 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         service = self._make_service()
 
         # Act
-        ok_res = service._ensure_project_active(SimpleNamespace(archived=False))
-        err_res = service._ensure_project_active(SimpleNamespace(archived=True))
+        ok_res = service._ensureProjectActive(SimpleNamespace(archived=False))
+        err_res = service._ensureProjectActive(SimpleNamespace(archived=True))
 
         # Assert
         self.assertTrue(ok_res.is_ok())
@@ -213,13 +213,13 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((1, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(return_value=Ok([]))
+        service._getMemberPermissions = AsyncMock(return_value=Ok([]))
 
         # Act
-        result = await service.authorize_project_permission(
+        result = await service.authorizeProjectPermission(
             "project-uuid",
             "u1",
             ProjectPermission.USERS_GET_ALL,
@@ -234,15 +234,15 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((1, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([ProjectPermission.OWNER.value])
         )
 
         # Act
-        result = await service.authorize_project_permission(
+        result = await service.authorizeProjectPermission(
             "project-uuid",
             "u1",
             ProjectPermission.USERS_REMOVE,
@@ -258,15 +258,15 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((1, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([ProjectPermission.OWNER.value])
         )
 
         # Act
-        result = await service.authorize_project_permission(
+        result = await service.authorizeProjectPermission(
             "project-uuid",
             "u-owner",
             ProjectPermission.USERS_PERMISSIONS_RW,
@@ -279,12 +279,10 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Create project should fail if actor lacks projects.create scope."""
         # Arrange
         service = self._make_service()
-        service._has_org_wide_project_permission = AsyncMock(
-            return_value=Ok(False)
-        )
+        service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(False))
 
         # Act
-        res = await service.create_project("u1", "org-1", "p1", None)
+        res = await service.createProject("u1", "org-1", "p1", None)
 
         # Assert
         self.assertTrue(res.is_err())
@@ -294,9 +292,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Creating a project should add owner permission in flat attr form."""
         # Arrange
         service = self._make_service()
-        service._has_org_wide_project_permission = AsyncMock(
-            return_value=Ok(True)
-        )
+        service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(True))
         service.project_repo.create = AsyncMock(
             return_value=SimpleNamespace(
                 id=10,
@@ -307,17 +303,17 @@ class TestProjectServiceCore(BaseProjectServiceTest):
                 is_archived=False,
             )
         )
-        service.membership_repo.upsert_membership = AsyncMock(
+        service.membership_repo.upsertMembership = AsyncMock(
             return_value=SimpleNamespace()
         )
-        service._set_project_permissions = AsyncMock(return_value=Ok(True))
+        service._setProjectPermissions = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.create_project("u1", "org-1", "p1", None)
+        res = await service.createProject("u1", "org-1", "p1", None)
 
         # Assert
         self.assertTrue(res.is_ok())
-        service._set_project_permissions.assert_awaited_once_with(
+        service._setProjectPermissions.assert_awaited_once_with(
             "u1", "proj-1", ["project.owner"]
         )
         self.session_manager.session.commit.assert_awaited()
@@ -326,9 +322,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Project creation should surface attr-write failure before commit."""
         # Arrange
         service = self._make_service()
-        service._has_org_wide_project_permission = AsyncMock(
-            return_value=Ok(True)
-        )
+        service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(True))
         service.project_repo.create = AsyncMock(
             return_value=SimpleNamespace(
                 id=10,
@@ -339,15 +333,15 @@ class TestProjectServiceCore(BaseProjectServiceTest):
                 is_archived=False,
             )
         )
-        service.membership_repo.upsert_membership = AsyncMock(
+        service.membership_repo.upsertMembership = AsyncMock(
             return_value=SimpleNamespace()
         )
-        service._set_project_permissions = AsyncMock(
+        service._setProjectPermissions = AsyncMock(
             return_value=Err(_DummyError("kc write failed"))
         )
 
         # Act
-        res = await service.create_project("u1", "org-1", "p1", None)
+        res = await service.createProject("u1", "org-1", "p1", None)
 
         # Assert
         self.assertTrue(res.is_err())
@@ -359,12 +353,12 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Project creation should return upstream org-wide permission lookup errors."""
         # Arrange
         service = self._make_service()
-        service._has_org_wide_project_permission = AsyncMock(
+        service._hasOrgWideProjectPermission = AsyncMock(
             return_value=Err(_DummyError("kc failed"))
         )
 
         # Act
-        res = await service.create_project("u1", "org-1", "p1", None)
+        res = await service.createProject("u1", "org-1", "p1", None)
 
         # Assert
         self.assertTrue(res.is_err())
@@ -373,12 +367,12 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """List by organization should fail if actor not in org."""
         # Arrange
         service = self._make_service()
-        service._ensure_user_in_org = AsyncMock(
+        service._ensureUserInOrg = AsyncMock(
             return_value=Err(_DummyError("not in org"))
         )
 
         # Act
-        res = await service.list_user_projects("u1", "org-1")
+        res = await service.listUserProjects("u1", "org-1")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -387,7 +381,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """List user projects should map repository rows to DTO."""
         # Arrange
         service = self._make_service()
-        service.project_repo.list_by_member = AsyncMock(
+        service.project_repo.listByMember = AsyncMock(
             return_value=[
                 SimpleNamespace(
                     uuid="p1",
@@ -400,7 +394,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Act
-        res = await service.list_user_projects("u1", None)
+        res = await service.listUserProjects("u1", None)
 
         # Assert
         self.assertTrue(res.is_ok())
@@ -411,27 +405,27 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Org-scoped project listing should validate org membership first."""
         # Arrange
         service = self._make_service()
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(None))
-        service.project_repo.list_by_member = AsyncMock(return_value=[])
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(None))
+        service.project_repo.listByMember = AsyncMock(return_value=[])
 
         # Act
-        res = await service.list_user_projects("u1", "org-1")
+        res = await service.listUserProjects("u1", "org-1")
 
         # Assert
         self.assertTrue(res.is_ok())
-        service._ensure_user_in_org.assert_awaited_once_with("u1", "org-1")
+        service._ensureUserInOrg.assert_awaited_once_with("u1", "org-1")
 
     async def test_has_org_wide_permission_true_and_false(self):
         """Org-wide permission check should respect membership permissions."""
         # Arrange
         service = self._make_service()
-        service.project_repo.list_by_member = AsyncMock(
+        service.project_repo.listByMember = AsyncMock(
             return_value=[
                 SimpleNamespace(uuid="proj-1"),
                 SimpleNamespace(uuid="proj-2"),
             ]
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             side_effect=[
                 Ok(["project.settings.read"]),
                 Ok(["projects.get_all"]),
@@ -439,7 +433,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Act
-        true_res = await service._has_org_wide_project_permission(
+        true_res = await service._hasOrgWideProjectPermission(
             "u1", "org-1", ProjectPermission.PROJECTS_GET_ALL
         )
 
@@ -448,15 +442,15 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         self.assertTrue(true_res.unwrap())
 
         # Arrange
-        service.project_repo.list_by_member = AsyncMock(
+        service.project_repo.listByMember = AsyncMock(
             return_value=[SimpleNamespace(uuid="proj-1")]
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Ok(["project.settings.read"])
         )
 
         # Act
-        false_res = await service._has_org_wide_project_permission(
+        false_res = await service._hasOrgWideProjectPermission(
             "u1", "org-1", ProjectPermission.PROJECTS_CREATE
         )
 
@@ -470,18 +464,18 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Org-wide checks should evaluate every joined project uuid."""
         # Arrange
         service = self._make_service()
-        service.project_repo.list_by_member = AsyncMock(
+        service.project_repo.listByMember = AsyncMock(
             return_value=[
                 SimpleNamespace(uuid="proj-a"),
                 SimpleNamespace(uuid="proj-b"),
             ]
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             side_effect=[Ok([]), Ok(["projects.create"])]
         )
 
         # Act
-        res = await service._has_org_wide_project_permission(
+        res = await service._hasOrgWideProjectPermission(
             "actor",
             "org-1",
             ProjectPermission.PROJECTS_CREATE,
@@ -491,7 +485,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         self.assertTrue(res.is_ok())
         self.assertTrue(res.unwrap())
         self.assertEqual(
-            service._get_permissions_from_attrs.await_args_list,
+            service._getPermissionsFromAttrs.await_args_list,
             [
                 unittest.mock.call("actor", "proj-a"),
                 unittest.mock.call("actor", "proj-b"),
@@ -502,10 +496,8 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Org project list should return DTO when actor has permission."""
         # Arrange
         service = self._make_service()
-        service._has_org_wide_project_permission = AsyncMock(
-            return_value=Ok(True)
-        )
-        service.project_repo.list_by_org = AsyncMock(
+        service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(True))
+        service.project_repo.listByOrg = AsyncMock(
             return_value=[
                 SimpleNamespace(
                     uuid="p1",
@@ -518,7 +510,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Act
-        res = await service.list_org_projects("u1", "org-1")
+        res = await service.listOrgProjects("u1", "org-1")
 
         # Assert
         self.assertTrue(res.is_ok())
@@ -528,12 +520,10 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Org project listing should fail without projects.get_all."""
         # Arrange
         service = self._make_service()
-        service._has_org_wide_project_permission = AsyncMock(
-            return_value=Ok(False)
-        )
+        service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(False))
 
         # Act
-        res = await service.list_org_projects("u1", "org-1")
+        res = await service.listOrgProjects("u1", "org-1")
 
         # Assert
         self.assertTrue(res.is_err())

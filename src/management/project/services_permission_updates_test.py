@@ -27,7 +27,7 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         service = self._make_service()
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             "proj-1", "actor", "target", ["bogus.permission"]
         )
 
@@ -40,18 +40,18 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok(["project.users.permissions.read_write"])
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="target")
         )
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             "proj-1",
             "actor",
             "target",
@@ -67,16 +67,16 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service.membership_repo.get_membership = AsyncMock(return_value=None)
+        service.membership_repo.getMembership = AsyncMock(return_value=None)
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             "proj-1", "actor", "target", ["project.settings.read"]
         )
 
@@ -89,19 +89,19 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="target")
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Ok(["project.settings.read"])
         )
-        service.kc.get_user_attributes = AsyncMock(
+        service.kc.getUserAttributes = AsyncMock(
             return_value=Ok(
                 {
                     PROJECT_PERMISSIONS_ATTR: [
@@ -112,10 +112,10 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
                 }
             )
         )
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             "proj-1",
             "actor",
             "target",
@@ -125,8 +125,8 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         # Assert
         self.assertTrue(res.is_ok())
         self.assertEqual(res.unwrap().permissions, ["project.settings.write"])
-        service.kc.get_user_attributes.assert_awaited_once_with("target")
-        service.kc.set_user_attribute.assert_awaited_once_with(
+        service.kc.getUserAttributes.assert_awaited_once_with("target")
+        service.kc.setUserAttribute.assert_awaited_once_with(
             "target",
             PROJECT_PERMISSIONS_ATTR,
             [
@@ -142,21 +142,21 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok([ProjectPermission.OWNER.value])
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="target")
         )
-        service._get_permissions_from_attrs = AsyncMock(return_value=Ok([]))
-        service.kc.get_user_attributes = AsyncMock(return_value=Ok({}))
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service._getPermissionsFromAttrs = AsyncMock(return_value=Ok([]))
+        service.kc.getUserAttributes = AsyncMock(return_value=Ok({}))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             "proj-1",
             "u-owner",
             "target",
@@ -172,22 +172,22 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="target")
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service._count_project_owners = AsyncMock(return_value=Ok(1))
+        service._countProjectOwners = AsyncMock(return_value=Ok(1))
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             "proj-1",
             "actor",
             "target",
@@ -205,24 +205,24 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="target")
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service._count_project_owners = AsyncMock(return_value=Ok(2))
-        service.kc.get_user_attributes = AsyncMock(return_value=Ok({}))
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service._countProjectOwners = AsyncMock(return_value=Ok(2))
+        service.kc.getUserAttributes = AsyncMock(return_value=Ok({}))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             "proj-1", "actor", "target", ["project.settings.read"]
         )
 
@@ -236,21 +236,21 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="target")
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Err(_DummyError("target perms failed"))
         )
 
         # Act
-        target_perm_err = await service.update_user_permissions(
+        target_perm_err = await service.updateUserPermissions(
             "proj-1", "actor", "target", ["project.settings.read"]
         )
 
@@ -258,15 +258,15 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         self.assertTrue(target_perm_err.is_err())
 
         # Arrange
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service._count_project_owners = AsyncMock(
+        service._countProjectOwners = AsyncMock(
             return_value=Err(_DummyError("count failed"))
         )
 
         # Act
-        owner_count_err = await service.update_user_permissions(
+        owner_count_err = await service.updateUserPermissions(
             "proj-1", "actor", "target", []
         )
 
@@ -278,12 +278,12 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         archived_info = SimpleNamespace(archived=True)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", archived_info))
         )
 
         # Act
-        res = await service.update_user_permissions(
+        res = await service.updateUserPermissions(
             "proj-1", "actor", "target", ["project.settings.read"]
         )
 

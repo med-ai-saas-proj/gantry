@@ -1,6 +1,7 @@
 import os
 import unittest
 
+
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
 from src.management.auth.services import (

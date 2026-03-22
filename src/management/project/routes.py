@@ -45,13 +45,13 @@ async def get_projects(
 ) -> ProjectListResponse:
     """List joined projects or all org projects depending on the query."""
     if query.organization:
-        result = await project_service.list_org_projects(
+        result = await project_service.listOrgProjects(
             actor_user_id=user_info["id"],
             organization_id=query.organization,
         )
         return result.unwrap()
 
-    result = await project_service.list_user_projects(
+    result = await project_service.listUserProjects(
         actor_user_id=user_info["id"],
     )
     return result.unwrap()
@@ -65,7 +65,7 @@ async def create_project(
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectInfoResponse:
     """Create a project inside the requested organization."""
-    result = await project_service.create_project(
+    result = await project_service.createProject(
         actor_user_id=user_info["id"],
         organization_id=organization,
         name=input_data.name,
@@ -88,7 +88,7 @@ async def get_project_users(
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectUserListResponse:
     """List users currently assigned to one project."""
-    result = await project_service.list_project_users(
+    result = await project_service.listProjectUsers(
         project_uuid=project_id,
         offset=pagination.offset,
         limit=pagination.limit,
@@ -108,7 +108,7 @@ async def add_project_user(
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> Response:
     """Add an organization member into the project."""
-    result = await project_service.add_user_to_project(
+    result = await project_service.addUserToProject(
         project_uuid=project_id,
         target_user_id=input_data.user_id,
     )
@@ -127,7 +127,7 @@ async def remove_project_user(
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> Response:
     """Remove one user from the project."""
-    result = await project_service.remove_user_from_project(
+    result = await project_service.removeUserFromProject(
         project_uuid=project_id, target_user_id=user_id
     )
     result.unwrap()
@@ -146,14 +146,14 @@ async def get_project_user_permissions(
 ) -> ProjectUserPermissionsResponse:
     """Return project permissions for a user, allowing self-read."""
     if user_info["id"] != user_id:
-        authz_res = await project_service.authorize_project_permission(
+        authz_res = await project_service.authorizeProjectPermission(
             project_uuid=project_id,
             user_id=user_info["id"],
             required=ProjectPermission.USERS_PERMISSIONS_RW,
         )
         authz_res.unwrap()
 
-    result = await project_service.get_user_permissions(
+    result = await project_service.getUserPermissions(
         project_uuid=project_id,
         target_user_id=user_id,
     )
@@ -177,7 +177,7 @@ async def update_project_user_permissions(
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectUserPermissionsResponse:
     """Replace all project permissions for one project member."""
-    result = await project_service.update_user_permissions(
+    result = await project_service.updateUserPermissions(
         project_uuid=project_id,
         actor_user_id=user_info["id"],
         target_user_id=user_id,
@@ -199,7 +199,7 @@ async def archive_project(
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectArchiveResponse:
     """Archive a project owned by the current actor."""
-    result = await project_service.set_project_archived(
+    result = await project_service.setProjectArchived(
         project_uuid=project_id, archived=True
     )
     return result.unwrap()
@@ -222,7 +222,7 @@ async def unarchive_project(
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectArchiveResponse:
     """Unarchive a project owned by the current actor."""
-    result = await project_service.set_project_archived(
+    result = await project_service.setProjectArchived(
         project_uuid=project_id, archived=False
     )
     return result.unwrap()

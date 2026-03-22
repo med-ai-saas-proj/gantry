@@ -9,8 +9,9 @@ from .models import (
 
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert
 
 
 class OrgSettingsRepository(Repository[OrgSettings, str]):
@@ -19,7 +20,7 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
     def __init__(self):
         super().__init__(OrgSettings, OrgSettings.org_id)
 
-    async def get_or_create(
+    async def getOrCreate(
         self, session: AsyncSession, org_id: str
     ) -> OrgSettings:
         """Return existing settings or create default ones."""
@@ -39,16 +40,27 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
         extra: dict,
     ) -> OrgSettings:
         """Create or update settings for an organization."""
-        settings = await self.get_or_create(session, org_id)
-        settings.rate_limit = rate_limit
-        settings.extra = extra
-        await session.flush()
-        await session.refresh(settings)
-        return settings
+        stmt = (
+            insert(OrgSettings)
+            .values(
+                org_id=org_id,
+                rate_limit=rate_limit,
+                extra=extra,
+            )
+            .on_conflict_do_update(
+                index_elements=[OrgSettings.org_id],
+                set_={
+                    "rate_limit": rate_limit,
+                    "extra": extra,
+                    "updated_at": func.now(),
+                },
+            )
+            .returning(OrgSettings)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one()
 
-    async def delete_by_org_id(
-        self, session: AsyncSession, org_id: str
-    ) -> bool:
+    async def deleteByOrgId(self, session: AsyncSession, org_id: str) -> bool:
         record = await self.getByKey(session, org_id)
         if record is None:
             return False
@@ -63,7 +75,7 @@ class OrgDeletionRequestRepository(Repository[OrgDeletionRequest, int]):
     def __init__(self):
         super().__init__(OrgDeletionRequest, OrgDeletionRequest.id)
 
-    async def get_by_org_id(
+    async def getByOrgId(
         self, session: AsyncSession, org_id: str
     ) -> OrgDeletionRequest | None:
         stmt = (
@@ -82,32 +94,32 @@ class OrgDeletionRequestRepository(Repository[OrgDeletionRequest, int]):
         await session.flush()
         return entity
 
-    async def upsert_request(
+    async def upsertRequest(
         self,
         session: AsyncSession,
         org_id: str,
     ) -> OrgDeletionRequest:
-        existing = await self.get_by_org_id(session, org_id)
-        if existing is None:
-            existing = OrgDeletionRequest(
-                org_id=org_id,
+        stmt = (
+            insert(OrgDeletionRequest)
+            .values(org_id=org_id)
+            .on_conflict_do_update(
+                index_elements=[OrgDeletionRequest.org_id],
+                set_={"requested_at": OrgDeletionRequest.requested_at},
             )
-            session.add(existing)
-        await session.flush()
-        await session.refresh(existing)
-        return existing
+            .returning(OrgDeletionRequest)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one()
 
-    async def delete_by_org_id(
-        self, session: AsyncSession, org_id: str
-    ) -> bool:
-        record = await self.get_by_org_id(session, org_id)
+    async def deleteByOrgId(self, session: AsyncSession, org_id: str) -> bool:
+        record = await self.getByOrgId(session, org_id)
         if record is None:
             return False
         await session.delete(record)
         await session.flush()
         return True
 
-    async def list_due_requests(
+    async def listDueRequests(
         self,
         session: AsyncSession,
         due_before_or_equal: datetime,

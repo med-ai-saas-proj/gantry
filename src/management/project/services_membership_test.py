@@ -26,16 +26,16 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(None))
-        service.membership_repo.get_membership = AsyncMock(
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(None))
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="u2")
         )
 
         # Act
-        res = await service.add_user_to_project("proj-1", "u2")
+        res = await service.addUserToProject("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -46,26 +46,26 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._ensure_user_in_org = AsyncMock(return_value=Ok(None))
-        service.membership_repo.get_membership = AsyncMock(return_value=None)
-        service.membership_repo.upsert_membership = AsyncMock(
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(None))
+        service.membership_repo.getMembership = AsyncMock(return_value=None)
+        service.membership_repo.upsertMembership = AsyncMock(
             return_value=SimpleNamespace()
         )
-        service.kc.get_user_attributes = AsyncMock(return_value=Ok({}))
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service.kc.getUserAttributes = AsyncMock(return_value=Ok({}))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.add_user_to_project("proj-1", "u2")
+        res = await service.addUserToProject("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_ok())
         self.membership_repo = service.membership_repo
-        self.membership_repo.upsert_membership.assert_awaited_once()
-        service.kc.get_user_attributes.assert_awaited_once_with("u2")
-        service.kc.set_user_attribute.assert_awaited_once_with(
+        self.membership_repo.upsertMembership.assert_awaited_once()
+        service.kc.getUserAttributes.assert_awaited_once_with("u2")
+        service.kc.setUserAttribute.assert_awaited_once_with(
             "u2",
             PROJECT_PERMISSIONS_ATTR,
             [],
@@ -77,12 +77,12 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         archived_info = SimpleNamespace(archived=True)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", archived_info))
         )
 
         # Act
-        res = await service.add_user_to_project("proj-1", "u2")
+        res = await service.addUserToProject("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -93,15 +93,15 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._ensure_user_in_org = AsyncMock(
+        service._ensureUserInOrg = AsyncMock(
             return_value=Err(_DummyError("not in org"))
         )
 
         # Act
-        res = await service.add_user_to_project("proj-1", "u2")
+        res = await service.addUserToProject("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -111,16 +111,16 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="u-owner")
         )
-        service.membership_repo.list_members = AsyncMock(
+        service.membership_repo.listMembers = AsyncMock(
             return_value=[SimpleNamespace(user_id="u-owner")]
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             side_effect=[
                 Ok(["project.owner"]),
                 Ok(["project.owner"]),
@@ -128,7 +128,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         )
 
         # Act
-        res = await service.remove_user_from_project("proj-1", "u-owner")
+        res = await service.removeUserFromProject("proj-1", "u-owner")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -138,14 +138,14 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         """Owner counting should use project-scoped attrs for each member id."""
         # Arrange
         service = self._make_service()
-        service.membership_repo.list_members = AsyncMock(
+        service.membership_repo.listMembers = AsyncMock(
             return_value=[
                 SimpleNamespace(user_id="u-owner"),
                 SimpleNamespace(user_id="u-editor"),
                 SimpleNamespace(user_id="u-owner-2"),
             ]
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             side_effect=[
                 Ok(["project.owner"]),
                 Ok(["project.settings.read"]),
@@ -154,13 +154,13 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         )
 
         # Act
-        res = await service._count_project_owners(10, "proj-1")
+        res = await service._countProjectOwners(10, "proj-1")
 
         # Assert
         self.assertTrue(res.is_ok())
         self.assertEqual(res.unwrap(), 2)
         self.assertEqual(
-            service._get_permissions_from_attrs.await_args_list,
+            service._getPermissionsFromAttrs.await_args_list,
             [
                 unittest.mock.call("u-owner", "proj-1"),
                 unittest.mock.call("u-editor", "proj-1"),
@@ -173,15 +173,15 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="u2")
         )
-        service.membership_repo.delete_membership = AsyncMock(return_value=True)
-        service._get_permissions_from_attrs = AsyncMock(return_value=Ok([]))
-        service.kc.get_user_attributes = AsyncMock(
+        service.membership_repo.deleteMembership = AsyncMock(return_value=True)
+        service._getPermissionsFromAttrs = AsyncMock(return_value=Ok([]))
+        service.kc.getUserAttributes = AsyncMock(
             return_value=Ok(
                 {
                     PROJECT_PERMISSIONS_ATTR: [
@@ -192,16 +192,16 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
                 }
             )
         )
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.remove_user_from_project("proj-1", "u2")
+        res = await service.removeUserFromProject("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_ok())
-        service.membership_repo.delete_membership.assert_awaited_once()
-        service.kc.get_user_attributes.assert_awaited_once_with("u2")
-        service.kc.set_user_attribute.assert_awaited_once_with(
+        service.membership_repo.deleteMembership.assert_awaited_once()
+        service.kc.getUserAttributes.assert_awaited_once_with("u2")
+        service.kc.setUserAttribute.assert_awaited_once_with(
             "u2",
             PROJECT_PERMISSIONS_ATTR,
             [encode_project_permission("other-proj", "project.settings.read")],
@@ -213,22 +213,22 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="u-owner")
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service._count_project_owners = AsyncMock(return_value=Ok(2))
-        service.membership_repo.delete_membership = AsyncMock(return_value=True)
-        service.kc.get_user_attributes = AsyncMock(return_value=Ok({}))
-        service.kc.set_user_attribute = AsyncMock(return_value=Ok(True))
+        service._countProjectOwners = AsyncMock(return_value=Ok(2))
+        service.membership_repo.deleteMembership = AsyncMock(return_value=True)
+        service.kc.getUserAttributes = AsyncMock(return_value=Ok({}))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
-        res = await service.remove_user_from_project("proj-1", "u-owner")
+        res = await service.removeUserFromProject("proj-1", "u-owner")
 
         # Assert
         self.assertTrue(res.is_ok())
@@ -240,32 +240,32 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="u-owner")
         )
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Err(_DummyError("perm lookup failed"))
         )
 
         # Act
-        perm_err = await service.remove_user_from_project("proj-1", "u-owner")
+        perm_err = await service.removeUserFromProject("proj-1", "u-owner")
 
         # Assert
         self.assertTrue(perm_err.is_err())
 
         # Arrange
-        service._get_permissions_from_attrs = AsyncMock(
+        service._getPermissionsFromAttrs = AsyncMock(
             return_value=Ok(["project.owner"])
         )
-        service._count_project_owners = AsyncMock(
+        service._countProjectOwners = AsyncMock(
             return_value=Err(_DummyError("count failed"))
         )
 
         # Act
-        count_err = await service.remove_user_from_project("proj-1", "u-owner")
+        count_err = await service.removeUserFromProject("proj-1", "u-owner")
 
         # Assert
         self.assertTrue(count_err.is_err())
@@ -275,12 +275,12 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         archived_info = SimpleNamespace(archived=True)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", archived_info))
         )
 
         # Act
-        res = await service.remove_user_from_project("proj-1", "u2")
+        res = await service.removeUserFromProject("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -291,13 +291,13 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service.membership_repo.get_membership = AsyncMock(return_value=None)
+        service.membership_repo.getMembership = AsyncMock(return_value=None)
 
         # Act
-        res = await service.remove_user_from_project("proj-1", "u2")
+        res = await service.removeUserFromProject("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -308,15 +308,15 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Ok(["project.settings.read"])
         )
 
         # Act
-        res = await service.get_user_permissions("proj-1", "u2")
+        res = await service.getUserPermissions("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_ok())
@@ -327,13 +327,13 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service.membership_repo.get_membership = AsyncMock(
+        service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="u2")
         )
-        service.kc.get_user_attributes = AsyncMock(
+        service.kc.getUserAttributes = AsyncMock(
             return_value=Ok(
                 {
                     PROJECT_PERMISSIONS_ATTR: [
@@ -347,7 +347,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         )
 
         # Act
-        res = await service.get_user_permissions("proj-1", "u2")
+        res = await service.getUserPermissions("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_ok())
@@ -358,12 +358,12 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         archived_info = SimpleNamespace(archived=True)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", archived_info))
         )
 
         # Act
-        res = await service.get_user_permissions("proj-1", "u2")
+        res = await service.getUserPermissions("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_err())
@@ -376,15 +376,15 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
-        service._get_project_or_err = AsyncMock(
+        service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", active_info))
         )
-        service._get_member_permissions = AsyncMock(
+        service._getMemberPermissions = AsyncMock(
             return_value=Err(_DummyError("perm lookup failed"))
         )
 
         # Act
-        res = await service.get_user_permissions("proj-1", "u2")
+        res = await service.getUserPermissions("proj-1", "u2")
 
         # Assert
         self.assertTrue(res.is_err())

@@ -48,7 +48,7 @@ class TestOrganizationDependencies(unittest.IsolatedAsyncioTestCase):
         )
 
         org_service = Mock()
-        org_service.get_settings = AsyncMock(
+        org_service.getSettings = AsyncMock(
             side_effect=[
                 Ok(SimpleNamespace(rate_limit=10)),
                 Ok(SimpleNamespace(rate_limit=None)),
@@ -77,7 +77,7 @@ class TestOrganizationDependencies(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_permissions_or_raise_and_required_permission(self):
         org_service = Mock()
-        org_service.get_user_permissions = AsyncMock(
+        org_service.getUserPermissions = AsyncMock(
             side_effect=[
                 Ok(SimpleNamespace(permissions=["organization.settings.read"])),
                 Err(_MemberMissingErr()),
@@ -101,7 +101,7 @@ class TestOrganizationDependencies(unittest.IsolatedAsyncioTestCase):
     async def test_required_org_permission_deny(self):
         dependency = requiredOrgPermission(OrgPermission.SETTINGS_READ)
         org_service = Mock()
-        org_service.get_user_permissions = AsyncMock(
+        org_service.getUserPermissions = AsyncMock(
             return_value=Ok(SimpleNamespace(permissions=[]))
         )
         with self.assertRaises(_InsufficientOrgPermission):
