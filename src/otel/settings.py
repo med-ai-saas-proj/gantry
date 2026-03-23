@@ -1,3 +1,5 @@
+from src.settings import AppSettings
+
 from enum import Enum
 from functools import lru_cache
 
@@ -26,9 +28,8 @@ class ExporterProtocol(str, Enum):
     http_protobuf = "http/protobuf"
 
 
+@AppSettings.register("otel")
 class OtelSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="otel_", case_sensitive=False)
-
     exporter_otlp_endpoint: HttpUrl = HttpUrl("http://localhost:4317")
     exporter_otlp_protocol: ExporterProtocol = ExporterProtocol.grpc
 

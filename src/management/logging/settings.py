@@ -1,13 +1,13 @@
+from src.settings import AppSettings
+
 from functools import lru_cache
 
 from pydantic import Field, HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+@AppSettings.register("logging")
 class LoggingSetting(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_prefix="logging_", case_sensitive=False
-    )
     loki_url: HttpUrl = Field(HttpUrl("http://localhost:3100"))
 
 

@@ -1,14 +1,15 @@
 """Environment settings for the Organization module."""
 
+from src.settings import AppSettings
+
 from functools import lru_cache
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+@AppSettings.register("org")
 class OrgSetting(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="org_", case_sensitive=False)
-
     keycloak_service_client_id: str = Field(
         "med-ai-saas-backend",
         validation_alias="KEYCLOAK_SERVICE_CLIENT_ID",

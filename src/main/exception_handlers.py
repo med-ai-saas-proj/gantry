@@ -1,5 +1,5 @@
+from src.settings import getAppSettings
 from src.shared.consts import messages_const
-from src.shared.settings import getAppSetting
 from src.shared.logging.logger import getLogger
 from src.shared.dtos.error_output import (
     ProblemDetails,
@@ -17,7 +17,7 @@ from fastapi.responses import Response, JSONResponse
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 
 
-app_settings = getAppSetting()
+app_settings = getAppSettings()
 
 
 async def recoverableErrorHandler(

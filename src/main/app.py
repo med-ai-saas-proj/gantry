@@ -1,8 +1,8 @@
 from src.service import service_app
+from src.settings import getAppSettings
 from src.management import management_app
 from src.shared.utils import request_id_utils
 from src.shared.consts import common_const
-from src.shared.settings import getAppSetting
 from src.shared.logging.logger import getLogger
 from src.shared.dtos.error_output import (
     ProblemDetails,
@@ -33,7 +33,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 configure_mappers()
 
-app_settings = getAppSetting()
+app_settings = getAppSettings()
 
 setupOtel(
     service_name=app_settings.app_name,

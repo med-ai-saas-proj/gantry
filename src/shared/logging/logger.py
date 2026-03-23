@@ -1,5 +1,6 @@
+from src.settings import getAppSettings
+
 from ..utils import request_id_utils
-from ..settings import getAppSetting
 
 import time
 import logging
@@ -49,7 +50,7 @@ def request_ider(_, __, event_dict):
 def configure_default_logging(
     logger: logging.Logger,
 ) -> structlog.stdlib.BoundLogger:
-    settings = getAppSetting()
+    settings = getAppSettings()
     pre_chain = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.CallsiteParameterAdder(

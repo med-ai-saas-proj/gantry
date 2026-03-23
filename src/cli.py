@@ -1,64 +1,85 @@
 import os
-from typing import TypedDict
+import sys
+from typing import Callable, ClassVar, final
+from functools import lru_cache
 
-import pydantic_ai
-
-
-pydantic_ai.Agent()
 from pydantic import create_model
 from pydantic_settings import (
+    CliApp,
     BaseSettings,
     SettingsConfigDict,
 )
-from sqlalchemy.util.typing import NotRequired
 
 
-class Test2(BaseSettings):
-    foo: int
-    bar: str
-    stuff_sdf: int
+# class AppSettings(BaseSettings):
+#     model_config = SettingsConfigDict(
+#         cli_parse_args=True,
+#         case_sensitive=False,
+#         env_nested_delimiter="_",
+#         env_nested_max_split=1,
+#     )
+#     port: int = 9000
+#     pass
 
 
-class Test(BaseSettings):
-    baz: bool
+# @final
+# class CentralizedSettings:
+#     """Register your settings here, used to build CLI."""
+
+#     type_arr: ClassVar[dict[str, type[BaseSettings]]] = {}
+
+#     @classmethod
+#     def register[T: type[BaseSettings]](cls, prefix: str) -> Callable[[T], T]:
+#         """Decorator to register your settings, pls use an appropriate prefix."""
+
+#         def wrapper(setting: T) -> T:
+#             setting.model_config.update(
+#                 env_prefix=f"{prefix}_",
+#                 cli_parse_args=True,
+#                 cli_prefix=prefix,
+#                 cli_ignore_unknown_args=True,
+#             )
+#             cls.type_arr[prefix] = setting
+#             return setting
+
+#         return wrapper
+
+#     @classmethod
+#     @lru_cache(1)
+#     def getCentralSettingType(cls) -> type[AppSettings]:
+#         Model = create_model(
+#             "TMP",
+#             __base__=AppSettings,
+#             **cls.type_arr,
+#         )
+#         return Model
+
+#     @classmethod
+#     @lru_cache(1)
+#     def getCentralSetting(cls) -> BaseSettings:
+#         return cls.getCentralSettingType()()
 
 
-class PydanticField[T: BaseSettings](TypedDict):
-    prefix: str
-    setting: type[T]
-    default: NotRequired[T]
+# @CentralizedSettings.register("test2")
+# class Test2(BaseSettings):
+#     foo: int
+#     bar: str
+#     stuff_sdf: int
 
 
-type_arr: list[PydanticField] = []
+# @CentralizedSettings.register("test")
+# class Test(BaseSettings):
+#     baz: bool
 
 
-def register[T](t: PydanticField[T]):
-    type_arr.append(t)
+# @lru_cache(1)
+# def getTestSettings():
+#     return Test()
 
 
-def initCentralSetting() -> type[BaseSettings]:
-    CentralSetting = create_model(
-        "CentralSetting",
-        __base__=BaseSettings,
-        __config__=SettingsConfigDict(
-            cli_parse_args=True,
-            case_sensitive=False,
-            env_nested_delimiter="_",
-            env_nested_max_split=1,
-        ),
-        **{
-            fieldd["prefix"]: (
-                fieldd["setting"],
-                fieldd["default"] if "default" in fieldd else ...,
-            )
-            for fieldd in type_arr
-        },
-    )
-
-    return CentralSetting
-
-
-from fastuuid import uuid7, uuid7_bulk
+# @lru_cache(1)
+# def getTest2Settings():
+#     return Test2()
 
 
 if __name__ == "__main__":
@@ -66,20 +87,9 @@ if __name__ == "__main__":
     os.environ["TEST2_BAR"] = "asldfk"
     os.environ["TEST2_STUFF_SDF"] = "10"
     os.environ["TEST_BAZ"] = "False"
+    CliApp.print_help(CentralizedSettings.getCentralSettingType())
+    sys.argv = ["shit ass", "--test.baz=True"]
 
-    register({"prefix": "test", "setting": Test})
-    register({"prefix": "test2", "setting": Test2})
-    # print(Test())
-    # print(initCentralSetting()())
-    # print(TestSubmodule())
-
-    prev = uuid7().bytes
-    for i in range(100):
-        now = uuid7().bytes
-        assert now > prev
-        prev = now
-
-    ls = uuid7_bulk(100)
-    print(ls)
-    for prev, next in zip(ls[:-1], ls[1:], strict=True):
-        assert prev.bytes < next.bytes
+    print(CentralizedSettings.getCentralSetting())
+    print(getTestSettings())
+    print(getTest2Settings())

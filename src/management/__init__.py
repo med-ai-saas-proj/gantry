@@ -1,4 +1,4 @@
-from src.shared.settings import getAppSetting
+from src.settings import getAppSettings
 from src.shared.custom_types.error_exception import ProblemDetails
 
 from .logging import logging_router
@@ -54,7 +54,7 @@ management_app = FastAPI(
 
 management_app.add_middleware(
     CORSMiddleware,
-    allow_origins=getAppSetting().allowed_origins.split(","),
+    allow_origins=getAppSettings().allowed_origins.split(","),
     allow_credentials=True,  # keep only if you really need cookies/auth
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],

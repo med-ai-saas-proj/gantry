@@ -1,13 +1,12 @@
+from src.settings import AppSettings
+
 from pydantic_settings import BaseSettings
 
 
+@AppSettings.register("objectstorage_")
 class ObjectStorageSettings(BaseSettings):
     """Settings for file storage configuration."""
 
-    model_config = {
-        "env_prefix": "objectstorage_",
-        "case_sensitive": False,
-    }
     s3_bucket_name: str
     s3_region_name: str
     s3_access_key_id: str
