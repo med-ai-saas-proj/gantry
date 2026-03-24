@@ -190,9 +190,9 @@ class BillingService:
             )
             return Ok(agg)
 
-    async def get_aggregate_by_apikey(
+    async def get_aggregate_by_apikeys(
         self,
-        apikey: list[str],
+        apikeys: list[str],
         org_id: str,
         start_time: datetime,
         end_time: datetime,
@@ -200,7 +200,7 @@ class BillingService:
         period_scale: int,
     ) -> Result[Sequence[BillingAggregateReport], InvalidAPIKey]:
         """Fetch the current total_amount for the given apikey/org/period."""
-        apikeys_info_res = await self.apikey_service.getApiKeysInfo(apikey)
+        apikeys_info_res = await self.apikey_service.getApiKeysInfo(apikeys)
         if isinstance(apikeys_info_res, Err):
             return apikeys_info_res
         apikey_ids = [info["api_key_id"] for info in apikeys_info_res.unwrap()]

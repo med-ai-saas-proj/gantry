@@ -272,7 +272,7 @@ class FileStorageService:
         await asyncio.to_thread(self._deleteFileFromStorage, file_path)
 
         async with self.session_manager.get_session() as session:
-            await self.file_repo.deleteFileByUUID(session, file_id)
+            await self.file_repo.deleteFileById(session, file_id)
             await session.commit()
         return Ok(None)
 

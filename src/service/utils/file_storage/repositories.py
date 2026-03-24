@@ -46,9 +46,7 @@ class FileRepository(Repository):
         )
         return await self.selectMany(session, stmt)
 
-    async def deleteFileByUUID(
-        self, session: AsyncSession, file_id: int
-    ) -> None:
+    async def deleteFileById(self, session: AsyncSession, file_id: int) -> None:
         """Delete Marked Deleted file by ID."""
         stmt = delete(File).where(
             (File.id == file_id) & (File.status == FileStatus.DELETED)

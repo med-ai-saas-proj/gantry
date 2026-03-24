@@ -9,7 +9,7 @@ repos:
 
       - id: update-example-env-files
         name: Update example.env files
-        entry: uv run examplenv gen
+        entry: examplenv gen
         language: system
         always_run: true
         files: ^$
