@@ -4,7 +4,7 @@ from src.management.auth.dependencies import getUserInfo
 from ..type import AggregatePeriod, BillingAggregateReport
 from .router import billing_router
 from ..factories import getBillingAggregateQueryService
-from ..services.aggregate_query_services import BillingAggregateQueryService
+from ..services.aggregate_query_service import BillingAggregateQueryService
 
 from uuid import UUID
 from typing import Sequence, Annotated

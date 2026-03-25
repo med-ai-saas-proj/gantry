@@ -13,7 +13,7 @@ from .services.services import BillingService
 from ..api_keys.factories import getApiKeyService
 from ...shared.logging.logger import getLogger
 from .repositories.spending_limit_repo import SpendingLimitRepository
-from .services.aggregate_query_services import BillingAggregateQueryService
+from .services.aggregate_query_service import BillingAggregateQueryService
 from .repositories.billing_transaction_repo import BillingTransactionRepository
 
 from functools import lru_cache
