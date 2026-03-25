@@ -9,9 +9,9 @@ from .models import (
 
 from datetime import datetime
 
-from sqlalchemy import func, insert, select
+from sqlalchemy import func, delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 
 class OrgSettingsRepository(Repository[OrgSettings, str]):
@@ -24,13 +24,23 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
         self, session: AsyncSession, org_id: str
     ) -> OrgSettings:
         """Return existing settings or create default ones."""
-        existing = await self.getByKey(session, org_id)
+        stmt = (
+            select(OrgSettings)
+            .select_from(OrgSettings)
+            .where(OrgSettings.org_id == org_id)
+            .limit(1)
+        )
+        res = await session.execute(stmt)
+        existing = res.scalar_one_or_none()
         if existing is not None:
             return existing
-        new_settings = OrgSettings(org_id=org_id, extra={})
-        session.add(new_settings)
-        await session.flush()
-        return new_settings
+        stmt = (
+            insert(OrgSettings)
+            .values(org_id=org_id, extra={})
+            .returning(OrgSettings)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one()
 
     async def upsert(
         self,
@@ -41,7 +51,7 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
     ) -> OrgSettings:
         """Create or update settings for an organization."""
         stmt = (
-            insert(OrgSettings)
+            pg_insert(OrgSettings)
             .values(
                 org_id=org_id,
                 rate_limit=rate_limit,
@@ -61,12 +71,13 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
         return result.scalar_one()
 
     async def deleteByOrgId(self, session: AsyncSession, org_id: str) -> bool:
-        record = await self.getByKey(session, org_id)
-        if record is None:
-            return False
-        await session.delete(record)
-        await session.flush()
-        return True
+        stmt = (
+            delete(OrgSettings)
+            .where(OrgSettings.org_id == org_id)
+            .returning(OrgSettings.org_id)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none() is not None
 
 
 class OrgDeletionRequestRepository(Repository[OrgDeletionRequest, int]):
@@ -80,19 +91,25 @@ class OrgDeletionRequestRepository(Repository[OrgDeletionRequest, int]):
     ) -> OrgDeletionRequest | None:
         stmt = (
             select(OrgDeletionRequest)
+            .select_from(OrgDeletionRequest)
             .where(OrgDeletionRequest.org_id == org_id)
             .limit(1)
         )
-        return await self.selectOne(session, stmt)
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
 
     async def create(
         self,
         session: AsyncSession,
         entity: OrgDeletionRequest,
     ) -> OrgDeletionRequest:
-        session.add(entity)
-        await session.flush()
-        return entity
+        stmt = (
+            insert(OrgDeletionRequest)
+            .values(org_id=entity.org_id)
+            .returning(OrgDeletionRequest)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one()
 
     async def upsertRequest(
         self,
@@ -100,7 +117,7 @@ class OrgDeletionRequestRepository(Repository[OrgDeletionRequest, int]):
         org_id: str,
     ) -> OrgDeletionRequest:
         stmt = (
-            insert(OrgDeletionRequest)
+            pg_insert(OrgDeletionRequest)
             .values(org_id=org_id)
             .on_conflict_do_update(
                 index_elements=[OrgDeletionRequest.org_id],
@@ -112,12 +129,13 @@ class OrgDeletionRequestRepository(Repository[OrgDeletionRequest, int]):
         return result.scalar_one()
 
     async def deleteByOrgId(self, session: AsyncSession, org_id: str) -> bool:
-        record = await self.getByOrgId(session, org_id)
-        if record is None:
-            return False
-        await session.delete(record)
-        await session.flush()
-        return True
+        stmt = (
+            delete(OrgDeletionRequest)
+            .where(OrgDeletionRequest.org_id == org_id)
+            .returning(OrgDeletionRequest.id)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none() is not None
 
     async def listDueRequests(
         self,
@@ -127,8 +145,10 @@ class OrgDeletionRequestRepository(Repository[OrgDeletionRequest, int]):
     ) -> list[OrgDeletionRequest]:
         stmt = (
             select(OrgDeletionRequest)
+            .select_from(OrgDeletionRequest)
             .where(OrgDeletionRequest.requested_at <= due_before_or_equal)
             .order_by(OrgDeletionRequest.requested_at.asc())
             .limit(limit)
         )
-        return await self.selectAll(session, stmt)
+        res = await session.execute(stmt)
+        return list(res.scalars().all())

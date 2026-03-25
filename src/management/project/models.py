@@ -40,7 +40,7 @@ class Project(WithCreateUpdateTimestamp, WithUUID, WithID, ProjectBaseSQLModel):
     )
 
 
-class ProjectMembership(WithCreateUpdateTimestamp, ProjectBaseSQLModel):
+class ProjectMember(WithCreateUpdateTimestamp, ProjectBaseSQLModel):
     """User membership inside a project."""
 
     __tablename__ = "ProjectMembers"

@@ -5,7 +5,7 @@ from src.shared.logging.logger import getLogger
 from src.management.organization.factories import getKeycloakOrgClient
 
 from .services import ProjectService
-from .repositories import ProjectRepository, ProjectMembershipRepository
+from .repositories import ProjectRepository, ProjectMemberRepository
 
 from functools import lru_cache
 
@@ -17,6 +17,6 @@ def getProjectService() -> ProjectService:
         session_manager=getSessionManager(),
         logger=getLogger(),
         project_repo=ProjectRepository(),
-        membership_repo=ProjectMembershipRepository(),
+        membership_repo=ProjectMemberRepository(),
         kc_client=getKeycloakOrgClient(),
     )

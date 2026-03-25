@@ -3,13 +3,13 @@
 from src.db.repository import Repository
 from src.shared.utils.uuid_utils import uuid7
 
-from .models import Project, ProjectMembership
+from .models import Project, ProjectMember
 
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 
 class ProjectRepository(Repository[Project, int]):
@@ -25,15 +25,18 @@ class ProjectRepository(Repository[Project, int]):
         description: str | None,
         organization_id: str,
     ) -> Project:
-        project = Project(
-            name=name,
-            description=description,
-            organization_id=organization_id,
+        stmt = (
+            insert(Project)
+            .values(
+                uuid=uuid7(),
+                name=name,
+                description=description,
+                organization_id=organization_id,
+            )
+            .returning(Project)
         )
-        project.uuid = uuid7()
-        session.add(project)
-        await session.flush()
-        return project
+        res = await session.execute(stmt)
+        return res.scalar_one()
 
     async def getByUuid(
         self, session: AsyncSession, project_uuid: str
@@ -42,8 +45,14 @@ class ProjectRepository(Repository[Project, int]):
             parsed = UUID(project_uuid)
         except ValueError:
             return None
-        stmt = select(Project).where(Project.uuid == parsed).limit(1)
-        return await self.selectOne(session, stmt)
+        stmt = (
+            select(Project)
+            .select_from(Project)
+            .where(Project.uuid == parsed)
+            .limit(1)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
 
     async def listByOrg(
         self,
@@ -52,10 +61,12 @@ class ProjectRepository(Repository[Project, int]):
     ) -> list[Project]:
         stmt = (
             select(Project)
+            .select_from(Project)
             .where(Project.organization_id == organization_id)
             .order_by(Project.created_at.desc())
         )
-        return list(await self.selectMany(session, stmt))
+        res = await session.execute(stmt)
+        return list(res.scalars().all())
 
     async def listByMember(
         self,
@@ -65,58 +76,62 @@ class ProjectRepository(Repository[Project, int]):
     ) -> list[Project]:
         stmt = (
             select(Project)
+            .select_from(Project)
             .join(
-                ProjectMembership,
-                ProjectMembership.project_id == Project.id,
+                ProjectMember,
+                ProjectMember.project_id == Project.id,
             )
-            .where(ProjectMembership.user_id == user_id)
+            .where(ProjectMember.user_id == user_id)
             .order_by(Project.created_at.desc())
         )
         if organization_id:
             stmt = stmt.where(Project.organization_id == organization_id)
-        return list(await self.selectMany(session, stmt))
+        res = await session.execute(stmt)
+        return list(res.scalars().all())
 
 
-class ProjectMembershipRepository(Repository[ProjectMembership, int]):
+class ProjectMemberRepository(Repository[ProjectMember, int]):
     """Repository for project memberships."""
 
     def __init__(self):
-        super().__init__(ProjectMembership, ProjectMembership.project_id)
+        super().__init__(ProjectMember, ProjectMember.project_id)
 
     async def getMembership(
         self,
         session: AsyncSession,
         project_id: int,
         user_id: str,
-    ) -> ProjectMembership | None:
+    ) -> ProjectMember | None:
         stmt = (
-            select(ProjectMembership)
-            .where(ProjectMembership.project_id == project_id)
-            .where(ProjectMembership.user_id == user_id)
+            select(ProjectMember)
+            .select_from(ProjectMember)
+            .where(ProjectMember.project_id == project_id)
+            .where(ProjectMember.user_id == user_id)
             .limit(1)
         )
-        return await self.selectOne(session, stmt)
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
 
     async def upsertMembership(
         self,
         session: AsyncSession,
         project_id: int,
         user_id: str,
-    ) -> ProjectMembership:
+    ) -> ProjectMember:
         stmt = (
-            insert(ProjectMembership)
+            pg_insert(ProjectMember)
             .values(
                 project_id=project_id,
                 user_id=user_id,
             )
             .on_conflict_do_update(
                 index_elements=[
-                    ProjectMembership.project_id,
-                    ProjectMembership.user_id,
+                    ProjectMember.project_id,
+                    ProjectMember.user_id,
                 ],
                 set_={"updated_at": func.now()},
             )
-            .returning(ProjectMembership)
+            .returning(ProjectMember)
         )
         result = await session.execute(stmt)
         return result.scalar_one()
@@ -127,44 +142,52 @@ class ProjectMembershipRepository(Repository[ProjectMembership, int]):
         project_id: int,
         user_id: str,
     ) -> bool:
-        existing = await self.getMembership(session, project_id, user_id)
-        if existing is None:
-            return False
-        await session.delete(existing)
-        await session.flush()
-        return True
+        stmt = (
+            delete(ProjectMember)
+            .where(
+                ProjectMember.project_id == project_id,
+                ProjectMember.user_id == user_id,
+            )
+            .returning(ProjectMember.project_id)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none() is not None
 
     async def listMembers(
         self,
         session: AsyncSession,
         project_id: int,
-    ) -> list[ProjectMembership]:
+    ) -> list[ProjectMember]:
         stmt = (
-            select(ProjectMembership)
-            .where(ProjectMembership.project_id == project_id)
-            .order_by(ProjectMembership.joined_at.asc())
+            select(ProjectMember)
+            .select_from(ProjectMember)
+            .where(ProjectMember.project_id == project_id)
+            .order_by(ProjectMember.joined_at.asc())
         )
-        return list(await self.selectMany(session, stmt))
+        res = await session.execute(stmt)
+        return list(res.scalars().all())
 
     async def listMembershipsForUserInOrg(
         self,
         session: AsyncSession,
         user_id: str,
         organization_id: str,
-    ) -> list[ProjectMembership]:
+    ) -> list[ProjectMember]:
         stmt = (
-            select(ProjectMembership)
-            .join(Project, Project.id == ProjectMembership.project_id)
-            .where(ProjectMembership.user_id == user_id)
+            select(ProjectMember)
+            .select_from(ProjectMember)
+            .join(Project, Project.id == ProjectMember.project_id)
+            .where(ProjectMember.user_id == user_id)
             .where(Project.organization_id == organization_id)
         )
-        return list(await self.selectMany(session, stmt))
+        res = await session.execute(stmt)
+        return list(res.scalars().all())
 
     async def countMembers(self, session: AsyncSession, project_id: int) -> int:
         stmt = (
             select(func.count())
-            .select_from(ProjectMembership)
-            .where(ProjectMembership.project_id == project_id)
+            .select_from(ProjectMember)
+            .where(ProjectMember.project_id == project_id)
         )
         res = await session.execute(stmt)
         return int(res.scalar() or 0)

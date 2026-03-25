@@ -27,7 +27,7 @@ class TestProjectFactories(unittest.TestCase):
                 return_value="project-repo",
             ),
             patch(
-                "src.management.project.factories.ProjectMembershipRepository",
+                "src.management.project.factories.ProjectMemberRepository",
                 return_value="membership-repo",
             ),
             patch(

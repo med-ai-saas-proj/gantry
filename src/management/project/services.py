@@ -25,7 +25,7 @@ from .permissions import (
     decode_project_permission,
     encode_project_permission,
 )
-from .repositories import ProjectRepository, ProjectMembershipRepository
+from .repositories import ProjectRepository, ProjectMemberRepository
 
 from typing import Any
 
@@ -99,7 +99,7 @@ class ProjectService:
         session_manager: AsyncSessionManager,
         logger: BoundLogger,
         project_repo: ProjectRepository,
-        membership_repo: ProjectMembershipRepository,
+        membership_repo: ProjectMemberRepository,
         kc_client: KeycloakOrgClient,
     ):
         self.session_manager = session_manager
