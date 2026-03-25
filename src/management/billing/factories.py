@@ -1,6 +1,7 @@
 """Singleton factory for BillingService."""
 
 from src.db.factories import getRedis, getSessionManager
+from src.management.billing.settings import getBillingSourceSetting
 from src.management.billing.services.billing_source_service import (
     BillingSourceService,
 )
@@ -17,6 +18,7 @@ from .repositories.billing_transaction_repo import BillingTransactionRepository
 
 from functools import lru_cache
 
+from httpx import get
 from stripe import StripeClient
 
 
@@ -33,10 +35,13 @@ def getBillingService() -> BillingService:
 
 @lru_cache(1)
 def getBillingSourceService() -> BillingSourceService:
+    billing_source_settings = getBillingSourceSetting()
     return BillingSourceService(
         billing_source_repo=BillingSourceRepo(),
         session_manager=getSessionManager(),
-        stripe_client=StripeClient(),
+        stripe_client=StripeClient(
+            billing_source_settings.stripe_secret_key.get_secret_value()
+        ),
     )
 
 

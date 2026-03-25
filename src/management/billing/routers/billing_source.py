@@ -104,7 +104,10 @@ async def create_setup_intent(
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
-    pass
+    res = await billing_source_service.createSetupIntent(
+        user_info["org_id"], billing_source_uid
+    )
+    return res.unwrap()
 
 
 @billing_router.delete(
@@ -119,7 +122,10 @@ async def delete_payment_method(
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
-    pass
+    res = await billing_source_service.deletePaymentMethod(
+        user_info["org_id"], billing_source_uid, payment_method_id
+    )
+    return res.unwrap()
 
 
 @billing_router.get(
@@ -133,7 +139,10 @@ async def list_payment_methods(
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
-    pass
+    res = await billing_source_service.listPaymentMethods(
+        user_info["org_id"], billing_source_uid
+    )
+    return res.unwrap()
 
 
 @billing_router.get(
@@ -148,21 +157,27 @@ async def get_payment_method_details(
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
-    pass
+    res = await billing_source_service.getPaymentMethodDetails(
+        user_info["org_id"], billing_source_uid, payment_method_id
+    )
+    return res.unwrap()
 
 
 @billing_router.get(
-    "/sources/{billing_source_uid}/setup_intents/pending",
-    description="List pending setup intent for a billing source (used to verify payment method after linking)",
+    "/sources/{billing_source_uid}/setup_intents/required_actions",
+    description="List setup intents that require user action for a billing source (used to verify payment method after linking)",
 )
-async def list_pending_setup_intents(
+async def list_required_action_setup_intents(
     billing_source_uid: uuid.UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
-    pass
+    res = await billing_source_service.listRequiredActionSetupIntents(
+        user_info["org_id"], billing_source_uid
+    )
+    return res.unwrap()
 
 
 @billing_router.delete(
@@ -177,4 +192,7 @@ async def cancel_setup_intent(
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
-    pass
+    res = await billing_source_service.cancelSetupIntent(
+        user_info["org_id"], billing_source_uid, setup_intent_id
+    )
+    return res.unwrap()
