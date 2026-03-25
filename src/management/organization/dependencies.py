@@ -47,7 +47,7 @@ async def getLimit(
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> int | None:
     """Return effective org limit (org override or global default)."""
-    settings_res = (await org_service.get_settings(org_id)).unwrap()
+    settings_res = (await org_service.getSettings(org_id)).unwrap()
     org_limit = settings_res.rate_limit
     if org_limit is not None:
         return org_limit
@@ -66,20 +66,6 @@ class _KeycloakOrgError(RecoverableError):
     code = "keycloak_error"
     title = "Keycloak Error"
     detail = "Could not fetch organisation permissions from Keycloak."
-
-
-def _is_trusted_backend_service_account(user_info: UserInfo) -> bool:
-    client_id = user_info.get("client_id")
-    username = user_info.get("username")
-    is_service_account = bool(user_info.get("is_service_account"))
-    expected_service_username = (
-        f"service-account-{org_settings.keycloak_service_client_id}"
-    )
-    return (
-        is_service_account
-        and client_id == org_settings.keycloak_service_client_id
-        and username == expected_service_username
-    )
 
 
 def _raise_permission_fetch_error(err: Exception):
@@ -105,7 +91,7 @@ async def _get_permissions_or_raise(
     org_id: str,
     user_id: str,
 ) -> list[str]:
-    perms_res = await org_service.get_user_permissions(org_id, user_id)
+    perms_res = await org_service.getUserPermissions(org_id, user_id)
     return (
         perms_res.map(lambda r: r.permissions)
         .map_err(_raise_permission_fetch_error)
@@ -142,9 +128,6 @@ def requiredOrgPermission(permission: OrgPermission):
         user_info: Annotated[UserInfo, Depends(_get_user_info)],
         org_service: Annotated[OrgService, Depends(getOrgService)],
     ) -> UserInfo:
-        if _is_trusted_backend_service_account(user_info):
-            return user_info
-
         user_perms = await _get_permissions_or_raise(
             org_service, org_id, user_info["id"]
         )

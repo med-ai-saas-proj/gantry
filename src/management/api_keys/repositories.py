@@ -62,7 +62,6 @@ class PermissionRepository(Repository[Permission, str]):
         """Update a permission's description."""
         permission.description = description
         await session.flush()
-        await session.refresh(permission)
         return permission
 
     async def deletePermission(
