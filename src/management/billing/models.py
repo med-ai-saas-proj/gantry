@@ -118,6 +118,18 @@ class Credit(
     )
 
 
+class BillingSourceState(str, enum.Enum):
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+    DELETED = "DELETED"
+
+
+class BillingSourceProvider(str, enum.Enum):
+    STRIPE = "stripe"
+    PAYPAL = "paypal"
+    # Add more providers as needed (e.g. "braintree", "square", etc.)
+
+
 class BillingSource(
     WithCreateUpdateTimestamp, WithID, WithClientUUIDv7, BillingBaseSQLModel
 ):
@@ -126,18 +138,16 @@ class BillingSource(
     organization_id: Mapped[str] = mapped_column(
         String(128), nullable=False, index=True
     )
-
-    source_type: Mapped[str] = mapped_column(
-        String(64), nullable=False
-    )  # e.g. "stripe", "paypal"
+    source_type: Mapped[BillingSourceProvider] = mapped_column(
+        Enum(BillingSourceProvider), nullable=False
+    )
     provider_id: Mapped[str] = mapped_column(
         String(128), nullable=False
     )  # e.g. Stripe customer ID
-
-    __table_args__ = (
-        UniqueConstraint(
-            organization_id, source_type, name="uq_billing_source"
-        ),
+    status: Mapped[BillingSourceState] = mapped_column(
+        Enum(BillingSourceState),
+        default=BillingSourceState.PENDING,
+        server_default=BillingSourceState.PENDING,
     )
 
 

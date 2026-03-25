@@ -3,10 +3,6 @@ from src.management.api_keys.dependencies import requiredPermissions
 
 from ..dtos import (
     CreditInfo,
-    BillingPing,
-    HoldRequest,
-    ScaledAmount,
-    ReleaseRequest,
     AddCreditRequest,
 )
 from .router import billing_router
@@ -15,9 +11,8 @@ from ..factories import BillingService, getBillingService
 import enum
 from uuid import UUID
 from typing import Annotated
-from datetime import datetime
 
-from fastapi import Body, Depends, APIRouter
+from fastapi import Body, Depends
 
 
 @billing_router.post(

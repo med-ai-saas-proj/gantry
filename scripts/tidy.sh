@@ -1,3 +1,4 @@
 #! /bin/bash
-ruff check --fix --select I -q "$@"
-ruff format -q "$@"
+uv run ruff check --fix --select I -q "$@"
+uv run ruff format -q "$@"
+git add . 

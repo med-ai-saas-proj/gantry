@@ -1,11 +1,14 @@
 """DTOs for the billing module."""
 
+from src.management.billing.models import BillingSourceProvider
+
 from re import U
 from uuid import UUID
 from typing import TypedDict
 from datetime import datetime
 
 from pydantic import BaseModel
+from typing_extensions import Literal
 
 
 class ScaledAmount(TypedDict):
@@ -105,3 +108,26 @@ class AddCreditRequest(BaseModel):
     start_year: int
     exp_month: int
     exp_year: int
+
+
+class BillingAddress(BaseModel):
+    line1: str
+    line2: str
+    city: str
+    state: str
+    postal_code: str
+    country: str
+
+
+class AddBillingSourceRequest(BaseModel):
+    name: str
+    email: str
+    phone: str
+    address: BillingAddress
+    provider: Literal[BillingSourceProvider.STRIPE]
+
+
+class UpdateBillingSourceRequest(BaseModel):
+    new_address: BillingAddress | None
+    new_email: str | None
+    new_phone: str | None

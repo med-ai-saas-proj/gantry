@@ -1,10 +1,10 @@
 from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
 
+from ..type import AggregatePeriod, BillingAggregateReport
 from .router import billing_router
-from ..services import BillingService
-from ..factories import getBillingService
-from ..repositories import AggregatePeriod, BillingAggregateReport
+from ..factories import getBillingAggregateQueryService
+from ..services.aggregate_query_services import BillingAggregateQueryService
 
 from uuid import UUID
 from typing import Sequence, Annotated
@@ -19,7 +19,9 @@ from fastapi import Depends
 )
 async def get_aggregate_by_projects(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[BillingService, Depends(getBillingService)],
+    billing_service: Annotated[
+        BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
+    ],
     project_uids: list[UUID],  # filter by project_uid or whole organization
     period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
@@ -45,7 +47,9 @@ async def get_aggregate_by_projects(
 )
 async def get_aggregate_by_apikeys(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[BillingService, Depends(getBillingService)],
+    billing_service: Annotated[
+        BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
+    ],
     apikeys: list[str],  # filter by apikey_id or whole organization
     period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
@@ -71,7 +75,9 @@ async def get_aggregate_by_apikeys(
 )
 async def get_aggregate_by_org(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[BillingService, Depends(getBillingService)],
+    billing_service: Annotated[
+        BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
+    ],
     period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
