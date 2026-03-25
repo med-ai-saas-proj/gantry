@@ -1,14 +1,14 @@
 from src.management.billing.dtos import (
-    InvoiceInfo,
-    TransactionInfo,
+    InvoiceInfoResponse,
     ManualPaymentResponse,
+    TransactionInfoResponse,
 )
 from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
 
 from .router import billing_router
 from ..services import BillingService
-from ..factories import getBillingService
+from ..factories import getBillingTransactionService
 
 import enum
 from uuid import UUID
@@ -31,7 +31,9 @@ class PaymentStatus(str, enum.Enum):
 )
 async def list_invoices(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[BillingService, Depends(getBillingService)],
+    billing_service: Annotated[
+        BillingService, Depends(getBillingTransactionService)
+    ],
     project_uid: list[UUID]
     | None = None,  # filter by project_uid or whole organization
     from_date: datetime | None = None,  # ISO date string
@@ -40,7 +42,7 @@ async def list_invoices(
     | None = None,  # e.g. "paid", "unpaid", "overdue"
     limit: int = 100,
     offset: int = 0,
-) -> list[InvoiceInfo]:
+) -> list[InvoiceInfoResponse]:
     pass
 
 
@@ -51,8 +53,10 @@ async def list_invoices(
 async def get_invoice_details(
     invoice_uid: UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[BillingService, Depends(getBillingService)],
-) -> InvoiceInfo:
+    billing_service: Annotated[
+        BillingService, Depends(getBillingTransactionService)
+    ],
+) -> InvoiceInfoResponse:
     pass
 
 
@@ -63,7 +67,9 @@ async def get_invoice_details(
 async def pay_invoice(
     invoice_uid: UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[BillingService, Depends(getBillingService)],
+    billing_service: Annotated[
+        BillingService, Depends(getBillingTransactionService)
+    ],
 ) -> ManualPaymentResponse:
     return ManualPaymentResponse(
         hosted_invoice_url="https://example.com/payment"

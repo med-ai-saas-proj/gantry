@@ -11,9 +11,9 @@ from src.management.billing.services.billing_source_service import (
 from .router import billing_router
 from ..models import BillingSourceProvider
 from ..factories import (
-    BillingService,
-    getBillingService,
+    BillingTransactionService,
     getBillingSourceService,
+    getBillingTransactionService,
 )
 
 import uuid

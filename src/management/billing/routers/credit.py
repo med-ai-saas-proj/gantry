@@ -2,13 +2,12 @@ from src.management.api_keys.entities import ApiKeyInfo
 from src.management.api_keys.dependencies import requiredPermissions
 
 from ..dtos import (
-    CreditInfo,
     AddCreditRequest,
+    CreditInfoResponse,
 )
 from .router import billing_router
-from ..factories import BillingService, getBillingService
+from ..factories import BillingTransactionService, getBillingTransactionService
 
-import enum
 from uuid import UUID
 from typing import Annotated
 
@@ -23,7 +22,9 @@ async def add_credits(
     apikey_info: Annotated[
         ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
     ],
-    billing_service: Annotated[BillingService, Depends(getBillingService)],
+    billing_service: Annotated[
+        BillingTransactionService, Depends(getBillingTransactionService)
+    ],
     body: Annotated[AddCreditRequest, Body()],
 ):
     pass
@@ -37,11 +38,34 @@ async def list_credits(
     apikey_info: Annotated[
         ApiKeyInfo, Depends(requiredPermissions(["billing:read"]))
     ],
-    billing_service: Annotated[BillingService, Depends(getBillingService)],
-    project_uid: UUID
+    billing_service: Annotated[
+        BillingTransactionService, Depends(getBillingTransactionService)
+    ],
+    project_uid: list[UUID]
     | None = None,  # filter by project_uid or whole organization
     status: str | None = None,  # e.g. "active", "used", "expired"
     limit: int = 100,
     offset: int = 0,
-) -> list[CreditInfo]:
+) -> list[CreditInfoResponse]:
+    pass
+
+
+@billing_router.get(
+    "/credits",
+    description="List credits for an organization or project, with filters for status (e.g. 'active', 'used', 'expired').",
+)
+async def list_credits_for_admin(
+    apikey_info: Annotated[
+        ApiKeyInfo, Depends(requiredPermissions(["billing:read"]))
+    ],
+    billing_service: Annotated[
+        BillingTransactionService, Depends(getBillingTransactionService)
+    ],
+    project_uid: list[UUID]
+    | None = None,  # filter by project_uid or whole organization
+    org_id: list[UUID] | None = None,  # filter by org_id for admin users
+    status: str | None = None,  # e.g. "active", "used", "expired"
+    limit: int = 100,
+    offset: int = 0,
+) -> list[CreditInfoResponse]:
     pass

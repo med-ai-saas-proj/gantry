@@ -1,40 +1,5 @@
-"""Core billing service — HOLD/RELEASE pattern.
-
-Flow (see architecture diagram):
-
-  HOLD (called by Service#1 before processing the request):
-    1. Fetch project limit + org limit + current org total in one DB transaction.
-       - Project limit: ProjectSpendingLimit for this project (or None = unlimited).
-       - Org limit:     OrganizationSpendingLimit for this org (or None = unlimited).
-       - Org total:     SUM(total_amount) across all open aggregates for all org
-                        projects this period. Provided by the caller as
-                        BillingPing.org_project_ids — the org→project mapping lives
-                        in Keycloak, not here.
-    2. Pre-check org limit in code.
-    3. Atomically upsert MonthlyAggregate via INSERT ON CONFLICT DO UPDATE WHERE
-       — enforces the project-level limit inside Postgres. Concurrent HOLDs are
-       serialised here so no two requests can both pass against the same stale total.
-    4. Commit the Postgres row (durable — money is tracked even if Redis dies).
-    5. Store hold metadata in Redis with TTL.
-    6. Return hold UUID to the caller.
-    → 403 SpendingLimitExceeded (project limit OR org limit breached).
-    → 409 AggregateFinalized if the current period is already closed.
-
-  RELEASE (called by Service#1 after computing the real cost):
-    1. Fetch hold record from Redis by UUID.
-       ↳ If Redis miss (crash / TTL expired): Err(HoldNotFound).
-         The hold amount is still in Postgres — a reconciliation job (future
-         ticket) can detect orphaned holds by comparing MonthlyAggregate
-         totals against committed BillingTransactions.
-    2. Compute delta = real_cost − hold_amount (usually ≤ 0).
-    3. Adjust MonthlyAggregate in Postgres: total_amount += delta.
-       ↳ If period was finalized between HOLD and RELEASE: Err(AggregateFinalized).
-    4. Delete hold record from Redis only after Postgres commits.
-    TODO(BILL-008): INSERT BillingTransaction into TimescaleDB.
-"""
-
 from src.db.factories import AsyncSessionManager
-from src.management.billing.dtos import BillingPing, ScaledAmount
+from src.management.billing.dtos import PostRequest, ScaledAmount
 from src.management.billing.models import SpendingLimitType
 from src.management.api_keys.services import ApiKeyService
 from src.shared.custom_types.error_exception import RecoverableError
@@ -47,21 +12,13 @@ from src.management.billing.repositories.billing_transaction_repo import (
 
 import json
 from uuid import UUID, uuid4
-from email import message
-from typing import Any, Sequence, TypedDict
+from typing import TypedDict
 from decimal import Decimal
 from datetime import datetime, timezone
 
-from sqlalchemy import select
 from safe_result import Ok, Err, Result
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
-from sqlalchemy.ext.asyncio import AsyncSession
-
-
-# ---------------------------------------------------------------------------
-# Error types
-# ---------------------------------------------------------------------------
 
 
 class SpendingLimitExceeded(RecoverableError):
@@ -78,22 +35,12 @@ class HoldNotFound(RecoverableError):
     detail = "The billing hold UUID does not exist or has expired."
 
 
-# ---------------------------------------------------------------------------
-# Redis configs
-# ---------------------------------------------------------------------------
-
-
 class _HoldRecord(TypedDict):
     project_id: int
     org_id: str
     apikey_id: int
     hold_amount: ScaledAmount
     billing_period: str  # "YYYY-MM" — period active when HOLD was placed
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _current_billing_period() -> str:
@@ -109,11 +56,6 @@ def _to_decimal(amount: ScaledAmount) -> Decimal:
     return Decimal(amount["value"]).scaleb(-amount["scale"])
 
 
-# ---------------------------------------------------------------------------
-# Service
-# ---------------------------------------------------------------------------
-
-
 class ProjectNotFound(RecoverableError):
     status = 404
     code = "project_not_found"
@@ -125,7 +67,7 @@ class ProjectNotFound(RecoverableError):
         self.message = message
 
 
-class BillingService:
+class BillingTransactionService:
     """Implements the two-phase HOLD / RELEASE billing protocol."""
 
     _HOLD_KEY = "billing:hold:{uuid}"
@@ -147,12 +89,12 @@ class BillingService:
         self.billing_transaction_repo = billing_transaction_repo
         self.apikey_service = apikey_service
 
-    # -----------------------------------------------------------------------
-    # Public API
-    # -----------------------------------------------------------------------
-
-    async def hold(
-        self, ping: BillingPing
+    async def post(
+        self,
+        org_id: str,
+        project_id: int,
+        api_key_id: int,
+        req: PostRequest,
     ) -> Result[UUID, SpendingLimitExceeded]:
         """Reserve spending capacity before a request is processed.
 
@@ -213,9 +155,12 @@ class BillingService:
         )
         return Ok(hold_uuid)
 
-    async def release(
+    async def capture(
         self,
-        hold_uuid: UUID,
+        org_id: str,
+        project_id: int,
+        api_key_id: int,
+        transaction_uid: UUID,
         real_amount: ScaledAmount,
     ) -> Result[bool, HoldNotFound]:
         """Commit the actual charge after a request completes.
@@ -234,9 +179,7 @@ class BillingService:
             return Err(HoldNotFound())
 
         hold: _HoldRecord = json.loads(raw)
-        project_id: int = hold["project_id"]
         billing_period: str = hold["billing_period"]
-        org_id: str = hold["org_id"]
 
         hold_amount = _to_decimal(hold["hold_amount"])
         real = _to_decimal(real_amount)

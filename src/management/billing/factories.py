@@ -1,35 +1,35 @@
 """Singleton factory for BillingService."""
 
 from src.db.factories import getRedis, getSessionManager
-from src.management.billing.settings import getBillingSourceSetting
-from src.management.billing.services.billing_source_service import (
-    BillingSourceService,
-)
-from src.management.billing.repositories.billing_source_repo import (
-    BillingSourceRepo,
-)
 
-from .services.services import BillingService
+from .settings import getBillingSourceSetting
 from ..api_keys.factories import getApiKeyService
 from ...shared.logging.logger import getLogger
+from .services.billing_source_service import (
+    BillingSourceService,
+)
+from .repositories.billing_source_repo import (
+    BillingSourceRepo,
+)
 from .repositories.spending_limit_repo import SpendingLimitRepository
 from .services.aggregate_query_service import BillingAggregateQueryService
 from .repositories.billing_transaction_repo import BillingTransactionRepository
+from .services.billing_transaction_services import BillingTransactionService
 
 from functools import lru_cache
 
-from httpx import get
 from stripe import StripeClient
 
 
 @lru_cache(1)
-def getBillingService() -> BillingService:
-    return BillingService(
+def getBillingTransactionService() -> BillingTransactionService:
+    return BillingTransactionService(
         logger=getLogger(),
         session_manager=getSessionManager(),
         redis=getRedis(),
         spending_limit_repo=SpendingLimitRepository(),
         billing_transaction_repo=BillingTransactionRepository(),
+        apikey_service=getApiKeyService(),
     )
 
 

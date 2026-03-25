@@ -11,4 +11,4 @@ class BillingSourceSetting(BaseSettings):
 
 
 def getBillingSourceSetting() -> BillingSourceSetting:
-    return BillingSourceSetting()
+    return BillingSourceSetting()  # type: ignore

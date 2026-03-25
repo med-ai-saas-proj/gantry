@@ -24,22 +24,13 @@ class ScaledAmount(TypedDict):
     scale: int
 
 
-class BillingPing(TypedDict):
-    """Input payload for requesting a billing HOLD."""
-
-    organization_id: str
-    project_id: int
-    apikey_id: int
-    amount: ScaledAmount  # maximum (worst-case) cost estimate
-    details: dict  # e.g. {"llm_usages": {"gpt-4o": {"input_tokens": 100}}}
-
-
-class HoldRequest(BaseModel):
+class PostRequest(BaseModel):
     amount: ScaledAmount
     details: dict = {}
+    capture: bool = False
 
 
-class ReleaseRequest(BaseModel):
+class CaptureRequest(BaseModel):
     real_amount: ScaledAmount
 
 
@@ -47,32 +38,29 @@ class ManualPaymentResponse(BaseModel):
     hosted_invoice_url: str  # URL to hosted payment page on the payment gateway (e.g. Stripe Checkout) where the user can complete the payment
 
 
-class TransactionInfo(BaseModel):
+class TransactionInfoResponse(BaseModel):
     transaction_id: UUID
     amount: ScaledAmount
     date: datetime
-    project_id: int
+    project_uid: str
     details: dict
 
 
-class InvoiceInfo(BaseModel):
-    invoice_id: str
+class InvoiceInfoResponse(BaseModel):
+    invoice_uid: str
     amount_due: ScaledAmount
     due_date: datetime
 
 
-class StripeInvoiceInfo(BaseModel):
-    invoice_id: str
+class InvoiceDetailInfoResponse(BaseModel):
+    invoice_uid: str
     amount_due: ScaledAmount
     due_date: datetime
     hosted_invoice_url: str
 
 
-type InvoiceDetailInfo = StripeInvoiceInfo  # can be extended to support multiple payment gateways with different invoice formats in the future
-
-
-class SpendingLimitInfo(BaseModel):
-    project_uid: UUID
+class SpendingLimitInfoResponse(BaseModel):
+    project_uid: str | None
     limit_amount: ScaledAmount
     current_spend: ScaledAmount
 
@@ -86,8 +74,8 @@ class UpdateSpendingLimitRequest(BaseModel):
     )
 
 
-class CreditInfo(BaseModel):
-    credit_id: UUID
+class CreditInfoResponse(BaseModel):
+    credit_uid: str
     amount: ScaledAmount
     name: str
     current_spent: ScaledAmount
