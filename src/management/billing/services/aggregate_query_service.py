@@ -4,7 +4,7 @@ from src.management.api_keys.services import ApiKeyService, InvalidAPIKey
 from src.shared.custom_types.error_exception import RecoverableError
 
 from ..type import AggregatePeriod, BillingAggregateReport
-from ..repositories.billing_transaction_repo import BillingTransactionRepository
+from ..repositories.transaction_repo import TransactionRepository
 
 from uuid import UUID
 from typing import Any, Sequence
@@ -31,12 +31,12 @@ class BillingAggregateQueryService:
         self,
         logger: BoundLogger,
         session_manager: AsyncSessionManager,
-        billing_transaction_repo: BillingTransactionRepository,
+        transaction_repo: TransactionRepository,
         apikey_service: ApiKeyService,
     ) -> None:
         self.logger = logger
         self.session_manager = session_manager
-        self.billing_transaction_repo = billing_transaction_repo
+        self.billing_transaction_repo = transaction_repo
         self.apikey_service = apikey_service
 
     async def get_aggregate_by_projects(

@@ -23,7 +23,7 @@ bucket_map = {
 }
 
 
-class BillingTransactionRepository(Repository[BillingTransaction, UUID]):
+class TransactionRepository(Repository[BillingTransaction, UUID]):
     """Repository for BillingTransaction records.
 
     BillingTransaction stores only apikey_id. For project/org-level queries
@@ -261,7 +261,7 @@ if __name__ == "__main__":
 
     async def test():
         async with getTimescaleSessionManager().get_session() as session:
-            repo = BillingTransactionRepository()
+            repo = TransactionRepository()
             await repo.addTransaction(
                 session=session,
                 apikey_id=1,

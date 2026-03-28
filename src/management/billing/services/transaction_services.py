@@ -4,11 +4,11 @@ from src.shared.utils.redis_lock import redis_lock
 from src.management.billing.models import SpendingLimitType
 from src.management.api_keys.services import ApiKeyService
 from src.shared.custom_types.error_exception import RecoverableError
+from src.management.billing.repositories.transaction_repo import (
+    TransactionRepository,
+)
 from src.management.billing.repositories.spending_limit_repo import (
     SpendingLimitRepository,
-)
-from src.management.billing.repositories.billing_transaction_repo import (
-    BillingTransactionRepository,
 )
 
 import json
@@ -16,7 +16,6 @@ import asyncio
 from uuid import UUID, uuid4
 from typing import Any, Callable, Awaitable, TypedDict, cast
 from decimal import Decimal
-from calendar import c
 from datetime import UTC, datetime, timezone
 
 from pyrusult import Ok, Err, Result
@@ -120,7 +119,7 @@ return 1
 """
 
 
-class BillingTransactionService:
+class TransactionService:
     """Implements the two-phase HOLD / RELEASE billing protocol."""
 
     _HOLD_KEY = "billing:hold:{uuid}"
@@ -136,14 +135,14 @@ class BillingTransactionService:
         session_manager: AsyncSessionManager,
         redis: Redis,
         spending_limit_repo: SpendingLimitRepository,
-        billing_transaction_repo: BillingTransactionRepository,
+        transaction_repo: TransactionRepository,
         apikey_service: ApiKeyService,
     ) -> None:
         self.logger = logger
         self.session_manager = session_manager
         self.redis = redis
         self.spending_limit_repo = spending_limit_repo
-        self.billing_transaction_repo = billing_transaction_repo
+        self.billing_transaction_repo = transaction_repo
         self.apikey_service = apikey_service
 
     async def redis_check_or_load[T](

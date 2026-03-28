@@ -8,7 +8,7 @@ from src.management.api_keys.dependencies import requiredPermissions
 
 from ..dtos import PostRequest, CaptureRequest
 from .router import billing_router
-from ..factories import BillingTransactionService, getBillingTransactionService
+from ..factories import TransactionService, getBillingTransactionService
 
 from uuid import UUID
 from typing import Annotated
@@ -24,7 +24,7 @@ async def post(
     ],
     body: Annotated[PostRequest, Body()],
     billing_service: Annotated[
-        BillingTransactionService, Depends(getBillingTransactionService)
+        TransactionService, Depends(getBillingTransactionService)
     ],
 ) -> UUID:
     return (
@@ -45,7 +45,7 @@ async def capture(
     ],
     body: Annotated[CaptureRequest, Body()],
     billing_service: Annotated[
-        BillingTransactionService, Depends(getBillingTransactionService)
+        TransactionService, Depends(getBillingTransactionService)
     ],
 ) -> bool:
     return (
@@ -66,7 +66,7 @@ async def capture(
 async def list_transactions(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
-        BillingTransactionService, Depends(getBillingTransactionService)
+        TransactionService, Depends(getBillingTransactionService)
     ],
     project_uid: list[UUID]
     | None = None,  # filter by project_uid or whole organization
@@ -86,7 +86,7 @@ async def get_transaction_details(
     transaction_uid: UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
-        BillingTransactionService, Depends(getBillingTransactionService)
+        TransactionService, Depends(getBillingTransactionService)
     ],
 ) -> TransactionInfoResponse:
     pass

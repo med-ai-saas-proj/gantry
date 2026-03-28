@@ -3,7 +3,7 @@ from src.management.auth.dependencies import getUserInfo
 
 from ..dtos import SpendingLimitInfoResponse, UpdateSpendingLimitRequest
 from .router import billing_router
-from ..factories import BillingTransactionService, getBillingTransactionService
+from ..factories import TransactionService, getBillingTransactionService
 
 from uuid import UUID
 from typing import Annotated
@@ -19,7 +19,7 @@ async def update_spending_limits(
     invoice_uid: UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
-        BillingTransactionService, Depends(getBillingTransactionService)
+        TransactionService, Depends(getBillingTransactionService)
     ],
     body: Annotated[UpdateSpendingLimitRequest, Body()],
 ):
@@ -33,7 +33,7 @@ async def update_spending_limits(
 async def get_spending_limits(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
-        BillingTransactionService, Depends(getBillingTransactionService)
+        TransactionService, Depends(getBillingTransactionService)
     ],
     project_uid: list[UUID]
     | None = None,  # filter by project_uid or whole organization
@@ -51,7 +51,7 @@ async def get_project_spending_limit(
     project_uid: UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
-        BillingTransactionService, Depends(getBillingTransactionService)
+        TransactionService, Depends(getBillingTransactionService)
     ],
 ) -> SpendingLimitInfoResponse:
     pass

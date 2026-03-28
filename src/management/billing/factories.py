@@ -5,7 +5,8 @@ from src.db.factories import getRedis, getSessionManager
 from .settings import getBillingSourceSetting
 from ..api_keys.factories import getApiKeyService
 from ...shared.logging.logger import getLogger
-from .services.transaction_services import BillingTransactionService
+from .repositories.transaction_repo import TransactionRepository
+from .services.transaction_services import TransactionService
 from .services.billing_source_service import (
     BillingSourceService,
 )
@@ -14,7 +15,6 @@ from .repositories.billing_source_repo import (
 )
 from .repositories.spending_limit_repo import SpendingLimitRepository
 from .services.aggregate_query_service import BillingAggregateQueryService
-from .repositories.billing_transaction_repo import BillingTransactionRepository
 
 from functools import lru_cache
 
@@ -22,13 +22,13 @@ from stripe import StripeClient
 
 
 @lru_cache(1)
-def getBillingTransactionService() -> BillingTransactionService:
-    return BillingTransactionService(
+def getBillingTransactionService() -> TransactionService:
+    return TransactionService(
         logger=getLogger(),
         session_manager=getSessionManager(),
         redis=getRedis(),
         spending_limit_repo=SpendingLimitRepository(),
-        billing_transaction_repo=BillingTransactionRepository(),
+        transaction_repo=TransactionRepository(),
         apikey_service=getApiKeyService(),
     )
 
@@ -50,6 +50,6 @@ def getBillingAggregateQueryService() -> BillingAggregateQueryService:
     return BillingAggregateQueryService(
         logger=getLogger(),
         session_manager=getSessionManager(),
-        billing_transaction_repo=BillingTransactionRepository(),
+        transaction_repo=TransactionRepository(),
         apikey_service=getApiKeyService(),
     )

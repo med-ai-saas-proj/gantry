@@ -6,7 +6,7 @@ from ..dtos import (
     CreditInfoResponse,
 )
 from .router import billing_router
-from ..factories import BillingTransactionService, getBillingTransactionService
+from ..factories import TransactionService, getBillingTransactionService
 
 from uuid import UUID
 from typing import Annotated
@@ -23,7 +23,7 @@ async def add_credits(
         ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
     ],
     billing_service: Annotated[
-        BillingTransactionService, Depends(getBillingTransactionService)
+        TransactionService, Depends(getBillingTransactionService)
     ],
     body: Annotated[AddCreditRequest, Body()],
 ):
@@ -39,7 +39,7 @@ async def list_credits(
         ApiKeyInfo, Depends(requiredPermissions(["billing:read"]))
     ],
     billing_service: Annotated[
-        BillingTransactionService, Depends(getBillingTransactionService)
+        TransactionService, Depends(getBillingTransactionService)
     ],
     project_uid: list[UUID]
     | None = None,  # filter by project_uid or whole organization
@@ -59,7 +59,7 @@ async def list_credits_for_admin(
         ApiKeyInfo, Depends(requiredPermissions(["billing:read"]))
     ],
     billing_service: Annotated[
-        BillingTransactionService, Depends(getBillingTransactionService)
+        TransactionService, Depends(getBillingTransactionService)
     ],
     project_uid: list[UUID]
     | None = None,  # filter by project_uid or whole organization
