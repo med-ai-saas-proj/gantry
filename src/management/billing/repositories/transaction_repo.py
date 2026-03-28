@@ -7,11 +7,12 @@ from src.management.billing.models import (
 )
 
 from uuid import UUID
+from turtle import up
 from typing import Sequence
 from decimal import Decimal
 from datetime import datetime
 
-from sqlalchemy import and_, func, text, select
+from sqlalchemy import and_, func, text, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -37,22 +38,50 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
     async def addTransaction(
         self,
         session: AsyncSession,
+        transaction_id: UUID,
         apikey_id: int,
         project_id: int,
         org_id: str,
         amount: Decimal,
         details: dict,
+        capture: bool = False,
     ) -> BillingTransaction:
         """Persist the final charge record (called during RELEASE)."""
         tx = BillingTransaction(
+            uuid=transaction_id,
             apikey_id=apikey_id,
             project_id=project_id,
             organization_id=org_id,
             amount=amount,
             details=details,
+            captured_at=func.now() if capture else None,
         )
         await self.add(session, tx)
         return tx
+
+    async def captureTransaction(
+        self,
+        session: AsyncSession,
+        transaction_id: UUID,
+        real_amount: Decimal,
+    ) -> BillingTransaction | None:
+        """Update the transaction record with the real amount and mark as captured (called during CAPTURE)."""
+        stmt = (
+            update(BillingTransaction)
+            .where(
+                (BillingTransaction.uuid == transaction_id)
+                & (
+                    BillingTransaction.captured_at.is_(None)
+                )  # only capture if not already captured
+            )
+            .values(
+                amount=real_amount,  # update to real amount
+                captured_at=func.now(),
+            )
+            .returning(BillingTransaction)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def getByApiKeys(
         self,
@@ -124,7 +153,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
         apikey_ids: list[int],
         org_id: str,
         start_time: datetime,
-        end_time: datetime,
+        end_time: datetime | None,
         period: AggregatePeriod,
         period_scale: int = 1,  # e.g. for period=weekly, period_scale=2 means 2-week aggregation buckets.
     ) -> Sequence[BillingAggregateReport]:
@@ -133,26 +162,24 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             text(f"'{period_scale} {bucket_map[period]}'"),
             TimescaleDBDailyBillingSummary.bucket,
         ).label("period_bucket")
-        stmt = (
-            select(
-                bucket,
-                func.coalesce(
-                    func.sum(TimescaleDBDailyBillingSummary.transaction_count),
-                    0,
-                ).label("transaction_count"),
-                func.coalesce(
-                    func.sum(TimescaleDBDailyBillingSummary.total_amount),
-                    Decimal("0"),
-                ).label("total_amount"),
-            )
-            .where(
-                TimescaleDBDailyBillingSummary.apikey_id.in_(apikey_ids),
-                TimescaleDBDailyBillingSummary.organization_id == org_id,
-                TimescaleDBDailyBillingSummary.bucket >= start_time,
-                TimescaleDBDailyBillingSummary.bucket < end_time,
-            )
-            .group_by(TimescaleDBDailyBillingSummary.apikey_id, bucket)
+        stmt = select(
+            bucket,
+            func.coalesce(
+                func.sum(TimescaleDBDailyBillingSummary.transaction_count),
+                0,
+            ).label("transaction_count"),
+            func.coalesce(
+                func.sum(TimescaleDBDailyBillingSummary.total_amount),
+                Decimal("0"),
+            ).label("total_amount"),
+        ).where(
+            TimescaleDBDailyBillingSummary.apikey_id.in_(apikey_ids),
+            TimescaleDBDailyBillingSummary.organization_id == org_id,
+            TimescaleDBDailyBillingSummary.bucket >= start_time,
         )
+        if end_time:
+            stmt = stmt.where(TimescaleDBDailyBillingSummary.bucket < end_time)
+        stmt = stmt.group_by(bucket)
         result = await session.execute(stmt)
         rows = result.all()
         return [
@@ -239,7 +266,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
         )
         if end_time:
             stmt = stmt.where(TimescaleDBDailyBillingSummary.bucket < end_time)
-        stmt = stmt.group_by(TimescaleDBDailyBillingSummary.project_id, bucket)
+        stmt = stmt.group_by(bucket)
         result = await session.execute(stmt)
         rows = result.all()
         return [
@@ -254,6 +281,8 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
 
 if __name__ == "__main__":
     # For testing purposes only
+    from src.shared.utils.uuid_utils import uuid7
+
     import asyncio
 
     async def test():
@@ -261,6 +290,7 @@ if __name__ == "__main__":
             repo = TransactionRepository()
             await repo.addTransaction(
                 session=session,
+                transaction_id=uuid7(),
                 apikey_id=1,
                 project_id=1,
                 org_id="org1",
@@ -269,6 +299,7 @@ if __name__ == "__main__":
             )
             await repo.addTransaction(
                 session=session,
+                transaction_id=uuid7(),
                 apikey_id=2,
                 project_id=1,
                 org_id="org1",

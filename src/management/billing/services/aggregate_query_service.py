@@ -44,7 +44,7 @@ class BillingAggregateQueryService:
         project_uids: list[UUID],
         org_id: str,
         start_time: datetime,
-        end_time: datetime,
+        end_time: datetime | None,
         aggregate_period: AggregatePeriod,
         period_scale: int,
     ) -> Result[Sequence[BillingAggregateReport], ProjectNotFound]:
@@ -73,7 +73,9 @@ class BillingAggregateQueryService:
                 project_ids=project_ids,
                 org_id=org_id,
                 start_time=start_time.astimezone(UTC).replace(tzinfo=None),
-                end_time=end_time.astimezone(UTC).replace(tzinfo=None),
+                end_time=end_time.astimezone(UTC).replace(tzinfo=None)
+                if end_time
+                else None,
                 period=aggregate_period,
                 period_scale=period_scale,
             )
@@ -84,7 +86,7 @@ class BillingAggregateQueryService:
         apikeys: list[str],
         org_id: str,
         start_time: datetime,
-        end_time: datetime,
+        end_time: datetime | None,
         aggregate_period: AggregatePeriod,
         period_scale: int,
     ) -> Result[Sequence[BillingAggregateReport], InvalidAPIKey]:
@@ -99,7 +101,9 @@ class BillingAggregateQueryService:
                 apikey_ids=apikey_ids,
                 org_id=org_id,
                 start_time=start_time.astimezone(UTC).replace(tzinfo=None),
-                end_time=end_time.astimezone(UTC).replace(tzinfo=None),
+                end_time=end_time.astimezone(UTC).replace(tzinfo=None)
+                if end_time
+                else None,
                 period=aggregate_period,
                 period_scale=period_scale,
             )
@@ -109,7 +113,7 @@ class BillingAggregateQueryService:
         self,
         org_id: str,
         start_time: datetime,
-        end_time: datetime,
+        end_time: datetime | None,
         aggregate_period: AggregatePeriod,
         period_scale: int,
     ) -> Result[Sequence[BillingAggregateReport], Any]:
@@ -120,7 +124,9 @@ class BillingAggregateQueryService:
                     session,
                     org_ids=[org_id],
                     start_time=start_time.astimezone(UTC).replace(tzinfo=None),
-                    end_time=end_time.astimezone(UTC).replace(tzinfo=None),
+                    end_time=end_time.astimezone(UTC).replace(tzinfo=None)
+                    if end_time
+                    else None,
                     period=aggregate_period,
                     period_scale=period_scale,
                 )

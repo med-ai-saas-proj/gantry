@@ -37,9 +37,9 @@ async def post(
     ).unwrap()
 
 
-@billing_router.post("/capture/{hold_uuid}")
+@billing_router.post("/capture/{transaction_uid}")
 async def capture(
-    hold_uuid: UUID,
+    transaction_uid: UUID,
     apikey_info: Annotated[
         ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
     ],
@@ -53,7 +53,7 @@ async def capture(
             org_id=apikey_info["org_id"],
             project_id=apikey_info["project_id"],
             api_key_id=apikey_info["api_key_id"],
-            transaction_uid=hold_uuid,
+            transaction_uid=transaction_uid,
             real_amount=body.real_amount,
         )
     ).unwrap()

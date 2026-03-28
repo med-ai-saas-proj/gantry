@@ -20,9 +20,11 @@ import json
 from uuid import UUID, uuid4
 from typing import Awaitable, TypedDict, cast
 from decimal import Decimal
+from calendar import c
 from datetime import UTC, datetime
 
 from pyrusult import Ok, Err, Result
+from sqlalchemy import func
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 
@@ -39,6 +41,13 @@ class TransactionNotFound(RecoverableError):
     code = "transaction_not_found"
     title = "Transaction Not Found"
     detail = "The billing transaction UUID does not exist or has expired."
+
+
+class TransactionExpiredOrCaptured(RecoverableError):
+    status = 400
+    code = "transaction_expired_or_captured"
+    title = "Transaction Expired or Already Captured"
+    detail = "The billing transaction has either expired or has already been captured and cannot be captured again."
 
 
 class _TransactionRecord(TypedDict):
@@ -119,6 +128,24 @@ local org_usage = tonumber(redis.call("GET", KEYS[2]) or "0")
 -- Calculate new usage
 local new_project_usage = project_usage - tonumber(ARGV[1])
 local new_org_usage = org_usage - tonumber(ARGV[1])
+-- Update usage (ensure it doesn't go below 0)
+redis.call("SET", KEYS[1], math.max(new_project_usage, 0))
+redis.call("SET", KEYS[2], math.max(new_org_usage, 0))
+redis.call("DEL", KEYS[3])
+return 1
+"""
+
+LUA_SCRIPT_CAPTURE_AND_UPDATE_USAGE = """
+-- KEYS[1] = project usage key
+-- KEYS[2] = org usage key
+-- KEYS[3] = transaction key
+-- ARGV[1] = delta to add (real_amount - hold_amount, can be negative)
+-- Get current usage
+local project_usage = tonumber(redis.call("GET", KEYS[1]) or "0")
+local org_usage = tonumber(redis.call("GET", KEYS[2]) or "0")
+-- Calculate new usage
+local new_project_usage = project_usage + tonumber(ARGV[1])
+local new_org_usage = org_usage + tonumber(ARGV[1])
 -- Update usage (ensure it doesn't go below 0)
 redis.call("SET", KEYS[1], math.max(new_project_usage, 0))
 redis.call("SET", KEYS[2], math.max(new_org_usage, 0))
@@ -400,16 +427,15 @@ class TransactionService:
             return Err(SpendingLimitExceeded())
         try:
             async with self.session_manager.get_session() as session:
-                await self.transaction_repo.add(
-                    session,
-                    BillingTransaction(
-                        uuid=transaction_uuid,
-                        organization_id=org_id,
-                        project_id=project_id,
-                        apikey_id=api_key_id,
-                        amount=amount,
-                        details=req.details,
-                    ),
+                await self.transaction_repo.addTransaction(
+                    session=session,
+                    transaction_id=transaction_uuid,
+                    apikey_id=api_key_id,
+                    project_id=project_id,
+                    org_id=org_id,
+                    amount=amount,
+                    details=req.details,
+                    capture=req.capture,
                 )
                 await session.commit()
         except Exception as e:
@@ -425,14 +451,6 @@ class TransactionService:
                     str(_to_int(amount, 8)),
                 ),
             )
-
-            self.logger.error(
-                "billing.transaction_insert_failed",
-                error=str(e),
-                project_id=project_id,
-                billing_period=billing_period,
-                org_id=org_id,
-            )
             return Err(
                 InternalServiceError(
                     message="Failed to record billing transaction. Please try again."
@@ -440,7 +458,7 @@ class TransactionService:
             )
 
         self.logger.info(
-            "billing.transaction_ok",
+            "billing.transaction.posted",
             transaction_uuid=str(transaction_uuid),
             project_id=project_id,
             billing_period=billing_period,
@@ -454,56 +472,55 @@ class TransactionService:
         api_key_id: int,
         transaction_uid: UUID,
         real_amount: ScaledAmount,
-    ) -> Result[bool, TransactionNotFound]:
+    ) -> Result[bool, TransactionNotFound | TransactionExpiredOrCaptured]:
         """Commit the actual charge after a request completes.
 
         Returns Ok(True) on success.
         """
-        hold_key = self._TRANSACTION_KEY.format(uuid=hold_uuid)
-        raw = await self.redis.get(hold_key)
+        transaction_key = self._TRANSACTION_KEY.format(uuid=transaction_uid)
+        raw = await self.redis.get(transaction_key)
         if raw is None:
-            # Redis miss: TTL expired or Redis crashed.
-            # The hold amount is still in the Postgres aggregate — a future reconciliation job should scan for holds whose TTL has passed and correct the aggregate.
-            self.logger.error(
-                "billing.release.hold_not_found",
-                hold_uuid=str(hold_uuid),
-            )
             return Err(TransactionNotFound())
 
-        hold: _HoldRecord = json.loads(raw)
-        billing_period: str = hold["billing_period"]
+        trx: _TransactionRecord = json.loads(raw)
 
-        hold_amount = _to_decimal(hold["hold_amount"])
+        amount = _to_decimal(trx["amount"])
         real = _to_decimal(real_amount)
         # delta ≤ 0 in the typical case (hold over-estimated real cost)
-        delta = real - hold_amount
+        delta = real - amount
 
         async with self.session_manager.get_session() as session:
-            agg = await self.usage_agg_repo.releaseAggregate(
-                session, project_id, org_id, billing_period, delta
+            updated_tx = await self.transaction_repo.captureTransaction(
+                session=session,
+                transaction_id=transaction_uid,
+                real_amount=real,
             )
-            if agg is None:
-                # Finalized period — should never happen in normal flow.
-                self.logger.error(
-                    "billing.release.finalized_aggregate",
-                    hold_uuid=str(hold_uuid),
-                    project_id=project_id,
-                    billing_period=billing_period,
-                    org_id=org_id,
-                )
-                return Err(AggregateFinalized())
-
-            # TODO(BILL-008): INSERT BillingTransaction into TimescaleDB.
+            if not updated_tx:
+                return Err(TransactionExpiredOrCaptured())
             await session.commit()
 
-        # Delete the hold from Redis only after Postgres commit succeeds.
-        await self.redis.delete(hold_key)
+        await cast(
+            Awaitable[int],
+            self.redis.eval(
+                LUA_SCRIPT_CAPTURE_AND_UPDATE_USAGE,
+                3,
+                self._PROJECT_USAGE_KEY.format(
+                    org_id=org_id, project_id=project_id
+                ),
+                self._ORG_USAGE_KEY.format(org_id=org_id),
+                transaction_key,
+                str(_to_int(delta, 8)),
+            ),
+        )
 
         self.logger.info(
-            "billing.release.ok",
-            hold_uuid=str(hold_uuid),
+            "billing.transaction.captured",
+            transaction_uuid=str(transaction_uid),
             project_id=project_id,
-            billing_period=billing_period,
+            org_id=org_id,
+            api_key_id=api_key_id,
+            pre_amount=str(amount),
+            real_amount=str(real),
             delta=str(delta),
         )
         return Ok(True)

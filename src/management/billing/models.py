@@ -5,6 +5,7 @@ from src.db.utils import (
     WithClientUUIDv7,
     WithCreateUpdateTimestamp,
 )
+from src.management.billing.routers.transactions import capture
 
 import enum
 from decimal import Decimal
@@ -82,10 +83,10 @@ class BillingTransaction(WithClientUUID, BillingBaseSQLModel, WithID):
         String(128), nullable=False, index=True
     )
 
-    # Numeric avoids float rounding — critical for billing.
-    # Postgres stores Numeric as varchar internally; (18, 8) is a soft limit,
-    # hard limit is ~1000 digits. Fine for any realistic USD amount.
     amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
+    captured_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
 
     # e.g. { "llm_usages": { "gpt-4o": { "input_tokens": 100, "output_tokens": 50 } } }
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
