@@ -153,15 +153,7 @@ class AuthService:
 
         username = claims.get("preferred_username")
 
-        org_id: str | None = None
-        organization_claim = claims.get("organization")
-        if isinstance(organization_claim, str):
-            org_id = organization_claim
-        elif isinstance(organization_claim, list):
-            for value in organization_claim:
-                if isinstance(value, str) and value:
-                    org_id = value
-                    break
+        org_id = self._extractOrganizationId(claims.get("organization"))
         if not org_id:
             return Err(MissingOrganizationClaimError())
 
@@ -174,6 +166,34 @@ class AuthService:
         }
 
         return Ok(auth_info)
+
+    def _extractOrganizationId(self, organization_claim: Any) -> str | None:
+        """Extract an organization id from supported Keycloak claim shapes."""
+        # Older mapper setups can emit a single organization string directly.
+        if isinstance(organization_claim, str):
+            return organization_claim or None
+
+        # Multivalued claims are returned as a list; use the first non-empty value.
+        if isinstance(organization_claim, list):
+            for value in organization_claim:
+                if isinstance(value, str) and value:
+                    return value
+            return None
+
+        # The current mapper can emit an object keyed by org name with nested ids.
+        if isinstance(organization_claim, dict):
+            direct_id = organization_claim.get("id")
+            if isinstance(direct_id, str) and direct_id:
+                return direct_id
+
+            # Some Keycloak shapes nest the id one level deeper under each org entry.
+            for value in organization_claim.values():
+                if isinstance(value, dict):
+                    nested_id = value.get("id")
+                    if isinstance(nested_id, str) and nested_id:
+                        return nested_id
+
+        return None
 
     def checkRole(
         self, user_info: UserInfo, role: ManagementRole
