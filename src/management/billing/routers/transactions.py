@@ -14,7 +14,7 @@ from uuid import UUID
 from typing import Annotated
 from datetime import datetime
 
-from fastapi import Body, Depends
+from fastapi import Body, Header, Depends
 
 
 @billing_router.post("/")
@@ -26,9 +26,11 @@ async def post(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
+    idempotency_key: Annotated[str | None, Header()],
 ) -> UUID:
     return (
         await billing_service.post(
+            idempotency_key=idempotency_key,
             org_id=apikey_info["org_id"],
             project_id=apikey_info["project_id"],
             api_key_id=apikey_info["api_key_id"],

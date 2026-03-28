@@ -59,6 +59,17 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
         await self.add(session, tx)
         return tx
 
+    async def getTransactionById(
+        self,
+        session: AsyncSession,
+        transaction_id: UUID,
+    ) -> BillingTransaction | None:
+        """Get the transaction record by its UUID."""
+        stmt = select(BillingTransaction).where(
+            BillingTransaction.uuid == transaction_id
+        )
+        return await self.selectOne(session, stmt)
+
     async def captureTransaction(
         self,
         session: AsyncSession,

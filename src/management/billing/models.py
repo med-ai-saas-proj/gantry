@@ -5,7 +5,6 @@ from src.db.utils import (
     WithClientUUIDv7,
     WithCreateUpdateTimestamp,
 )
-from src.management.billing.routers.transactions import capture
 
 import enum
 from decimal import Decimal
