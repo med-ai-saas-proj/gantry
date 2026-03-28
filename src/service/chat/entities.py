@@ -1,13 +1,11 @@
 """This file contain definition of chat's database entities."""
 
-from src.shared.entities.base import BaseEntity
-
 from uuid import UUID
 from typing import Literal, TypedDict
 from datetime import datetime
 
 
-class Conversation(BaseEntity):
+class Conversation(TypedDict):
     """**table_name**: `conversations`.
 
     Conversation id and metadata.
@@ -25,7 +23,7 @@ class Conversation(BaseEntity):
     metadata: dict[str, str]
 
 
-class ConversationNotDeleted(BaseEntity):
+class ConversationNotDeleted(TypedDict):
     """**view_name**: `conversations_not_deleted`.
 
     View conversation where deleted_at is NULL
@@ -39,7 +37,7 @@ class ConversationNotDeleted(BaseEntity):
     metadata: dict[str, str]
 
 
-class AIProvider(BaseEntity):
+class AIProvider(TypedDict):
     """**table_name**: `ai_providers`, **only modify on new db version**.
 
     Contain information about AI service providers
@@ -49,7 +47,7 @@ class AIProvider(BaseEntity):
     name: str
 
 
-class BaseAIModel(BaseEntity):
+class BaseAIModel(TypedDict):
     """**table_name**: `base_ai_models`, **admin only**.
 
     Contain information about llm base models for Admin
@@ -63,7 +61,7 @@ class BaseAIModel(BaseEntity):
     rate_per_sec: int
 
 
-class AIModel(BaseEntity):
+class AIModel(TypedDict):
     """**table_name**: `ai_models`.
 
     User's custom model. Matches migration table `custom_ai_models` and
@@ -77,7 +75,7 @@ class AIModel(BaseEntity):
     instruction: str
 
 
-class MessageRole(BaseEntity):
+class MessageRole(TypedDict):
     """**table_name**: `message_roles`, **only modify on new db version**.
 
     Message role, should contain a small set of role.
@@ -105,7 +103,7 @@ class ToolCall(TypedDict):
     function: FunctionCall
 
 
-class Message(BaseEntity):
+class Message(TypedDict):
     """**table_name**: `messages`.
 
     Message between user and agent.
@@ -127,7 +125,7 @@ class Message(BaseEntity):
     tool_call: ToolCall | None
 
 
-class MessagePart(BaseEntity):
+class MessagePart(TypedDict):
     """**table_name**: `message_parts`.
 
     Message parts, can contain text, tool_call, media.
@@ -140,7 +138,7 @@ class MessagePart(BaseEntity):
     content: str
 
 
-class MessageCitationReferenceType(BaseEntity):
+class MessageCitationReferenceType(TypedDict):
     """**table_name**: `message_citation_types`.
 
     Only modify on new DB version.
@@ -152,7 +150,7 @@ class MessageCitationReferenceType(BaseEntity):
     reference_type: str
 
 
-class MessageCitation(BaseEntity):
+class MessageCitation(TypedDict):
     """**table_name**: `message_citations`.
 
     `reference_type` is foreign key to MessageCitationReferenceType

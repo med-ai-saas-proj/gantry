@@ -19,7 +19,7 @@ import uuid
 import secrets
 from typing import Callable, TypedDict, NotRequired
 
-from safe_result import Ok, Err, Result
+from pyrusult import Ok, Err, Result
 from structlog.stdlib import BoundLogger
 
 
@@ -178,8 +178,8 @@ class ApiKeyService:
             )
 
             await session.commit()
-            return Ok[CreateAPIKeyOutputSuccess](
-                {"key": formatted_key, "hint": hint}
+            return Ok(
+                CreateAPIKeyOutputSuccess({"key": formatted_key, "hint": hint})
             )
 
     async def getApiKeysInfo(
@@ -225,14 +225,16 @@ class ApiKeyService:
     ]:
         """Verify an API key and its permissions."""
         if api_key == "bypass_key":
-            return Ok[ApiKeyInfo](
-                {
-                    "user_id": "test_user",
-                    "project_id": 0,
-                    "api_key_id": 0,
-                    "org_id": "test_org1",
-                    "project_uid": str(uuid.UUID(int=0)),
-                }
+            return Ok(
+                ApiKeyInfo(
+                    {
+                        "user_id": "test_user",
+                        "project_id": 0,
+                        "api_key_id": 0,
+                        "org_id": "test_org1",
+                        "project_uid": str(uuid.UUID(int=0)),
+                    }
+                )
             )
 
         if len(required_permissions) == 0:
@@ -261,15 +263,17 @@ class ApiKeyService:
             if missing_permissions:
                 return Err(InsufficientPermission())
 
-            return Ok[ApiKeyInfo](
-                {
-                    "user_id": str(key.user_id),
-                    "project_id": key.project_id,
-                    "api_key_id": key.id,
-                    # In real implementation, org_id and project_uid should be fetched from db
-                    "project_uid": str(uuid.uuid4()),
-                    "org_id": "test_org1",
-                }
+            return Ok(
+                ApiKeyInfo(
+                    {
+                        "user_id": str(key.user_id),
+                        "project_id": key.project_id,
+                        "api_key_id": key.id,
+                        # In real implementation, org_id and project_uid should be fetched from db
+                        "project_uid": str(uuid.uuid4()),
+                        "org_id": "test_org1",
+                    }
+                )
             )
 
     async def getApiKeys(
