@@ -18,7 +18,7 @@ from fastapi import Body, Depends
 
 
 @billing_router.post("/")
-async def hold(
+async def post(
     apikey_info: Annotated[
         ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
     ],

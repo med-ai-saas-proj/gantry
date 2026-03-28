@@ -5,6 +5,7 @@ from src.db.factories import getRedis, getSessionManager
 from .settings import getBillingSourceSetting
 from ..api_keys.factories import getApiKeyService
 from ...shared.logging.logger import getLogger
+from .services.transaction_services import BillingTransactionService
 from .services.billing_source_service import (
     BillingSourceService,
 )
@@ -14,7 +15,6 @@ from .repositories.billing_source_repo import (
 from .repositories.spending_limit_repo import SpendingLimitRepository
 from .services.aggregate_query_service import BillingAggregateQueryService
 from .repositories.billing_transaction_repo import BillingTransactionRepository
-from .services.billing_transaction_services import BillingTransactionService
 
 from functools import lru_cache
 

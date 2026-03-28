@@ -13,6 +13,7 @@ async def redis_lock(
     lock_ttl: int = 10,
     blocking_timeout: float | None = None,
     retry_delay: float = 0.1,
+    raise_on_timeout: bool = True,
 ):
     """Acquire a Redis lock for a given resource."""
     lock = redis_client.lock(
@@ -21,7 +22,15 @@ async def redis_lock(
         blocking_timeout=blocking_timeout,
         sleep=retry_delay,
     )
-    await lock.acquire()
+    get_lock = await lock.acquire()
+    if not get_lock:
+        if raise_on_timeout:
+            raise TimeoutError(
+                f"Could not acquire lock for resource: {resource}"
+            )
+        else:
+            yield None
+            return
     service_task = asyncio.current_task()
     watchdog = asyncio.create_task(lock_watchdog(lock, lock_ttl, service_task))
     try:

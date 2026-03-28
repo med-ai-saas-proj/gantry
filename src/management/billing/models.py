@@ -13,7 +13,6 @@ from sqlalchemy import (
     Numeric,
     DateTime,
     BigInteger,
-    ForeignKey,
     UniqueConstraint,
     func,
 )
@@ -26,6 +25,11 @@ class BillingBaseSQLModel(BaseTimescaleSQLModel):
 
     __abstract__ = True
     __table_args__ = {"schema": "Billing"}
+
+
+AMOUNT_PRECISION = 18
+AMOUNT_SCALE = 8
+AMOUNT_COLUMN_TYPE = Numeric(precision=AMOUNT_PRECISION, scale=AMOUNT_SCALE)
 
 
 class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
@@ -45,7 +49,7 @@ class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
     project_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     apikey_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
-    total_amount: Mapped[Decimal] = mapped_column(Numeric(18, 8))
+    total_amount: Mapped[Decimal] = mapped_column(Numeric())
     transaction_count: Mapped[int] = mapped_column(BigInteger)
 
 
@@ -87,9 +91,7 @@ class BillingTransaction(WithClientUUIDv7, BillingBaseSQLModel, WithID):
     # Numeric avoids float rounding — critical for billing.
     # Postgres stores Numeric as varchar internally; (18, 8) is a soft limit,
     # hard limit is ~1000 digits. Fine for any realistic USD amount.
-    amount: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False
-    )
+    amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
 
     # e.g. { "llm_usages": { "gpt-4o": { "input_tokens": 100, "output_tokens": 50 } } }
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
@@ -110,11 +112,9 @@ class Credit(
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     expired_date: Mapped[date] = mapped_column(Date, nullable=False)
 
-    amount: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False
-    )
+    amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
     current_spent: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False, default=Decimal("0")
+        AMOUNT_COLUMN_TYPE, nullable=False, default=Decimal("0")
     )
 
 
@@ -165,13 +165,13 @@ class BillingInvoice(
     )
 
     total_amount: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False
+        AMOUNT_COLUMN_TYPE, nullable=False
     )
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     details: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
     used_credits: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False, default=Decimal("0")
+        AMOUNT_COLUMN_TYPE, nullable=False, default=Decimal("0")
     )
 
 
@@ -180,18 +180,9 @@ class BillingInvoiceLineItem(
 ):
     __tablename__ = "BillingInvoiceLineItems"
 
-    invoice_id: Mapped[int] = mapped_column(
-        BigInteger,
-        ForeignKey(BillingInvoice.id, ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
     description: Mapped[str] = mapped_column(String(256), nullable=False)
 
-    amount: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False
-    )
+    amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
     project_id: Mapped[int | None] = mapped_column(
         BigInteger, nullable=True, index=True
     )  # optional link to project
@@ -199,7 +190,7 @@ class BillingInvoiceLineItem(
 
 class SpendingLimitType(str, enum.Enum):
     MONTHLY = "monthly"
-    DAILY = "daily"
+    # DAILY = "daily"
 
 
 class SpendingLimit(
@@ -218,7 +209,7 @@ class SpendingLimit(
         Enum(SpendingLimitType, schema="Billing"), nullable=False
     )
     limit: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=True
+        AMOUNT_COLUMN_TYPE, nullable=True
     )
 
     __table_args__ = (

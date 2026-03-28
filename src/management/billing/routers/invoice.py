@@ -7,8 +7,8 @@ from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
 
 from .router import billing_router
-from ..services import BillingService
 from ..factories import getBillingTransactionService
+from ..services.transaction_services import BillingTransactionService
 
 import enum
 from uuid import UUID
@@ -32,7 +32,7 @@ class PaymentStatus(str, enum.Enum):
 async def list_invoices(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
-        BillingService, Depends(getBillingTransactionService)
+        BillingTransactionService, Depends(getBillingTransactionService)
     ],
     project_uid: list[UUID]
     | None = None,  # filter by project_uid or whole organization
@@ -54,7 +54,7 @@ async def get_invoice_details(
     invoice_uid: UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
-        BillingService, Depends(getBillingTransactionService)
+        BillingTransactionService, Depends(getBillingTransactionService)
     ],
 ) -> InvoiceInfoResponse:
     pass
@@ -68,7 +68,7 @@ async def pay_invoice(
     invoice_uid: UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
-        BillingService, Depends(getBillingTransactionService)
+        BillingTransactionService, Depends(getBillingTransactionService)
     ],
 ) -> ManualPaymentResponse:
     return ManualPaymentResponse(

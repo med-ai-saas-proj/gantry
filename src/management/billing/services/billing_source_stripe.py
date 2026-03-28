@@ -9,7 +9,7 @@ from .billing_source_provider import BillingSourceProviderInterface
 import asyncio
 
 from stripe import StripeError, StripeClient
-from safe_result import Ok, Err
+from pyrusult import Ok, Err
 from stripe.params import CustomerUpdateParams
 
 

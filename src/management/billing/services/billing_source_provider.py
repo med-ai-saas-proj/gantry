@@ -5,7 +5,7 @@ from src.shared.custom_types.error_exception import (
 
 from abc import ABC, abstractmethod
 
-from safe_result import Result
+from pyrusult import Result
 
 
 class BillingSourceProviderInterface(ABC):

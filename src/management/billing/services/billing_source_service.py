@@ -19,11 +19,12 @@ from src.management.billing.services.billing_source_provider import (
 from ..models import BillingSource, BillingSourceState, BillingSourceProvider
 from ..repositories.billing_source_repo import BillingSourceRepo
 
+import re
 import uuid
 from typing import Sequence
 
 from stripe import StripeClient
-from safe_result import Ok, Err, Result
+from pyrusult import Ok, Err, Result, ResultStatus
 
 
 class BillingSourceNotFoundError(RecoverableError):
@@ -70,8 +71,15 @@ class BillingSourceService:
 
         provider_imp = self.provider_impl[BillingSourceProvider.STRIPE]
         stripe_api_call_res = await provider_imp.createCustomer(req)
-        if isinstance(stripe_api_call_res, Err):
-            return Err(stripe_api_call_res.error)
+        if stripe_api_call_res.status == ResultStatus.Err:
+            # If creating the customer in Stripe fails, we should clean up the pending billing source we created
+            async with self.session_manager.get_session() as session:
+                await self.billing_source_repo.deleteBillingSourceById(
+                    session, billing_source.id
+                )
+                await session.commit()
+            return stripe_api_call_res.into()
+
         stripe_customer_id = stripe_api_call_res.value
 
         async with self.session_manager.get_session() as session:
@@ -113,8 +121,8 @@ class BillingSourceService:
         billing_source_res = await self._getBillingSourceOrError(
             org_id, billing_source_uid
         )
-        if isinstance(billing_source_res, Err):
-            return billing_source_res
+        if billing_source_res.status == ResultStatus.Err:
+            return billing_source_res.into()
         billing_source = billing_source_res.value
         provider_imp = self.provider_impl[billing_source.source_type]
         await provider_imp.updateCustomer(
@@ -184,8 +192,8 @@ class BillingSourceService:
         | NotImplementedError,
     ]:
         res = await self._getBillingSourceOrError(org_id, billing_source_uid)
-        if isinstance(res, Err):
-            return res
+        if res.status == ResultStatus.Err:
+            return res.into()
 
         billing_source = res.value
         provider_imp = self.provider_impl[billing_source.source_type]
@@ -201,8 +209,8 @@ class BillingSourceService:
         | NotImplementedError,
     ]:
         res = await self._getBillingSourceOrError(org_id, billing_source_uid)
-        if isinstance(res, Err):
-            return res
+        if res.status == ResultStatus.Err:
+            return res.into()
 
         billing_source = res.value
         provider_imp = self.provider_impl[billing_source.source_type]
@@ -223,8 +231,8 @@ class BillingSourceService:
         | NotImplementedError,
     ]:
         res = await self._getBillingSourceOrError(org_id, billing_source_uid)
-        if isinstance(res, Err):
-            return res
+        if res.status == ResultStatus.Err:
+            return res.into()
 
         billing_source = res.value
         provider_imp = self.provider_impl[billing_source.source_type]
@@ -240,8 +248,8 @@ class BillingSourceService:
         | NotImplementedError,
     ]:
         res = await self._getBillingSourceOrError(org_id, billing_source_uid)
-        if isinstance(res, Err):
-            return res
+        if res.status == ResultStatus.Err:
+            return res.into()
 
         billing_source = res.value
         provider_imp = self.provider_impl[billing_source.source_type]
@@ -260,8 +268,8 @@ class BillingSourceService:
         | NotImplementedError,
     ]:
         res = await self._getBillingSourceOrError(org_id, billing_source_uid)
-        if isinstance(res, Err):
-            return res
+        if res.status == ResultStatus.Err:
+            return res.into()
         billing_source = res.value
         return await self.provider_impl[
             billing_source.source_type
@@ -277,8 +285,8 @@ class BillingSourceService:
         ExternalAPIError | BillingSourceNotFoundError | NotImplementedError,
     ]:
         res = await self._getBillingSourceOrError(org_id, billing_source_uid)
-        if isinstance(res, Err):
-            return res
+        if res.status == ResultStatus.Err:
+            return res.into()
         billing_source = res.value
         provider_imp = self.provider_impl[billing_source.source_type]
         return await provider_imp.detachPaymentMethod(payment_method_id)

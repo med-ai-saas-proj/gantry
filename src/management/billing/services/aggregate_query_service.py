@@ -8,10 +8,10 @@ from ..repositories.billing_transaction_repo import BillingTransactionRepository
 
 from uuid import UUID
 from typing import Any, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 
+from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import select
-from safe_result import Ok, Err, Result
 from structlog.stdlib import BoundLogger
 
 
@@ -72,8 +72,8 @@ class BillingAggregateQueryService:
                 session,
                 project_ids=project_ids,
                 org_id=org_id,
-                start_time=start_time,
-                end_time=end_time,
+                start_time=start_time.astimezone(UTC).replace(tzinfo=None),
+                end_time=end_time.astimezone(UTC).replace(tzinfo=None),
                 period=aggregate_period,
                 period_scale=period_scale,
             )
@@ -90,16 +90,16 @@ class BillingAggregateQueryService:
     ) -> Result[Sequence[BillingAggregateReport], InvalidAPIKey]:
         """Fetch the current total_amount for the given apikey/org/period."""
         apikeys_info_res = await self.apikey_service.getApiKeysInfo(apikeys)
-        if isinstance(apikeys_info_res, Err):
-            return apikeys_info_res
+        if apikeys_info_res.status == ResultStatus.Err:
+            return apikeys_info_res.into()
         apikey_ids = [info["api_key_id"] for info in apikeys_info_res.unwrap()]
         async with self.session_manager.get_session() as session:
             agg = await self.billing_transaction_repo.sumByPeriodByApiKeys(
                 session,
                 apikey_ids=apikey_ids,
                 org_id=org_id,
-                start_time=start_time,
-                end_time=end_time,
+                start_time=start_time.astimezone(UTC).replace(tzinfo=None),
+                end_time=end_time.astimezone(UTC).replace(tzinfo=None),
                 period=aggregate_period,
                 period_scale=period_scale,
             )
@@ -119,8 +119,8 @@ class BillingAggregateQueryService:
                 await self.billing_transaction_repo.sumByPeriodByOrganizations(
                     session,
                     org_ids=[org_id],
-                    start_time=start_time,
-                    end_time=end_time,
+                    start_time=start_time.astimezone(UTC).replace(tzinfo=None),
+                    end_time=end_time.astimezone(UTC).replace(tzinfo=None),
                     period=aggregate_period,
                     period_scale=period_scale,
                 )
