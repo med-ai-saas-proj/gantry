@@ -92,3 +92,11 @@ class ExternalAPIError(RecoverableError):
     def __init__(self, message: str, from_exception: Exception | None = None):
         super().__init__(from_exception)
         self.message = message
+
+
+class InternalServiceError(UnrecoverableError):
+    detail = "An internal service error occurred. Please contact support."
+
+    def __init__(self, message: str, from_exception: Exception | None = None):
+        super().__init__(from_exception)
+        self.message = message

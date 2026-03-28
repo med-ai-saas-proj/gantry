@@ -1,5 +1,10 @@
 from src.db.base import BaseTimescaleSQLModel
-from src.db.utils import WithID, WithClientUUIDv7, WithCreateUpdateTimestamp
+from src.db.utils import (
+    WithID,
+    WithClientUUID,
+    WithClientUUIDv7,
+    WithCreateUpdateTimestamp,
+)
 
 import enum
 from decimal import Decimal
@@ -53,18 +58,7 @@ class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
     transaction_count: Mapped[int] = mapped_column(BigInteger)
 
 
-class BillingTransaction(WithClientUUIDv7, BillingBaseSQLModel, WithID):
-    """Individual charge record for each API call.
-
-    All amounts are in USD. Currency conversion is handled by the payment
-    provider layer, not here.
-
-    Flow:
-      1. Service calls HOLD(maximum_cost) before processing request.
-      2. After processing, service calls RELEASE(uuid, real_cost).
-      3. RELEASE deletes the hold and inserts this transaction record.
-    """
-
+class BillingTransaction(WithClientUUID, BillingBaseSQLModel, WithID):
     __tablename__ = "BillingTransactions"
 
     created_at: Mapped[datetime] = mapped_column(

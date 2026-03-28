@@ -41,6 +41,35 @@ class SpendingLimitRepository(Repository[SpendingLimit, int]):
         )
         return await self.selectMany(session, stmt)
 
+    async def getProjectLimits(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        project_id: int,
+        limit_type: SpendingLimitType,
+    ) -> SpendingLimit | None:
+        """Get the spending limit record for an organization."""
+        stmt = select(SpendingLimit).where(
+            (SpendingLimit.organization_id == org_id)
+            & (SpendingLimit.project_id == project_id)
+            & (SpendingLimit.limit_type == limit_type)
+        )
+        return await self.selectOne(session, stmt)
+
+    async def getOrgLimits(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        limit_type: SpendingLimitType,
+    ) -> SpendingLimit | None:
+        """Get the spending limit record for an organization."""
+        stmt = select(SpendingLimit).where(
+            (SpendingLimit.organization_id == org_id)
+            & (SpendingLimit.project_id.is_(None))  # global default
+            & (SpendingLimit.limit_type == limit_type)
+        )
+        return await self.selectOne(session, stmt)
+
     async def upsert(
         self,
         session: AsyncSession,
