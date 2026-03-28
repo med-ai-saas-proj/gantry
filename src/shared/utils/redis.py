@@ -1,3 +1,5 @@
+from src.db import session
+
 import asyncio
 from typing import Callable, Awaitable
 from contextlib import asynccontextmanager
@@ -5,6 +7,7 @@ from contextlib import asynccontextmanager
 from redis.asyncio import Redis
 from redis.exceptions import LockNotOwnedError
 from redis.asyncio.lock import Lock
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @asynccontextmanager
@@ -65,11 +68,12 @@ async def lock_watchdog(
 
 async def redis_check_or_load[T](
     redis: Redis,
+    session_manager: session.AsyncSessionManager,
     lock_id: str,
     lock_ttl: int,
     lock_blocking_timeout: int,
     checker: Callable[[Redis], Awaitable[bool]],
-    loader: Callable[[], Awaitable[T]],
+    loader: Callable[[AsyncSession], Awaitable[T]],
     setter: Callable[[Redis, T], Awaitable[None]],
     retry_times: int = 3,
 ) -> bool:
@@ -94,8 +98,9 @@ async def redis_check_or_load[T](
 
             # Load the value using the provided loader function
             try:
-                loaded_value = await loader()
-                await setter(redis, loaded_value)
+                async with session_manager.get_session() as session:
+                    loaded_value = await loader(session)
+                    await setter(redis, loaded_value)
             except Exception as e:
                 await asyncio.sleep(
                     0.2

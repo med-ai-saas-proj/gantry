@@ -17,7 +17,6 @@ from src.management.billing.repositories.spending_limit_repo import (
 )
 
 import json
-from ast import Not
 from uuid import UUID, uuid4
 from typing import Awaitable, TypedDict, cast
 from decimal import Decimal
@@ -28,6 +27,7 @@ from pyrusult import Ok, Err, Result
 from sqlalchemy import func
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class SpendingLimitExceeded(RecoverableError):
@@ -254,18 +254,19 @@ class TransactionService:
         ) -> bool:
             is_existed = await cast(
                 Awaitable[bool],
-                redis.exists(
+                redis.expire(
                     project_limit_key,
+                    self._CACHE_TTL,
                 ),
             )
             return is_existed
 
         async def check_org_limits(redis: Redis) -> bool:
-
             is_existed = await cast(
                 Awaitable[bool],
-                redis.exists(
+                redis.expire(
                     org_limit_key,
+                    self._CACHE_TTL,
                 ),
             )
             return is_existed
@@ -273,63 +274,73 @@ class TransactionService:
         async def check_org_usage(redis: Redis) -> bool:
             is_existed = await cast(
                 Awaitable[bool],
-                redis.exists(org_usage_key),
+                redis.expire(
+                    org_usage_key,
+                    self._CACHE_TTL,
+                ),
             )
             return is_existed
 
         async def check_project_usage(redis: Redis) -> bool:
             is_existed = await cast(
                 Awaitable[bool],
-                redis.exists(project_usage_key),
+                redis.expire(
+                    project_usage_key,
+                    self._CACHE_TTL,
+                ),
             )
             return is_existed
 
-        async def load_project_limits_from_db() -> Decimal | None:
-            async with self.session_manager.get_session() as session:
-                limit = await self.spending_limit_repo.getProjectLimits(
-                    session, org_id, project_id, SpendingLimitType.MONTHLY
-                )
-                return limit.limit if limit else None
+        async def load_project_limits_from_db(
+            session: AsyncSession,
+        ) -> Decimal | None:
+            limit = await self.spending_limit_repo.getProjectLimits(
+                session, org_id, project_id, SpendingLimitType.MONTHLY
+            )
+            return limit.limit if limit else None
 
-        async def load_org_limits_from_db() -> Decimal | None:
-            async with self.session_manager.get_session() as session:
-                limit = await self.spending_limit_repo.getOrgLimits(
-                    session, org_id, SpendingLimitType.MONTHLY
-                )
-                return limit.limit if limit else None
+        async def load_org_limits_from_db(
+            session: AsyncSession,
+        ) -> Decimal | None:
+            limit = await self.spending_limit_repo.getOrgLimits(
+                session, org_id, SpendingLimitType.MONTHLY
+            )
+            return limit.limit if limit else None
 
-        async def load_org_usage_from_db() -> Decimal:
-            async with self.session_manager.get_session() as session:
-                usage = await self.transaction_repo.sumByPeriodByOrganizations(
-                    session,
-                    [org_id],
-                    billing_period,
-                    None,
-                    AggregatePeriod.MONTHLY,
-                    period_scale=1,
-                )
-                return (
-                    usage[0]["total_amount"]
-                    if usage and len(usage) > 0
-                    else Decimal(0)
-                )
+        async def load_org_usage_from_db(
+            session: AsyncSession,
+        ) -> Decimal:
+            usage = await self.transaction_repo.sumByPeriodByOrganizations(
+                session,
+                [org_id],
+                billing_period,
+                None,
+                AggregatePeriod.MONTHLY,
+                period_scale=1,
+            )
+            return (
+                usage[0]["total_amount"]
+                if usage and len(usage) > 0
+                else Decimal(0)
+            )
 
-        async def load_project_usage_from_db() -> Decimal:
-            async with self.session_manager.get_session() as session:
-                usage = await self.transaction_repo.sumByPeriodByProjects(
-                    session,
-                    [project_id],
-                    org_id,
-                    billing_period,
-                    None,
-                    AggregatePeriod.MONTHLY,
-                    period_scale=1,
-                )
-                return (
-                    usage[0]["total_amount"]
-                    if usage and len(usage) > 0
-                    else Decimal(0)
-                )
+        async def load_project_usage_from_db(
+            session: AsyncSession,
+        ) -> Decimal:
+            usage = await self.transaction_repo.sumByPeriodByProjects(
+                session,
+                [project_id],
+                org_id,
+                billing_period,
+                None,
+                AggregatePeriod.MONTHLY,
+                period_scale=1,
+            )
+            return (
+                usage[0]["total_amount"]
+                if usage and len(usage) > 0
+                else Decimal(0)
+            )
 
         async def save_project_limits_to_redis(
             redis: Redis, project_limit: Decimal | None
@@ -367,6 +378,7 @@ class TransactionService:
 
         success = await redis_check_or_load(
             redis=self.redis,
+            session_manager=self.session_manager,
             lock_id=f"spending_limit:{org_id}:{project_id}",
             lock_ttl=10,
             lock_blocking_timeout=5,
@@ -385,6 +397,7 @@ class TransactionService:
 
         success = await redis_check_or_load(
             redis=self.redis,
+            session_manager=self.session_manager,
             lock_id=f"spending_limit:{org_id}",
             lock_ttl=10,
             lock_blocking_timeout=5,
@@ -403,6 +416,7 @@ class TransactionService:
 
         success = await redis_check_or_load(
             redis=self.redis,
+            session_manager=self.session_manager,
             lock_id=f"usage:{org_id}",
             lock_ttl=10,
             lock_blocking_timeout=5,
@@ -421,6 +435,7 @@ class TransactionService:
 
         success = await redis_check_or_load(
             redis=self.redis,
+            session_manager=self.session_manager,
             lock_id=f"usage:{org_id}:{project_id}",
             lock_ttl=10,
             lock_blocking_timeout=5,
@@ -609,49 +624,55 @@ class TransactionService:
         async def check_org_usage(redis: Redis) -> bool:
             is_existed = await cast(
                 Awaitable[bool],
-                redis.exists(org_usage_key),
+                redis.expire(
+                    org_usage_key,
+                    self._CACHE_TTL,
+                ),
             )
             return is_existed
 
         async def check_project_usage(redis: Redis) -> bool:
             is_existed = await cast(
                 Awaitable[bool],
-                redis.exists(project_usage_key),
+                redis.expire(
+                    project_usage_key,
+                    self._CACHE_TTL,
+                ),
             )
             return is_existed
 
-        async def load_org_usage_from_db() -> Decimal:
-            async with self.session_manager.get_session() as session:
-                usage = await self.transaction_repo.sumByPeriodByOrganizations(
-                    session,
-                    [org_id],
-                    billing_period,
-                    None,
-                    AggregatePeriod.MONTHLY,
-                    period_scale=1,
-                )
-                return (
-                    usage[0]["total_amount"]
-                    if usage and len(usage) > 0
-                    else Decimal(0)
-                )
+        async def load_org_usage_from_db(
+            session: AsyncSession,
+        ) -> Decimal:
+            usage = await self.transaction_repo.sumByPeriodByOrganizations(
+                session,
+                [org_id],
+                billing_period,
+                None,
+                AggregatePeriod.MONTHLY,
+                period_scale=1,
+            )
+            return (
+                usage[0]["total_amount"]
+                if usage and len(usage) > 0
+                else Decimal(0)
+            )
 
-        async def load_project_usage_from_db() -> Decimal:
-            async with self.session_manager.get_session() as session:
-                usage = await self.transaction_repo.sumByPeriodByProjects(
-                    session,
-                    [project_id],
-                    org_id,
-                    billing_period,
-                    None,
-                    AggregatePeriod.MONTHLY,
-                    period_scale=1,
-                )
-                return (
-                    usage[0]["total_amount"]
-                    if usage and len(usage) > 0
-                    else Decimal(0)
-                )
+        async def load_project_usage_from_db(session: AsyncSession) -> Decimal:
+            usage = await self.transaction_repo.sumByPeriodByProjects(
+                session,
+                [project_id],
+                org_id,
+                billing_period,
+                None,
+                AggregatePeriod.MONTHLY,
+                period_scale=1,
+            )
+            return (
+                usage[0]["total_amount"]
+                if usage and len(usage) > 0
+                else Decimal(0)
+            )
 
         async def save_org_usage_to_redis(redis: Redis, org_usage: Decimal):
             await redis.set(
@@ -671,6 +692,7 @@ class TransactionService:
 
         success = await redis_check_or_load(
             redis=self.redis,
+            session_manager=self.session_manager,
             lock_id=f"usage:{org_id}",
             lock_ttl=10,
             lock_blocking_timeout=5,
@@ -688,6 +710,7 @@ class TransactionService:
 
         success = await redis_check_or_load(
             redis=self.redis,
+            session_manager=self.session_manager,
             lock_id=f"usage:{org_id}:{project_id}",
             lock_ttl=10,
             lock_blocking_timeout=5,
