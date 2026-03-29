@@ -21,7 +21,7 @@ chat_router = APIRouter(prefix="/chat")
 @chat_router.post("", response_model=ChatOutput | StreamEvent)
 async def chat(
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["chat.run"]))
     ],
     input: Annotated[ChatInput, Body()],
     chat_service: Annotated[ChatService, Depends(getChatService)],

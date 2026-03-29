@@ -1,33 +1,55 @@
 from src.shared.dtos.base import BaseDTO
 
-from typing import TypedDict
 from datetime import datetime
 
 from pydantic import Field
 
 
-class CreateAPIKeyInput(BaseDTO):
-    """Input DTO for creating an API key."""
+class ApiKeyWriteRequest(BaseDTO):
+    """Input DTO for creating or updating an API key."""
 
-    name: str = Field("Api Key")
-    description: str = Field("")
-    project_id: str
-    permissions: list[str]
-
-
-class CreateAPIKeyOutputSuccess(TypedDict):
-    """Output DTO for successful API key creation."""
-
-    key: str
-    hint: str
+    name: str = Field(min_length=1, max_length=1024)
+    description: str = Field(default="", max_length=4096)
+    permissions: list[str] = Field(default_factory=list)
 
 
-class ApiKeyOutput(BaseDTO):
-    """Output DTO for API key details."""
+class ApiKeyResponse(BaseDTO):
+    """Output DTO for one API key resource."""
 
     id: int
+    project_id: str
     name: str
     description: str
     hint: str
     created_at: datetime
     permissions: list[str]
+
+
+class ApiKeyCreateResponse(ApiKeyResponse):
+    """Create response that includes the raw key once."""
+
+    key: str
+
+
+class ApiKeyListResponse(BaseDTO):
+    """List response for project API keys."""
+
+    total: int
+    results: list[ApiKeyResponse]
+
+
+class ApiKeyPermissionCatalogResponse(BaseDTO):
+    """List all permissions currently available to API keys."""
+
+    total: int
+    results: list[str]
+    finalized: bool
+
+
+class ApiKeyPermissionAuditResponse(BaseDTO):
+    """Describe mismatches between runtime and stored API key permissions."""
+
+    registered_permissions: list[str]
+    stored_permissions: list[str]
+    stale_permissions: list[str]
+    unused_permissions: list[str]
