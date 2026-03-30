@@ -143,6 +143,54 @@ async def updateApiKey(
     return result.unwrap()
 
 
+@apikey_router.post("/{apikey_id}/disable", response_model=ApiKeyResponse)
+async def disableApiKey(
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    apikey_id: Annotated[int, Path()],
+    apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
+    project_service: Annotated[ProjectService, Depends(getProjectService)],
+) -> ApiKeyResponse:
+    """Disable one API key after project write permission authorization."""
+    project_id_res = await apikey_service.getApiKeyProjectId(apikey_id)
+    project_id = project_id_res.unwrap()
+    authz_res = await project_service.authorizeProjectPermission(
+        project_uuid=project_id,
+        user_id=user_info["id"],
+        required=ProjectPermission.APIKEY_WRITE,
+    )
+    authz_res.unwrap()
+
+    result = await apikey_service.setApiKeyDisabled(
+        api_key_id=apikey_id,
+        disabled=True,
+    )
+    return result.unwrap()
+
+
+@apikey_router.post("/{apikey_id}/enable", response_model=ApiKeyResponse)
+async def enableApiKey(
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    apikey_id: Annotated[int, Path()],
+    apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
+    project_service: Annotated[ProjectService, Depends(getProjectService)],
+) -> ApiKeyResponse:
+    """Enable one API key after project write permission authorization."""
+    project_id_res = await apikey_service.getApiKeyProjectId(apikey_id)
+    project_id = project_id_res.unwrap()
+    authz_res = await project_service.authorizeProjectPermission(
+        project_uuid=project_id,
+        user_id=user_info["id"],
+        required=ProjectPermission.APIKEY_WRITE,
+    )
+    authz_res.unwrap()
+
+    result = await apikey_service.setApiKeyDisabled(
+        api_key_id=apikey_id,
+        disabled=False,
+    )
+    return result.unwrap()
+
+
 @apikey_router.delete("/{apikey_id}")
 async def deleteApiKey(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],

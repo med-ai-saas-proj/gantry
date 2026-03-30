@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS "ApiKey"."ApiKeys" (
     name VARCHAR(1024) NOT NULL,
     description VARCHAR(4096) NOT NULL,
     permissions TEXT[] NOT NULL DEFAULT '{}',
+    disabled BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
     CONSTRAINT "ApiKeys_pkey" PRIMARY KEY (id)

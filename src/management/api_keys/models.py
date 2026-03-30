@@ -2,7 +2,7 @@ from src.db.base import BaseSQLModel
 from src.db.utils import WithID, WithCreateUpdateTimestamp
 from src.management.project.models import Project
 
-from sqlalchemy import String, BigInteger, ForeignKey
+from sqlalchemy import String, Boolean, BigInteger, ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 from sqlalchemy.dialects.postgresql import ARRAY
 
@@ -31,6 +31,12 @@ class ApiKey(WithCreateUpdateTimestamp, WithID, ApiKeyBaseSQLModel):
         nullable=False,
         default=list,
         server_default="{}",
+    )
+    disabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
     )
     project_id: Mapped[int] = mapped_column(
         BigInteger,

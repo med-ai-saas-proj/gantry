@@ -104,6 +104,30 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNone(result_none)
 
+    async def test_update_disabled_by_id_returns_updated_entity_or_none(self):
+        execute_res = Mock()
+        execute_res.scalar_one_or_none.return_value = "updated"
+        self.session.execute = AsyncMock(return_value=execute_res)
+
+        result = await self.repo.updateDisabledById(
+            self.session,
+            11,
+            disabled=True,
+        )
+
+        self.assertEqual(result, "updated")
+        stmt = self.session.execute.await_args.args[0]
+        self.assertIn("UPDATE", str(stmt))
+        self.assertIn("disabled", str(stmt))
+
+        execute_res.scalar_one_or_none.return_value = None
+        result_none = await self.repo.updateDisabledById(
+            self.session,
+            11,
+            disabled=False,
+        )
+        self.assertIsNone(result_none)
+
     async def test_delete_by_id_returns_bool(self):
         execute_res = Mock()
         execute_res.scalar_one_or_none.return_value = 11

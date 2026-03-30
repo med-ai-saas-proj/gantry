@@ -75,6 +75,15 @@ class ApiKeyNotFoundError(RecoverableError):
     detail = "The requested API key does not exist."
 
 
+class ApiKeyDisabledError(RecoverableError):
+    """Raised when a disabled API key is used."""
+
+    status = 401
+    code = "api_key_disabled"
+    title = "API Key Disabled"
+    detail = "This API key is disabled."
+
+
 class ApiKeyServiceConfig(TypedDict):
     """Configuration for ApiKeyService."""
 
@@ -169,6 +178,7 @@ class ApiKeyService:
             "hint": api_key.hint,
             "created_at": api_key.created_at,
             "permissions": list(api_key.permissions),
+            "disabled": bool(api_key.disabled),
         }
 
     async def _getApiKeyById(
@@ -207,6 +217,7 @@ class ApiKeyService:
             hint=str(api_key["hint"]),
             created_at=api_key["created_at"],
             permissions=list(api_key["permissions"]),
+            disabled=bool(api_key["disabled"]),
         )
 
     def getPermissionCatalog(self) -> ApiKeyPermissionCatalogResponse:
@@ -284,6 +295,7 @@ class ApiKeyService:
                 hint=created.hint,
                 created_at=created.created_at,
                 permissions=list(created.permissions),
+                disabled=bool(created.disabled),
                 key=formatted_key,
             )
         )
@@ -379,6 +391,44 @@ class ApiKeyService:
                 )
             )
 
+    async def setApiKeyDisabled(
+        self,
+        *,
+        api_key_id: int,
+        disabled: bool,
+    ) -> Result[
+        ApiKeyResponse,
+        ApiKeyNotFoundError | ProjectNotFoundError,
+    ]:
+        """Enable or disable one API key."""
+        api_key_res = await self._getApiKeyById(api_key_id)
+        if api_key_res.status == ResultStatus.Err:
+            return api_key_res.into()
+        api_key = api_key_res.unwrap()
+
+        async with self.session_manager.get_session() as session:
+            updated = await self.api_key_repo.updateDisabledById(
+                session,
+                api_key_id,
+                disabled=disabled,
+            )
+            if updated is None:
+                return Err(ApiKeyNotFoundError())
+
+            project = await self.project_repo.getByKey(
+                session, int(api_key["project_id"])
+            )
+            if project is None:
+                return Err(ProjectNotFoundError())
+
+            await session.commit()
+            return Ok(
+                self._toResponse(
+                    self._snapshotApiKey(updated),
+                    str(project.uuid),
+                )
+            )
+
     async def deleteApiKey(
         self, api_key_id: int
     ) -> Result[bool, ApiKeyNotFoundError]:
@@ -395,6 +445,7 @@ class ApiKeyService:
     ) -> Result[
         ApiKeyInfo,
         InvalidAPIKey
+        | ApiKeyDisabledError
         | InsufficientPermission
         | UserNotFoundError
         | ProjectNotFoundError,
@@ -410,6 +461,8 @@ class ApiKeyService:
             key = await self.api_key_repo.getByHashedKey(session, hashed_key)
             if key is None:
                 return Err(InvalidAPIKey())
+            if key.disabled:
+                return Err(ApiKeyDisabledError())
             if key.user_id is None:
                 return Err(UserNotFoundError())
 

@@ -97,6 +97,22 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         res = await session.execute(stmt)
         return res.scalar_one_or_none()
 
+    async def updateDisabledById(
+        self,
+        session: AsyncSession,
+        api_key_id: int,
+        *,
+        disabled: bool,
+    ) -> ApiKey | None:
+        stmt = (
+            update(ApiKey)
+            .where(ApiKey.id == api_key_id)
+            .values(disabled=disabled)
+            .returning(ApiKey)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
     async def listDistinctPermissions(
         self,
         session: AsyncSession,

@@ -15,6 +15,7 @@ from src.management.api_keys.services import (
     ApiKeyService,
     InvalidAPIKey,
     UserNotFoundError,
+    ApiKeyDisabledError,
     ApiKeyNotFoundError,
     InsufficientPermission,
     InvalidPermissionError,
@@ -60,6 +61,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="sk_ab...cdef",
             created_at=self.created_at,
             permissions=["chat.run"],
+            disabled=False,
         )
         self.project_repo.getByUuid = AsyncMock(return_value=project)
         self.api_key_repo.create = AsyncMock(return_value=created)
@@ -114,6 +116,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.run"],
+            disabled=False,
         )
         self.project_repo.getByUuid = AsyncMock(return_value=project)
         self.api_key_repo.getByProjectId = AsyncMock(return_value=[api_key])
@@ -142,6 +145,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.run"],
+            disabled=False,
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
         self.api_key_repo.getByKey = AsyncMock(return_value=api_key)
@@ -171,6 +175,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.run"],
+            disabled=False,
         )
         self.api_key_repo.getByKey = AsyncMock(return_value=api_key)
         self.project_repo.getByKey = AsyncMock(return_value=None)
@@ -213,6 +218,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.run"],
+            disabled=False,
         )
         updated = SimpleNamespace(
             id=11,
@@ -222,6 +228,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.read"],
+            disabled=False,
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
         self.api_key_repo.getByKey = AsyncMock(return_value=current)
@@ -248,6 +255,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.run"],
+            disabled=False,
         )
         self.api_key_repo.getByKey = AsyncMock(return_value=current)
         self.api_key_repo.updateById = AsyncMock(return_value=None)
@@ -273,6 +281,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.run"],
+            disabled=False,
         )
         updated = SimpleNamespace(
             id=11,
@@ -282,6 +291,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.read"],
+            disabled=False,
         )
         self.api_key_repo.getByKey = AsyncMock(return_value=current)
         self.api_key_repo.updateById = AsyncMock(return_value=updated)
@@ -314,12 +324,47 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result.unwrap())
         self.session_manager.session.commit.assert_awaited_once()
 
+    async def test_set_api_key_disabled_returns_updated_response(self):
+        current = SimpleNamespace(
+            id=11,
+            project_id=7,
+            name="current",
+            description="desc",
+            hint="hint",
+            created_at=self.created_at,
+            permissions=["chat.run"],
+            disabled=False,
+        )
+        updated = SimpleNamespace(
+            id=11,
+            project_id=7,
+            name="current",
+            description="desc",
+            hint="hint",
+            created_at=self.created_at,
+            permissions=["chat.run"],
+            disabled=True,
+        )
+        project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
+        self.api_key_repo.getByKey = AsyncMock(return_value=current)
+        self.api_key_repo.updateDisabledById = AsyncMock(return_value=updated)
+        self.project_repo.getByKey = AsyncMock(return_value=project)
+
+        result = await self.service.setApiKeyDisabled(
+            api_key_id=11, disabled=True
+        )
+
+        self.assertEqual(result.status, ResultStatus.Ok)
+        self.assertTrue(result.unwrap().disabled)
+        self.session_manager.session.commit.assert_awaited_once()
+
     async def test_verify_api_key_returns_runtime_context(self):
         api_key = SimpleNamespace(
             id=11,
             user_id="u1",
             project_id=7,
             permissions=["chat.run", "chat.read"],
+            disabled=False,
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
         self.api_key_repo.getByHashedKey = AsyncMock(return_value=api_key)
@@ -347,12 +392,30 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, ResultStatus.Err)
         self.assertIsInstance(result.err(), InvalidAPIKey)
 
+    async def test_verify_api_key_rejects_disabled_key(self):
+        api_key = SimpleNamespace(
+            id=11,
+            user_id="u1",
+            project_id=7,
+            permissions=["chat.run", "chat.read"],
+            disabled=True,
+        )
+        self.api_key_repo.getByHashedKey = AsyncMock(return_value=api_key)
+
+        result = await self.service.verifyApiKey(
+            "sk_demo.secret", ["chat.read"]
+        )
+
+        self.assertEqual(result.status, ResultStatus.Err)
+        self.assertIsInstance(result.err(), ApiKeyDisabledError)
+
     async def test_verify_api_key_rejects_missing_user_id(self):
         api_key = SimpleNamespace(
             id=11,
             user_id=None,
             project_id=7,
             permissions=["chat.read"],
+            disabled=False,
         )
         self.api_key_repo.getByHashedKey = AsyncMock(return_value=api_key)
 
@@ -369,6 +432,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             user_id="u1",
             project_id=7,
             permissions=["chat.run"],
+            disabled=False,
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
         self.api_key_repo.getByHashedKey = AsyncMock(return_value=api_key)
@@ -387,6 +451,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             user_id="u1",
             project_id=7,
             permissions=["chat.run", "chat.read"],
+            disabled=False,
         )
         self.api_key_repo.getByHashedKey = AsyncMock(return_value=api_key)
         self.project_repo.getByKey = AsyncMock(return_value=None)
@@ -407,6 +472,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.run"],
+            disabled=False,
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
         self.api_key_repo.getByKey = AsyncMock(return_value=api_key)
@@ -434,6 +500,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.run"],
+            disabled=False,
         )
         self.api_key_repo.getByKey = AsyncMock(return_value=api_key)
         self.project_repo.getByKey = AsyncMock(return_value=None)

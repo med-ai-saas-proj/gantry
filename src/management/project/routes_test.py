@@ -3,6 +3,7 @@ from src.management.project.dtos import (
     PaginationQuery,
     ProjectListQuery,
     CreateProjectRequest,
+    UpdateProjectRequest,
     AddProjectUserRequest,
     ProjectUserPermissionsRequest,
 )
@@ -23,6 +24,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         service.listOrgProjects = AsyncMock(return_value=Ok("org-projects"))
         service.listUserProjects = AsyncMock(return_value=Ok("user-projects"))
         service.createProject = AsyncMock(return_value=Ok("created"))
+        service.updateProject = AsyncMock(return_value=Ok("updated"))
 
         self.assertEqual(
             (await routes.list_project_permissions()).permissions,
@@ -52,6 +54,15 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
                 service,
             ),
             "created",
+        )
+        self.assertEqual(
+            await routes.update_project(
+                {"id": "u1", "roles": []},
+                "proj-1",
+                UpdateProjectRequest(name="P2", description="desc2"),
+                service,
+            ),
+            "updated",
         )
 
     async def test_membership_and_permission_routes(self):

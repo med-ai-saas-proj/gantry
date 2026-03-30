@@ -23,6 +23,7 @@ class ApiKeyResponse(BaseDTO):
     hint: str
     created_at: datetime
     permissions: list[str]
+    disabled: bool
 
 
 class ApiKeyCreateResponse(ApiKeyResponse):

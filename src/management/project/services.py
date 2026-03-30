@@ -492,6 +492,45 @@ class ProjectService:
             await session.commit()
             return Ok(output)
 
+    async def updateProject(
+        self,
+        project_uuid: str,
+        name: str,
+        description: str | None,
+    ) -> Result[
+        ProjectInfoResponse,
+        ProjectNotFoundError | ProjectArchivedError,
+    ]:
+        """Update mutable project metadata for one active project."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res
+        project_id, _, project_info = project_res.unwrap()
+
+        active_res = self._ensureProjectActive(project_info)
+        if active_res.status == ResultStatus.Err:
+            return active_res
+
+        async with self.session_manager.get_session() as session:
+            updated = await self.project_repo.updateById(
+                session,
+                project_id,
+                name=name,
+                description=description,
+            )
+            if updated is None:
+                return Err(ProjectNotFoundError())
+            await session.commit()
+            return Ok(
+                ProjectInfoResponse(
+                    id=str(updated.uuid),
+                    name=updated.name,
+                    description=updated.description,
+                    organization_id=updated.organization_id,
+                    archived=updated.is_archived,
+                )
+            )
+
     async def listProjectUsers(
         self,
         project_uuid: str,

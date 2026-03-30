@@ -78,6 +78,9 @@ class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
         apikey_service.getApiKeyProjectId = AsyncMock(return_value=Ok("proj-1"))
         apikey_service.getApiKey = AsyncMock(return_value=Ok("detail"))
         apikey_service.updateApiKey = AsyncMock(return_value=Ok("updated"))
+        apikey_service.setApiKeyDisabled = AsyncMock(
+            side_effect=[Ok("disabled"), Ok("enabled")]
+        )
         apikey_service.deleteApiKey = AsyncMock(return_value=Ok(True))
         project_service = Mock()
         project_service.authorizeProjectPermission = AsyncMock(
@@ -109,3 +112,15 @@ class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
             user_info, 11, apikey_service, project_service
         )
         self.assertEqual(delete_res.status_code, 200)
+        self.assertEqual(
+            await routes.disableApiKey(
+                user_info, 11, apikey_service, project_service
+            ),
+            "disabled",
+        )
+        self.assertEqual(
+            await routes.enableApiKey(
+                user_info, 11, apikey_service, project_service
+            ),
+            "enabled",
+        )

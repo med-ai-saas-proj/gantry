@@ -9,6 +9,7 @@ from .dtos import (
     ProjectInfoResponse,
     ProjectListResponse,
     CreateProjectRequest,
+    UpdateProjectRequest,
     AddProjectUserRequest,
     ProjectArchiveResponse,
     ProjectUserListResponse,
@@ -68,6 +69,26 @@ async def create_project(
     result = await project_service.createProject(
         actor_user_id=user_info["id"],
         organization_id=organization,
+        name=input_data.name,
+        description=input_data.description,
+    )
+    return result.unwrap()
+
+
+@project_router.put("/{project_id}", response_model=ProjectInfoResponse)
+async def update_project(
+    user_info: Annotated[
+        UserInfo,
+        Depends(requiredProjectPermission(ProjectPermission.SETTINGS_WRITE)),
+    ],
+    project_id: Annotated[str, Path()],
+    input_data: Annotated[UpdateProjectRequest, Body()],
+    project_service: Annotated[ProjectService, Depends(getProjectService)],
+) -> ProjectInfoResponse:
+    """Update mutable metadata for one project."""
+    _ = user_info
+    result = await project_service.updateProject(
+        project_uuid=project_id,
         name=input_data.name,
         description=input_data.description,
     )

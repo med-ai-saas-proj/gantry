@@ -368,6 +368,49 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         # Assert
         self.assertTrue(res.status == ResultStatus.Err)
 
+    async def test_update_project_updates_mutable_metadata(self):
+        """Update project should persist new name and description."""
+        # Arrange
+        service = self._make_service()
+        active_info = SimpleNamespace(archived=False)
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((10, "org-1", active_info))
+        )
+        service.project_repo.updateById = AsyncMock(
+            return_value=SimpleNamespace(
+                id=10,
+                uuid="proj-1",
+                name="New",
+                description="new",
+                organization_id="org-1",
+                is_archived=False,
+            )
+        )
+
+        # Act
+        res = await service.updateProject("proj-1", "New", "new")
+
+        # Assert
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().name, "New")
+        self.session_manager.session.commit.assert_awaited_once()
+
+    async def test_update_project_rejects_archived_project(self):
+        """Archived projects should not allow metadata updates."""
+        # Arrange
+        service = self._make_service()
+        archived_info = SimpleNamespace(archived=True)
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((10, "org-1", archived_info))
+        )
+
+        # Act
+        res = await service.updateProject("proj-1", "New", "new")
+
+        # Assert
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), ProjectArchivedError)
+
     async def test_list_user_projects_org_membership_error(self):
         """List by organization should fail if actor not in org."""
         # Arrange
