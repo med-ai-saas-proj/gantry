@@ -13,10 +13,10 @@ from fastapi import Body, Depends, APIRouter
 
 @billing_router.put(
     "/spending-limits",
-    description="Update spending limits for a specific invoice.",
+    description="Update spending limits for a specific project",
 )
 async def update_spending_limits(
-    invoice_uid: UUID,
+    project_id: UUID | None,  # if None, update org-level limit
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)

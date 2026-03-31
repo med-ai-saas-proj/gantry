@@ -5,11 +5,17 @@ from src.management.auth.entities import UserInfo
 from src.management.api_keys.entities import ApiKeyInfo
 from src.management.auth.dependencies import getUserInfo
 from src.management.api_keys.dependencies import requiredPermissions
+from src.shared.custom_types.responses.response import (
+    ListResponse,
+    ObjectResponse,
+    PaginatedResponse,
+)
 
 from ..dtos import PostRequest, CaptureRequest
 from .router import billing_router
 from ..factories import TransactionService, getBillingTransactionService
 
+from ast import List
 from uuid import UUID
 from typing import Annotated
 from datetime import datetime
@@ -39,7 +45,7 @@ async def post(
     ).unwrap()
 
 
-@billing_router.post("/capture/{transaction_uid}")
+@billing_router.post("/{transaction_uid}/capture")
 async def capture(
     transaction_uid: UUID,
     apikey_info: Annotated[
@@ -76,8 +82,20 @@ async def list_transactions(
     end_date: datetime | None = None,  # ISO date string
     limit: int = 100,
     offset: int = 0,
-) -> list[TransactionInfoResponse]:
-    pass
+) -> PaginatedResponse[TransactionInfoResponse]:
+    res, total = (
+        await billing_service.get_transactions(
+            org_id=user_info["org_id"],
+            project_uids=project_uid,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+            offset=offset,
+        )
+    ).unwrap()
+    return PaginatedResponse[TransactionInfoResponse](
+        data=res, total=total, offset=offset, limit=limit
+    )
 
 
 @billing_router.get(
@@ -90,5 +108,10 @@ async def get_transaction_details(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-) -> TransactionInfoResponse:
-    pass
+) -> ObjectResponse[TransactionInfoResponse]:
+    res = (
+        await billing_service.get_transaction_by_id(
+            org_id=user_info["org_id"], transaction_uid=transaction_uid
+        )
+    ).unwrap()
+    return ObjectResponse[TransactionInfoResponse](data=res)

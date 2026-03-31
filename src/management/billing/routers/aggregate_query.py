@@ -1,5 +1,6 @@
 from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
+from src.shared.custom_types.responses import ListResponse
 
 from ..type import AggregatePeriod, BillingAggregateReport
 from .router import billing_router
@@ -7,7 +8,7 @@ from ..factories import getBillingAggregateQueryService
 from ..services.aggregate_query_service import BillingAggregateQueryService
 
 from uuid import UUID
-from typing import Sequence, Annotated
+from typing import Annotated
 from datetime import datetime
 
 from fastapi import Depends
@@ -27,7 +28,7 @@ async def get_aggregate_by_projects(
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
-) -> Sequence[BillingAggregateReport]:
+) -> ListResponse[BillingAggregateReport]:
     res = (
         await billing_service.get_aggregate_by_projects(
             project_uids=project_uids,
@@ -38,7 +39,7 @@ async def get_aggregate_by_projects(
             period_scale=period_scale,
         )
     ).unwrap()
-    return res
+    return ListResponse[BillingAggregateReport](data=res)
 
 
 @billing_router.get(
@@ -55,7 +56,7 @@ async def get_aggregate_by_apikeys(
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
-) -> Sequence[BillingAggregateReport]:
+) -> ListResponse[BillingAggregateReport]:
     res = (
         await billing_service.get_aggregate_by_apikeys(
             apikeys=apikeys,
@@ -66,7 +67,7 @@ async def get_aggregate_by_apikeys(
             period_scale=period_scale,
         )
     ).unwrap()
-    return res
+    return ListResponse[BillingAggregateReport](data=res)
 
 
 @billing_router.get(
@@ -82,7 +83,7 @@ async def get_aggregate_by_org(
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
-) -> Sequence[BillingAggregateReport]:
+) -> ListResponse[BillingAggregateReport]:
     res = (
         await billing_service.get_aggregate_by_org(
             org_id=user_info["org_id"],
@@ -92,4 +93,4 @@ async def get_aggregate_by_org(
             period_scale=period_scale,
         )
     ).unwrap()
-    return res
+    return ListResponse[BillingAggregateReport](data=res)

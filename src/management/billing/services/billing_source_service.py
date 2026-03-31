@@ -1,5 +1,6 @@
 from src.db.session import AsyncSessionManager
 from src.management.billing.dtos import (
+    BillingSourceResponse,
     AddBillingSourceRequest,
     UpdateBillingSourceRequest,
 )
@@ -58,7 +59,7 @@ class BillingSourceService:
 
     async def addBillingSource(
         self, org_id: str, req: AddBillingSourceRequest
-    ) -> Result[BillingSource, ExternalAPIError]:
+    ) -> Result[BillingSourceResponse, ExternalAPIError]:
         async with self.session_manager.get_session() as session:
             billing_source = BillingSource(
                 organization_id=org_id,
@@ -93,18 +94,37 @@ class BillingSourceService:
             session.expunge_all()
             await session.commit()
 
-        return Ok(updated_billing_source)
+        return Ok(
+            BillingSourceResponse(
+                billing_source_uid=updated_billing_source.uuid,
+                organization_id=updated_billing_source.organization_id,
+                source_type=updated_billing_source.source_type,
+                status=updated_billing_source.status,
+                created_at=updated_billing_source.created_at,
+            )
+        )
 
     async def listBillingSources(
         self,
         org_id: str,
         providers: list[BillingSourceProvider] | None = None,
-    ) -> Result[Sequence[BillingSource], ExternalAPIError]:
+    ) -> Result[Sequence[BillingSourceResponse], ExternalAPIError]:
         async with self.session_manager.get_session() as session:
             billing_sources = await self.billing_source_repo.getByOrgId(
                 session, org_id, providers
             )
-            return Ok(billing_sources)
+            return Ok(
+                [
+                    BillingSourceResponse(
+                        billing_source_uid=bs.uuid,
+                        organization_id=bs.organization_id,
+                        source_type=bs.source_type,
+                        status=bs.status,
+                        created_at=bs.created_at,
+                    )
+                    for bs in billing_sources
+                ]
+            )
 
     async def updateBillingSource(
         self,

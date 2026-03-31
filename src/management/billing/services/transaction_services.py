@@ -1,6 +1,10 @@
 from src.db.factories import AsyncSessionManager
 from src.shared.utils.redis import redis_lock, redis_check_or_load
-from src.management.billing.dtos import PostRequest, ScaledAmount
+from src.management.billing.dtos import (
+    PostRequest,
+    ScaledAmount,
+    TransactionInfoResponse,
+)
 from src.management.billing.type import AggregatePeriod
 from src.shared.utils.uuid_utils import uuid7
 from src.management.billing.models import SpendingLimitType, BillingTransaction
@@ -18,7 +22,7 @@ from src.management.billing.repositories.spending_limit_repo import (
 
 import json
 from uuid import UUID, uuid4
-from typing import Awaitable, TypedDict, cast
+from typing import Sequence, Awaitable, TypedDict, cast
 from decimal import Decimal
 from calendar import c
 from datetime import UTC, datetime
@@ -49,6 +53,13 @@ class TransactionInProgress(RecoverableError):
     code = "transaction_in_progress"
     title = "Transaction In Progress"
     detail = "Another request with the same idempotency key is currently being processed. Please retry after some time."
+
+
+class TransactionNotFound(RecoverableError):
+    status = 404
+    code = "transaction_not_found"
+    title = "Transaction Not Found"
+    detail = "The billing transaction was not found."
 
 
 class _TransactionRecord(TypedDict):
@@ -499,7 +510,7 @@ class TransactionService:
         trx_res = cast(str, trx_res)
         if trx_res.startswith("pending:"):
             async with self.session_manager.get_session() as session:
-                existing_trx = await self.transaction_repo.getTransactionById(
+                existing_trx = await self.transaction_repo.getTransactionByUUID(
                     session, UUID(trx_res[len("pending:") :])
                 )
                 if existing_trx:
@@ -531,7 +542,7 @@ class TransactionService:
             async with self.session_manager.get_session() as session:
                 await self.transaction_repo.addTransaction(
                     session=session,
-                    transaction_id=transaction_uuid,
+                    transaction_uid=transaction_uuid,
                     apikey_id=api_key_id,
                     project_id=project_id,
                     org_id=org_id,
@@ -731,7 +742,7 @@ class TransactionService:
         async with self.session_manager.get_session() as session:
             updated_tx = await self.transaction_repo.captureTransaction(
                 session=session,
-                transaction_id=transaction_uid,
+                transaction_uid=transaction_uid,
                 real_amount=real,
             )
             if not updated_tx:
@@ -764,3 +775,69 @@ class TransactionService:
             delta=str(delta),
         )
         return Ok(True)
+
+    async def get_transactions(
+        self,
+        org_id: str,
+        project_uids: list[UUID] | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> Result[
+        tuple[Sequence[TransactionInfoResponse], int], InternalServiceError
+    ]:
+        """List transactions with optional filters (e.g. project_id, date range, etc.). Supports pagination."""
+
+        async with self.session_manager.get_session() as session:
+            (
+                transactions,
+                total,
+            ) = await self.transaction_repo.getTransactionInfoList(
+                session=session,
+                org_id=org_id,
+                project_uids=project_uids,
+                start_date=start_date,
+                end_date=end_date,
+                offset=offset,
+                limit=limit,
+            )
+            return Ok(
+                (
+                    [
+                        TransactionInfoResponse(
+                            transaction_uid=trx["transaction_uid"],
+                            project_uid=trx["project_uid"],
+                            amount=trx["amount"],
+                            details=trx["details"],
+                            date=trx["date"],
+                            captured_at=trx["captured_at"],
+                        )
+                        for trx in transactions
+                    ],
+                    total,
+                )
+            )
+
+    async def get_transaction_by_id(
+        self, org_id: str, transaction_uid: UUID
+    ) -> Result[TransactionInfoResponse, TransactionNotFound]:
+        """Get transaction details by transaction UUID."""
+        async with self.session_manager.get_session() as session:
+            trx = await self.transaction_repo.getTransactionInfoByUUID(
+                session=session,
+                transaction_uid=transaction_uid,
+                org_id=org_id,
+            )
+            if not trx:
+                return Err(TransactionNotFound())
+            return Ok(
+                TransactionInfoResponse(
+                    transaction_uid=trx["transaction_uid"],
+                    project_uid=trx["project_uid"],
+                    amount=trx["amount"],
+                    details=trx["details"],
+                    date=trx["date"],
+                    captured_at=trx["captured_at"],
+                )
+            )

@@ -1,5 +1,6 @@
-from src.management.api_keys.entities import ApiKeyInfo
-from src.management.api_keys.dependencies import requiredPermissions
+from src.management.auth.entities import UserInfo
+from src.management.auth.dependencies import getUserInfo
+from src.shared.custom_types.responses.response import PaginatedResponse
 
 from ..dtos import (
     AddCreditRequest,
@@ -19,9 +20,7 @@ from fastapi import Body, Depends
     description="Add credits to an organization or project (e.g. from a promotion, refund, etc.).",
 )
 async def add_credits(
-    apikey_info: Annotated[
-        ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
-    ],
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
@@ -35,9 +34,7 @@ async def add_credits(
     description="List credits for an organization or project, with filters for status (e.g. 'active', 'used', 'expired').",
 )
 async def list_credits(
-    apikey_info: Annotated[
-        ApiKeyInfo, Depends(requiredPermissions(["billing:read"]))
-    ],
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
@@ -46,7 +43,7 @@ async def list_credits(
     status: str | None = None,  # e.g. "active", "used", "expired"
     limit: int = 100,
     offset: int = 0,
-) -> list[CreditInfoResponse]:
+) -> PaginatedResponse[CreditInfoResponse]:
     pass
 
 
@@ -55,9 +52,7 @@ async def list_credits(
     description="List credits for an organization or project, with filters for status (e.g. 'active', 'used', 'expired').",
 )
 async def list_credits_for_admin(
-    apikey_info: Annotated[
-        ApiKeyInfo, Depends(requiredPermissions(["billing:read"]))
-    ],
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
@@ -67,5 +62,5 @@ async def list_credits_for_admin(
     status: str | None = None,  # e.g. "active", "used", "expired"
     limit: int = 100,
     offset: int = 0,
-) -> list[CreditInfoResponse]:
+) -> PaginatedResponse[CreditInfoResponse]:
     pass

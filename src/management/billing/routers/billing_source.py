@@ -1,9 +1,14 @@
 from src.management.billing.dtos import (
+    BillingSourceResponse,
     AddBillingSourceRequest,
     UpdateBillingSourceRequest,
 )
 from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
+from src.shared.custom_types.responses.response import (
+    ListResponse,
+    ObjectResponse,
+)
 from src.management.billing.services.billing_source_service import (
     BillingSourceService,
 )
@@ -11,9 +16,7 @@ from src.management.billing.services.billing_source_service import (
 from .router import billing_router
 from ..models import BillingSourceProvider
 from ..factories import (
-    TransactionService,
     getBillingSourceService,
-    getBillingTransactionService,
 )
 
 import uuid
@@ -32,11 +35,11 @@ async def add_billing_source(
         BillingSourceService, Depends(getBillingSourceService)
     ],
     req: Annotated[AddBillingSourceRequest, Body()],
-):
+) -> ObjectResponse[BillingSourceResponse]:
     res = await billing_source_service.addBillingSource(
         org_id=user_info["org_id"], req=req
     )
-    return res.unwrap()
+    return ObjectResponse[BillingSourceResponse](data=res.unwrap())
 
 
 @billing_router.get(
@@ -52,7 +55,7 @@ async def list_billing_sources(
     res = await billing_source_service.listBillingSources(
         org_id=user_info["org_id"], providers=providers
     )
-    return res.unwrap()
+    return ListResponse[BillingSourceResponse](data=res.unwrap())
 
 
 @billing_router.put(
@@ -72,7 +75,7 @@ async def update_billing_source(
         billing_source_uid=billing_source_uid,
         update_fields=req,
     )
-    return res.unwrap()
+    res.unwrap()
 
 
 @billing_router.delete(
@@ -90,7 +93,7 @@ async def delete_billing_source(
         org_id=user_info["org_id"],
         billing_source_uid=billing_source_uid,
     )
-    return res.unwrap()
+    res.unwrap()
 
 
 @billing_router.post(
@@ -125,7 +128,7 @@ async def delete_payment_method(
     res = await billing_source_service.deletePaymentMethod(
         user_info["org_id"], billing_source_uid, payment_method_id
     )
-    return res.unwrap()
+    res.unwrap()
 
 
 @billing_router.get(
@@ -195,4 +198,4 @@ async def cancel_setup_intent(
     res = await billing_source_service.cancelSetupIntent(
         user_info["org_id"], billing_source_uid, setup_intent_id
     )
-    return res.unwrap()
+    res.unwrap()

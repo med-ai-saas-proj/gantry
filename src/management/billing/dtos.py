@@ -1,10 +1,15 @@
 """DTOs for the billing module."""
 
-from src.management.billing.models import BillingSourceProvider
+from src.management.billing.models import (
+    BillingSourceState,
+    BillingSourceProvider,
+)
 
 from re import U
 from uuid import UUID
+from venv import create
 from typing import TypedDict
+from decimal import Decimal
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -38,12 +43,21 @@ class ManualPaymentResponse(BaseModel):
     hosted_invoice_url: str  # URL to hosted payment page on the payment gateway (e.g. Stripe Checkout) where the user can complete the payment
 
 
+class BillingSourceResponse(BaseModel):
+    billing_source_uid: UUID
+    organization_id: str
+    source_type: BillingSourceProvider
+    status: BillingSourceState
+    created_at: datetime
+
+
 class TransactionInfoResponse(BaseModel):
-    transaction_id: UUID
-    amount: ScaledAmount
+    transaction_uid: UUID
+    amount: Decimal
     date: datetime
-    project_uid: str
+    project_uid: UUID
     details: dict
+    captured_at: datetime | None
 
 
 class InvoiceInfoResponse(BaseModel):

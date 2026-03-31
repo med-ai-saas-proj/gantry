@@ -1,10 +1,15 @@
 from src.db.factories import getTimescaleSessionManager
 from src.db.repository import Repository
-from src.management.billing.type import AggregatePeriod, BillingAggregateReport
+from src.management.billing.type import (
+    AggregatePeriod,
+    BillingAggregateReport,
+    BillingTransactionInfo,
+)
 from src.management.billing.models import (
     BillingTransaction,
     TimescaleDBDailyBillingSummary,
 )
+from src.management.project.models import Project
 
 from uuid import UUID
 from turtle import up
@@ -12,6 +17,7 @@ from typing import Sequence
 from decimal import Decimal
 from datetime import datetime
 
+from regex import B, P
 from sqlalchemy import and_, func, text, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,7 +44,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
     async def addTransaction(
         self,
         session: AsyncSession,
-        transaction_id: UUID,
+        transaction_uid: UUID,
         apikey_id: int,
         project_id: int,
         org_id: str,
@@ -48,7 +54,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
     ) -> BillingTransaction:
         """Persist the final charge record (called during RELEASE)."""
         tx = BillingTransaction(
-            uuid=transaction_id,
+            uuid=transaction_uid,
             apikey_id=apikey_id,
             project_id=project_id,
             organization_id=org_id,
@@ -59,28 +65,117 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
         await self.add(session, tx)
         return tx
 
-    async def getTransactionById(
+    async def getTransactionByUUID(
         self,
         session: AsyncSession,
-        transaction_id: UUID,
+        transaction_uid: UUID,
     ) -> BillingTransaction | None:
         """Get the transaction record by its UUID."""
         stmt = select(BillingTransaction).where(
-            BillingTransaction.uuid == transaction_id
+            BillingTransaction.uuid == transaction_uid
         )
         return await self.selectOne(session, stmt)
+
+    async def getTransactionInfoList(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        project_uids: list[UUID] | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> tuple[Sequence[BillingTransactionInfo], int]:
+        """Get the transaction records by a list of UUIDs."""
+        stmt = (
+            select(
+                BillingTransaction.uuid,
+                BillingTransaction.amount,
+                BillingTransaction.created_at,
+                BillingTransaction.details,
+                BillingTransaction.captured_at,
+                BillingTransaction.organization_id,
+                Project.uuid.label("project_uid"),
+                func.count().over().label("total"),
+            )
+            .select_from(BillingTransaction)
+            .join(Project, BillingTransaction.project_id == Project.id)
+            .where(BillingTransaction.organization_id == org_id)
+        )
+        if project_uids and len(project_uids) > 0:
+            stmt = stmt.where(Project.uuid.in_(project_uids))
+        if start_date:
+            stmt = stmt.where(BillingTransaction.created_at >= start_date)
+        if end_date:
+            stmt = stmt.where(BillingTransaction.created_at <= end_date)
+        stmt = stmt.order_by(BillingTransaction.created_at.desc())
+        stmt = self.buildFilterPagination(stmt, offset=offset, limit=limit)
+        res = await session.execute(stmt)
+        rows = res.all()
+        return [
+            {
+                "organization_id": row.organization_id,
+                "transaction_uid": row.uuid,
+                "amount": row.amount,
+                "date": row.created_at,
+                "project_uid": row.project_uid,
+                "details": row.details,
+                "captured_at": row.captured_at,
+            }
+            for row in rows
+        ], rows[0].total if rows else 0
+
+    async def getTransactionInfoByUUID(
+        self,
+        session: AsyncSession,
+        transaction_uid: UUID,
+        org_id: str,
+    ) -> BillingTransactionInfo | None:
+        """Get the transaction record by its UUID."""
+        stmt = (
+            select(
+                BillingTransaction.uuid,
+                BillingTransaction.amount,
+                BillingTransaction.created_at,
+                BillingTransaction.details,
+                BillingTransaction.captured_at,
+                BillingTransaction.organization_id,
+                Project.uuid.label("project_uid"),
+            )
+            .select_from(BillingTransaction)
+            .join(Project, BillingTransaction.project_id == Project.id)
+            .where(
+                and_(
+                    BillingTransaction.uuid == transaction_uid,
+                    BillingTransaction.organization_id == org_id,
+                )
+            )
+        )
+        res = await session.execute(stmt)
+        row = res.one_or_none()
+        if not row:
+            return None
+        return {
+            "organization_id": row.organization_id,
+            "transaction_uid": row.uuid,
+            "amount": row.amount,
+            "date": row.created_at,
+            "project_uid": row.project_uid,
+            "details": row.details,
+            "captured_at": row.captured_at,
+        }
 
     async def captureTransaction(
         self,
         session: AsyncSession,
-        transaction_id: UUID,
+        transaction_uid: UUID,
         real_amount: Decimal,
     ) -> BillingTransaction | None:
         """Update the transaction record with the real amount and mark as captured (called during CAPTURE)."""
         stmt = (
             update(BillingTransaction)
             .where(
-                (BillingTransaction.uuid == transaction_id)
+                (BillingTransaction.uuid == transaction_uid)
                 & (
                     BillingTransaction.captured_at.is_(None)
                 )  # only capture if not already captured
@@ -301,7 +396,7 @@ if __name__ == "__main__":
             repo = TransactionRepository()
             await repo.addTransaction(
                 session=session,
-                transaction_id=uuid7(),
+                transaction_uid=uuid7(),
                 apikey_id=1,
                 project_id=1,
                 org_id="org1",
@@ -310,7 +405,7 @@ if __name__ == "__main__":
             )
             await repo.addTransaction(
                 session=session,
-                transaction_id=uuid7(),
+                transaction_uid=uuid7(),
                 apikey_id=2,
                 project_id=1,
                 org_id="org1",

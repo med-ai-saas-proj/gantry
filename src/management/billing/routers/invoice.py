@@ -1,10 +1,13 @@
 from src.management.billing.dtos import (
     InvoiceInfoResponse,
     ManualPaymentResponse,
-    TransactionInfoResponse,
 )
 from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
+from src.shared.custom_types.responses.response import (
+    ObjectResponse,
+    PaginatedResponse,
+)
 
 from .router import billing_router
 from ..factories import getBillingTransactionService
@@ -15,8 +18,8 @@ from uuid import UUID
 from typing import Annotated
 from datetime import datetime
 
+from regex import P
 from fastapi import Depends
-from pydantic import BaseModel
 
 
 class PaymentStatus(str, enum.Enum):
@@ -42,7 +45,7 @@ async def list_invoices(
     | None = None,  # e.g. "paid", "unpaid", "overdue"
     limit: int = 100,
     offset: int = 0,
-) -> list[InvoiceInfoResponse]:
+) -> PaginatedResponse[InvoiceInfoResponse]:
     pass
 
 
@@ -56,7 +59,7 @@ async def get_invoice_details(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-) -> InvoiceInfoResponse:
+) -> ObjectResponse[InvoiceInfoResponse]:
     pass
 
 
@@ -70,7 +73,9 @@ async def pay_invoice(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-) -> ManualPaymentResponse:
-    return ManualPaymentResponse(
-        hosted_invoice_url="https://example.com/payment"
+) -> ObjectResponse[ManualPaymentResponse]:
+    return ObjectResponse(
+        data=ManualPaymentResponse(
+            hosted_invoice_url="https://example.com/payment"
+        )
     )

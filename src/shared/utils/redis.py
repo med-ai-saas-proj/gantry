@@ -1,4 +1,4 @@
-from src.db import session
+from src.db.session import AsyncSessionManager
 
 import asyncio
 from typing import Callable, Awaitable
@@ -68,7 +68,7 @@ async def lock_watchdog(
 
 async def redis_check_or_load[T](
     redis: Redis,
-    session_manager: session.AsyncSessionManager,
+    session_manager: AsyncSessionManager,
     lock_id: str,
     lock_ttl: int,
     lock_blocking_timeout: int,
