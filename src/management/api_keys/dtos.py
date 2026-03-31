@@ -44,7 +44,6 @@ class ApiKeyPermissionCatalogResponse(BaseDTO):
 
     total: int
     results: list[str]
-    finalized: bool
 
 
 class ApiKeyPermissionAuditResponse(BaseDTO):

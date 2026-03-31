@@ -533,7 +533,6 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.total, 2)
         self.assertEqual(result.results, ["chat.read", "chat.run"])
-        self.assertFalse(result.finalized)
 
     async def test_audit_permissions_returns_stale_and_unused_permissions(self):
         self.api_key_repo.listDistinctPermissions = AsyncMock(

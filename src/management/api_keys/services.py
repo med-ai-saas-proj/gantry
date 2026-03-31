@@ -20,7 +20,6 @@ from .entities import ApiKeyInfo
 from .permissions import (
     listPermissions,
     hasOnlyRegisteredPermissions,
-    isPermissionRegistrationDone,
 )
 from .repositories import ApiKeyRepository
 
@@ -226,7 +225,6 @@ class ApiKeyService:
         return ApiKeyPermissionCatalogResponse(
             total=len(permissions),
             results=permissions,
-            finalized=isPermissionRegistrationDone(),
         )
 
     async def auditPermissions(self) -> ApiKeyPermissionAuditResponse:
