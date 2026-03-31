@@ -2,7 +2,7 @@ import enum
 from uuid import UUID
 from typing import TypedDict
 from decimal import Decimal
-from datetime import datetime
+from datetime import date, datetime
 
 
 class AggregatePeriod(str, enum.Enum):
@@ -26,3 +26,20 @@ class BillingTransactionInfo(TypedDict):
     project_uid: UUID
     details: dict
     captured_at: datetime | None
+
+
+class BillingInvoiceInfo(TypedDict):
+    invoice_id: int
+    invoice_uid: UUID
+    billing_period: date
+    total_amount: Decimal
+    provider_invoice_id: str
+    paid_at: datetime | None
+    details: dict
+    used_credits: Decimal
+
+
+class BillingInvoiceLineItemInfo(TypedDict):
+    description: str
+    amount: Decimal
+    project_uid: UUID | None

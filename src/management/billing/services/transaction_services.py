@@ -1,5 +1,5 @@
 from src.db.factories import AsyncSessionManager
-from src.shared.utils.redis import redis_lock, redis_check_or_load
+from src.shared.utils.redis import redis_check_or_load
 from src.management.billing.dtos import (
     PostRequest,
     ScaledAmount,
@@ -7,7 +7,7 @@ from src.management.billing.dtos import (
 )
 from src.management.billing.type import AggregatePeriod
 from src.shared.utils.uuid_utils import uuid7
-from src.management.billing.models import SpendingLimitType, BillingTransaction
+from src.management.billing.models import SpendingLimitType
 from src.management.api_keys.services import ApiKeyService
 from src.shared.custom_types.error_exception import (
     RecoverableError,
@@ -24,11 +24,9 @@ import json
 from uuid import UUID, uuid4
 from typing import Sequence, Awaitable, TypedDict, cast
 from decimal import Decimal
-from calendar import c
 from datetime import UTC, datetime
 
 from pyrusult import Ok, Err, Result
-from sqlalchemy import func
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -784,9 +782,7 @@ class TransactionService:
         end_date: datetime | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> Result[
-        tuple[Sequence[TransactionInfoResponse], int], InternalServiceError
-    ]:
+    ) -> Result[tuple[Sequence[TransactionInfoResponse], int], None]:
         """List transactions with optional filters (e.g. project_id, date range, etc.). Supports pagination."""
 
         async with self.session_manager.get_session() as session:

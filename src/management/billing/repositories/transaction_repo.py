@@ -1,23 +1,22 @@
 from src.db.factories import getTimescaleSessionManager
 from src.db.repository import Repository
-from src.management.billing.type import (
+from src.management.project.models import Project
+
+from ..type import (
     AggregatePeriod,
     BillingAggregateReport,
     BillingTransactionInfo,
 )
-from src.management.billing.models import (
+from ..models import (
     BillingTransaction,
     TimescaleDBDailyBillingSummary,
 )
-from src.management.project.models import Project
 
 from uuid import UUID
-from turtle import up
 from typing import Sequence
 from decimal import Decimal
 from datetime import datetime
 
-from regex import B, P
 from sqlalchemy import and_, func, text, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 

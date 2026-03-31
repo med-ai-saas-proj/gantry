@@ -6,7 +6,6 @@ from src.management.api_keys.entities import ApiKeyInfo
 from src.management.auth.dependencies import getUserInfo
 from src.management.api_keys.dependencies import requiredPermissions
 from src.shared.custom_types.responses.response import (
-    ListResponse,
     ObjectResponse,
     PaginatedResponse,
 )
@@ -15,7 +14,6 @@ from ..dtos import PostRequest, CaptureRequest
 from .router import billing_router
 from ..factories import TransactionService, getBillingTransactionService
 
-from ast import List
 from uuid import UUID
 from typing import Annotated
 from datetime import datetime

@@ -1,6 +1,7 @@
 from src.management.billing.dtos import (
     InvoiceInfoResponse,
     ManualPaymentResponse,
+    InvoiceDetailInfoResponse,
 )
 from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
@@ -8,24 +9,16 @@ from src.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
 )
+from src.management.billing.services.invoice_service import InvoiceService
 
 from .router import billing_router
-from ..factories import getBillingTransactionService
-from ..services.transaction_services import TransactionService
+from ..factories import getInvoiceService
 
-import enum
 from uuid import UUID
 from typing import Annotated
 from datetime import datetime
 
-from regex import P
 from fastapi import Depends
-
-
-class PaymentStatus(str, enum.Enum):
-    PENDING = "pending"
-    COMPLETED = "completed"
-    FAILED = "failed"
 
 
 @billing_router.get(
@@ -34,19 +27,29 @@ class PaymentStatus(str, enum.Enum):
 )
 async def list_invoices(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[
-        TransactionService, Depends(getBillingTransactionService)
-    ],
-    project_uid: list[UUID]
-    | None = None,  # filter by project_uid or whole organization
+    invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
     from_date: datetime | None = None,  # ISO date string
     to_date: datetime | None = None,  # ISO date string
-    payment_status: list[PaymentStatus]
-    | None = None,  # e.g. "paid", "unpaid", "overdue"
+    paid: bool | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> PaginatedResponse[InvoiceInfoResponse]:
-    pass
+    invoices, total = (
+        await invoice_service.list_invoices(
+            org_id=user_info["org_id"],
+            offset=offset,
+            limit=limit,
+            from_date=from_date,
+            to_date=to_date,
+            paid=paid,
+        )
+    ).unwrap()
+    return PaginatedResponse(
+        data=invoices,
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @billing_router.get(
@@ -56,11 +59,14 @@ async def list_invoices(
 async def get_invoice_details(
     invoice_uid: UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[
-        TransactionService, Depends(getBillingTransactionService)
-    ],
-) -> ObjectResponse[InvoiceInfoResponse]:
-    pass
+    invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
+) -> ObjectResponse[InvoiceDetailInfoResponse]:
+    res = (
+        await invoice_service.get_invoice_by_id(
+            org_id=user_info["org_id"], invoice_uid=invoice_uid
+        )
+    ).unwrap()
+    return ObjectResponse(data=res)
 
 
 @billing_router.post(
@@ -70,9 +76,7 @@ async def get_invoice_details(
 async def pay_invoice(
     invoice_uid: UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[
-        TransactionService, Depends(getBillingTransactionService)
-    ],
+    invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[ManualPaymentResponse]:
     return ObjectResponse(
         data=ManualPaymentResponse(

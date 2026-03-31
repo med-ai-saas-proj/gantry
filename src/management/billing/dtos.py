@@ -8,9 +8,9 @@ from src.management.billing.models import (
 from re import U
 from uuid import UUID
 from venv import create
-from typing import TypedDict
+from typing import Sequence, TypedDict
 from decimal import Decimal
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 from typing_extensions import Literal
@@ -61,16 +61,24 @@ class TransactionInfoResponse(BaseModel):
 
 
 class InvoiceInfoResponse(BaseModel):
-    invoice_uid: str
-    amount_due: ScaledAmount
-    due_date: datetime
+    invoice_uid: UUID
+    billing_period: date
+    total_amount: Decimal
+    paid_at: datetime | None
+    details: dict
+    used_credits: Decimal
 
 
-class InvoiceDetailInfoResponse(BaseModel):
-    invoice_uid: str
-    amount_due: ScaledAmount
-    due_date: datetime
-    hosted_invoice_url: str
+class InvoiceItemInfoResponse(BaseModel):
+    description: str
+    amount: Decimal
+    project_uid: UUID | None
+
+
+class InvoiceDetailInfoResponse(InvoiceInfoResponse):
+    line_items: Sequence[
+        InvoiceItemInfoResponse
+    ]  # each dict contains description, amount, and project_id of the line item
 
 
 class SpendingLimitInfoResponse(BaseModel):

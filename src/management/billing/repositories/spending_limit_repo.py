@@ -1,10 +1,8 @@
 """Billing repository layer."""
 
 from src.db.repository import Repository
-from src.management.billing.models import (
-    SpendingLimit,
-    SpendingLimitType,
-)
+
+from ..models import SpendingLimit, SpendingLimitType
 
 from typing import Sequence
 from decimal import Decimal

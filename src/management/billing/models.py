@@ -5,11 +5,13 @@ from src.db.utils import (
     WithClientUUIDv7,
     WithCreateUpdateTimestamp,
 )
+from src.management.billing.routers import invoice
 
 import enum
 from decimal import Decimal
 from datetime import date, datetime
 
+from regex import F
 from sqlalchemy import (
     Date,
     Enum,
@@ -18,6 +20,7 @@ from sqlalchemy import (
     Numeric,
     DateTime,
     BigInteger,
+    ForeignKey,
     UniqueConstraint,
     func,
 )
@@ -130,7 +133,7 @@ class BillingSource(
     __tablename__ = "BillingSources"
 
     organization_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, index=True
+        String(128), nullable=False, index=True, unique=True
     )
     source_type: Mapped[BillingSourceProvider] = mapped_column(
         Enum(BillingSourceProvider), nullable=False
@@ -161,6 +164,9 @@ class BillingInvoice(
     total_amount: Mapped[Decimal] = mapped_column(
         AMOUNT_COLUMN_TYPE, nullable=False
     )
+    provider_invoice_id: Mapped[str] = mapped_column(
+        String(128), nullable=False
+    )  # e.g. Stripe invoice ID
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     details: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
@@ -174,6 +180,12 @@ class BillingInvoiceLineItem(
 ):
     __tablename__ = "BillingInvoiceLineItems"
 
+    invoice_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(BillingInvoice.id, ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )  # foreign key to BillingInvoice.id
     description: Mapped[str] = mapped_column(String(256), nullable=False)
 
     amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)

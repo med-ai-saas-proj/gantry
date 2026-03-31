@@ -5,6 +5,8 @@ from src.db.factories import getRedis, getSessionManager
 from .settings import getBillingSourceSetting
 from ..api_keys.factories import getApiKeyService
 from ...shared.logging.logger import getLogger
+from .services.invoice_service import InvoiceService
+from .repositories.invoice_repo import InvoiceRepo
 from .repositories.transaction_repo import TransactionRepository
 from .services.transaction_services import TransactionService
 from .services.billing_source_service import (
@@ -52,4 +54,12 @@ def getBillingAggregateQueryService() -> BillingAggregateQueryService:
         session_manager=getSessionManager(),
         transaction_repo=TransactionRepository(),
         apikey_service=getApiKeyService(),
+    )
+
+
+@lru_cache(1)
+def getInvoiceService() -> InvoiceService:
+    return InvoiceService(
+        session_manager=getSessionManager(),
+        invoice_repo=InvoiceRepo(),
     )
