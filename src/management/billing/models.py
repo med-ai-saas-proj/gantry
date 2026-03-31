@@ -5,13 +5,11 @@ from src.db.utils import (
     WithClientUUIDv7,
     WithCreateUpdateTimestamp,
 )
-from src.management.billing.routers import invoice
 
 import enum
 from decimal import Decimal
 from datetime import date, datetime
 
-from regex import F
 from sqlalchemy import (
     Date,
     Enum,
@@ -133,7 +131,7 @@ class BillingSource(
     __tablename__ = "BillingSources"
 
     organization_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, index=True, unique=True
+        String(128), nullable=False, index=True
     )
     source_type: Mapped[BillingSourceProvider] = mapped_column(
         Enum(BillingSourceProvider), nullable=False
