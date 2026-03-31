@@ -33,9 +33,7 @@ class TestProjectPermissions(unittest.TestCase):
         self.assertTrue(
             has_permission(perms, ProjectPermission.USERS_PERMISSIONS_RW)
         )
-        self.assertFalse(
-            has_permission(perms, ProjectPermission.PROJECTS_CREATE)
-        )
+        self.assertTrue(has_permission(perms, ProjectPermission.APIKEY_WRITE))
         self.assertFalse(
             has_permission(perms, ProjectPermission.PROJECTS_GET_ALL)
         )
@@ -62,6 +60,7 @@ class TestProjectPermissions(unittest.TestCase):
         self.assertEqual(entry, "proj-123:project.owner")
         self.assertEqual(decoded, ("proj-123", "project.owner"))
         self.assertIn(ProjectPermission.OWNER.value, ALL_PERMISSIONS)
+        self.assertNotIn("organization.projects.create", ALL_PERMISSIONS)
 
     def test_decode_project_permission_rejects_invalid_entries(self):
         """Malformed flat entries should be ignored by decoder."""

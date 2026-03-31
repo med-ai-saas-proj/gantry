@@ -27,6 +27,7 @@ class TestOrgPermissions(unittest.TestCase):
         # Assert
         self.assertIn(OrgPermission.USERS_GET_ALL.value, effective)
         self.assertIn(OrgPermission.SETTINGS_WRITE.value, effective)
+        self.assertIn(OrgPermission.PROJECTS_CREATE.value, effective)
         self.assertTrue(has_permission(perms, OrgPermission.INVITE))
 
     def test_missing_permission_returns_false(self):

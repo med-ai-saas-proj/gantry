@@ -28,6 +28,9 @@ class OrgPermission(str, Enum):
     SETTINGS_READ = "organization.settings.read"
     SETTINGS_WRITE = "organization.settings.write"
 
+    # Project creation at org scope
+    PROJECTS_CREATE = "organization.projects.create"
+
 
 # Owner inherits every other permission automatically.
 PERMISSION_HIERARCHY: Final[dict[OrgPermission, list[OrgPermission]]] = {
@@ -38,6 +41,7 @@ PERMISSION_HIERARCHY: Final[dict[OrgPermission, list[OrgPermission]]] = {
         OrgPermission.USERS_PERMISSIONS_RW,
         OrgPermission.SETTINGS_READ,
         OrgPermission.SETTINGS_WRITE,
+        OrgPermission.PROJECTS_CREATE,
     ],
 }
 

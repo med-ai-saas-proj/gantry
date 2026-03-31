@@ -1,5 +1,6 @@
 from .entities import ApiKeyInfo
 from .factories import ApiKeyService, getApiKeyService
+from .permissions import registerPermissions
 
 from typing import Annotated
 
@@ -15,6 +16,7 @@ api_key_header = APIKeyHeader(
 
 def requiredPermissions(permissions: list[str]):
     """Dependency to verify the API key and create required permissions."""
+    registerPermissions(permissions)
 
     async def get_api_key(
         api_key: Annotated[str, Security(api_key_header)],

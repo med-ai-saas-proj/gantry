@@ -7,7 +7,7 @@ from .models import Project, ProjectMember
 
 from uuid import UUID
 
-from sqlalchemy import func, delete, insert, select
+from sqlalchemy import func, delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -50,6 +50,26 @@ class ProjectRepository(Repository[Project, int]):
             .select_from(Project)
             .where(Project.uuid == parsed)
             .limit(1)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
+    async def updateById(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        *,
+        name: str,
+        description: str | None,
+    ) -> Project | None:
+        stmt = (
+            update(Project)
+            .where(Project.id == project_id)
+            .values(
+                name=name,
+                description=description,
+            )
+            .returning(Project)
         )
         res = await session.execute(stmt)
         return res.scalar_one_or_none()

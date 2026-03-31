@@ -276,11 +276,11 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         # Assert
         self.assertTrue(result.status == ResultStatus.Ok)
 
-    async def test_create_project_requires_projects_create(self):
-        """Create project should fail if actor lacks projects.create scope."""
+    async def test_create_project_requires_org_projects_create(self):
+        """Create project should fail if actor lacks org-scoped create permission."""
         # Arrange
         service = self._make_service()
-        service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(False))
+        service._getOrgPermissions = AsyncMock(return_value=Ok([]))
 
         # Act
         res = await service.createProject("u1", "org-1", "p1", None)
@@ -293,7 +293,9 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Creating a project should add owner permission in flat attr form."""
         # Arrange
         service = self._make_service()
-        service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(True))
+        service._getOrgPermissions = AsyncMock(
+            return_value=Ok(["organization.owner"])
+        )
         service.project_repo.create = AsyncMock(
             return_value=SimpleNamespace(
                 id=10,
@@ -323,7 +325,9 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Project creation should surface attr-write failure before commit."""
         # Arrange
         service = self._make_service()
-        service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(True))
+        service._getOrgPermissions = AsyncMock(
+            return_value=Ok(["organization.owner"])
+        )
         service.project_repo.create = AsyncMock(
             return_value=SimpleNamespace(
                 id=10,
@@ -348,13 +352,13 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Err)
         self.session_manager.session.commit.assert_not_awaited()
 
-    async def test_create_project_propagates_org_wide_permission_lookup_error(
+    async def test_create_project_propagates_org_permission_lookup_error(
         self,
     ):
-        """Project creation should return upstream org-wide permission lookup errors."""
+        """Project creation should return upstream org permission lookup errors."""
         # Arrange
         service = self._make_service()
-        service._hasOrgWideProjectPermission = AsyncMock(
+        service._getOrgPermissions = AsyncMock(
             return_value=Err(_DummyError("kc failed"))
         )
 
@@ -363,6 +367,49 @@ class TestProjectServiceCore(BaseProjectServiceTest):
 
         # Assert
         self.assertTrue(res.status == ResultStatus.Err)
+
+    async def test_update_project_updates_mutable_metadata(self):
+        """Update project should persist new name and description."""
+        # Arrange
+        service = self._make_service()
+        active_info = SimpleNamespace(archived=False)
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((10, "org-1", active_info))
+        )
+        service.project_repo.updateById = AsyncMock(
+            return_value=SimpleNamespace(
+                id=10,
+                uuid="proj-1",
+                name="New",
+                description="new",
+                organization_id="org-1",
+                is_archived=False,
+            )
+        )
+
+        # Act
+        res = await service.updateProject("proj-1", "New", "new")
+
+        # Assert
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().name, "New")
+        self.session_manager.session.commit.assert_awaited_once()
+
+    async def test_update_project_rejects_archived_project(self):
+        """Archived projects should not allow metadata updates."""
+        # Arrange
+        service = self._make_service()
+        archived_info = SimpleNamespace(archived=True)
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((10, "org-1", archived_info))
+        )
+
+        # Act
+        res = await service.updateProject("proj-1", "New", "new")
+
+        # Assert
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), ProjectArchivedError)
 
     async def test_list_user_projects_org_membership_error(self):
         """List by organization should fail if actor not in org."""
@@ -452,7 +499,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
 
         # Act
         false_res = await service._hasOrgWideProjectPermission(
-            "u1", "org-1", ProjectPermission.PROJECTS_CREATE
+            "u1", "org-1", ProjectPermission.PROJECTS_GET_ALL
         )
 
         # Assert
@@ -472,14 +519,14 @@ class TestProjectServiceCore(BaseProjectServiceTest):
             ]
         )
         service._getPermissionsFromAttrs = AsyncMock(
-            side_effect=[Ok([]), Ok(["projects.create"])]
+            side_effect=[Ok([]), Ok(["projects.get_all"])]
         )
 
         # Act
         res = await service._hasOrgWideProjectPermission(
             "actor",
             "org-1",
-            ProjectPermission.PROJECTS_CREATE,
+            ProjectPermission.PROJECTS_GET_ALL,
         )
 
         # Assert

@@ -9,7 +9,6 @@ class ProjectPermission(str, Enum):
 
     OWNER = "project.owner"
 
-    PROJECTS_CREATE = "projects.create"
     PROJECTS_GET_ALL = "projects.get_all"
 
     USERS_ADD = "project.users.add"
@@ -19,6 +18,9 @@ class ProjectPermission(str, Enum):
 
     SETTINGS_READ = "project.settings.read"
     SETTINGS_WRITE = "project.settings.write"
+
+    APIKEY_READ = "apikey.read"
+    APIKEY_WRITE = "apikey.write"
 
 
 PERMISSION_HIERARCHY: Final[
@@ -31,6 +33,8 @@ PERMISSION_HIERARCHY: Final[
         ProjectPermission.USERS_PERMISSIONS_RW,
         ProjectPermission.SETTINGS_READ,
         ProjectPermission.SETTINGS_WRITE,
+        ProjectPermission.APIKEY_READ,
+        ProjectPermission.APIKEY_WRITE,
     ]
 }
 

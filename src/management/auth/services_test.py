@@ -54,6 +54,38 @@ class TestAuthService(unittest.TestCase):
         self.assertTrue(result.status == ResultStatus.Ok)
         self.assertEqual(result.unwrap()["org_id"], "org-1")
 
+    def test_map_claims_supports_organization_claim_object_with_id(self):
+        result = self.service._mapClaimsToAuthInfo(
+            {
+                "sub": "user-1",
+                "preferred_username": "alice",
+                "email": "alice@test",
+                "organization": {
+                    "demo-org": {"id": "org-1"},
+                },
+                "azp": "med-ai-saas-app",
+            }
+        )
+
+        self.assertTrue(result.status == ResultStatus.Ok)
+        self.assertEqual(result.unwrap()["org_id"], "org-1")
+
+    def test_map_claims_rejects_organization_claim_object_without_id(self):
+        result = self.service._mapClaimsToAuthInfo(
+            {
+                "sub": "user-1",
+                "preferred_username": "alice",
+                "email": "alice@test",
+                "organization": {
+                    "demo-org": {"name": "demo-org"},
+                },
+                "azp": "med-ai-saas-app",
+            }
+        )
+
+        self.assertTrue(result.status == ResultStatus.Err)
+        self.assertIsInstance(result.err(), MissingOrganizationClaimError)
+
     def test_map_claims_rejects_regular_user_without_organization_claim(self):
         result = self.service._mapClaimsToAuthInfo(
             {
