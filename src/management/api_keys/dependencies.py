@@ -26,3 +26,11 @@ def requiredPermissions(permissions: list[str]):
         return user_info.unwrap()
 
     return get_api_key
+
+
+async def getApiKeyInfo(
+    api_key: Annotated[str, Security(api_key_header)],
+    api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
+) -> ApiKeyInfo:
+    user_info = await api_key_service.parseApiKey(api_key)
+    return user_info.unwrap()

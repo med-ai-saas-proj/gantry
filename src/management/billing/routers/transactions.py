@@ -4,7 +4,7 @@ from src.management.billing.dtos import (
 from src.management.auth.entities import UserInfo
 from src.management.api_keys.entities import ApiKeyInfo
 from src.management.auth.dependencies import getUserInfo
-from src.management.api_keys.dependencies import requiredPermissions
+from src.management.api_keys.dependencies import getApiKeyInfo
 from src.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
@@ -23,9 +23,7 @@ from fastapi import Body, Header, Depends
 
 @billing_router.post("/")
 async def post(
-    apikey_info: Annotated[
-        ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
-    ],
+    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
     body: Annotated[PostRequest, Body()],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
@@ -46,9 +44,7 @@ async def post(
 @billing_router.post("/{transaction_uid}/capture")
 async def capture(
     transaction_uid: UUID,
-    apikey_info: Annotated[
-        ApiKeyInfo, Depends(requiredPermissions(["billing:write"]))
-    ],
+    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
     body: Annotated[CaptureRequest, Body()],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)

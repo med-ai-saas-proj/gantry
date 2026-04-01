@@ -470,6 +470,44 @@ class ApiKeyService:
             await session.commit()
             return Ok(True)
 
+    async def parseApiKey(
+        self, api_key: str
+    ) -> Result[
+        ApiKeyInfo,
+        InvalidAPIKey
+        | ApiKeyDisabledError
+        | InsufficientPermission
+        | UserNotFoundError
+        | ProjectNotFoundError,
+    ]:
+        """Verify an API key and resolve its project and organization context."""
+        async with self.session_manager.get_session() as session:
+            hashed_key = self._hashApiKey(api_key)
+            key = await self.api_key_repo.getByHashedKey(session, hashed_key)
+            if key is None:
+                return Err(InvalidAPIKey())
+            if key.disabled:
+                return Err(ApiKeyDisabledError())
+            if key.user_id is None:
+                return Err(UserNotFoundError())
+
+            project = await self.project_repo.getByKey(session, key.project_id)
+            if project is None:
+                return Err(ProjectNotFoundError())
+
+            return Ok(
+                ApiKeyInfo(
+                    {
+                        "user_id": str(key.user_id),
+                        "project_id": key.project_id,
+                        "api_key_id": key.id,
+                        "project_uid": str(project.uuid),
+                        "org_id": project.organization_id,
+                        "hashed_key": key.hashed_key,
+                    }
+                )
+            )
+
     async def verifyApiKey(
         self, api_key: str, required_permissions: list[str]
     ) -> Result[
