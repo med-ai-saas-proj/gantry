@@ -150,7 +150,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
             side_effect=[
                 Ok(["project.owner"]),
                 Ok(["project.settings.read"]),
-                Ok(["project.owner", "projects.create"]),
+                Ok(["project.owner", "projects.get_all"]),
             ]
         )
 

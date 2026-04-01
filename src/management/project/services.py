@@ -1,6 +1,10 @@
 """Business logic for project management."""
 
 from src.db.factories import AsyncSessionManager
+from src.management.organization.permissions import (
+    OrgPermission,
+    has_permission as has_org_permission,
+)
 from src.shared.custom_types.error_exception import RecoverableError
 from src.management.organization.keycloak_client import (
     KeycloakOrgError,
@@ -178,6 +182,35 @@ class ProjectService:
                     extracted.append(permission)
             return extracted
         return []
+
+    def _extractOrgPermissions(self, attrs: dict[str, Any]) -> list[str]:
+        """Extract organization-scoped permissions from Keycloak attrs."""
+        raw = attrs.get("org_permissions", [])
+        if isinstance(raw, str):
+            raw = [raw]
+        if isinstance(raw, list):
+            return [
+                permission for permission in raw if isinstance(permission, str)
+            ]
+        return []
+
+    async def _getOrgPermissions(
+        self,
+        org_id: str,
+        user_id: str,
+    ) -> Result[
+        list[str],
+        MemberNotFoundError | KeycloakOrgError | UserNotInOrganizationError,
+    ]:
+        """Load organization permissions for a confirmed org member."""
+        in_org_res = await self._ensureUserInOrg(user_id, org_id)
+        if in_org_res.status == ResultStatus.Err:
+            return in_org_res.into()
+
+        attrs_res = await self.kc.getUserAttributes(user_id)
+        if attrs_res.status == ResultStatus.Err:
+            return attrs_res.into()
+        return Ok(self._extractOrgPermissions(attrs_res.unwrap()))
 
     async def _getPermissionsFromAttrs(
         self,
@@ -415,15 +448,19 @@ class ProjectService:
         ProjectInfoResponse,
         MemberNotFoundError
         | KeycloakOrgError
+        | UserNotInOrganizationError
         | InsufficientProjectPermissionError,
     ]:
         """Create a project and seed the creator as project owner."""
-        authz_res = await self._hasOrgWideProjectPermission(
-            actor_user_id, organization_id, ProjectPermission.PROJECTS_CREATE
+        org_perms_res = await self._getOrgPermissions(
+            organization_id, actor_user_id
         )
-        if authz_res.status == ResultStatus.Err:
-            return authz_res
-        if not authz_res.unwrap():
+        if org_perms_res.status == ResultStatus.Err:
+            return org_perms_res
+        if not has_org_permission(
+            org_perms_res.unwrap(),
+            OrgPermission.PROJECTS_CREATE,
+        ):
             return Err(InsufficientProjectPermissionError())
 
         async with self.session_manager.get_session() as session:
@@ -454,6 +491,45 @@ class ProjectService:
             )
             await session.commit()
             return Ok(output)
+
+    async def updateProject(
+        self,
+        project_uuid: str,
+        name: str,
+        description: str | None,
+    ) -> Result[
+        ProjectInfoResponse,
+        ProjectNotFoundError | ProjectArchivedError,
+    ]:
+        """Update mutable project metadata for one active project."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res
+        project_id, _, project_info = project_res.unwrap()
+
+        active_res = self._ensureProjectActive(project_info)
+        if active_res.status == ResultStatus.Err:
+            return active_res
+
+        async with self.session_manager.get_session() as session:
+            updated = await self.project_repo.updateById(
+                session,
+                project_id,
+                name=name,
+                description=description,
+            )
+            if updated is None:
+                return Err(ProjectNotFoundError())
+            await session.commit()
+            return Ok(
+                ProjectInfoResponse(
+                    id=str(updated.uuid),
+                    name=updated.name,
+                    description=updated.description,
+                    organization_id=updated.organization_id,
+                    archived=updated.is_archived,
+                )
+            )
 
     async def listProjectUsers(
         self,

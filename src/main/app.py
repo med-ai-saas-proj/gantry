@@ -7,6 +7,7 @@ from src.shared.logging.logger import getLogger
 from src.shared.dtos.error_output import (
     ProblemDetails,
 )
+from src.management.api_keys.permissions import doneRegisterPermission
 from src.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
@@ -32,6 +33,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 
 configure_mappers()
+doneRegisterPermission()
 
 app_settings = getAppSetting()
 

@@ -305,7 +305,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertTrue(
             (
                 await service._hasOrgWideProjectPermission(
-                    "u1", "org-1", ProjectPermission.PROJECTS_CREATE
+                    "u1", "org-1", ProjectPermission.PROJECTS_GET_ALL
                 )
             ).status
             == ResultStatus.Err

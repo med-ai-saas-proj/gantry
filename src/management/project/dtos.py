@@ -29,6 +29,13 @@ class CreateProjectRequest(BaseDTO):
     description: str | None = Field(None, max_length=1024)
 
 
+class UpdateProjectRequest(BaseDTO):
+    """Body for updating project metadata."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+    description: str | None = Field(None, max_length=1024)
+
+
 class ProjectInfoResponse(BaseDTO):
     """Project metadata response."""
 

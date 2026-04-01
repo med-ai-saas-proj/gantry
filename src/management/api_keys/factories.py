@@ -1,9 +1,10 @@
 from src.db.factories import getSessionManager
 from src.shared.logging.logger import getLogger
+from src.management.project.repositories import ProjectRepository
 
 from .services import ApiKeyService
 from .settings import getApiKeysSettings
-from .repositories import ApiKeyRepository, PermissionRepository
+from .repositories import ApiKeyRepository
 
 from functools import lru_cache
 
@@ -19,6 +20,6 @@ def getApiKeyService():
         },
         logger=getLogger(),
         api_key_repo=ApiKeyRepository(),
-        permission_repo=PermissionRepository(),
+        project_repo=ProjectRepository(),
         session_manager=getSessionManager(),
     )

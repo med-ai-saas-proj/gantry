@@ -43,7 +43,7 @@ async def upload_file(
         FileStorageService, Depends(getFileStorageService)
     ],
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["file.write"]))
     ],
 ):
     """Upload a file to the file storage service."""
@@ -86,7 +86,7 @@ async def list_files(
         FileStorageService, Depends(getFileStorageService)
     ],
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["file.read"]))
     ],
 ):
     """List files in the file storage service."""
@@ -128,7 +128,7 @@ async def list_files(
 async def download_file(
     file_id: uuid.UUID,
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["file.read"]))
     ],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
@@ -155,7 +155,7 @@ async def get_file_info_and_presigned_url(
         FileStorageService, Depends(getFileStorageService)
     ],
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["file.read"]))
     ],
 ) -> FileInfoWithPresignedURLResponse:
     """Get file URL and info by file ID."""
@@ -190,7 +190,7 @@ async def get_file_info(
         FileStorageService, Depends(getFileStorageService)
     ],
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["file.read"]))
     ],
 ):
     """Get file info by file ID."""
@@ -218,7 +218,7 @@ async def get_file_info(
 async def get_file_presigned_url(
     file_id: uuid.UUID,
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["file.read"]))
     ],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
@@ -244,7 +244,7 @@ async def get_file_presigned_url(
 async def delete_file(
     file_id: uuid.UUID,
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["file.delete"]))
     ],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
@@ -269,7 +269,7 @@ async def update_file_metadata(
     file_id: uuid.UUID,
     body: Annotated[UpdateFileMetadataRequest, Body()],
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["file.write"]))
     ],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)

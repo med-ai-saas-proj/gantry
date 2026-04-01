@@ -31,7 +31,7 @@ ai_search_router = APIRouter(prefix="/ai_search", tags=["Doctor Help"])
 )
 async def ai_search(
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["ai_search.run"]))
     ],
     input: AiSearchInput,
     ai_search_service: Annotated[AiSearchService, Depends(getAiSearchService)],
