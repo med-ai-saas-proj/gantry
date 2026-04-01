@@ -68,4 +68,5 @@ dev = [
     "boto3-stubs[s3]>=1.42.33",
     "examplenv",
     "typer>=0.24.1",
+    "scalar-fastapi>=1.8.1",
 ]

@@ -1,3 +1,4 @@
+from src.main import app
 from src.shared.settings import getAppSetting
 from src.shared.custom_types.error_exception import ProblemDetails
 
@@ -13,10 +14,13 @@ import asyncio
 import contextlib
 
 from fastapi import FastAPI, APIRouter
+from scalar_fastapi import get_scalar_api_reference
 from fastapi.middleware.cors import CORSMiddleware
 
 
 __all__ = ["management_app"]
+
+app_setting = getAppSetting()
 
 
 async def _org_delete_worker_loop():
@@ -42,9 +46,11 @@ async def lifespan(app: FastAPI):
 
 
 management_app = FastAPI(
-    title="Venera API platform",
-    openapi_url="/docs/openapi.json",
-    docs_url="/docs",
+    title=app_setting.app_name,
+    openapi_url=app_setting.openapi_json_path
+    if app_setting.stage == "DEV"
+    else None,
+    docs_url=None,
     lifespan=lifespan,
     responses={
         400: {"model": ProblemDetails},
@@ -75,3 +81,12 @@ v1_router.include_router(logging_router)
 
 # management_app.include_router(api_router)
 management_app.include_router(v1_router)
+
+if app_setting.stage == "DEV":
+
+    @management_app.get(app_setting.docs_url, include_in_schema=False)
+    async def scalar_html():
+        return get_scalar_api_reference(
+            openapi_url=app_setting.openapi_json_path.lstrip("/"),
+            title=app_setting.app_name + " Management API Reference",
+        )

@@ -49,6 +49,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
         org_id: str,
         amount: Decimal,
         details: dict,
+        created_at: datetime,
         capture: bool = False,
     ) -> BillingTransaction:
         """Persist the final charge record (called during RELEASE)."""
@@ -60,6 +61,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             amount=amount,
             details=details,
             captured_at=func.now() if capture else None,
+            created_at=created_at,
         )
         await self.add(session, tx)
         return tx
@@ -401,6 +403,7 @@ if __name__ == "__main__":
                 org_id="org1",
                 amount=Decimal("10.5"),
                 details={"example": "data"},
+                created_at=datetime(2026, 1, 15),
             )
             await repo.addTransaction(
                 session=session,
@@ -410,6 +413,7 @@ if __name__ == "__main__":
                 org_id="org1",
                 amount=Decimal("20.0"),
                 details={"example": "data"},
+                created_at=datetime(2026, 1, 20),
             )
             await session.commit()
         async with getTimescaleSessionManager().get_session() as session:

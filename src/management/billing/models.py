@@ -68,7 +68,7 @@ class BillingTransaction(WithClientUUID, BillingBaseSQLModel, WithID):
         server_default=func.now(),
         nullable=False,
         primary_key=True,
-        init=False,
+        # init=False,
     )
 
     # apikey_id is enough, project_id and org_id can be derived from it
@@ -224,4 +224,5 @@ class SpendingLimit(
             unique=True,
             postgresql_where=project_id.is_(None),  # global default record
         ),
+        BillingBaseSQLModel.__table_args__,
     )

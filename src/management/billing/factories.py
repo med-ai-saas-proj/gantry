@@ -1,6 +1,10 @@
 """Singleton factory for BillingService."""
 
-from src.db.factories import getRedis, getSessionManager
+from src.db.factories import (
+    getRedis,
+    getSessionManager,
+    getTimescaleSessionManager,
+)
 
 from .settings import getBillingSourceSetting
 from ..api_keys.factories import getApiKeyService
@@ -27,7 +31,7 @@ from stripe import StripeClient
 def getBillingTransactionService() -> TransactionService:
     return TransactionService(
         logger=getLogger(),
-        session_manager=getSessionManager(),
+        session_manager=getTimescaleSessionManager(),
         redis=getRedis(),
         spending_limit_repo=SpendingLimitRepository(),
         transaction_repo=TransactionRepository(),
@@ -40,7 +44,7 @@ def getBillingSourceService() -> BillingSourceService:
     billing_source_settings = getBillingSourceSetting()
     return BillingSourceService(
         billing_source_repo=BillingSourceRepo(),
-        session_manager=getSessionManager(),
+        session_manager=getTimescaleSessionManager(),
         stripe_client=StripeClient(
             billing_source_settings.stripe_secret_key.get_secret_value()
         ),
@@ -51,7 +55,7 @@ def getBillingSourceService() -> BillingSourceService:
 def getBillingAggregateQueryService() -> BillingAggregateQueryService:
     return BillingAggregateQueryService(
         logger=getLogger(),
-        session_manager=getSessionManager(),
+        session_manager=getTimescaleSessionManager(),
         transaction_repo=TransactionRepository(),
         apikey_service=getApiKeyService(),
     )
@@ -60,6 +64,6 @@ def getBillingAggregateQueryService() -> BillingAggregateQueryService:
 @lru_cache(1)
 def getInvoiceService() -> InvoiceService:
     return InvoiceService(
-        session_manager=getSessionManager(),
+        session_manager=getTimescaleSessionManager(),
         invoice_repo=InvoiceRepo(),
     )

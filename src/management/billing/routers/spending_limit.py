@@ -1,5 +1,9 @@
 from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
+from src.shared.custom_types.responses.response import (
+    ObjectResponse,
+    PaginatedResponse,
+)
 
 from ..dtos import SpendingLimitInfoResponse, UpdateSpendingLimitRequest
 from .router import billing_router
@@ -35,11 +39,11 @@ async def get_spending_limits(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-    project_uid: list[UUID]
+    project_uids: list[UUID]
     | None = None,  # filter by project_uid or whole organization
     offset: int = 0,
     limit: int = 100,
-) -> list[SpendingLimitInfoResponse]:
+) -> PaginatedResponse[SpendingLimitInfoResponse]:
     pass
 
 
@@ -53,5 +57,5 @@ async def get_project_spending_limit(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-) -> SpendingLimitInfoResponse:
+) -> ObjectResponse[SpendingLimitInfoResponse]:
     pass

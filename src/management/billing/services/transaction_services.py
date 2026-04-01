@@ -68,11 +68,11 @@ class _TransactionRecord(TypedDict):
     billing_period: str
 
 
-def _current_billing_period() -> datetime:
+def _get_billing_period(
+    ref_time: datetime,
+) -> datetime:
     """Return the current UTC billing period in YYYY-MM format."""
-    return datetime.now(UTC).replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0, tzinfo=None
-    )
+    return ref_time.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def _to_decimal(amount: ScaledAmount) -> Decimal:
@@ -112,7 +112,7 @@ LUA_SCRIPT_ADD_USAGE_AND_CHECK_LIMIT = """
 -- ARGV[4] = cache TTL in seconds
 -- ARGV[5] = transaction TTL in seconds
 -- ARGV[6] = idempotency key TTL in seconds
-existed_idempotency = redis.call("GET", KEYS[6])
+local existed_idempotency = redis.call("GET", KEYS[6])
 -- If idempotency key exists and not pending, return the existing transaction ID to ensure idempotency
 if existed_idempotency then
     return existed_idempotency
@@ -243,7 +243,8 @@ class TransactionService:
 
         Returns Ok(transaction_uuid) on success.
         """
-        billing_period = _current_billing_period()
+        now = datetime.now(UTC).replace(tzinfo=None)
+        billing_period = _get_billing_period(now)
         amount = _to_decimal(req.amount)
         period_key = billing_period.strftime("%Y-%m")
 
@@ -538,6 +539,7 @@ class TransactionService:
 
         try:
             async with self.session_manager.get_session() as session:
+                # use server time for created_at to ensure it's consistent with billing period calculation
                 await self.transaction_repo.addTransaction(
                     session=session,
                     transaction_uid=transaction_uuid,
@@ -547,6 +549,7 @@ class TransactionService:
                     amount=amount,
                     details=req.details,
                     capture=req.capture,
+                    created_at=now,
                 )
                 await session.commit()
         except Exception as e:
@@ -600,34 +603,40 @@ class TransactionService:
         Returns Ok(True) on success.
         """
         transaction_key = self._TRANSACTION_KEY.format(uuid=transaction_uid)
-        project_usage_key = self._PROJECT_USAGE_KEY.format(
-            org_id=org_id, project_id=project_id
-        )
-        org_usage_key = self._ORG_USAGE_KEY.format(org_id=org_id)
+        real = _to_decimal(real_amount)
 
         raw = await self.redis.get(transaction_key)
         if raw is None:
-            return Err(TransactionNotFoundOrExpiredOrCaptured())
+            async with self.session_manager.get_session() as session:
+                trx_ = await self.transaction_repo.getTransactionByUUID(
+                    session, transaction_uid
+                )
+                if not trx_:
+                    return Err(TransactionNotFoundOrExpiredOrCaptured())
+                amount = trx_.amount
+                billing_period = _get_billing_period(trx_.created_at)
+                billing_period_str = billing_period.strftime("%Y-%m")
+        else:
+            trx: _TransactionRecord = json.loads(raw)
 
-        trx: _TransactionRecord = json.loads(raw)
+            if (
+                trx["org_id"] != org_id
+                or trx["project_id"] != project_id
+                or trx["apikey_id"] != api_key_id
+            ):
+                return Err(TransactionNotFoundOrExpiredOrCaptured())
 
-        if (
-            trx["org_id"] != org_id
-            or trx["project_id"] != project_id
-            or trx["apikey_id"] != api_key_id
-        ):
-            return Err(TransactionNotFoundOrExpiredOrCaptured())
+            amount = _to_decimal(trx["amount"])
+            billing_period_str = trx["billing_period"]
+            billing_period = datetime.strptime(
+                trx["billing_period"], "%Y-%m"
+            ).replace(tzinfo=UTC)
 
-        amount = _to_decimal(trx["amount"])
-        real = _to_decimal(real_amount)
-        billing_period = datetime.strptime(
-            trx["billing_period"], "%Y-%m"
-        ).replace(tzinfo=UTC)
         org_usage_key = self._ORG_USAGE_KEY.format(
-            org_id=org_id, period=trx["billing_period"]
+            org_id=org_id, period=billing_period_str
         )
         project_usage_key = self._PROJECT_USAGE_KEY.format(
-            org_id=org_id, project_id=project_id, period=trx["billing_period"]
+            org_id=org_id, project_id=project_id, period=billing_period_str
         )
 
         async def check_org_usage(redis: Redis) -> bool:

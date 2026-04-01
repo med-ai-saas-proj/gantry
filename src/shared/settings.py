@@ -19,6 +19,8 @@ class AppSettings(BaseSettings):
 
     app_name: str = Field("Med-AI-SaaS")
     app_version: str = Field("1.0.0")
+    openapi_json_path: str = Field("/docs/openapi.json")
+    docs_url: str = Field("/docs")
 
 
 @lru_cache(1)

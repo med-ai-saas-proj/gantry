@@ -95,6 +95,9 @@ class ExternalAPIError(RecoverableError):
 
 
 class InternalServiceError(UnrecoverableError):
+    status = 500
+    title = "Internal Service Error"
+    code = "internal_service_error"
     detail = "An internal service error occurred. Please contact support."
 
     def __init__(self, message: str, from_exception: Exception | None = None):

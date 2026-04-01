@@ -30,7 +30,7 @@ async def post(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-    idempotency_key: Annotated[str | None, Header()],
+    idempotency_key: str | None = Header(None),
 ) -> UUID:
     return (
         await billing_service.post(

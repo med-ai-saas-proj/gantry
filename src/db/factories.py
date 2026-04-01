@@ -39,4 +39,7 @@ def getTimescaleSessionManager():
 
 @lru_cache(1)
 def getRedis() -> Redis:
-    return Redis.from_url(getDBSettings().redis_connection_uri.encoded_string())
+    return Redis.from_url(
+        getDBSettings().redis_connection_uri.encoded_string(),
+        decode_responses=True,
+    )
