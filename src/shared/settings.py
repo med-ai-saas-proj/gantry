@@ -22,6 +22,11 @@ class AppSettings(BaseSettings):
     openapi_json_path: str = Field("/docs/openapi.json")
     docs_url: str = Field("/docs")
 
+    mock_auth: bool = Field(
+        False,
+        description="If true, bypasses all auth checks (for testing only)",
+    )
+
 
 @lru_cache(1)
 def getAppSetting():
