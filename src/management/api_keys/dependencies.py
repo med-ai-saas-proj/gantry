@@ -17,12 +17,11 @@ api_key_header = APIKeyHeader(
     description="API authorization header. Put your API token here.",
 )
 
-app_settings = getAppSetting()
-
 
 def requiredPermissions(permissions: list[str]):
     """Dependency to verify the API key and create required permissions."""
     registerPermissions(permissions)
+    app_settings = getAppSetting()
 
     async def get_api_key(
         api_key: Annotated[str, Security(api_key_header)],
@@ -57,6 +56,8 @@ def getApiKeyInfo(
     api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
 ):
     """Dependency to get API key info without permission checks."""
+
+    app_settings = getAppSetting()
 
     async def get_api_key(
         api_key: Annotated[str, Security(api_key_header)],
