@@ -1,8 +1,8 @@
 from src.db.base import BaseTimescaleSQLModel
 from src.db.utils import (
     WithID,
+    WithUUID,
     WithClientUUID,
-    WithClientUUIDv7,
     WithCreateUpdateTimestamp,
 )
 
@@ -92,9 +92,7 @@ class BillingTransaction(WithClientUUID, BillingBaseSQLModel, WithID):
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
-class Credit(
-    WithCreateUpdateTimestamp, WithID, WithClientUUIDv7, BillingBaseSQLModel
-):
+class Credit(WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel):
     __tablename__ = "Credits"
 
     organization_id: Mapped[str] = mapped_column(
@@ -126,7 +124,7 @@ class BillingSourceProvider(str, enum.Enum):
 
 
 class BillingSource(
-    WithCreateUpdateTimestamp, WithID, WithClientUUIDv7, BillingBaseSQLModel
+    WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel
 ):
     __tablename__ = "BillingSources"
 
@@ -147,7 +145,7 @@ class BillingSource(
 
 
 class BillingInvoice(
-    WithCreateUpdateTimestamp, WithID, WithClientUUIDv7, BillingBaseSQLModel
+    WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel
 ):
     __tablename__ = "BillingInvoices"
 
@@ -174,7 +172,7 @@ class BillingInvoice(
 
 
 class BillingInvoiceLineItem(
-    WithCreateUpdateTimestamp, WithID, WithClientUUIDv7, BillingBaseSQLModel
+    WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel
 ):
     __tablename__ = "BillingInvoiceLineItems"
 
@@ -198,7 +196,7 @@ class SpendingLimitType(str, enum.Enum):
 
 
 class SpendingLimit(
-    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel, WithClientUUIDv7
+    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel, WithUUID
 ):
     __tablename__ = "SpendingLimits"
 
