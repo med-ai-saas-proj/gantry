@@ -1,137 +1,230 @@
-from src.db.base import BaseSQLModel
-from src.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
+from src.db.base import BaseTimescaleSQLModel
+from src.db.utils import (
+    WithID,
+    WithUUID,
+    WithCreateUpdateTimestamp,
+    WithClientUUIDWithoutUnique,
+)
 
+import enum
 from decimal import Decimal
+from datetime import date, datetime
 
 from sqlalchemy import (
+    Date,
+    Enum,
     Index,
     String,
     Numeric,
+    DateTime,
     BigInteger,
+    ForeignKey,
+    UniqueConstraint,
+    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 
 
-class BillingBaseSQLModel(BaseSQLModel):
+class BillingBaseSQLModel(BaseTimescaleSQLModel):
     """Base SQL Model for the billing module."""
 
     __abstract__ = True
     __table_args__ = {"schema": "Billing"}
 
 
-class BillingTransaction(
-    WithCreateUpdateTimestamp, WithUUID, BillingBaseSQLModel
-):
-    """Individual charge record for each API call.
+AMOUNT_PRECISION = 18
+AMOUNT_SCALE = 8
+AMOUNT_COLUMN_TYPE = Numeric(precision=AMOUNT_PRECISION, scale=AMOUNT_SCALE)
 
-    All amounts are in USD. Currency conversion is handled by the payment
-    provider layer, not here.
 
-    Flow:
-      1. Service calls HOLD(maximum_cost) before processing request.
-      2. After processing, service calls RELEASE(uuid, real_cost).
-      3. RELEASE deletes the hold and inserts this transaction record.
+class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
+    """Daily aggregated billing data for efficient reporting.
+
+    MUST NOT BE INSERTED/UPDATED/DELETED BY APPLICATION CODE.
+    This is managed by a TimescaleDB continuous aggregate view.
     """
 
+    __tablename__ = "daily_billing_summary"
+    __table_args__ = {"schema": "Billing", "skip_autogenerate": True}
+
+    bucket: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), primary_key=True
+    )
+    organization_id: Mapped[str] = mapped_column(primary_key=True)
+    project_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    apikey_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+
+    total_amount: Mapped[Decimal] = mapped_column(Numeric())
+    transaction_count: Mapped[int] = mapped_column(BigInteger)
+
+
+# timescaledb hypertable doesnot allow having others unique index except primary key
+class BillingTransaction(
+    WithClientUUIDWithoutUnique, BillingBaseSQLModel, WithID
+):
     __tablename__ = "BillingTransactions"
+
+    # use server time instead of db time to avoid billing period not matching
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        # default=datetime.now(UTC).replace(tzinfo=None),
+        server_default=func.now(),
+        nullable=False,
+        primary_key=True,
+        # init=False,
+    )
 
     # apikey_id is enough, project_id and org_id can be derived from it
     apikey_id: Mapped[int] = mapped_column(
         BigInteger, nullable=False, index=True
     )
+    # for quick access patterns, we also store project_id and org_id here (denormalization)
+    project_id: Mapped[int] = mapped_column(
+        BigInteger, nullable=True, index=True
+    )
+    organization_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, index=True
+    )
 
-    # Numeric avoids float rounding — critical for billing.
-    # Postgres stores Numeric as varchar internally; (18, 8) is a soft limit,
-    # hard limit is ~1000 digits. Fine for any realistic USD amount.
-    amount: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False
+    amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
+    captured_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
     )
 
     # e.g. { "llm_usages": { "gpt-4o": { "input_tokens": 100, "output_tokens": 50 } } }
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
-class MonthlyAggregate(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
-    """Pre-aggregated billing total per project per calendar month.
-
-    All amounts are in USD.
-
-    Period format: "2026-02" — calendar month, UTC boundary.
-
-    Caching strategy (TODO: implement in BILL-008):
-      - Current month's aggregate is cached in Redis under
-        key `billing:agg:{project_id}:{billing_period}` for hot reads/writes.
-      - Postgres is always the source of truth.
-      - Finalized (past) months are read directly from Postgres — they never change.
-    """
-
-    __tablename__ = "MonthlyAggregates"
-    __table_args__ = (
-        Index(
-            "ix_monthly_aggregates_project_period",
-            "project_id",
-            "billing_period",
-            unique=True,
-        ),
-        {"schema": "Billing"},
-    )
-
-    project_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
-
-    # "2026-02" — always calendar month, always UTC
-    billing_period: Mapped[str] = mapped_column(String(7), nullable=False)
-
-    total_amount: Mapped[Decimal] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=False, default=Decimal("0")
-    )
-    # False = open, True = finalized
-    is_finalized: Mapped[bool] = mapped_column(nullable=False, default=False)
-
-
-class OrganizationSpendingLimit(
-    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
-):
-    """Spending cap at the organization level. All amounts in USD.
-
-    NULL on a limit field means no limit is set — falls back to global default.
-    Project-level limits (ProjectSpendingLimit) take precedence over these.
-    """
-
-    __tablename__ = "OrganizationSpendingLimits"
+class Credit(WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel):
+    __tablename__ = "Credits"
 
     organization_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, unique=True, index=True
+        String(128), nullable=False, index=True
     )
 
-    # NULL = no limit set (global default applies)
-    monthly_limit: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=True
-    )
-    daily_limit: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=True
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    note: Mapped[str] = mapped_column(String(512), nullable=True)
+
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    expired_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+    amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
+    current_spent: Mapped[Decimal] = mapped_column(
+        AMOUNT_COLUMN_TYPE, nullable=False, default=Decimal("0")
     )
 
 
-class ProjectSpendingLimit(
-    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel
+class BillingSourceState(str, enum.Enum):
+    PENDING = "PENDING"
+    ACTIVE = "ACTIVE"
+    DELETED = "DELETED"
+
+
+class BillingSourceProvider(str, enum.Enum):
+    STRIPE = "stripe"
+    PAYPAL = "paypal"
+    # Add more providers as needed (e.g. "braintree", "square", etc.)
+
+
+class BillingSource(
+    WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel
 ):
-    """Spending cap at the project level. All amounts in USD.
+    __tablename__ = "BillingSources"
 
-    Takes precedence over OrganizationSpendingLimit.
-    NULL on a limit field means fall back to the org-level limit.
-    """
+    organization_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, index=True
+    )
+    source_type: Mapped[BillingSourceProvider] = mapped_column(
+        Enum(BillingSourceProvider), nullable=False
+    )
+    provider_id: Mapped[str] = mapped_column(
+        String(128), nullable=False
+    )  # e.g. Stripe customer ID
+    status: Mapped[BillingSourceState] = mapped_column(
+        Enum(BillingSourceState),
+        default=BillingSourceState.PENDING,
+        server_default=BillingSourceState.PENDING,
+    )
 
-    __tablename__ = "ProjectSpendingLimits"
 
+class BillingInvoice(
+    WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel
+):
+    __tablename__ = "BillingInvoices"
+
+    organization_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, index=True
+    )
+
+    billing_period: Mapped[date] = mapped_column(
+        Date, nullable=False, unique=True
+    )
+
+    total_amount: Mapped[Decimal] = mapped_column(
+        AMOUNT_COLUMN_TYPE, nullable=False
+    )
+    provider_invoice_id: Mapped[str] = mapped_column(
+        String(128), nullable=False
+    )  # e.g. Stripe invoice ID
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    details: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+    used_credits: Mapped[Decimal] = mapped_column(
+        AMOUNT_COLUMN_TYPE, nullable=False, default=Decimal("0")
+    )
+
+
+class BillingInvoiceLineItem(
+    WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel
+):
+    __tablename__ = "BillingInvoiceLineItems"
+
+    invoice_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(BillingInvoice.id, ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )  # foreign key to BillingInvoice.id
+    description: Mapped[str] = mapped_column(String(256), nullable=False)
+
+    amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
+    project_id: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True, index=True
+    )  # optional link to project
+
+
+class SpendingLimitType(str, enum.Enum):
+    MONTHLY = "monthly"
+    # DAILY = "daily"
+
+
+class SpendingLimit(
+    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel, WithUUID
+):
+    __tablename__ = "SpendingLimits"
+
+    organization_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, index=True
+    )
     project_id: Mapped[int] = mapped_column(
-        BigInteger, nullable=False, unique=True, index=True
+        BigInteger, nullable=True, unique=True, index=True
     )
 
-    # NULL = fall back to org-level limit
-    monthly_limit: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=True
+    limit_type: Mapped[SpendingLimitType] = mapped_column(
+        Enum(SpendingLimitType, schema="Billing"), nullable=False
     )
-    daily_limit: Mapped[Decimal | None] = mapped_column(
-        Numeric(precision=18, scale=8), nullable=True
+    limit: Mapped[Decimal | None] = mapped_column(
+        AMOUNT_COLUMN_TYPE, nullable=True
+    )
+
+    __table_args__ = (
+        UniqueConstraint(organization_id, project_id, name="uq_spending_limit"),
+        Index(
+            "ix_spending_limits_org",
+            organization_id,
+            unique=True,
+            postgresql_where=project_id.is_(None),  # global default record
+        ),
+        BillingBaseSQLModel.__table_args__,
     )

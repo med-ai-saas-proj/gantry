@@ -1,5 +1,6 @@
 """FastAPI dependencies for authentication and authorization."""
 
+from src.shared.settings import getAppSetting
 from src.management.organization.factories import (
     KeycloakOrgClient,
     getKeycloakOrgClient,
@@ -44,7 +45,10 @@ class MissingOrganizationContextError(RecoverableError):
     detail = "The authenticated token does not include an organization id."
 
 
-async def getUserInfo(
+app_settings = getAppSetting()
+
+
+async def _getUserInfo(
     token: Annotated[str, Security(oauth_2_scheme)],
     auth_service: Annotated[AuthService, Depends(getAuthService)],
     kc_org_client: Annotated[KeycloakOrgClient, Depends(getKeycloakOrgClient)],
@@ -74,6 +78,33 @@ async def getUserInfo(
             break
 
     return user_info
+
+
+getUserInfo = _getUserInfo
+
+if app_settings.mock_auth:
+    from src.management.auth.services import UnauthorizedError
+
+    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+    # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
+    security = HTTPBearer()
+
+    async def mock_getUserInfo(
+        auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+        auth_service: Annotated[AuthService, Depends(getAuthService)],
+    ) -> UserInfo:
+        if auth.credentials == "bypass_token":
+            return UserInfo(
+                id="test_user",
+                username="test_user",
+                email="test_user@example.com",
+                roles=[],
+                org_id="test_org1",
+            )
+        raise UnauthorizedError()
+
+    getUserInfo = mock_getUserInfo
 
 
 async def getUserOrgId(

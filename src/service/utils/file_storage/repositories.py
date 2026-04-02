@@ -46,18 +46,19 @@ class FileRepository(Repository):
         )
         return await self.selectMany(session, stmt)
 
-    async def deleteFileByUUID(
-        self, session: AsyncSession, file_id: int
-    ) -> None:
+    async def deleteFileById(self, session: AsyncSession, file_id: int) -> File:
         """Delete Marked Deleted file by ID."""
-        stmt = delete(File).where(
-            (File.id == file_id) & (File.status == FileStatus.DELETED)
+        stmt = (
+            delete(File)
+            .where((File.id == file_id) & (File.status == FileStatus.DELETED))
+            .returning(File)
         )
-        await session.execute(stmt)
+        res = await session.execute(stmt)
+        return res.scalar_one()
 
     async def markFileAsAvailableById(
         self, session: AsyncSession, file_id: int
-    ) -> File | None:
+    ) -> File:
         """Mark file as available by ID after upload."""
         stmt = (
             update(File)
@@ -66,8 +67,7 @@ class FileRepository(Repository):
             .returning(File)
         )
         res = await session.execute(stmt)
-        file_record = res.scalar_one_or_none()
-        return file_record if file_record else None
+        return res.scalar_one()
 
     async def markFileAsDeletedByUUID(
         self, session: AsyncSession, file_uuid: uuid.UUID, project_id: int
@@ -83,8 +83,7 @@ class FileRepository(Repository):
             .values(status=FileStatus.DELETED)
         ).returning(File)
         res = await session.execute(stmt)
-        file_record = res.scalar_one_or_none()
-        return file_record if file_record else None
+        return res.scalar_one_or_none()
 
     async def updateExtraMetadataByUUID(
         self,
@@ -105,5 +104,4 @@ class FileRepository(Repository):
             .returning(File)
         )
         res = await session.execute(stmt)
-        file_record = res.scalar_one_or_none()
-        return file_record if file_record else None
+        return res.scalar_one_or_none()

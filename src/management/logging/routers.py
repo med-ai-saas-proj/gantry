@@ -19,7 +19,7 @@ app_settings = getAppSetting()
 
 @logging_router.get(
     "/",
-    description="Query logs with simple query parameters, suitable for simple queries with only label filters and keyword search. For more complex queries that cannot be easily expressed in query parameters, please use the POST endpoint with a request body."
+    description="Query logs with simple query parameters, suitable for simple queries with only label filters and keyword search. For more complex queries that cannot be easily expressed in query parameters, please use the POST endpoint with a request body.",
 )
 async def simple_query_log(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
@@ -61,7 +61,7 @@ async def simple_query_log(
 
 @logging_router.post(
     "/",
-    description="Query logs with more complex request body, supports keyword search and filters with operators (e.g. >, <, =) and custom Loki Label Filters through custom_query field. The GET endpoint is more suitable for simple queries with only label filters and no keyword search, while this POST endpoint can handle more complex queries that cannot be easily expressed in query parameters."
+    description="Query logs with more complex request body, supports keyword search and filters with operators (e.g. >, <, =) and custom Loki Label Filters through custom_query field. The GET endpoint is more suitable for simple queries with only label filters and no keyword search, while this POST endpoint can handle more complex queries that cannot be easily expressed in query parameters.",
 )
 async def query_log(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],

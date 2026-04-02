@@ -24,6 +24,22 @@ def getSessionManager():
     return AsyncSessionManager(getAsyncEngine())
 
 
+def getTimescaleAsyncEngine():
+    engine = create_async_engine(
+        getDBSettings().timescale_connection_uri.encoded_string(), echo=True
+    )
+    SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
+    return engine
+
+
+@lru_cache(1)
+def getTimescaleSessionManager():
+    return AsyncSessionManager(getTimescaleAsyncEngine())
+
+
 @lru_cache(1)
 def getRedis() -> Redis:
-    return Redis.from_url(getDBSettings().redis_connection_uri.encoded_string())
+    return Redis.from_url(
+        getDBSettings().redis_connection_uri.encoded_string(),
+        decode_responses=True,
+    )

@@ -26,7 +26,7 @@ from .repositories import ApiKeyRepository
 import hmac
 import uuid
 import secrets
-from typing import Callable, TypedDict, NotRequired
+from typing import Callable, Sequence, TypedDict, NotRequired
 
 from pyrusult import Ok, Err, Result, ResultStatus
 from structlog.stdlib import BoundLogger
@@ -48,6 +48,14 @@ class InvalidAPIKey(RecoverableError):
     code = "invalid_api_key"
     title = "Invalid API Key"
     detail = "API key is invalid or does not exist."
+
+    def __init__(
+        self,
+        from_exception: Exception | None = None,
+        message: str | None = None,
+    ):
+        super().__init__(from_exception)
+        self.message = message
 
 
 class InsufficientPermission(RecoverableError):
@@ -389,6 +397,30 @@ class ApiKeyService:
                 )
             )
 
+    async def getApiKeysInfo(
+        self, api_key: list[str]
+    ) -> Result[Sequence[ApiKeyInfo], InvalidAPIKey]:
+        async with self.session_manager.get_session() as session:
+            hashed_keys_map = {self._hashApiKey(key): key for key in api_key}
+            keys = await self.api_key_repo.getByHashedKeys(
+                session,
+                list(hashed_keys_map.keys()),
+            )
+            existed_hashed_keys = {key["hashed_key"] for key in keys}
+            missing_hashed_keys = (
+                set(hashed_keys_map.keys()) - existed_hashed_keys
+            )
+            if missing_hashed_keys:
+                missing_keys_str = ", ".join(
+                    hashed_keys_map[hk] for hk in missing_hashed_keys
+                )
+                return Err(
+                    InvalidAPIKey(
+                        message=f"API keys not found: {missing_keys_str}"
+                    )
+                )
+            return Ok(keys)
+
     async def setApiKeyDisabled(
         self,
         *,
@@ -438,6 +470,44 @@ class ApiKeyService:
             await session.commit()
             return Ok(True)
 
+    async def parseApiKey(
+        self, api_key: str
+    ) -> Result[
+        ApiKeyInfo,
+        InvalidAPIKey
+        | ApiKeyDisabledError
+        | InsufficientPermission
+        | UserNotFoundError
+        | ProjectNotFoundError,
+    ]:
+        """Verify an API key and resolve its project and organization context."""
+        async with self.session_manager.get_session() as session:
+            hashed_key = self._hashApiKey(api_key)
+            key = await self.api_key_repo.getByHashedKey(session, hashed_key)
+            if key is None:
+                return Err(InvalidAPIKey())
+            if key.disabled:
+                return Err(ApiKeyDisabledError())
+            if key.user_id is None:
+                return Err(UserNotFoundError())
+
+            project = await self.project_repo.getByKey(session, key.project_id)
+            if project is None:
+                return Err(ProjectNotFoundError())
+
+            return Ok(
+                ApiKeyInfo(
+                    {
+                        "user_id": str(key.user_id),
+                        "project_id": key.project_id,
+                        "api_key_id": key.id,
+                        "project_uid": str(project.uuid),
+                        "org_id": project.organization_id,
+                        "hashed_key": key.hashed_key,
+                    }
+                )
+            )
+
     async def verifyApiKey(
         self, api_key: str, required_permissions: list[str]
     ) -> Result[
@@ -483,6 +553,7 @@ class ApiKeyService:
                         "api_key_id": key.id,
                         "project_uid": str(project.uuid),
                         "org_id": project.organization_id,
+                        "hashed_key": key.hashed_key,
                     }
                 )
             )
