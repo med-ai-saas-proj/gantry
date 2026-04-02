@@ -2,8 +2,8 @@ from src.db.base import BaseTimescaleSQLModel
 from src.db.utils import (
     WithID,
     WithUUID,
-    WithClientUUID,
     WithCreateUpdateTimestamp,
+    WithClientUUIDWithoutUnique,
 )
 
 import enum
@@ -59,9 +59,13 @@ class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
     transaction_count: Mapped[int] = mapped_column(BigInteger)
 
 
-class BillingTransaction(WithClientUUID, BillingBaseSQLModel, WithID):
+# timescaledb hypertable doesnot allow having others unique index except primary key
+class BillingTransaction(
+    WithClientUUIDWithoutUnique, BillingBaseSQLModel, WithID
+):
     __tablename__ = "BillingTransactions"
 
+    # use server time instead of db time to avoid billing period not matching
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         # default=datetime.now(UTC).replace(tzinfo=None),

@@ -48,6 +48,15 @@ class WithClientUUID(MappedAsDataclass, kw_only=True):
     )
 
 
+class WithClientUUIDWithoutUnique(MappedAsDataclass, kw_only=True):
+    uuid: Mapped[PythonUUID] = mapped_column(
+        Uuid,
+        index=True,
+        nullable=False,
+        sort_order=-997,
+    )
+
+
 class WithCreateUpdateTimestamp(MappedAsDataclass, kw_only=True):
     """Add created_at and updated_at to table."""
 
