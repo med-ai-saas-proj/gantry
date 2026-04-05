@@ -47,10 +47,14 @@ class SpendingLimitRepository(Repository[SpendingLimit, int]):
         limit_type: SpendingLimitType,
     ) -> SpendingLimit | None:
         """Get the spending limit record for an organization."""
-        stmt = select(SpendingLimit).where(
-            (SpendingLimit.organization_id == org_id)
-            & (SpendingLimit.project_id == project_id)
-            & (SpendingLimit.limit_type == limit_type)
+        stmt = (
+            select(SpendingLimit)
+            .where(
+                (SpendingLimit.organization_id == org_id)
+                & (SpendingLimit.project_id == project_id)
+                & (SpendingLimit.limit_type == limit_type)
+            )
+            .with_for_update(read=True)
         )
         return await self.selectOne(session, stmt)
 
@@ -61,10 +65,14 @@ class SpendingLimitRepository(Repository[SpendingLimit, int]):
         limit_type: SpendingLimitType,
     ) -> SpendingLimit | None:
         """Get the spending limit record for an organization."""
-        stmt = select(SpendingLimit).where(
-            (SpendingLimit.organization_id == org_id)
-            & (SpendingLimit.project_id.is_(None))  # global default
-            & (SpendingLimit.limit_type == limit_type)
+        stmt = (
+            select(SpendingLimit)
+            .where(
+                (SpendingLimit.organization_id == org_id)
+                & (SpendingLimit.project_id.is_(None))  # global default
+                & (SpendingLimit.limit_type == limit_type)
+            )
+            .with_for_update(read=True)
         )
         return await self.selectOne(session, stmt)
 

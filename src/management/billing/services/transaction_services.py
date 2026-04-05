@@ -1,32 +1,34 @@
 from src.db.factories import AsyncSessionManager
-from src.shared.utils.redis import redis_check_or_load
-from src.management.billing.dtos import (
-    PostRequest,
-    ScaledAmount,
-    TransactionInfoResponse,
-)
-from src.management.billing.type import AggregatePeriod
+from src.shared.utils.redis import redis_get_or_load
 from src.shared.utils.uuid_utils import uuid7
-from src.management.billing.models import SpendingLimitType
 from src.management.api_keys.services import ApiKeyService
 from src.shared.custom_types.error_exception import (
     RecoverableError,
     InternalServiceError,
 )
-from src.management.billing.repositories.transaction_repo import (
+
+from ..dtos import (
+    PostRequest,
+    ScaledAmount,
+    TransactionInfoResponse,
+)
+from ..type import AggregatePeriod
+from ..models import SpendingLimitType
+from ..repositories.transaction_repo import (
     TransactionRepository,
 )
-from src.management.billing.repositories.spending_limit_repo import (
+from ..repositories.spending_limit_repo import (
     SpendingLimitRepository,
 )
 
 import json
+import asyncio
 from uuid import UUID, uuid4
 from typing import Sequence, Awaitable, TypedDict, cast
 from decimal import Decimal
 from datetime import UTC, datetime
 
-from pyrusult import Ok, Err, Result
+from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -75,6 +77,14 @@ def _get_billing_period(
     return ref_time.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
+def _get_next_billing_period(current_period: datetime) -> datetime:
+    """Return the next UTC billing period in YYYY-MM format."""
+    if current_period.month == 12:
+        return current_period.replace(year=current_period.year + 1, month=1)
+    else:
+        return current_period.replace(month=current_period.month + 1)
+
+
 def _to_decimal(amount: ScaledAmount) -> Decimal:
     """Convert a ScaledAmount to a Python Decimal.
 
@@ -83,9 +93,14 @@ def _to_decimal(amount: ScaledAmount) -> Decimal:
     return Decimal(amount["value"]).scaleb(-amount["scale"])
 
 
-def _to_int(amount: Decimal, scale: int) -> int:
+def _decimal_to_int(amount: Decimal, scale: int) -> int:
     """Convert a Decimal amount to an integer representation given a scale."""
     return int((amount * (10**scale)).to_integral_value())
+
+
+def _int_to_decimal(amount: int, scale: int) -> Decimal:
+    """Convert an integer amount with scale back to Decimal."""
+    return Decimal(amount).scaleb(-scale)
 
 
 class ProjectNotFound(RecoverableError):
@@ -228,6 +243,286 @@ class TransactionService:
         self.transaction_repo = transaction_repo
         self.apikey_service = apikey_service
 
+    async def getSpendingLimits(
+        self, org_id: str, project_id: int
+    ) -> Result[tuple[Decimal | None, Decimal | None], InternalServiceError]:
+        """Get current spending limits for the organization and project."""
+        org_limit_key = self._ORG_SPENDING_LIMIT_KEY.format(org_id=org_id)
+        project_limit_key = self._PROJECT_SPENDING_LIMIT_KEY.format(
+            org_id=org_id, project_id=project_id
+        )
+        res = await self._getOrLoadSpendingLimitsToRedis(
+            org_id=org_id,
+            project_id=project_id,
+            org_limit_key=org_limit_key,
+            project_limit_key=project_limit_key,
+        )
+        if res.status == ResultStatus.Err:
+            return res.into()
+        org_limit_raw, project_limit_raw = res.unwrap()
+        org_limit = (
+            _int_to_decimal(int(org_limit_raw), 8)
+            if org_limit_raw != "-1"
+            else None
+        )
+        project_limit = (
+            _int_to_decimal(int(project_limit_raw), 8)
+            if project_limit_raw != "-1"
+            else None
+        )
+        return Ok((project_limit, org_limit))
+
+    async def getUsage(
+        self, org_id: str, project_id: int, ref_time: datetime
+    ) -> Result[tuple[Decimal, Decimal], InternalServiceError]:
+        """Get current usage for the organization and project in the billing period."""
+        billing_period = _get_billing_period(ref_time)
+        org_usage_key = self._ORG_USAGE_KEY.format(
+            org_id=org_id, period=billing_period.strftime("%Y-%m")
+        )
+        project_usage_key = self._PROJECT_USAGE_KEY.format(
+            org_id=org_id,
+            project_id=project_id,
+            period=billing_period.strftime("%Y-%m"),
+        )
+        res = await self._getOrLoadUsageToRedis(
+            org_id=org_id,
+            project_id=project_id,
+            billing_period=billing_period,
+            org_usage_key=org_usage_key,
+            project_usage_key=project_usage_key,
+        )
+        if res.status == ResultStatus.Err:
+            return res.into()
+        org_usage_raw, project_usage_raw = res.unwrap()
+        org_usage = _int_to_decimal(int(org_usage_raw), 8)
+        project_usage = _int_to_decimal(int(project_usage_raw), 8)
+        return Ok((org_usage, project_usage))
+
+    async def _getOrLoadSpendingLimitsToRedis(
+        self,
+        org_id: str,
+        project_id: int,
+        org_limit_key: str,
+        project_limit_key: str,
+    ) -> Result[tuple[str, str], InternalServiceError]:
+        async def get_project_limits(
+            redis: Redis,
+        ) -> str | None:
+            v = await cast(
+                Awaitable[str | None],
+                redis.getex(
+                    project_limit_key,
+                    ex=self._CACHE_TTL,
+                ),
+            )
+            return v
+
+        async def get_org_limits(redis: Redis) -> str | None:
+            v = await cast(
+                Awaitable[str | None],
+                redis.getex(
+                    org_limit_key,
+                    ex=self._CACHE_TTL,
+                ),
+            )
+            return v
+
+        async def load_project_limits_from_db(
+            session: AsyncSession,
+        ) -> str:
+            limit = await self.spending_limit_repo.getProjectLimits(
+                session, org_id, project_id, SpendingLimitType.MONTHLY
+            )
+            v = limit.limit if limit else None
+            return str(_decimal_to_int(v, 8)) if v is not None else "-1"
+
+        async def load_org_limits_from_db(
+            session: AsyncSession,
+        ) -> str:
+            limit = await self.spending_limit_repo.getOrgLimits(
+                session, org_id, SpendingLimitType.MONTHLY
+            )
+            v = limit.limit if limit else None
+            return str(_decimal_to_int(v, 8)) if v is not None else "-1"
+
+        async def save_project_limits_to_redis(
+            redis: Redis, project_limit: str
+        ):
+            await redis.set(
+                project_limit_key,
+                project_limit,
+                ex=self._CACHE_TTL,
+            )
+
+        async def save_org_limits_to_redis(redis: Redis, org_limit: str):
+            await redis.set(
+                org_limit_key,
+                org_limit,
+                ex=self._CACHE_TTL,
+            )
+
+        org_limit, project_limit = await asyncio.gather(
+            redis_get_or_load(
+                redis=self.redis,
+                session_manager=self.session_manager,
+                lock_id=f"spending_limit:{org_id}",
+                lock_ttl=10,
+                lock_blocking_timeout=5,
+                getter=get_org_limits,
+                loader=load_org_limits_from_db,
+                setter=save_org_limits_to_redis,
+                retry_times=3,
+            ),
+            redis_get_or_load(
+                redis=self.redis,
+                session_manager=self.session_manager,
+                lock_id=f"spending_limit:{org_id}:{project_id}",
+                lock_ttl=10,
+                lock_blocking_timeout=5,
+                getter=get_project_limits,
+                loader=load_project_limits_from_db,
+                setter=save_project_limits_to_redis,
+                retry_times=3,
+            ),
+        )
+
+        if org_limit is None:
+            return Err(
+                InternalServiceError(
+                    message="Failed to load organization spending limits. Please try again."
+                )
+            )
+
+        if project_limit is None:
+            return Err(
+                InternalServiceError(
+                    message="Failed to load project spending limits. Please try again."
+                )
+            )
+        return Ok((org_limit, project_limit))
+
+    async def _getOrLoadUsageToRedis(
+        self,
+        org_id: str,
+        project_id: int,
+        billing_period: datetime,
+        org_usage_key: str,
+        project_usage_key: str,
+    ) -> Result[tuple[str, str], InternalServiceError]:
+        next_billing_period = _get_next_billing_period(billing_period)
+
+        async def get_org_usage(redis: Redis) -> str | None:
+            v = await cast(
+                Awaitable[str | None],
+                redis.getex(
+                    org_usage_key,
+                    ex=self._CACHE_TTL,
+                ),
+            )
+            return v
+
+        async def get_project_usage(redis: Redis) -> str | None:
+            v = await cast(
+                Awaitable[str | None],
+                redis.getex(
+                    project_usage_key,
+                    ex=self._CACHE_TTL,
+                ),
+            )
+            return v
+
+        async def load_org_usage_from_db(
+            session: AsyncSession,
+        ) -> str:
+            usage = await self.transaction_repo.sumByPeriodByOrganizations(
+                session,
+                [org_id],
+                billing_period,
+                next_billing_period,
+                AggregatePeriod.MONTHLY,
+                period_scale=1,
+            )
+            v = (
+                usage[0]["total_amount"]
+                if usage and len(usage) > 0
+                else Decimal(0)
+            )
+            return str(_decimal_to_int(v, 8))
+
+        async def load_project_usage_from_db(
+            session: AsyncSession,
+        ) -> str:
+            usage = await self.transaction_repo.sumByPeriodByProjects(
+                session,
+                [project_id],
+                org_id,
+                billing_period,
+                next_billing_period,
+                AggregatePeriod.MONTHLY,
+                period_scale=1,
+            )
+            v = (
+                usage[0]["total_amount"]
+                if usage and len(usage) > 0
+                else Decimal(0)
+            )
+            return str(_decimal_to_int(v, 8))
+
+        async def save_org_usage_to_redis(redis: Redis, org_usage: str):
+            await redis.set(
+                org_usage_key,
+                org_usage,
+                ex=self._CACHE_TTL,
+            )
+
+        async def save_project_usage_to_redis(redis: Redis, project_usage: str):
+            await redis.set(
+                project_usage_key,
+                project_usage,
+                ex=self._CACHE_TTL,
+            )
+
+        org_usage, project_usage = await asyncio.gather(
+            redis_get_or_load(
+                redis=self.redis,
+                session_manager=self.session_manager,
+                lock_id=f"usage:{org_id}",
+                lock_ttl=10,
+                lock_blocking_timeout=5,
+                getter=get_org_usage,
+                loader=load_org_usage_from_db,
+                setter=save_org_usage_to_redis,
+                retry_times=3,
+            ),
+            redis_get_or_load(
+                redis=self.redis,
+                session_manager=self.session_manager,
+                lock_id=f"usage:{org_id}:{project_id}",
+                lock_ttl=10,
+                lock_blocking_timeout=5,
+                getter=get_project_usage,
+                loader=load_project_usage_from_db,
+                setter=save_project_usage_to_redis,
+                retry_times=3,
+            ),
+        )
+
+        if org_usage is None:
+            return Err(
+                InternalServiceError(
+                    message="Failed to load organization usage. Please try again."
+                )
+            )
+
+        if project_usage is None:
+            return Err(
+                InternalServiceError(
+                    message="Failed to load project usage. Please try again."
+                )
+            )
+        return Ok((org_usage, project_usage))
+
     async def post(
         self,
         org_id: str,
@@ -247,7 +542,6 @@ class TransactionService:
         billing_period = _get_billing_period(now)
         amount = _to_decimal(req.amount)
         period_key = billing_period.strftime("%Y-%m")
-
         org_limit_key = self._ORG_SPENDING_LIMIT_KEY.format(org_id=org_id)
         project_limit_key = self._PROJECT_SPENDING_LIMIT_KEY.format(
             org_id=org_id, project_id=project_id
@@ -259,208 +553,19 @@ class TransactionService:
             org_id=org_id, project_id=project_id, period=period_key
         )
 
-        async def check_project_limits(
-            redis: Redis,
-        ) -> bool:
-            is_existed = await cast(
-                Awaitable[bool],
-                redis.expire(
-                    project_limit_key,
-                    self._CACHE_TTL,
-                ),
-            )
-            return is_existed
+        spending_limits_res = await self.getSpendingLimits(org_id, project_id)
+        if spending_limits_res.status == ResultStatus.Err:
+            return spending_limits_res.into()
 
-        async def check_org_limits(redis: Redis) -> bool:
-            is_existed = await cast(
-                Awaitable[bool],
-                redis.expire(
-                    org_limit_key,
-                    self._CACHE_TTL,
-                ),
-            )
-            return is_existed
-
-        async def check_org_usage(redis: Redis) -> bool:
-            is_existed = await cast(
-                Awaitable[bool],
-                redis.expire(
-                    org_usage_key,
-                    self._CACHE_TTL,
-                ),
-            )
-            return is_existed
-
-        async def check_project_usage(redis: Redis) -> bool:
-            is_existed = await cast(
-                Awaitable[bool],
-                redis.expire(
-                    project_usage_key,
-                    self._CACHE_TTL,
-                ),
-            )
-            return is_existed
-
-        async def load_project_limits_from_db(
-            session: AsyncSession,
-        ) -> Decimal | None:
-            limit = await self.spending_limit_repo.getProjectLimits(
-                session, org_id, project_id, SpendingLimitType.MONTHLY
-            )
-            return limit.limit if limit else None
-
-        async def load_org_limits_from_db(
-            session: AsyncSession,
-        ) -> Decimal | None:
-            limit = await self.spending_limit_repo.getOrgLimits(
-                session, org_id, SpendingLimitType.MONTHLY
-            )
-            return limit.limit if limit else None
-
-        async def load_org_usage_from_db(
-            session: AsyncSession,
-        ) -> Decimal:
-            usage = await self.transaction_repo.sumByPeriodByOrganizations(
-                session,
-                [org_id],
-                billing_period,
-                None,
-                AggregatePeriod.MONTHLY,
-                period_scale=1,
-            )
-            return (
-                usage[0]["total_amount"]
-                if usage and len(usage) > 0
-                else Decimal(0)
-            )
-
-        async def load_project_usage_from_db(
-            session: AsyncSession,
-        ) -> Decimal:
-            usage = await self.transaction_repo.sumByPeriodByProjects(
-                session,
-                [project_id],
-                org_id,
-                billing_period,
-                None,
-                AggregatePeriod.MONTHLY,
-                period_scale=1,
-            )
-            return (
-                usage[0]["total_amount"]
-                if usage and len(usage) > 0
-                else Decimal(0)
-            )
-
-        async def save_project_limits_to_redis(
-            redis: Redis, project_limit: Decimal | None
-        ):
-            await redis.set(
-                project_limit_key,
-                _to_int(project_limit, 8) if project_limit is not None else -1,
-                ex=self._CACHE_TTL,
-            )
-
-        async def save_org_limits_to_redis(
-            redis: Redis, org_limit: Decimal | None
-        ):
-            await redis.set(
-                org_limit_key,
-                _to_int(org_limit, 8) if org_limit is not None else -1,
-                ex=self._CACHE_TTL,
-            )
-
-        async def save_org_usage_to_redis(redis: Redis, org_usage: Decimal):
-            await redis.set(
-                org_usage_key,
-                _to_int(org_usage, 8),
-                ex=self._CACHE_TTL,
-            )
-
-        async def save_project_usage_to_redis(
-            redis: Redis, project_usage: Decimal
-        ):
-            await redis.set(
-                project_usage_key,
-                _to_int(project_usage, 8),
-                ex=self._CACHE_TTL,
-            )
-
-        success = await redis_check_or_load(
-            redis=self.redis,
-            session_manager=self.session_manager,
-            lock_id=f"spending_limit:{org_id}:{project_id}",
-            lock_ttl=10,
-            lock_blocking_timeout=5,
-            checker=check_project_limits,
-            loader=load_project_limits_from_db,
-            setter=save_project_limits_to_redis,
-            retry_times=3,
+        usage_res = await self._getOrLoadUsageToRedis(
+            org_id=org_id,
+            project_id=project_id,
+            billing_period=billing_period,
+            org_usage_key=org_usage_key,
+            project_usage_key=project_usage_key,
         )
-
-        if not success:
-            return Err(
-                InternalServiceError(
-                    message="Failed to load project spending limits. Please try again."
-                )
-            )
-
-        success = await redis_check_or_load(
-            redis=self.redis,
-            session_manager=self.session_manager,
-            lock_id=f"spending_limit:{org_id}",
-            lock_ttl=10,
-            lock_blocking_timeout=5,
-            checker=check_org_limits,
-            loader=load_org_limits_from_db,
-            setter=save_org_limits_to_redis,
-            retry_times=3,
-        )
-
-        if not success:
-            return Err(
-                InternalServiceError(
-                    message="Failed to load organization spending limits. Please try again."
-                )
-            )
-
-        success = await redis_check_or_load(
-            redis=self.redis,
-            session_manager=self.session_manager,
-            lock_id=f"usage:{org_id}",
-            lock_ttl=10,
-            lock_blocking_timeout=5,
-            checker=check_org_usage,
-            loader=load_org_usage_from_db,
-            setter=save_org_usage_to_redis,
-            retry_times=3,
-        )
-
-        if not success:
-            return Err(
-                InternalServiceError(
-                    message="Failed to load organization usage. Please try again."
-                )
-            )
-
-        success = await redis_check_or_load(
-            redis=self.redis,
-            session_manager=self.session_manager,
-            lock_id=f"usage:{org_id}:{project_id}",
-            lock_ttl=10,
-            lock_blocking_timeout=5,
-            checker=check_project_usage,
-            loader=load_project_usage_from_db,
-            setter=save_project_usage_to_redis,
-            retry_times=3,
-        )
-
-        if not success:
-            return Err(
-                InternalServiceError(
-                    message="Failed to load project usage. Please try again."
-                )
-            )
+        if usage_res.status == ResultStatus.Err:
+            return usage_res.into()
 
         idempotency_key = idempotency_key or str(uuid4())
         idempotency_cache_key = self._POST_IDEMPOTENCY_KEY.format(
@@ -489,7 +594,7 @@ class TransactionService:
                 org_usage_key,
                 trx_key,
                 idempotency_cache_key,
-                str(_to_int(amount, 8)),  # ARGV[1]
+                str(_decimal_to_int(amount, 8)),  # ARGV[1]
                 json.dumps(transaction_record),  # ARGV[2]
                 str(transaction_uuid),  # ARGV[3]
                 self._CACHE_TTL,  # ARGV[4]
@@ -563,7 +668,7 @@ class TransactionService:
                     org_usage_key,
                     trx_key,
                     idempotency_cache_key,
-                    str(_to_int(amount, 8)),
+                    str(_decimal_to_int(amount, 8)),
                     str(transaction_uuid),
                     self._CACHE_TTL,
                 ),
@@ -639,110 +744,15 @@ class TransactionService:
             org_id=org_id, project_id=project_id, period=billing_period_str
         )
 
-        async def check_org_usage(redis: Redis) -> bool:
-            is_existed = await cast(
-                Awaitable[bool],
-                redis.expire(
-                    org_usage_key,
-                    self._CACHE_TTL,
-                ),
-            )
-            return is_existed
-
-        async def check_project_usage(redis: Redis) -> bool:
-            is_existed = await cast(
-                Awaitable[bool],
-                redis.expire(
-                    project_usage_key,
-                    self._CACHE_TTL,
-                ),
-            )
-            return is_existed
-
-        async def load_org_usage_from_db(
-            session: AsyncSession,
-        ) -> Decimal:
-            usage = await self.transaction_repo.sumByPeriodByOrganizations(
-                session,
-                [org_id],
-                billing_period,
-                None,
-                AggregatePeriod.MONTHLY,
-                period_scale=1,
-            )
-            return (
-                usage[0]["total_amount"]
-                if usage and len(usage) > 0
-                else Decimal(0)
-            )
-
-        async def load_project_usage_from_db(session: AsyncSession) -> Decimal:
-            usage = await self.transaction_repo.sumByPeriodByProjects(
-                session,
-                [project_id],
-                org_id,
-                billing_period,
-                None,
-                AggregatePeriod.MONTHLY,
-                period_scale=1,
-            )
-            return (
-                usage[0]["total_amount"]
-                if usage and len(usage) > 0
-                else Decimal(0)
-            )
-
-        async def save_org_usage_to_redis(redis: Redis, org_usage: Decimal):
-            await redis.set(
-                org_usage_key,
-                _to_int(org_usage, 8),
-                ex=self._CACHE_TTL,
-            )
-
-        async def save_project_usage_to_redis(
-            redis: Redis, project_usage: Decimal
-        ):
-            await redis.set(
-                project_usage_key,
-                _to_int(project_usage, 8),
-                ex=self._CACHE_TTL,
-            )
-
-        success = await redis_check_or_load(
-            redis=self.redis,
-            session_manager=self.session_manager,
-            lock_id=f"usage:{org_id}",
-            lock_ttl=10,
-            lock_blocking_timeout=5,
-            checker=check_org_usage,
-            loader=load_org_usage_from_db,
-            setter=save_org_usage_to_redis,
-            retry_times=3,
+        usage_res = await self._getOrLoadUsageToRedis(
+            org_id=org_id,
+            project_id=project_id,
+            billing_period=billing_period,
+            org_usage_key=org_usage_key,
+            project_usage_key=project_usage_key,
         )
-        if not success:
-            return Err(
-                InternalServiceError(
-                    message="Failed to load organization usage. Please try again."
-                )
-            )
-
-        success = await redis_check_or_load(
-            redis=self.redis,
-            session_manager=self.session_manager,
-            lock_id=f"usage:{org_id}:{project_id}",
-            lock_ttl=10,
-            lock_blocking_timeout=5,
-            checker=check_project_usage,
-            loader=load_project_usage_from_db,
-            setter=save_project_usage_to_redis,
-            retry_times=3,
-        )
-        if not success:
-            return Err(
-                InternalServiceError(
-                    message="Failed to load project usage. Please try again."
-                )
-            )
+        if usage_res.status == ResultStatus.Err:
+            return usage_res.into()
 
         # delta ≤ 0 in the typical case (hold over-estimated real cost)
         delta = real - amount
@@ -766,7 +776,7 @@ class TransactionService:
                 project_usage_key,
                 org_usage_key,
                 transaction_key,
-                str(_to_int(delta, 8)),
+                str(_decimal_to_int(delta, 8)),
                 self._CACHE_TTL,
             ),
         )
