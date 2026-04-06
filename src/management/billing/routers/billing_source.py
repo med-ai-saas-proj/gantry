@@ -6,7 +6,6 @@ from src.management.billing.dtos import (
 from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
 from src.shared.custom_types.responses.response import (
-    ListResponse,
     ObjectResponse,
 )
 from src.management.billing.services.billing_source_service import (
@@ -14,7 +13,6 @@ from src.management.billing.services.billing_source_service import (
 )
 
 from .router import billing_router
-from ..models import BillingSourceProvider
 from ..factories import (
     getBillingSourceService,
 )
@@ -27,43 +25,41 @@ from fastapi import Body, Depends
 
 @billing_router.post(
     "/sources",
-    description="Add a billing source (e.g. Stripe customer) for an organization.",
+    description="Create a new billing source for an organization.",
 )
-async def add_billing_source(
+async def create_billing_source(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
     req: Annotated[AddBillingSourceRequest, Body()],
 ) -> ObjectResponse[BillingSourceResponse]:
-    res = await billing_source_service.addBillingSource(
+    res = await billing_source_service.createBillingSource(
         org_id=user_info["org_id"], req=req
     )
     return ObjectResponse[BillingSourceResponse](data=res.unwrap())
 
 
 @billing_router.get(
-    "/sources", description="List billing sources for an organization."
+    "/sources", description="Get billing sources info for an organization."
 )
 async def list_billing_sources(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
-    providers: list[BillingSourceProvider] | None,
-):
-    res = await billing_source_service.listBillingSources(
-        org_id=user_info["org_id"], providers=providers
+) -> ObjectResponse[BillingSourceResponse]:
+    res = await billing_source_service.getBillingSource(
+        org_id=user_info["org_id"]
     )
-    return ListResponse[BillingSourceResponse](data=res.unwrap())
+    return ObjectResponse[BillingSourceResponse](data=res.unwrap())
 
 
 @billing_router.put(
-    "/sources/{billing_source_uid}",
+    "/sources",
     description="Update a billing source (e.g. change default payment method, update billing address, etc.).",
 )
 async def update_billing_source(
-    billing_source_uid: uuid.UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
@@ -72,53 +68,30 @@ async def update_billing_source(
 ):
     res = await billing_source_service.updateBillingSource(
         org_id=user_info["org_id"],
-        billing_source_uid=billing_source_uid,
         update_fields=req,
     )
     res.unwrap()
 
 
-@billing_router.delete(
-    "/sources/{billing_source_uid}",
-    description="Remove a billing source from an organization.",
-)
-async def delete_billing_source(
-    billing_source_uid: uuid.UUID,
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_source_service: Annotated[
-        BillingSourceService, Depends(getBillingSourceService)
-    ],
-):
-    res = await billing_source_service.deleteBillingSource(
-        org_id=user_info["org_id"],
-        billing_source_uid=billing_source_uid,
-    )
-    res.unwrap()
-
-
 @billing_router.post(
-    "/sources/{billing_source_uid}/setup_intents",
+    "/sources/setup_intents",
     description="Create a setup intent for a billing source.",
 )
 async def create_setup_intent(
-    billing_source_uid: uuid.UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
-    res = await billing_source_service.createSetupIntent(
-        user_info["org_id"], billing_source_uid
-    )
+    res = await billing_source_service.createSetupIntent(user_info["org_id"])
     return res.unwrap()
 
 
 @billing_router.delete(
-    "/sources/{billing_source_uid}/payment_method/{payment_method_id}",
+    "/sources/payment_method/{payment_method_id}",
     description="Remove a payment method from a billing source.",
 )
 async def delete_payment_method(
-    billing_source_uid: uuid.UUID,
     payment_method_id: str,  # e.g. "pm_12345" for Stripe
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
@@ -126,34 +99,30 @@ async def delete_payment_method(
     ],
 ):
     res = await billing_source_service.deletePaymentMethod(
-        user_info["org_id"], billing_source_uid, payment_method_id
+        user_info["org_id"], payment_method_id
     )
     res.unwrap()
 
 
 @billing_router.get(
-    "/sources/{billing_source_uid}/payment_methods",
+    "/sources/payment_methods",
     description="List payment methods for a billing source.",
 )
 async def list_payment_methods(
-    billing_source_uid: uuid.UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
-    res = await billing_source_service.listPaymentMethods(
-        user_info["org_id"], billing_source_uid
-    )
+    res = await billing_source_service.listPaymentMethods(user_info["org_id"])
     return res.unwrap()
 
 
 @billing_router.get(
-    "/sources/{billing_source_uid}/payment_methods/{payment_method_id}",
+    "/sources/payment_methods/{payment_method_id}",
     description="Get details for a specific payment method.",
 )
 async def get_payment_method_details(
-    billing_source_uid: uuid.UUID,
     payment_method_id: str,  # e.g. "pm_12345" for Stripe
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
@@ -161,34 +130,32 @@ async def get_payment_method_details(
     ],
 ):
     res = await billing_source_service.getPaymentMethodDetails(
-        user_info["org_id"], billing_source_uid, payment_method_id
+        user_info["org_id"], payment_method_id
     )
     return res.unwrap()
 
 
 @billing_router.get(
-    "/sources/{billing_source_uid}/setup_intents/required_actions",
+    "/sources/setup_intents/required_actions",
     description="List setup intents that require user action for a billing source (used to verify payment method after linking)",
 )
 async def list_required_action_setup_intents(
-    billing_source_uid: uuid.UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
     res = await billing_source_service.listRequiredActionSetupIntents(
-        user_info["org_id"], billing_source_uid
+        user_info["org_id"],
     )
     return res.unwrap()
 
 
 @billing_router.delete(
-    "/sources/{billing_source_uid}/setup_intents/{setup_intent_id}",
+    "/sources/setup_intents/{setup_intent_id}",
     description="Cancel a pending setup intent for a billing source.",
 )
 async def cancel_setup_intent(
-    billing_source_uid: uuid.UUID,
     setup_intent_id: str,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
@@ -196,6 +163,6 @@ async def cancel_setup_intent(
     ],
 ):
     res = await billing_source_service.cancelSetupIntent(
-        user_info["org_id"], billing_source_uid, setup_intent_id
+        user_info["org_id"], setup_intent_id
     )
     res.unwrap()

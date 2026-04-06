@@ -59,11 +59,6 @@ class StripeBillingSourceProviderInterface(BillingSourceProviderInterface):
             )
         )
 
-    async def deleteCustomer(self, provider_id: str):
-        return await self._async_wrap(
-            lambda: self.client.v1.customers.delete(provider_id)
-        )
-
     async def updateCustomer(
         self, provider_id: str, req: UpdateBillingSourceRequest
     ):

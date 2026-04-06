@@ -14,12 +14,6 @@ class BillingSourceProviderInterface(ABC):
         pass
 
     @abstractmethod
-    async def deleteCustomer(
-        self, provider_id: str
-    ) -> Result[None, ExternalAPIError | NotImplementedError]:
-        pass
-
-    @abstractmethod
     async def updateCustomer(
         self, provider_id: str, req
     ) -> Result[None, ExternalAPIError | NotImplementedError]:

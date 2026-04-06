@@ -1,7 +1,6 @@
 """DTOs for the billing module."""
 
 from src.management.billing.models import (
-    BillingSourceState,
     BillingSourceProvider,
 )
 
@@ -45,7 +44,6 @@ class BillingSourceResponse(BaseModel):
     billing_source_uid: UUID
     organization_id: str
     source_type: BillingSourceProvider
-    status: BillingSourceState
     created_at: datetime
 
 

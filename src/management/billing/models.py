@@ -22,6 +22,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from google.auth import default
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -115,12 +116,6 @@ class Credit(WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel):
     )
 
 
-class BillingSourceState(str, enum.Enum):
-    PENDING = "PENDING"
-    ACTIVE = "ACTIVE"
-    DELETED = "DELETED"
-
-
 class BillingSourceProvider(str, enum.Enum):
     STRIPE = "stripe"
     PAYPAL = "paypal"
@@ -133,7 +128,7 @@ class BillingSource(
     __tablename__ = "BillingSources"
 
     organization_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, index=True
+        String(128), nullable=False, index=True, unique=True
     )
     source_type: Mapped[BillingSourceProvider] = mapped_column(
         Enum(BillingSourceProvider), nullable=False
@@ -141,11 +136,6 @@ class BillingSource(
     provider_id: Mapped[str] = mapped_column(
         String(128), nullable=False
     )  # e.g. Stripe customer ID
-    status: Mapped[BillingSourceState] = mapped_column(
-        Enum(BillingSourceState),
-        default=BillingSourceState.PENDING,
-        server_default=BillingSourceState.PENDING,
-    )
 
 
 class BillingInvoice(

@@ -10,6 +10,7 @@ class BillingSourceSetting(BaseSettings):
     )
 
     stripe_secret_key: SecretStr
+    stripe_webhook_secret: SecretStr
 
 
 @lru_cache(1)
