@@ -1,4 +1,5 @@
 from src.db.session import AsyncSessionManager
+from src.shared.utils.redis import redis_lock
 from src.shared.custom_types.error_exception import (
     ExternalAPIError,
     RecoverableError,
@@ -7,9 +8,12 @@ from src.shared.custom_types.error_exception import (
 )
 
 from ..dtos import (
+    BillingAddress,
     BillingSourceResponse,
+    BillingAddressResponse,
     AddBillingSourceRequest,
     UpdateBillingSourceRequest,
+    BillingSourceDetailResponse,
 )
 from ..models import BillingSource, BillingSourceProvider
 from .billing_source_stripe import (
@@ -20,17 +24,29 @@ from .billing_source_provider import (
 )
 from ..repositories.billing_source_repo import BillingSourceRepo
 
-import uuid
+from typing import cast
 
-from stripe import StripeClient
+from stripe import Customer, StripeClient
 from pyrusult import Ok, Err, Result, ResultStatus
+from redis.asyncio import Redis
 
 
 class BillingSourceNotFoundError(RecoverableError):
     status = 404
     code = "billing_source_not_found"
     title = "Billing Source Not Found"
-    detail = "The specified billing source was not found for the organization."
+    detail = "The billing source for the organization was not found."
+
+    def __init__(self, message: str):
+        super().__init__()
+        self.message = message
+
+
+class BillingSourceAlreadyExistsError(RecoverableError):
+    status = 400
+    code = "billing_source_already_exists"
+    title = "Billing Source Already Exists"
+    detail = "A billing source already exists for the organization."
 
     def __init__(self, message: str):
         super().__init__()
@@ -44,10 +60,12 @@ class BillingSourceService:
         self,
         billing_source_repo: BillingSourceRepo,
         session_manager: AsyncSessionManager,
+        redis_client: Redis,
         stripe_client: StripeClient,
     ) -> None:
         self.billing_source_repo = billing_source_repo
         self.session_manager = session_manager
+        self.redis_client = redis_client
         self.stripe_client = stripe_client
         self.provider_impl = {
             BillingSourceProvider.STRIPE: StripeBillingSourceProviderInterface(
@@ -57,31 +75,46 @@ class BillingSourceService:
 
     async def createBillingSource(
         self, org_id: str, req: AddBillingSourceRequest
-    ) -> Result[BillingSourceResponse, ExternalAPIError]:
-        provider_imp = self.provider_impl[BillingSourceProvider.STRIPE]
-        stripe_api_call_res = await provider_imp.createCustomer(req)
-        if stripe_api_call_res.status == ResultStatus.Err:
-            return stripe_api_call_res.into()
+    ) -> Result[
+        BillingSourceResponse,
+        ExternalAPIError | BillingSourceAlreadyExistsError,
+    ]:
+        async with redis_lock(
+            self.redis_client,
+            f"billing_source_creation_lock:{org_id}",
+        ) as lock_acquired:
+            existed = await self._getBillingSourceOrError(org_id)
+            if existed.status == ResultStatus.Ok:
+                return Err(
+                    BillingSourceAlreadyExistsError(
+                        message=f"Billing source already exists for org {org_id}"
+                    )
+                )
 
-        stripe_customer_id = stripe_api_call_res.value
-        async with self.session_manager.get_session() as session:
-            billing_source = BillingSource(
-                organization_id=org_id,
-                source_type=BillingSourceProvider.STRIPE,
-                provider_id=stripe_customer_id,
-            )
-            await self.billing_source_repo.add(session, billing_source)
-            session.expunge_all()
-            await session.commit()
+            provider_imp = self.provider_impl[BillingSourceProvider.STRIPE]
+            stripe_api_call_res = await provider_imp.createCustomer(req)
+            if stripe_api_call_res.status == ResultStatus.Err:
+                return stripe_api_call_res.into()
 
-        return Ok(
-            BillingSourceResponse(
-                billing_source_uid=billing_source.uuid,
-                organization_id=billing_source.organization_id,
-                source_type=billing_source.source_type,
-                created_at=billing_source.created_at,
+            stripe_customer_id = stripe_api_call_res.value
+            async with self.session_manager.get_session() as session:
+                billing_source = BillingSource(
+                    organization_id=org_id,
+                    source_type=BillingSourceProvider.STRIPE,
+                    provider_id=stripe_customer_id,
+                )
+                await self.billing_source_repo.add(session, billing_source)
+                session.expunge_all()
+                await session.commit()
+
+            return Ok(
+                BillingSourceResponse(
+                    billing_source_uid=billing_source.uuid,
+                    organization_id=billing_source.organization_id,
+                    source_type=billing_source.source_type,
+                    created_at=billing_source.created_at,
+                )
             )
-        )
 
     async def updateBillingSource(
         self,
@@ -107,19 +140,48 @@ class BillingSourceService:
     async def getBillingSource(
         self,
         org_id: str,
-    ):
+    ) -> Result[
+        BillingSourceDetailResponse,
+        ExternalAPIError | BillingSourceNotFoundError | NotImplementedError,
+    ]:
         billing_source_res = await self._getBillingSourceOrError(org_id)
         if billing_source_res.status == ResultStatus.Err:
             return billing_source_res.into()
         billing_source = billing_source_res.value
-        return Ok(
-            BillingSourceResponse(
-                billing_source_uid=billing_source.uuid,
-                organization_id=billing_source.organization_id,
-                source_type=billing_source.source_type,
-                created_at=billing_source.created_at,
+        source_type = billing_source.source_type
+        billing_source_details_res = await self.provider_impl[
+            source_type
+        ].getCustomer(billing_source.provider_id)
+        if billing_source_details_res.status == ResultStatus.Err:
+            return billing_source_details_res.into()
+
+        if source_type == BillingSourceProvider.STRIPE:
+            billing_source_details = cast(
+                Customer, billing_source_details_res.value
             )
-        )
+            return Ok(
+                BillingSourceDetailResponse(
+                    billing_source_uid=billing_source.uuid,
+                    organization_id=billing_source.organization_id,
+                    source_type=billing_source.source_type,
+                    created_at=billing_source.created_at,
+                    provider_id=billing_source.provider_id,
+                    email=billing_source_details.email,
+                    phone=billing_source_details.phone,
+                    name=billing_source_details.name,
+                    billing_address=BillingAddressResponse(
+                        line1=billing_source_details.address.line1,
+                        line2=billing_source_details.address.line2,
+                        city=billing_source_details.address.city,
+                        state=billing_source_details.address.state,
+                        postal_code=billing_source_details.address.postal_code,
+                        country=billing_source_details.address.country,
+                    )
+                    if billing_source_details.address
+                    else None,
+                )
+            )
+        return Err(NotImplementedError())
 
     async def _getBillingSourceOrError(
         self, org_id: str

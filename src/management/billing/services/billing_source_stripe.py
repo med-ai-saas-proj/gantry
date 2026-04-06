@@ -2,11 +2,16 @@ from src.management.billing.dtos import (
     AddBillingSourceRequest,
     UpdateBillingSourceRequest,
 )
-from src.shared.custom_types.error_exception import ExternalAPIError
+from src.shared.custom_types.error_exception import (
+    ExternalAPIError,
+    NotImplementedError,
+)
 
 from .billing_source_provider import BillingSourceProviderInterface
 
 import asyncio
+from ctypes import cast
+from typing import Any
 
 from stripe import StripeError, StripeClient
 from pyrusult import Ok, Err
@@ -121,4 +126,14 @@ class StripeBillingSourceProviderInterface(BillingSourceProviderInterface):
     async def detachPaymentMethod(self, payment_method_id: str):
         return await self._async_wrap(
             lambda: self.client.v1.payment_methods.detach(payment_method_id)
+        )
+
+    async def getCustomer(
+        self, provider_id: str
+    ) -> (
+        Ok[Any, ExternalAPIError | NotImplementedError]
+        | Err[dict, ExternalAPIError | NotImplementedError]
+    ):
+        return await self._async_wrap(
+            lambda: self.client.v1.customers.retrieve(provider_id)
         )

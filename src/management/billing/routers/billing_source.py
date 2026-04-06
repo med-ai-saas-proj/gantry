@@ -2,6 +2,7 @@ from src.management.billing.dtos import (
     BillingSourceResponse,
     AddBillingSourceRequest,
     UpdateBillingSourceRequest,
+    BillingSourceDetailResponse,
 )
 from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
@@ -43,16 +44,16 @@ async def create_billing_source(
 @billing_router.get(
     "/sources", description="Get billing sources info for an organization."
 )
-async def list_billing_sources(
+async def billing_source_info(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
-) -> ObjectResponse[BillingSourceResponse]:
+) -> ObjectResponse[BillingSourceDetailResponse]:
     res = await billing_source_service.getBillingSource(
         org_id=user_info["org_id"]
     )
-    return ObjectResponse[BillingSourceResponse](data=res.unwrap())
+    return ObjectResponse[BillingSourceDetailResponse](data=res.unwrap())
 
 
 @billing_router.put(

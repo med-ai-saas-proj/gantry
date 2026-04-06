@@ -4,6 +4,7 @@ from src.shared.custom_types.error_exception import (
 )
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from pyrusult import Result
 
@@ -17,6 +18,12 @@ class BillingSourceProviderInterface(ABC):
     async def updateCustomer(
         self, provider_id: str, req
     ) -> Result[None, ExternalAPIError | NotImplementedError]:
+        pass
+
+    @abstractmethod
+    async def getCustomer(
+        self, provider_id: str
+    ) -> Result[Any, ExternalAPIError | NotImplementedError]:
         pass
 
     @abstractmethod

@@ -47,6 +47,23 @@ class BillingSourceResponse(BaseModel):
     created_at: datetime
 
 
+class BillingAddressResponse(BaseModel):
+    line1: str | None
+    line2: str | None
+    city: str | None
+    state: str | None
+    postal_code: str | None
+    country: str | None
+
+
+class BillingSourceDetailResponse(BillingSourceResponse):
+    provider_id: str
+    email: str | None
+    phone: str | None
+    name: str | None
+    billing_address: BillingAddressResponse | None
+
+
 class TransactionInfoResponse(BaseModel):
     transaction_uid: UUID
     amount: Decimal

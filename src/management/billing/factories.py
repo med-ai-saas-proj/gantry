@@ -45,6 +45,7 @@ def getBillingSourceService() -> BillingSourceService:
     return BillingSourceService(
         billing_source_repo=BillingSourceRepo(),
         session_manager=getTimescaleSessionManager(),
+        redis_client=getRedis(),
         stripe_client=StripeClient(
             billing_source_settings.stripe_secret_key.get_secret_value()
         ),

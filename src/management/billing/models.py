@@ -22,7 +22,6 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
-from google.auth import default
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import JSONB
 
