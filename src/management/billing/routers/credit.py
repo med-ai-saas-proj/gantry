@@ -12,7 +12,7 @@ from ..factories import TransactionService, getBillingTransactionService
 from uuid import UUID
 from typing import Annotated
 
-from fastapi import Body, Depends
+from fastapi import Body, Query, Depends
 
 
 @billing_router.post(
@@ -38,9 +38,10 @@ async def list_credits(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-    project_uid: list[UUID]
-    | None = None,  # filter by project_uid or whole organization
-    status: str | None = None,  # e.g. "active", "used", "expired"
+    project_uids: list[UUID] | None = Query(
+        None
+    ),  # filter by project_uid or whole organization
+    status: str | None = Query(None),  # e.g. "active", "used", "expired"
     limit: int = 100,
     offset: int = 0,
 ) -> PaginatedResponse[CreditInfoResponse]:
@@ -56,10 +57,13 @@ async def list_credits_for_admin(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-    project_uid: list[UUID]
-    | None = None,  # filter by project_uid or whole organization
-    org_id: list[UUID] | None = None,  # filter by org_id for admin users
-    status: str | None = None,  # e.g. "active", "used", "expired"
+    project_uids: list[UUID] | None = Query(
+        None
+    ),  # filter by project_uid or whole organization
+    org_ids: list[UUID] | None = Query(
+        None
+    ),  # filter by org_id for admin users
+    status: str | None = Query(None),  # e.g. "active", "used", "expired"
     limit: int = 100,
     offset: int = 0,
 ) -> PaginatedResponse[CreditInfoResponse]:

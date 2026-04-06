@@ -12,11 +12,11 @@ from ..factories import TransactionService, getBillingTransactionService
 from uuid import UUID
 from typing import Annotated
 
-from fastapi import Body, Depends, APIRouter
+from fastapi import Body, Query, Depends
 
 
 @billing_router.put(
-    "/spending-limits",
+    "/spending-limits/{project_id}",
     description="Update spending limits for a specific project",
 )
 async def update_spending_limits(
@@ -39,8 +39,9 @@ async def get_spending_limits(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-    project_uids: list[UUID]
-    | None = None,  # filter by project_uid or whole organization
+    project_uids: list[UUID] | None = Query(
+        None
+    ),  # filter by project_uid or whole organization
     offset: int = 0,
     limit: int = 100,
 ) -> PaginatedResponse[SpendingLimitInfoResponse]:

@@ -89,9 +89,6 @@ class UpdateSpendingLimitRequest(BaseModel):
     new_limit: ScaledAmount | None = (
         None  # if null, will remove spending limit and allow all charges to go through regardless of amount
     )
-    project_uid: UUID | None = (
-        None  # if null, will apply to whole organization instead of specific project
-    )
 
 
 class CreditInfoResponse(BaseModel):

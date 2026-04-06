@@ -1,4 +1,3 @@
-from src.db.factories import getTimescaleSessionManager
 from src.db.repository import Repository
 from src.management.project.models import Project
 
@@ -198,11 +197,9 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
         skip: int = 0,
         limit: int = 100,
     ) -> Sequence[BillingTransaction]:
-        """Get transactions for a set of API keys, newest first.
-
-        Use for project-level or org-level queries: resolve
-        project_id / org_id -> apikey_ids in the service layer first.
-        """
+        """Get transactions for a list of API keys, newest first."""
+        if len(apikey_ids) == 0:
+            return []  # no apikeys, no transactions
         stmt = (
             select(BillingTransaction)
             .where(
@@ -224,6 +221,8 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
         limit: int = 100,
     ) -> Sequence[BillingTransaction]:
         """Get transactions for an organization, newest first."""
+        if len(org_ids) == 0:
+            return []  # no orgs, no transactions
         stmt = (
             select(BillingTransaction)
             .where(BillingTransaction.organization_id.in_(org_ids))
@@ -241,6 +240,8 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
         limit: int = 100,
     ) -> Sequence[BillingTransaction]:
         """Get transactions for a project, newest first."""
+        if len(project_ids) == 0:
+            return []  # no projects, no transactions
         stmt = (
             select(BillingTransaction)
             .where(
@@ -257,7 +258,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
     async def sumByPeriodByApiKeys(
         self,
         session: AsyncSession,
-        apikey_ids: list[int],
+        apikey_ids: list[int] | None,
         org_id: str,
         start_time: datetime,
         end_time: datetime | None,
@@ -280,10 +281,13 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
                 Decimal("0"),
             ).label("total_amount"),
         ).where(
-            TimescaleDBDailyBillingSummary.apikey_id.in_(apikey_ids),
             TimescaleDBDailyBillingSummary.organization_id == org_id,
             TimescaleDBDailyBillingSummary.bucket >= start_time,
         )
+        if apikey_ids is not None and len(apikey_ids) > 0:
+            stmt = stmt.where(
+                TimescaleDBDailyBillingSummary.apikey_id.in_(apikey_ids)
+            )
         if end_time:
             stmt = stmt.where(TimescaleDBDailyBillingSummary.bucket < end_time)
         stmt = stmt.group_by(bucket)
@@ -308,6 +312,8 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
         period_scale: int = 1,  # e.g. for period=weekly, period_scale=2 means 2-week aggregation buckets.
     ) -> Sequence[BillingAggregateReport]:
         """Sum the total amount for an organization in a time period."""
+        if len(org_ids) == 0:
+            return []  # no orgs, no data
         bucket = func.public.time_bucket(
             text(f"'{period_scale} {bucket_map[period]}'"),
             TimescaleDBDailyBillingSummary.bucket,
@@ -344,7 +350,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
     async def sumByPeriodByProjects(
         self,
         session: AsyncSession,
-        project_ids: list[int],
+        project_ids: list[int] | None,
         org_id: str,
         start_time: datetime,
         end_time: datetime | None,
@@ -367,10 +373,13 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
                 Decimal("0"),
             ).label("total_amount"),
         ).where(
-            TimescaleDBDailyBillingSummary.project_id.in_(project_ids),
             TimescaleDBDailyBillingSummary.organization_id == org_id,
             TimescaleDBDailyBillingSummary.bucket >= start_time,
         )
+        if project_ids is not None and len(project_ids) > 0:
+            stmt = stmt.where(
+                TimescaleDBDailyBillingSummary.project_id.in_(project_ids)
+            )
         if end_time:
             stmt = stmt.where(TimescaleDBDailyBillingSummary.bucket < end_time)
         stmt = stmt.group_by(bucket)

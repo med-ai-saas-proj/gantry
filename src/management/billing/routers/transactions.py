@@ -18,7 +18,7 @@ from uuid import UUID
 from typing import Annotated
 from datetime import datetime
 
-from fastapi import Body, Header, Depends
+from fastapi import Body, Query, Header, Depends
 
 
 @billing_router.post("/")
@@ -70,8 +70,9 @@ async def list_transactions(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-    project_uid: list[UUID]
-    | None = None,  # filter by project_uid or whole organization
+    project_uids: list[UUID] | None = Query(
+        None
+    ),  # filter by project_uid or whole organization
     start_date: datetime | None = None,  # ISO date string
     end_date: datetime | None = None,  # ISO date string
     limit: int = 100,
@@ -80,7 +81,7 @@ async def list_transactions(
     res, total = (
         await billing_service.get_transactions(
             org_id=user_info["org_id"],
-            project_uids=project_uid,
+            project_uids=project_uids,
             start_date=start_date,
             end_date=end_date,
             limit=limit,

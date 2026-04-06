@@ -27,8 +27,8 @@ async def get_aggregate_by_projects(
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
-    project_uids: list[UUID] = Query(
-        default=[]
+    project_uids: list[UUID] | None = Query(
+        None
     ),  # filter by project_uid or whole organization
 ) -> ListResponse[BillingAggregateReport]:
     res = (
@@ -57,8 +57,8 @@ async def get_aggregate_by_apikeys(
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
-    apikeys: list[str] = Query(
-        default=[]
+    apikeys: list[str] | None = Query(
+        None
     ),  # filter by apikey_id or whole organization
 ) -> ListResponse[BillingAggregateReport]:
     res = (
