@@ -51,10 +51,7 @@ def requiredPermissions(permissions: list[str]):
     return get_api_key
 
 
-def getApiKeyInfo(
-    api_key: Annotated[str, Security(api_key_header)],
-    api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
-):
+def getApiKeyInfo():
     """Dependency to get API key info without permission checks."""
 
     app_settings = getAppSetting()

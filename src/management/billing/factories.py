@@ -55,9 +55,10 @@ def getBillingSourceService() -> BillingSourceService:
 def getBillingAggregateQueryService() -> BillingAggregateQueryService:
     return BillingAggregateQueryService(
         logger=getLogger(),
-        session_manager=getTimescaleSessionManager(),
+        timescale_session_manager=getTimescaleSessionManager(),
         transaction_repo=TransactionRepository(),
         apikey_service=getApiKeyService(),
+        session_manager=getSessionManager(),
     )
 
 

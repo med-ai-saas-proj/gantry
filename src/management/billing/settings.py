@@ -1,4 +1,6 @@
-from pydantic import Field, SecretStr
+from functools import lru_cache
+
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -7,8 +9,9 @@ class BillingSourceSetting(BaseSettings):
         env_prefix="billing_source_", case_sensitive=False
     )
 
-    stripe_secret_key: SecretStr = Field()
+    stripe_secret_key: SecretStr
 
 
+@lru_cache(1)
 def getBillingSourceSetting() -> BillingSourceSetting:
     return BillingSourceSetting()  # type: ignore

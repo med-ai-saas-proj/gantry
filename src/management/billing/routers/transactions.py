@@ -23,7 +23,7 @@ from fastapi import Body, Header, Depends
 
 @billing_router.post("/")
 async def post(
-    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
+    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo())],
     body: Annotated[PostRequest, Body()],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
@@ -44,7 +44,7 @@ async def post(
 @billing_router.post("/{transaction_uid}/capture")
 async def capture(
     transaction_uid: UUID,
-    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
+    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo())],
     body: Annotated[CaptureRequest, Body()],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)

@@ -685,11 +685,18 @@ class TransactionService:
             ex=self._IDEMPOTENCY_KEY_TTL,
         )
 
+        if req.capture:
+            await self.redis.delete(trx_key)
+
         self.logger.info(
             "billing.transaction.posted",
             transaction_uuid=str(transaction_uuid),
             project_id=project_id,
             billing_period=billing_period,
+            org_id=org_id,
+            api_key_id=api_key_id,
+            amount=str(amount),
+            capture=req.capture,
         )
         return Ok(transaction_uuid)
 
