@@ -13,7 +13,7 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
 def getAsyncEngine():
     engine = create_async_engine(
-        getDBSettings().postgres_connection_uri.encoded_string(), echo=True
+        getDBSettings().timescale_connection_uri.encoded_string(), echo=True
     )
     SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
     return engine
