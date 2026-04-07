@@ -1,63 +1,29 @@
 BEGIN;
-
 -- Running downgrade 5522a77606bc ->
-
 DROP INDEX "Billing"."BillingInvoiceLineItems_uuid_idx";
-
 DROP INDEX "Billing"."BillingInvoiceLineItems_project_id_idx";
-
 DROP INDEX "Billing"."BillingInvoiceLineItems_invoice_id_idx";
-
 DROP TABLE "Billing"."BillingInvoiceLineItems";
-
 DROP INDEX "Billing".ix_spending_limits_org;
-
 DROP INDEX "Billing"."SpendingLimits_uuid_idx";
-
 DROP INDEX "Billing"."SpendingLimits_project_id_idx";
-
 DROP INDEX "Billing"."SpendingLimits_organization_id_idx";
-
 DROP TABLE "Billing"."SpendingLimits";
-
 DROP INDEX "Billing"."Credits_uuid_idx";
-
 DROP INDEX "Billing"."Credits_organization_id_idx";
-
 DROP TABLE "Billing"."Credits";
-
 DROP INDEX "Billing"."BillingTransactions_uuid_idx";
-
 DROP INDEX "Billing"."BillingTransactions_project_id_idx";
-
 DROP INDEX "Billing"."BillingTransactions_organization_id_idx";
-
 DROP INDEX "Billing"."BillingTransactions_apikey_id_idx";
-
 DROP TABLE "Billing"."BillingTransactions";
-
 DROP INDEX "Billing"."BillingSources_uuid_idx";
-
 DROP INDEX "Billing"."BillingSources_organization_id_idx";
-
 DROP TABLE "Billing"."BillingSources";
-
 DROP INDEX "Billing"."BillingInvoices_uuid_idx";
-
 DROP INDEX "Billing"."BillingInvoices_organization_id_idx";
-
 DROP TABLE "Billing"."BillingInvoices";
-
 DROP MATERIALIZED VIEW IF EXISTS "Billing".daily_billing_summary;
 ;
-
 DROP SCHEMA IF EXISTS "Billing" CASCADE;
-;
-
-DELETE FROM alembic_version
-WHERE
-    alembic_version.version_num = '5522a77606bc';
-
-DROP TABLE alembic_version;
-
 COMMIT;
