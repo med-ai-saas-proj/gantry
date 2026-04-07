@@ -4,15 +4,15 @@ BEGIN;
 
 ;;
 
-CREATE SCHEMA IF NOT EXISTS "Project";;
+CREATE SCHEMA IF NOT EXISTS "Project";
 
-CREATE SCHEMA IF NOT EXISTS "Conversation";;
+CREATE SCHEMA IF NOT EXISTS "Conversation";
 
-CREATE SCHEMA IF NOT EXISTS "FileStorage";;
+CREATE SCHEMA IF NOT EXISTS "FileStorage";
 
 CREATE TABLE "Project"."Projects" (
     id BIGSERIAL NOT NULL,
-    uuid UUID DEFAULT uuidv7() NOT NULL,
+    uuid UUID NOT NULL,
     name VARCHAR(255) NOT NULL,
     description VARCHAR(1024),
     organization_id VARCHAR(255) NOT NULL,
