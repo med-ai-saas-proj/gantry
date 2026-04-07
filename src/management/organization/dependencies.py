@@ -12,30 +12,36 @@ from .permissions import OrgPermission, has_permission
 
 from typing import Annotated
 
-from fastapi import Path, Depends, Security
+from fastapi import Path, Depends, Request, Security
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
-auth_settings = getAuthSettings()
-server_url_str = auth_settings.server_url.encoded_string()
-realm_name = auth_settings.realm_name
-org_settings = getOrgSettings()
+oauth2_scheme: OAuth2AuthorizationCodeBearer | None = None
 
-oauth_2_scheme = OAuth2AuthorizationCodeBearer(
-    tokenUrl=(
-        f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
-    ),
-    authorizationUrl=(
-        f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/auth"
-    ),
-    refreshUrl=(
-        f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
-    ),
-)
+
+def _constructOauth2Scheme(request: Request):
+    global oauth2_scheme
+    if oauth2_scheme is None:
+        auth_settings = getAuthSettings()
+        server_url_str = auth_settings.server_url.encoded_string()
+        realm_name = auth_settings.realm_name
+
+        oauth2_scheme = OAuth2AuthorizationCodeBearer(
+            tokenUrl=(
+                f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
+            ),
+            authorizationUrl=(
+                f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/auth"
+            ),
+            refreshUrl=(
+                f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
+            ),
+        )
+    return oauth2_scheme(request)
 
 
 async def _get_user_info(
-    token: Annotated[str, Security(oauth_2_scheme)],
+    token: Annotated[str, Security(_constructOauth2Scheme)],
     auth_service: Annotated[AuthService, Depends(getAuthService)],
 ) -> UserInfo:
     """Verify the JWT and return ``UserInfo``."""
@@ -47,6 +53,7 @@ async def getLimit(
     org_service: Annotated[OrgService, Depends(getOrgService)],
 ) -> int | None:
     """Return effective org limit (org override or global default)."""
+    org_settings = getOrgSettings()
     settings_res = (await org_service.get_settings(org_id)).unwrap()
     org_limit = settings_res.rate_limit
     if org_limit is not None:
@@ -69,6 +76,7 @@ class _KeycloakOrgError(RecoverableError):
 
 
 def _is_trusted_backend_service_account(user_info: UserInfo) -> bool:
+    org_settings = getOrgSettings()
     client_id = user_info.get("client_id")
     username = user_info.get("username")
     is_service_account = bool(user_info.get("is_service_account"))

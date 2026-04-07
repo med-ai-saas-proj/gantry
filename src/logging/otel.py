@@ -26,14 +26,12 @@ from opentelemetry.instrumentation.system_metrics import (
 )
 
 
-otel_settings = getOtelSettings()
-
-
 def setupOtel(
     service_name: str,
     service_version: str,
     logger: BoundLogger,
 ):
+    otel_settings = getOtelSettings()
     resource = Resource.create(
         {
             "service.name": service_name,

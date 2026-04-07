@@ -13,9 +13,6 @@ from fastapi.params import Body, Query
 
 logging_router = APIRouter(prefix="/logging", tags=["logging"])
 
-log_query_service = getLogQueryService()
-app_settings = getAppSettings()
-
 
 @logging_router.get(
     "/",
@@ -23,27 +20,33 @@ app_settings = getAppSettings()
 )
 async def simple_query_log(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    start: datetime = Query(...),
-    end: datetime = Query(...),
-    limit: int = Query(default=1000, le=10000, gt=0),
-    direction: Literal["forward", "backward"] = Query(default="backward"),
-    level: Literal["debug", "info", "warn", "error"] | None = Query(
-        default=None
-    ),
-    keyword: str | None = Query(default=None),
-    filters: str | None = Query(
-        default=None, description="Filters in the format of key:value,key:value"
-    ),
-    custom_query: str | None = Query(
-        default=None,
-        description="Custom query string, should be valid Loki Label Filters",
-    ),
+    start: Annotated[datetime, Query()],
+    end: Annotated[datetime, Query()],
+    limit: Annotated[int, Query(le=10000, gt=0)] = 100,
+    direction: Annotated[Literal["forward", "backward"], Query()] = "backward",
+    level: Annotated[
+        Literal["debug", "info", "warn", "error"] | None, Query()
+    ] = None,
+    keyword: Annotated[str | None, Query()] = None,
+    filters: Annotated[
+        str | None,
+        Query(description="Filters in the format of key:value,key:value"),
+    ] = None,
+    custom_query: Annotated[
+        str | None,
+        Query(
+            description="Custom query string, should be valid Loki Label Filters",
+        ),
+    ] = None,
 ) -> list[dict]:
+
+    app_settings = getAppSettings()
     filters_dict = {}
     for f in filters.split(",") if filters is not None else []:
         key, value = f.split(":")
         filters_dict[key] = value
 
+    log_query_service = getLogQueryService()
     res = log_query_service.search_logs(
         user_info["org_id"],
         app_settings.app_name,
@@ -67,6 +70,9 @@ async def query_log(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     query_request: Annotated[QueryLogRequest, Body()],
 ) -> list[dict]:
+    app_settings = getAppSettings()
+
+    log_query_service = getLogQueryService()
     res = log_query_service.search_logs(
         user_info["org_id"],
         app_settings.app_name,

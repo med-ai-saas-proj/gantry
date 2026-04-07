@@ -54,7 +54,8 @@ management_app = FastAPI(
 
 management_app.add_middleware(
     CORSMiddleware,
-    allow_origins=getAppSettings().allowed_origins.split(","),
+    allow_origins="*",
+    # allow_origins=getAppSettings().allowed_origins.split(","),
     allow_credentials=True,  # keep only if you really need cookies/auth
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],

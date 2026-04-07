@@ -1,9 +1,11 @@
-from enum import StrEnum
-from typing import Callable, ClassVar, NamedTuple, final
-from functools import lru_cache
+from __future__ import annotations
 
-from pydantic import create_model
-from pydantic.main import BaseModel
+from enum import StrEnum
+from typing import Self, Callable, ClassVar, Annotated, final
+from functools import lru_cache
+from tkinter.constants import N
+
+from pydantic import Field, create_model
 from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
@@ -16,20 +18,26 @@ class AppStage(StrEnum):
     STAGING = "STAGING"
 
 
+class ModifiedBaseSettings(BaseSettings):
+    @classmethod
+    def get(cls) -> Self: ...
+
+
 class _AppSettings(BaseSettings):
     model_config = SettingsConfigDict(
         cli_parse_args=True,
         case_sensitive=False,
-        env_nested_delimiter="_",
-        env_nested_max_split=1,
+        env_nested_delimiter="__",
+        # env_nested_max_split=1,
         frozen=True,
+        # cli_ignore_unknown_args=True,
+        cli_implicit_flags=True,
     )
     port: int = 8080
     internal_port: int = 9000
 
     stage: AppStage = AppStage.DEV
-    debug: bool = False
-    allowed_origins: str = "*"
+    allowed_origins: list[str] = ["*"]
 
     app_name: str = "Med-AI-SaaS"
     app_version: str = "1.0.0"
@@ -39,10 +47,14 @@ class _AppSettings(BaseSettings):
 class AppSettings:
     """Register your settings here, used to build CLI."""
 
-    type_arr: ClassVar[dict[str, type[BaseSettings]]] = {}
+    type_arr: ClassVar[dict[str, type[ModifiedBaseSettings]]] = {}
+    model_type: ClassVar[type[_AppSettings] | None] = None
+    model: ClassVar[_AppSettings | None] = None
 
     @classmethod
-    def register[T: type[BaseSettings]](cls, prefix: str) -> Callable[[T], T]:
+    def register[T: type[ModifiedBaseSettings]](
+        cls, prefix: str
+    ) -> Callable[[T], T]:
         """Decorator to register your settings, pls use an appropriate prefix."""
 
         def wrapper(setting: T) -> T:
@@ -51,27 +63,38 @@ class AppSettings:
                 cli_parse_args=True,
                 cli_prefix=prefix,
                 cli_ignore_unknown_args=True,
+                cli_implicit_flags=True,
                 frozen=True,
             )
+            setting.get = lambda: getattr(cls.getAppSettings(), prefix)
+            # cls.type_arr[prefix] = Annotated[
+            #     setting, Field(default_factory=setting)
+            # ]
             cls.type_arr[prefix] = setting
             return setting
 
         return wrapper
 
     @classmethod
-    @lru_cache(1)
     def getAppSettingsType(cls) -> type[_AppSettings]:
-        Model = create_model(
-            "TMP",
-            __base__=_AppSettings,
-            field_definitions=cls.type_arr.items(),
-        )
-        return Model
+        # raise RuntimeError("Shit from", __file__, 80)
+        if cls.model_type is None:
+            Model = create_model(
+                "AppSettings",
+                __base__=_AppSettings,
+                **cls.type_arr,
+            )
+            cls.model_type = Model
+            print("Stuff is ok here", __file__, 88)
+            return Model
+        else:
+            return cls.model_type
 
     @classmethod
-    @lru_cache(1)
     def getAppSettings(cls) -> _AppSettings:
-        return cls.getAppSettingsType()()
+        if cls.model is None:
+            cls.model = cls.getAppSettingsType()()
+        return cls.model
 
 
 def getAppSettings():

@@ -12,12 +12,10 @@ from functools import lru_cache
 from pydantic_ai import Agent
 
 
-prompt_service = getPromptService()
-
-
 @lru_cache(1)
 def getChatAgent() -> Agent[AgentDeps, str]:
     """Construct Chat Agent."""
+    prompt_service = getPromptService()
     return Agent[AgentDeps, str](
         name=CHAT_AGENT_ID,
         instructions=[

@@ -17,12 +17,10 @@ from fastapi.responses import Response, JSONResponse
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 
 
-app_settings = getAppSettings()
-
-
 async def recoverableErrorHandler(
     req: Request, e: RecoverableError
 ) -> JSONResponse:
+    app_settings = getAppSettings()
     if app_settings.debug:
         assert e._stack_frames is not None
         getLogger().error(
@@ -47,6 +45,7 @@ async def unrecoverableErrorHandler(
         exception="".join(traceback.format_exception_only(exception)),
         stack="".join(exception._stack_frames),
     )
+    app_settings = getAppSettings()
     if app_settings.debug:
         return Response("".join(exception._stack_frames), status_code=500)
     return Response(messages_const.INTERNAL_SERVER_ERROR, status_code=500)
@@ -78,6 +77,7 @@ async def fastapi_exception_handler(
             for error in errors
         ],
     }
+    app_settings = getAppSettings()
     if app_settings.debug:
         exception_response["type"] = "fast_api_exception_handler"
     return JSONResponse(
@@ -103,6 +103,7 @@ async def pydantic_exception_handler(
             for error in errors
         ],
     }
+    app_settings = getAppSettings()
     if app_settings.debug:
         exception_response["type"] = "pydantic_exception_handler"
         getLogger().error(
@@ -124,6 +125,7 @@ async def internal_exception_handler(
         "Got a weird exception here, you should definitely check your code out!",
         traceback=traceback.format_exception(exception),
     )
+    app_settings = getAppSettings()
     if app_settings.debug:
         return Response(
             status_code=500,

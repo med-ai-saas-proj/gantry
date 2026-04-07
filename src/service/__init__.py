@@ -1,7 +1,7 @@
 from src.shared.custom_types.error_exception import ProblemDetails
 
-from .chat import chat_router
-from .ai_search import ai_search_router
+# from .chat import chat_router
+# from .ai_search import ai_search_router
 from .utils.conversation import conversation_router
 from .utils.file_storage import file_storage_router
 
@@ -34,8 +34,8 @@ service_app.add_middleware(
 )
 
 v1_router = APIRouter(prefix="/v1", tags=["service"], include_in_schema=True)
-v1_router.include_router(ai_search_router)
-v1_router.include_router(chat_router)
+# v1_router.include_router(ai_search_router)
+# v1_router.include_router(chat_router)
 v1_router.include_router(file_storage_router)
 v1_router.include_router(conversation_router)
 

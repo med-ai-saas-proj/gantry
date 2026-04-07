@@ -1,10 +1,8 @@
-from src.settings import AppSettings
+from src.settings import AppSettings, ModifiedBaseSettings
 
 from enum import Enum
-from functools import lru_cache
 
 from pydantic import HttpUrl
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class TracesType(str, Enum):
@@ -28,14 +26,25 @@ class ExporterProtocol(str, Enum):
     http_protobuf = "http/protobuf"
 
 
-@AppSettings.register("otel")
-class OtelSettings(BaseSettings):
+class LogLevel(str, Enum):
+    DEBUG = "DEBUG"
+    INFO = "INFO"
+    WARNING = "WARNING"
+    ERROR = "ERROR"
+    CRITICAL = "CRITICAL"
+    FATAL = "FATAL"
+    pass
+
+
+@AppSettings.register("log")
+class LoggingSettings(ModifiedBaseSettings):
+    level: LogLevel = LogLevel.INFO
+
     exporter_otlp_endpoint: HttpUrl = HttpUrl("http://localhost:4317")
     exporter_otlp_protocol: ExporterProtocol = ExporterProtocol.grpc
 
     traces: TracesType = TracesType.disabled
     metrics: MetricsType = MetricsType.disabled
-    logs: LogsType = LogsType.disabled
 
     prometheus_port: int = 9000
 
@@ -55,6 +64,5 @@ class OtelSettings(BaseSettings):
     # -: envvar:`OTEL_BLRP_EXPORT_TIMEOUT
 
 
-@lru_cache(1)
-def getOtelSettings() -> OtelSettings:
-    return OtelSettings()  # type: ignore
+def getOtelSettings() -> LoggingSettings:
+    return LoggingSettings.get()

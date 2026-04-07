@@ -1,0 +1,381 @@
+{
+  "$defs": {
+    "ApiKeysSetting": {
+      "additionalProperties": false,
+      "properties": {
+        "secret": {
+          "format": "password",
+          "title": "Secret",
+          "type": "string",
+          "writeOnly": true
+        },
+        "secret_length": {
+          "default": 32,
+          "exclusiveMinimum": 16,
+          "title": "Secret Length",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "secret"
+      ],
+      "title": "ApiKeysSetting",
+      "type": "object"
+    },
+    "AppStage": {
+      "enum": [
+        "DEV",
+        "PROD",
+        "STAGING"
+      ],
+      "title": "AppStage",
+      "type": "string"
+    },
+    "ConversationSettings": {
+      "additionalProperties": false,
+      "description": "Settings for file storage configuration.",
+      "properties": {
+        "cache_ttl": {
+          "default": 600,
+          "title": "Cache Ttl",
+          "type": "integer"
+        },
+        "cache_limit": {
+          "default": 50,
+          "title": "Cache Limit",
+          "type": "integer"
+        }
+      },
+      "title": "ConversationSettings",
+      "type": "object"
+    },
+    "DBSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "postgres_connection_uri": {
+          "format": "multi-host-uri",
+          "minLength": 1,
+          "title": "Postgres Connection Uri",
+          "type": "string"
+        },
+        "redis_connection_uri": {
+          "format": "uri",
+          "minLength": 1,
+          "title": "Redis Connection Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "postgres_connection_uri",
+        "redis_connection_uri"
+      ],
+      "title": "DBSettings",
+      "type": "object"
+    },
+    "ExporterProtocol": {
+      "enum": [
+        "grpc",
+        "http/protobuf"
+      ],
+      "title": "ExporterProtocol",
+      "type": "string"
+    },
+    "LoggingSetting": {
+      "additionalProperties": false,
+      "properties": {
+        "loki_url": {
+          "default": "http://localhost:3100/",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Loki Url",
+          "type": "string"
+        }
+      },
+      "title": "LoggingSetting",
+      "type": "object"
+    },
+    "LogsType": {
+      "enum": [
+        "otlp",
+        "disabled"
+      ],
+      "title": "LogsType",
+      "type": "string"
+    },
+    "MetricsType": {
+      "enum": [
+        "otlp",
+        "prometheus",
+        "disabled"
+      ],
+      "title": "MetricsType",
+      "type": "string"
+    },
+    "ModelsSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "openai_base_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Openai Base Url"
+        },
+        "groq_api_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Groq Api Key"
+        },
+        "openai_api_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Openai Api Key"
+        },
+        "anthropic_api_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anthropic Api Key"
+        }
+      },
+      "title": "ModelsSettings",
+      "type": "object"
+    },
+    "ObjectStorageSettings": {
+      "additionalProperties": false,
+      "description": "Settings for file storage configuration.",
+      "properties": {
+        "s3_bucket_name": {
+          "title": "S3 Bucket Name",
+          "type": "string"
+        },
+        "s3_region_name": {
+          "title": "S3 Region Name",
+          "type": "string"
+        },
+        "s3_access_key_id": {
+          "title": "S3 Access Key Id",
+          "type": "string"
+        },
+        "s3_secret_access_key": {
+          "title": "S3 Secret Access Key",
+          "type": "string"
+        },
+        "s3_endpoint_url": {
+          "title": "S3 Endpoint Url",
+          "type": "string"
+        },
+        "s3_presigned_url_expiry_seconds": {
+          "default": 3600,
+          "title": "S3 Presigned Url Expiry Seconds",
+          "type": "integer"
+        },
+        "redis_cache_expiry_seconds": {
+          "default": 3600,
+          "title": "Redis Cache Expiry Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "s3_bucket_name",
+        "s3_region_name",
+        "s3_access_key_id",
+        "s3_secret_access_key",
+        "s3_endpoint_url"
+      ],
+      "title": "ObjectStorageSettings",
+      "type": "object"
+    },
+    "OrgSetting": {
+      "additionalProperties": false,
+      "properties": {
+        "KEYCLOAK_SERVICE_CLIENT_ID": {
+          "default": "med-ai-saas-backend",
+          "description": "Service account client id for Keycloak Admin API calls.",
+          "title": "Keycloak Service Client Id",
+          "type": "string"
+        },
+        "KEYCLOAK_SERVICE_CLIENT_SECRET": {
+          "description": "Service account client secret for Keycloak Admin API calls.",
+          "title": "Keycloak Service Client Secret",
+          "type": "string"
+        },
+        "default_rate_limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Global default rate-limit (requests/min). Individual orgs can override this.",
+          "title": "Default Rate Limit"
+        },
+        "deletion_cancel_window_days": {
+          "default": 30,
+          "description": "How many days an org deletion request can be canceled before hard deletion.",
+          "minimum": 1,
+          "title": "Deletion Cancel Window Days",
+          "type": "integer"
+        },
+        "deletion_worker_interval_seconds": {
+          "default": 60,
+          "description": "Background worker interval for processing due deletions.",
+          "minimum": 5,
+          "title": "Deletion Worker Interval Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "KEYCLOAK_SERVICE_CLIENT_SECRET"
+      ],
+      "title": "OrgSetting",
+      "type": "object"
+    },
+    "OtelSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "exporter_otlp_endpoint": {
+          "default": "http://localhost:4317/",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Exporter Otlp Endpoint",
+          "type": "string"
+        },
+        "exporter_otlp_protocol": {
+          "$ref": "#/$defs/ExporterProtocol",
+          "default": "grpc"
+        },
+        "traces": {
+          "$ref": "#/$defs/TracesType",
+          "default": "disabled"
+        },
+        "metrics": {
+          "$ref": "#/$defs/MetricsType",
+          "default": "disabled"
+        },
+        "logs": {
+          "$ref": "#/$defs/LogsType",
+          "default": "disabled"
+        },
+        "prometheus_port": {
+          "default": 9000,
+          "title": "Prometheus Port",
+          "type": "integer"
+        }
+      },
+      "title": "OtelSettings",
+      "type": "object"
+    },
+    "TracesType": {
+      "enum": [
+        "otlp",
+        "disabled"
+      ],
+      "title": "TracesType",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "port": {
+      "default": 8080,
+      "title": "Port",
+      "type": "integer"
+    },
+    "internal_port": {
+      "default": 9000,
+      "title": "Internal Port",
+      "type": "integer"
+    },
+    "stage": {
+      "$ref": "#/$defs/AppStage",
+      "default": "DEV"
+    },
+    "debug": {
+      "default": false,
+      "title": "Debug",
+      "type": "boolean"
+    },
+    "allowed_origins": {
+      "default": "*",
+      "title": "Allowed Origins",
+      "type": "string"
+    },
+    "app_name": {
+      "default": "Med-AI-SaaS",
+      "title": "App Name",
+      "type": "string"
+    },
+    "app_version": {
+      "default": "1.0.0",
+      "title": "App Version",
+      "type": "string"
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingSetting"
+    },
+    "db": {
+      "$ref": "#/$defs/DBSettings"
+    },
+    "apikey": {
+      "$ref": "#/$defs/ApiKeysSetting"
+    },
+    "org": {
+      "$ref": "#/$defs/OrgSetting"
+    },
+    "conversation": {
+      "$ref": "#/$defs/ConversationSettings"
+    },
+    "objectstorage_": {
+      "$ref": "#/$defs/ObjectStorageSettings"
+    },
+    "otel": {
+      "$ref": "#/$defs/OtelSettings"
+    },
+    "aimodel": {
+      "$ref": "#/$defs/ModelsSettings"
+    }
+  },
+  "required": [
+    "logging",
+    "db",
+    "apikey",
+    "org",
+    "conversation",
+    "objectstorage_",
+    "otel",
+    "aimodel"
+  ],
+  "title": "TMP",
+  "type": "object"
+}

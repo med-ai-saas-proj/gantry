@@ -1,16 +1,14 @@
-from src.settings import AppSettings
-
-from pydantic_settings import BaseSettings
+from src.settings import AppSettings, ModifiedBaseSettings
 
 
 @AppSettings.register("conversation")
-class ConversationSettings(BaseSettings):
+class ConversationSettings(ModifiedBaseSettings):
     """Settings for file storage configuration."""
 
     cache_ttl: int = 600  # in seconds
     cache_limit: int = 50
 
 
-def getConversationSettings() -> ConversationSettings:
+def getConversationSettings():
     """Get conversation settings from environment variables."""
-    return ConversationSettings()
+    return ConversationSettings.get()

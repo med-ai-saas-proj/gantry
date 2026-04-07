@@ -1,18 +1,13 @@
-from src.settings import AppSettings
-
-from functools import lru_cache
-
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from src.settings import AppSettings, ModifiedBaseSettings
 
 
 @AppSettings.register("aimodel")
-class ModelsSettings(BaseSettings):
+class ModelsSettings(ModifiedBaseSettings):
     openai_base_url: str | None = None
     groq_api_key: str | None = None
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
 
 
-@lru_cache(1)
-def getModelsSettings() -> ModelsSettings:
+def getModelsSettings():
     return ModelsSettings()

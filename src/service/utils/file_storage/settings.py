@@ -1,10 +1,8 @@
-from src.settings import AppSettings
-
-from pydantic_settings import BaseSettings
+from src.settings import AppSettings, ModifiedBaseSettings
 
 
-@AppSettings.register("objectstorage_")
-class ObjectStorageSettings(BaseSettings):
+@AppSettings.register("objectstorage")
+class ObjectStorageSettings(ModifiedBaseSettings):
     """Settings for file storage configuration."""
 
     s3_bucket_name: str
@@ -18,4 +16,4 @@ class ObjectStorageSettings(BaseSettings):
 
 def getObjectStorageSettings() -> ObjectStorageSettings:
     """Retrieves the file storage settings, cached for performance."""
-    return ObjectStorageSettings()
+    return ObjectStorageSettings.get()

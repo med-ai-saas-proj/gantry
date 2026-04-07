@@ -6,30 +6,34 @@ from .settings import getAuthSettings
 from .factories import AuthService, getAuthService
 
 from typing import Annotated
+from functools import lru_cache
 
-from fastapi import Depends, Security
+from fastapi import Depends, Request, Security
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
-auth_settings = getAuthSettings()
-server_url_str = auth_settings.server_url.encoded_string()
-realm_name = auth_settings.realm_name
+@lru_cache(1)
+def _constructOauth2Scheme(request: Request):
+    auth_settings = getAuthSettings()
+    server_url_str = auth_settings.server_url.encoded_string()
+    realm_name = auth_settings.realm_name
 
-oauth_2_scheme = OAuth2AuthorizationCodeBearer(
-    tokenUrl=(
-        f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
-    ),
-    authorizationUrl=(
-        f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/auth"
-    ),
-    refreshUrl=(
-        f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
-    ),
-)
+    oauth2_scheme = OAuth2AuthorizationCodeBearer(
+        tokenUrl=(
+            f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
+        ),
+        authorizationUrl=(
+            f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/auth"
+        ),
+        refreshUrl=(
+            f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
+        ),
+    )
+    return oauth2_scheme(request)
 
 
 async def getUserInfo(
-    token: Annotated[str, Security(oauth_2_scheme)],
+    token: Annotated[str, Security(_constructOauth2Scheme)],
     auth_service: Annotated[AuthService, Depends(getAuthService)],
 ) -> UserInfo:
     """
@@ -63,7 +67,7 @@ def requireRole(role: ManagementRole):
     """
 
     async def dependency(
-        token: Annotated[str, Security(oauth_2_scheme)],
+        token: Annotated[str, Security(_constructOauth2Scheme)],
         auth_service: Annotated[AuthService, Depends(getAuthService)],
     ) -> UserInfo:
         user_info = auth_service.verifyToken(token).unwrap()

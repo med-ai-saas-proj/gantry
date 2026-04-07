@@ -1,4 +1,4 @@
-from src.shared.logging.logger import LOGGER
+from src.shared.logging.logger import getLogger
 from src.service.utils.agent.factories import getPromptService
 from src.service.utils.agent.agent_deps import AgentDeps
 from src.service.utils.agent.tools.consts import (
@@ -54,7 +54,7 @@ def make_fda_tool(return_fields: list[str], name: str):
         ctx: RunContext[AgentDeps], drug_name: str, limit: int = 5
     ) -> ToolOutput:
         try:
-            LOGGER.debug("Calling tool", name=name, drug_name=drug_name)
+            getLogger().debug("Calling tool", name=name, drug_name=drug_name)
             return search_openfda(
                 map_properties_to_openfda_fields(
                     {"drug_name": drug_name, "limit": limit},
@@ -69,7 +69,7 @@ def make_fda_tool(return_fields: list[str], name: str):
                 return_fields=return_fields,
             )
         except Exception as e:
-            LOGGER.error("Fail to search openfda", error=str(e))
+            getLogger().error("Fail to search openfda", error=str(e))
             return {"error": "Server error"}
 
     tool = Tool[AgentDeps](

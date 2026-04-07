@@ -1,5 +1,5 @@
 from src.management.api_keys import requiredPermissions
-from src.shared.logging.logger import LOGGER
+from src.shared.logging.logger import getLogger
 from src.management.api_keys.entities import ApiKeyInfo
 from src.shared.custom_types.responses.sse import SSEResponse
 
@@ -37,7 +37,7 @@ async def ai_search(
     ai_search_service: Annotated[AiSearchService, Depends(getAiSearchService)],
 ) -> SSEResponse | JSONResponse:
     """Use AI to search the internet and summarize the result."""
-    LOGGER.debug("api_key_info", api_key_info=api_key_info)
+    getLogger().debug("api_key_info", api_key_info=api_key_info)
     if input.stream:
         return SSEResponse(
             ai_search_service.aiSearchStream(

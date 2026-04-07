@@ -1,9 +1,8 @@
-from src.settings import getAppSettings
+from src.shared.utils import request_id_utils
 
-from ..utils import request_id_utils
+from .settings import getOtelSettings
 
 import time
-import logging
 from functools import lru_cache
 
 import orjson
@@ -13,7 +12,7 @@ from structlog.stdlib import BoundLogger
 from structlog.processors import CallsiteParameter
 
 
-def add_open_telemetry_spans(_, __, event_dict):
+def addOTELSpans(_, __, event_dict):
     span = trace.get_current_span()
     if not span.is_recording():
         event_dict["span"] = None
@@ -33,24 +32,22 @@ def add_open_telemetry_spans(_, __, event_dict):
     return event_dict
 
 
-def orjson_renderer(_, __, event_dict):
+def orjsonRenderer(_, __, event_dict):
     return orjson.dumps(event_dict).decode()
 
 
-def ms_timestamper(_, __, event_dict):
+def msTimestamper(_, __, event_dict):
     event_dict["timestamp"] = time.time_ns() // 1_000_000
     return event_dict
 
 
-def request_ider(_, __, event_dict):
+def requestIder(_, __, event_dict):
     event_dict["requestId"] = request_id_utils.get()
     return event_dict
 
 
-def configure_default_logging(
-    logger: logging.Logger,
-) -> structlog.stdlib.BoundLogger:
-    settings = getAppSettings()
+@lru_cache(1)
+def getLogger() -> structlog.stdlib.BoundLogger:
     pre_chain = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.CallsiteParameterAdder(
@@ -61,35 +58,24 @@ def configure_default_logging(
             ]
         ),
         structlog.processors.add_log_level,
-        structlog.processors.StackInfoRenderer(),
-        ms_timestamper,
-        request_ider,
-        add_open_telemetry_spans,
+        # structlog.processors.StackInfoRenderer(),
+        structlog.processors.dict_tracebacks,
+        msTimestamper,
+        requestIder,
+        addOTELSpans,
     ]
-    processors = pre_chain
-    min_level = logging.DEBUG if settings.debug else logging.INFO
-    logger.addHandler(logging.StreamHandler())
-    logger.setLevel(min_level)
-
-    # if settings.stage == AppStage.PROD:
-    #     processors += [orjson_renderer]
-    # else:
-    #     processors += [structlog.dev.ConsoleRenderer()]
-    processors += [orjson_renderer]
+    processors = pre_chain + [orjsonRenderer]
 
     return structlog.wrap_logger(
-        logger,
+        None,
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(min_level),
         context_class=dict,
-        # logger_factory=structlog.PrintLoggerFactory(),
+        wrapper_class=structlog.make_filtering_bound_logger(
+            getOtelSettings().level.value
+        ),
+        logger_factory=structlog.BytesLoggerFactory(),
         cache_logger_on_first_use=True,
     )
-
-
-@lru_cache(1)
-def getLogger() -> BoundLogger:
-    return configure_default_logging(logging.getLogger("core"))
 
 
 def getServiceLogger(

@@ -1,6 +1,6 @@
 """This file contain definition of chat's routers."""
 
-from src.shared.logging.logger import LOGGER, getServiceLogger
+from src.shared.logging.logger import getServiceLogger
 from src.shared.custom_types.responses.sse import SSEResponse
 
 from .dtos import ChatInput

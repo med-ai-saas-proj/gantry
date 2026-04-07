@@ -1,17 +1,13 @@
-from src.settings import AppSettings
-
-from functools import lru_cache
+from src.settings import AppSettings, ModifiedBaseSettings
 
 from pydantic import Field, SecretStr
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-@AppSettings.register("apikey")
-class ApiKeysSetting(BaseSettings):
+@AppSettings.register("apikeys")
+class ApiKeysSetting(ModifiedBaseSettings):
     secret: SecretStr
     secret_length: int = Field(gt=16, default=32)
 
 
-@lru_cache(1)
 def getApiKeysSettings() -> ApiKeysSetting:
-    return ApiKeysSetting()
+    return ApiKeysSetting.get()

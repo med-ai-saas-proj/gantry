@@ -1,11 +1,11 @@
-from src.shared.logging.logger import LOGGER
+from src.shared.logging.logger import getLogger
 
 from . import consts
 from .services import CrawlerService
 
 
 CRAWLER_SERVICE = CrawlerService(
-    LOGGER,
+    getLogger(),
     consts.GOOGLE_PROGRAMMATIC_SEARCH_API_KEY,
     consts.GOOGLE_PROGRAMMATIC_SEARCH_CX,
     max_concurrent_crawler=consts.CRAWLER_MAX_CONCURRENT,

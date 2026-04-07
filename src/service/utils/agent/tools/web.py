@@ -1,4 +1,4 @@
-from src.shared.logging.logger import LOGGER
+from src.shared.logging.logger import getLogger
 from src.service.crawler.services import SearchTimeRange
 from src.service.crawler.initialize import CRAWLER_SERVICE
 from src.service.utils.agent.factories import getPromptService
@@ -60,7 +60,7 @@ async def web_search(
     """
     try:
         results = await CRAWLER_SERVICE.discover(query, 5, date_restrict)
-        LOGGER.debug("Done crawling")
+        getLogger().debug("Done crawling")
         if (
             ctx.deps
             and isinstance(ctx.deps, dict)
@@ -69,7 +69,7 @@ async def web_search(
         ):
             ctx.deps["viewed_urls"] = [it["url"] for it in results]
         else:
-            LOGGER.warn("Wrong dependency type, please check")
+            getLogger().warn("Wrong dependency type, please check")
         return results
     except Exception as e:
         return {"error": str(e)}
