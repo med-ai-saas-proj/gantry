@@ -1,4 +1,4 @@
-from src.db.factories import getTimescaleSessionManager
+from src.db.factories import getSessionManager
 from src.db.repository import Repository
 from src.management.project.models import Project
 
