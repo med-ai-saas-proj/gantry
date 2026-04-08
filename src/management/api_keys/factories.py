@@ -1,4 +1,4 @@
-from src.db.factories import getSessionManager
+from src.db.factories import getRedis, getSessionManager
 from src.shared.logging.logger import getLogger
 from src.management.project.repositories import ProjectRepository
 
@@ -22,4 +22,5 @@ def getApiKeyService():
         api_key_repo=ApiKeyRepository(),
         project_repo=ProjectRepository(),
         session_manager=getSessionManager(),
+        redis=getRedis(),
     )

@@ -65,6 +65,10 @@ class TestOrganizationFactories(unittest.TestCase):
                 return_value="session-manager",
             ),
             patch(
+                "src.management.organization.factories.getRedis",
+                return_value="redis-client",
+            ),
+            patch(
                 "src.management.organization.factories.getLogger",
                 return_value="logger",
             ),
@@ -85,4 +89,5 @@ class TestOrganizationFactories(unittest.TestCase):
             deletion_repo="deletion-repo",
             session_manager="session-manager",
             logger="logger",
+            redis="redis-client",
         )

@@ -31,6 +31,14 @@ class TestProjectFactories(unittest.TestCase):
                 return_value="membership-repo",
             ),
             patch(
+                "src.management.project.factories.ProjectSettingsRepository",
+                return_value="settings-repo",
+            ),
+            patch(
+                "src.management.project.factories.getRedis",
+                return_value="redis-client",
+            ),
+            patch(
                 "src.management.project.factories.ProjectService"
             ) as mock_cls,
         ):
@@ -46,5 +54,7 @@ class TestProjectFactories(unittest.TestCase):
             logger="logger",
             project_repo="project-repo",
             membership_repo="membership-repo",
+            settings_repo="settings-repo",
             kc_client="kc-client",
+            redis="redis-client",
         )

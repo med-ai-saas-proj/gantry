@@ -12,7 +12,9 @@ from .dtos import (
     UpdateProjectRequest,
     AddProjectUserRequest,
     ProjectArchiveResponse,
+    ProjectSettingsResponse,
     ProjectUserListResponse,
+    UpdateProjectSettingsRequest,
     ProjectUserPermissionsRequest,
     ProjectUserPermissionsResponse,
     ProjectPermissionCatalogResponse,
@@ -91,6 +93,47 @@ async def update_project(
         project_uuid=project_id,
         name=input_data.name,
         description=input_data.description,
+    )
+    return result.unwrap()
+
+
+@project_router.get(
+    "/{project_id}/settings",
+    response_model=ProjectSettingsResponse,
+)
+async def get_project_settings(
+    user_info: Annotated[
+        UserInfo,
+        Depends(requiredProjectPermission(ProjectPermission.SETTINGS_READ)),
+    ],
+    project_id: Annotated[str, Path()],
+    project_service: Annotated[ProjectService, Depends(getProjectService)],
+) -> ProjectSettingsResponse:
+    """Return project settings for one readable project."""
+    _ = user_info
+    result = await project_service.getProjectSettings(project_id)
+    return result.unwrap()
+
+
+@project_router.patch(
+    "/{project_id}/settings",
+    response_model=ProjectSettingsResponse,
+)
+async def update_project_settings(
+    user_info: Annotated[
+        UserInfo,
+        Depends(requiredProjectPermission(ProjectPermission.SETTINGS_WRITE)),
+    ],
+    project_id: Annotated[str, Path()],
+    input_data: Annotated[UpdateProjectSettingsRequest, Body()],
+    project_service: Annotated[ProjectService, Depends(getProjectService)],
+) -> ProjectSettingsResponse:
+    """Update per-project settings such as the project RPM limit."""
+    _ = user_info
+    result = await project_service.updateProjectSettings(
+        project_uuid=project_id,
+        rate_limit=input_data.rate_limit,
+        extra=input_data.extra,
     )
     return result.unwrap()
 

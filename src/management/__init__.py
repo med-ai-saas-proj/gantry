@@ -1,4 +1,3 @@
-from src.main import app
 from src.shared.settings import getAppSetting
 from src.shared.custom_types.error_exception import ProblemDetails
 

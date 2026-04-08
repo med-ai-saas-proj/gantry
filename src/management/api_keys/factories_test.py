@@ -37,6 +37,10 @@ class TestApiKeyFactories(unittest.TestCase):
                 return_value="session-manager",
             ),
             patch(
+                "src.management.api_keys.factories.getRedis",
+                return_value="redis-client",
+            ),
+            patch(
                 "src.management.api_keys.factories.ApiKeyRepository",
                 return_value="api-key-repo",
             ),
@@ -61,4 +65,5 @@ class TestApiKeyFactories(unittest.TestCase):
             api_key_repo="api-key-repo",
             project_repo="project-repo",
             session_manager="session-manager",
+            redis="redis-client",
         )

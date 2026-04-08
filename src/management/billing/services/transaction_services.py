@@ -9,6 +9,23 @@ from src.management.billing.type import AggregatePeriod
 from src.shared.utils.uuid_utils import uuid7
 from src.management.billing.models import SpendingLimitType
 from src.management.api_keys.services import ApiKeyService
+from src.management.billing.cache_keys import (
+    BILLING_ORG_USAGE_KEY,
+    BILLING_TRANSACTION_KEY,
+    BILLING_CACHE_TTL_SECONDS,
+    BILLING_PROJECT_USAGE_KEY,
+    BILLING_POST_IDEMPOTENCY_KEY,
+    BILLING_ORG_SPENDING_LIMIT_KEY,
+    BILLING_PROJECT_SPENDING_LIMIT_KEY,
+    BILLING_MAX_TRANSACTION_AGE_SECONDS,
+    BILLING_POST_IDEMPOTENCY_KEY_TTL_SECONDS,
+    billing_org_usage_key,
+    billing_transaction_key,
+    billing_project_usage_key,
+    billing_post_idempotency_key,
+    billing_org_spending_limit_key,
+    billing_project_spending_limit_key,
+)
 from src.shared.custom_types.error_exception import (
     RecoverableError,
     InternalServiceError,
@@ -196,21 +213,15 @@ return 1
 
 
 class TransactionService:
-    _CACHE_TTL = 36000  # seconds
-    _MAX_TRANSACTION_AGE = 3600  # seconds, after which a transaction is considered expired and cannot be captured
-    _IDEMPOTENCY_KEY_TTL = (
-        3600  # seconds, how long to keep idempotency keys in cache
-    )
-    _TRANSACTION_KEY = "billing:trx:{uuid}"
-    _PROJECT_SPENDING_LIMIT_KEY = (
-        "billing:spending_limit:{org_id}:proj:{project_id}"
-    )
-    _ORG_SPENDING_LIMIT_KEY = "billing:spending_limit:{org_id}"
-
-    _ORG_USAGE_KEY = "billing:usage:{org_id}:{period}"
-    _PROJECT_USAGE_KEY = "billing:usage:{org_id}:proj:{project_id}:{period}"
-
-    _POST_IDEMPOTENCY_KEY = "billing:post_idempotency:{key}"
+    _CACHE_TTL = BILLING_CACHE_TTL_SECONDS
+    _MAX_TRANSACTION_AGE = BILLING_MAX_TRANSACTION_AGE_SECONDS
+    _IDEMPOTENCY_KEY_TTL = BILLING_POST_IDEMPOTENCY_KEY_TTL_SECONDS
+    _TRANSACTION_KEY = BILLING_TRANSACTION_KEY
+    _PROJECT_SPENDING_LIMIT_KEY = BILLING_PROJECT_SPENDING_LIMIT_KEY
+    _ORG_SPENDING_LIMIT_KEY = BILLING_ORG_SPENDING_LIMIT_KEY
+    _ORG_USAGE_KEY = BILLING_ORG_USAGE_KEY
+    _PROJECT_USAGE_KEY = BILLING_PROJECT_USAGE_KEY
+    _POST_IDEMPOTENCY_KEY = BILLING_POST_IDEMPOTENCY_KEY
 
     def __init__(
         self,
@@ -248,15 +259,13 @@ class TransactionService:
         amount = _to_decimal(req.amount)
         period_key = billing_period.strftime("%Y-%m")
 
-        org_limit_key = self._ORG_SPENDING_LIMIT_KEY.format(org_id=org_id)
-        project_limit_key = self._PROJECT_SPENDING_LIMIT_KEY.format(
-            org_id=org_id, project_id=project_id
+        org_limit_key = billing_org_spending_limit_key(org_id)
+        project_limit_key = billing_project_spending_limit_key(
+            org_id, project_id
         )
-        org_usage_key = self._ORG_USAGE_KEY.format(
-            org_id=org_id, period=period_key
-        )
-        project_usage_key = self._PROJECT_USAGE_KEY.format(
-            org_id=org_id, project_id=project_id, period=period_key
+        org_usage_key = billing_org_usage_key(org_id, period_key)
+        project_usage_key = billing_project_usage_key(
+            org_id, project_id, period_key
         )
 
         async def check_project_limits(
@@ -463,9 +472,7 @@ class TransactionService:
             )
 
         idempotency_key = idempotency_key or str(uuid4())
-        idempotency_cache_key = self._POST_IDEMPOTENCY_KEY.format(
-            key=idempotency_key
-        )
+        idempotency_cache_key = billing_post_idempotency_key(idempotency_key)
 
         transaction_uuid = uuid7()
         transaction_record: _TransactionRecord = {
@@ -476,7 +483,7 @@ class TransactionService:
             "billing_period": period_key,
         }
 
-        trx_key = self._TRANSACTION_KEY.format(uuid=transaction_uuid)
+        trx_key = billing_transaction_key(str(transaction_uuid))
 
         trx_res = await cast(
             Awaitable[int | str],
@@ -602,7 +609,7 @@ class TransactionService:
 
         Returns Ok(True) on success.
         """
-        transaction_key = self._TRANSACTION_KEY.format(uuid=transaction_uid)
+        transaction_key = billing_transaction_key(str(transaction_uid))
         real = _to_decimal(real_amount)
 
         raw = await self.redis.get(transaction_key)
@@ -632,11 +639,9 @@ class TransactionService:
                 trx["billing_period"], "%Y-%m"
             ).replace(tzinfo=UTC)
 
-        org_usage_key = self._ORG_USAGE_KEY.format(
-            org_id=org_id, period=billing_period_str
-        )
-        project_usage_key = self._PROJECT_USAGE_KEY.format(
-            org_id=org_id, project_id=project_id, period=billing_period_str
+        org_usage_key = billing_org_usage_key(org_id, billing_period_str)
+        project_usage_key = billing_project_usage_key(
+            org_id, project_id, billing_period_str
         )
 
         async def check_org_usage(redis: Redis) -> bool:

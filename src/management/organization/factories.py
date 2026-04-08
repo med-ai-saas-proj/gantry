@@ -1,6 +1,6 @@
 """Factory functions for the Organization module singletons."""
 
-from src.db.factories import getSessionManager
+from src.db.factories import getRedis, getSessionManager
 from src.shared.logging.logger import getLogger
 from src.management.auth.settings import getAuthSettings
 
@@ -38,4 +38,5 @@ def getOrgService() -> OrgService:
         deletion_repo=OrgDeletionRequestRepository(),
         session_manager=getSessionManager(),
         logger=getLogger(),
+        redis=getRedis(),
     )

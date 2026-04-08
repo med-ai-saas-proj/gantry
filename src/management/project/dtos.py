@@ -36,6 +36,35 @@ class UpdateProjectRequest(BaseDTO):
     description: str | None = Field(None, max_length=1024)
 
 
+class ProjectSettingsResponse(BaseDTO):
+    """Project settings response."""
+
+    rate_limit: int | None = Field(
+        None,
+        description=(
+            "Requests per minute. null means inherit organization/default."
+        ),
+    )
+    extra: dict = Field(
+        default_factory=dict,
+        description="Additional settings as a flat key-value map",
+    )
+
+
+class UpdateProjectSettingsRequest(BaseDTO):
+    """Body for updating project settings."""
+
+    rate_limit: int | None = Field(
+        None,
+        ge=1,
+        description="Requests per minute; null to inherit organization limit",
+    )
+    extra: dict = Field(
+        default_factory=dict,
+        description="Flat key-value pairs for additional settings",
+    )
+
+
 class ProjectInfoResponse(BaseDTO):
     """Project metadata response."""
 
