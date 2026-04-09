@@ -1,4 +1,4 @@
-from src.db.factories import getTimescaleSessionManager
+from src.db.factories import getSessionManager
 from src.management.billing.type import AggregatePeriod
 from src.shared.utils.uuid_utils import uuid7
 from src.management.billing.repositories.transaction_repo import (
@@ -13,7 +13,7 @@ from datetime import datetime
 class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
     async def test_timescaledb(self):
 
-        async with getTimescaleSessionManager().get_session() as session:
+        async with getSessionManager().get_session() as session:
             repo = TransactionRepository()
             await repo.addTransaction(
                 session=session,
@@ -36,7 +36,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
                 created_at=datetime(2026, 1, 20),
             )
             await session.commit()
-        async with getTimescaleSessionManager().get_session() as session:
+        async with getSessionManager().get_session() as session:
             transactions = await repo.sumByPeriodByApiKeys(
                 session=session,
                 apikey_ids=[1, 2, 3],

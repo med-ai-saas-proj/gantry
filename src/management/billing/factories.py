@@ -3,7 +3,6 @@
 from src.db.factories import (
     getRedis,
     getSessionManager,
-    getTimescaleSessionManager,
 )
 
 from .settings import getBillingSourceSetting
@@ -24,6 +23,7 @@ from .services.aggregate_query_service import BillingAggregateQueryService
 
 from functools import lru_cache
 
+import redis
 from stripe import StripeClient
 
 
@@ -31,7 +31,7 @@ from stripe import StripeClient
 def getBillingTransactionService() -> TransactionService:
     return TransactionService(
         logger=getLogger(),
-        session_manager=getTimescaleSessionManager(),
+        session_manager=getSessionManager(),
         redis=getRedis(),
         spending_limit_repo=SpendingLimitRepository(),
         transaction_repo=TransactionRepository(),
@@ -44,11 +44,11 @@ def getBillingSourceService() -> BillingSourceService:
     billing_source_settings = getBillingSourceSetting()
     return BillingSourceService(
         billing_source_repo=BillingSourceRepo(),
-        session_manager=getTimescaleSessionManager(),
-        redis_client=getRedis(),
+        session_manager=getSessionManager(),
         stripe_client=StripeClient(
             billing_source_settings.stripe_secret_key.get_secret_value()
         ),
+        redis_client=getRedis(),
     )
 
 
@@ -56,16 +56,15 @@ def getBillingSourceService() -> BillingSourceService:
 def getBillingAggregateQueryService() -> BillingAggregateQueryService:
     return BillingAggregateQueryService(
         logger=getLogger(),
-        timescale_session_manager=getTimescaleSessionManager(),
+        session_manager=getSessionManager(),
         transaction_repo=TransactionRepository(),
         apikey_service=getApiKeyService(),
-        session_manager=getSessionManager(),
     )
 
 
 @lru_cache(1)
 def getInvoiceService() -> InvoiceService:
     return InvoiceService(
-        session_manager=getTimescaleSessionManager(),
+        session_manager=getSessionManager(),
         invoice_repo=InvoiceRepo(),
     )

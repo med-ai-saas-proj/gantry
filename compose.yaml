@@ -132,7 +132,7 @@ services:
     image: timescale/timescaledb:latest-pg17
     container_name: timescale-db
     env_file:
-      - .env.postgres-timescale
+      - .env.postgres
     ports:
       - "5432:5432"
     volumes:
@@ -152,7 +152,7 @@ services:
           cpus: "0.1"
           memory: 20M
 
-  db:
+  vector-db:
     image: pgvector/pgvector:pg18
     container_name: postgres-pgvector
     env_file:

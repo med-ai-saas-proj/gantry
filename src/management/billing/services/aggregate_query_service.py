@@ -30,13 +30,11 @@ class BillingAggregateQueryService:
     def __init__(
         self,
         logger: BoundLogger,
-        timescale_session_manager: AsyncSessionManager,
         session_manager: AsyncSessionManager,
         transaction_repo: TransactionRepository,
         apikey_service: ApiKeyService,
     ) -> None:
         self.logger = logger
-        self.timescaledb_session_manager = timescale_session_manager
         self.session_manager = session_manager
         self.billing_transaction_repo = transaction_repo
         self.apikey_service = apikey_service
@@ -72,7 +70,7 @@ class BillingAggregateQueryService:
         else:
             project_ids = []  # means aggregate for whole organization
 
-        async with self.timescaledb_session_manager.get_session() as session:
+        async with self.session_manager.get_session() as session:
             agg = await self.billing_transaction_repo.sumByPeriodByProjects(
                 session,
                 project_ids=project_ids,
@@ -105,7 +103,7 @@ class BillingAggregateQueryService:
             ]
         else:
             apikey_ids = []  # means aggregate for whole organization
-        async with self.timescaledb_session_manager.get_session() as session:
+        async with self.session_manager.get_session() as session:
             agg = await self.billing_transaction_repo.sumByPeriodByApiKeys(
                 session,
                 apikey_ids=apikey_ids,
@@ -128,7 +126,7 @@ class BillingAggregateQueryService:
         period_scale: int,
     ) -> Result[Sequence[BillingAggregateReport], Any]:
         """Fetch the current total_amount for the given org/period."""
-        async with self.timescaledb_session_manager.get_session() as session:
+        async with self.session_manager.get_session() as session:
             agg = (
                 await self.billing_transaction_repo.sumByPeriodByOrganizations(
                     session,

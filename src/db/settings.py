@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class DBSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="db_", case_sensitive=False)
-    postgres_connection_uri: PostgresDsn
+    pgvector_connection_uri: PostgresDsn
     timescale_connection_uri: PostgresDsn
     redis_connection_uri: RedisDsn
 
