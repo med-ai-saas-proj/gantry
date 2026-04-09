@@ -1,0 +1,63 @@
+# Med-AI-SaaS Configuration
+port = 8080
+internal_port = 9000
+stage = "DEV"
+allowed_origins = ["*"]
+app_name = "Med-AI-SaaS"
+app_version = "1.0.0"
+
+[auth]
+server_url = "http://localhost:8000/"
+client_id = "example_client"
+realm_name = "example_realm"
+
+[logging]
+loki_url = "http://localhost:3100/"
+
+[db]
+# REQUIRED: e.g., "postgresql://user:pass@localhost:5432/dbname"
+postgres_connection_uri = "postgresql+asyncpg://internet_crawler:123456@localhost:5432/tailm"
+# REQUIRED: e.g., "redis://localhost:6379/0"
+redis_connection_uri = "redis://:password123@localhost:6379/0"
+
+[apikeys]
+# REQUIRED: The secret key for API key management
+secret = ""
+secret_length = 32
+
+[org]
+# REQUIRED: Service account secret for Keycloak
+KEYCLOAK_SERVICE_CLIENT_SECRET = ""
+KEYCLOAK_SERVICE_CLIENT_ID = "med-ai-saas-backend"
+deletion_cancel_window_days = 30
+deletion_worker_interval_seconds = 60
+# default_rate_limit = 100 # Optional
+
+[conversation]
+cache_ttl = 600
+cache_limit = 50
+
+[objectstorage]
+# ALL FIELDS BELOW ARE REQUIRED
+s3_bucket_name = ""
+s3_region_name = ""
+s3_access_key_id = ""
+s3_secret_access_key = ""
+s3_endpoint_url = ""
+s3_presigned_url_expiry_seconds = 3600
+redis_cache_expiry_seconds = 3600
+
+[log]
+level = "INFO"
+exporter_otlp_endpoint = "http://localhost:4317/"
+exporter_otlp_protocol = "grpc"
+traces = "disabled"
+metrics = "disabled"
+prometheus_port = 9000
+
+[aimodel]
+# Optional: Fill these to enable specific AI providers
+openai_base_url = ""
+openai_api_key = ""
+anthropic_api_key = ""
+groq_api_key = ""

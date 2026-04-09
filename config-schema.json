@@ -31,6 +31,31 @@
       "title": "AppStage",
       "type": "string"
     },
+    "AuthSetting": {
+      "additionalProperties": false,
+      "properties": {
+        "server_url": {
+          "default": "http://localhost:8000/",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Server Url",
+          "type": "string"
+        },
+        "client_id": {
+          "default": "example_client",
+          "title": "Client Id",
+          "type": "string"
+        },
+        "realm_name": {
+          "default": "example_realm",
+          "title": "Realm Name",
+          "type": "string"
+        }
+      },
+      "title": "AuthSetting",
+      "type": "object"
+    },
     "ConversationSettings": {
       "additionalProperties": false,
       "description": "Settings for file storage configuration.",
@@ -80,6 +105,18 @@
       "title": "ExporterProtocol",
       "type": "string"
     },
+    "LogLevel": {
+      "enum": [
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR",
+        "CRITICAL",
+        "FATAL"
+      ],
+      "title": "LogLevel",
+      "type": "string"
+    },
     "LoggingSetting": {
       "additionalProperties": false,
       "properties": {
@@ -95,13 +132,41 @@
       "title": "LoggingSetting",
       "type": "object"
     },
-    "LogsType": {
-      "enum": [
-        "otlp",
-        "disabled"
-      ],
-      "title": "LogsType",
-      "type": "string"
+    "LoggingSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO"
+        },
+        "exporter_otlp_endpoint": {
+          "default": "http://localhost:4317/",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Exporter Otlp Endpoint",
+          "type": "string"
+        },
+        "exporter_otlp_protocol": {
+          "$ref": "#/$defs/ExporterProtocol",
+          "default": "grpc"
+        },
+        "traces": {
+          "$ref": "#/$defs/TracesType",
+          "default": "disabled"
+        },
+        "metrics": {
+          "$ref": "#/$defs/MetricsType",
+          "default": "disabled"
+        },
+        "prometheus_port": {
+          "default": 9000,
+          "title": "Prometheus Port",
+          "type": "integer"
+        }
+      },
+      "title": "LoggingSettings",
+      "type": "object"
     },
     "MetricsType": {
       "enum": [
@@ -260,42 +325,6 @@
       "title": "OrgSetting",
       "type": "object"
     },
-    "OtelSettings": {
-      "additionalProperties": false,
-      "properties": {
-        "exporter_otlp_endpoint": {
-          "default": "http://localhost:4317/",
-          "format": "uri",
-          "maxLength": 2083,
-          "minLength": 1,
-          "title": "Exporter Otlp Endpoint",
-          "type": "string"
-        },
-        "exporter_otlp_protocol": {
-          "$ref": "#/$defs/ExporterProtocol",
-          "default": "grpc"
-        },
-        "traces": {
-          "$ref": "#/$defs/TracesType",
-          "default": "disabled"
-        },
-        "metrics": {
-          "$ref": "#/$defs/MetricsType",
-          "default": "disabled"
-        },
-        "logs": {
-          "$ref": "#/$defs/LogsType",
-          "default": "disabled"
-        },
-        "prometheus_port": {
-          "default": 9000,
-          "title": "Prometheus Port",
-          "type": "integer"
-        }
-      },
-      "title": "OtelSettings",
-      "type": "object"
-    },
     "TracesType": {
       "enum": [
         "otlp",
@@ -321,15 +350,15 @@
       "$ref": "#/$defs/AppStage",
       "default": "DEV"
     },
-    "debug": {
-      "default": false,
-      "title": "Debug",
-      "type": "boolean"
-    },
     "allowed_origins": {
-      "default": "*",
+      "default": [
+        "*"
+      ],
+      "items": {
+        "type": "string"
+      },
       "title": "Allowed Origins",
-      "type": "string"
+      "type": "array"
     },
     "app_name": {
       "default": "Med-AI-SaaS",
@@ -341,13 +370,16 @@
       "title": "App Version",
       "type": "string"
     },
+    "auth": {
+      "$ref": "#/$defs/AuthSetting"
+    },
     "logging": {
       "$ref": "#/$defs/LoggingSetting"
     },
     "db": {
       "$ref": "#/$defs/DBSettings"
     },
-    "apikey": {
+    "apikeys": {
       "$ref": "#/$defs/ApiKeysSetting"
     },
     "org": {
@@ -356,26 +388,27 @@
     "conversation": {
       "$ref": "#/$defs/ConversationSettings"
     },
-    "objectstorage_": {
+    "objectstorage": {
       "$ref": "#/$defs/ObjectStorageSettings"
     },
-    "otel": {
-      "$ref": "#/$defs/OtelSettings"
+    "log": {
+      "$ref": "#/$defs/LoggingSettings"
     },
     "aimodel": {
       "$ref": "#/$defs/ModelsSettings"
     }
   },
   "required": [
+    "auth",
     "logging",
     "db",
-    "apikey",
+    "apikeys",
     "org",
     "conversation",
-    "objectstorage_",
-    "otel",
+    "objectstorage",
+    "log",
     "aimodel"
   ],
-  "title": "TMP",
+  "title": "AppSettings",
   "type": "object"
 }

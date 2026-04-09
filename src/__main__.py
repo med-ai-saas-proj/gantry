@@ -1,44 +1,70 @@
-from src.main import app, mainMainMain
-from src.logging import getLogger
-from src.settings import AppSettings
+# from src.commands.server import RunServer
+# from src.commands.gen_config_schema import RunGenConfigSchema
 
-import os
-import json
-from typing import Annotated
-from pathlib import Path
-
-from pydantic import Field, FilePath, BaseModel
-from pydantic_settings import CliApp, CliSubCommand
-
-
-print("OK")
+# from pydantic_settings import (
+#     CliApp,
+#     BaseSettings,
+#     CliSubCommand,
+#     CliUnknownArgs,
+#     SettingsConfigDict,
+# )
 
 
-class Server(AppSettings.getAppSettingsType()):
-    def cli_cmd(self):
-        # Args parsing is done
-        # Setup logging
-        getLogger().info("Logger configured")
+# class MainCliApp(BaseSettings):
+#     model_config = SettingsConfigDict(
+#         cli_parse_args=True,
+#         cli_ignore_unknown_args=True,
+#         cli_kebab_case="no_enums",
+#         cli_prog_name="gantry",
+#         cli_avoid_json=True,
+#     )
+
+#     server: CliSubCommand[RunServer]
+#     gen_config_schema: CliSubCommand[RunGenConfigSchema]
+#     unknown_args: CliUnknownArgs
+
+#     def cli_cmd(self):
+#         CliApp.run_subcommand(self)
+
+import typer
 
 
-class GenConfigSchema(BaseModel):
-    path: Annotated[FilePath, Field()] = Path("config-schema.json")
+app = typer.Typer(
+    pretty_exceptions_enable=False,
+    rich_markup_mode=None,
+    rich_help_panel=None,
+    name="gantry",
+    help="This is not gonna help",
+    suggest_commands=True,
+)
 
-    def cli_cmd(self):
-        schema = AppSettings.getAppSettingsType().model_json_schema()
+context_settings = {
+    "allow_extra_args": True,
+    "ignore_unknown_options": True,
+    "help_option_names": [],
+}
 
-        with open(self.path, "w") as f:
-            json.dump(schema, f, indent=2)
+
+@app.command(
+    "gen-config-schema",
+    context_settings=context_settings,
+)
+def genConfigSchema(ctx: typer.Context):
+    from src.commands.gen_config_schema import runGenConfigSchema
+
+    runGenConfigSchema(ctx.args)
 
 
-class Main(BaseModel):
-    server: CliSubCommand[Server]
-    gen_config_schema: CliSubCommand[GenConfigSchema]
+@app.command(
+    "server",
+    context_settings=context_settings,
+)
+def server(ctx: typer.Context):
+    from src.commands.server import runServer
 
-    def cli_cmd(self):
-        CliApp.run_subcommand(self)
+    runServer(ctx.args)
 
 
 if __name__ == "__main__":
-    print(os.getenv("DB_POSTGRES_CONNECTION_URI"))
-    CliApp.run(Main)
+    # CliApp.run(MainCliApp)
+    app()

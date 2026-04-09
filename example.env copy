@@ -1,4 +1,4 @@
-# Example environment variables for .env
+# Example environment variables for .env copy
 GOOGLE_PROGRAMMABLE_SEARCH_API_KEY='<YOUR_GOOGLE_PROGRAMMABLE_SEARCH_API_KEY>' # !SECRET
 GOOGLE_PROGRAMMABLE_SEARCH_CX='<YOUR_GOOGLE_PROGRAMMABLE_SEARCH_CX>' # !SECRET
 

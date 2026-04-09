@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Self, Callable, ClassVar, Annotated, final
-from functools import lru_cache
-from tkinter.constants import N
 
-from pydantic import Field, create_model
+from pydantic import Field, FilePath, AliasChoices, create_model
 from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
@@ -32,6 +30,8 @@ class _AppSettings(BaseSettings):
         frozen=True,
         # cli_ignore_unknown_args=True,
         cli_implicit_flags=True,
+        cli_kebab_case="no_enums",
+        cli_avoid_json=True,
     )
     port: int = 8080
     internal_port: int = 9000
@@ -64,12 +64,11 @@ class AppSettings:
                 cli_prefix=prefix,
                 cli_ignore_unknown_args=True,
                 cli_implicit_flags=True,
+                cli_kebab_case="no_enums",
+                cli_avoid_json=True,
                 frozen=True,
             )
             setting.get = lambda: getattr(cls.getAppSettings(), prefix)
-            # cls.type_arr[prefix] = Annotated[
-            #     setting, Field(default_factory=setting)
-            # ]
             cls.type_arr[prefix] = setting
             return setting
 
@@ -85,7 +84,6 @@ class AppSettings:
                 **cls.type_arr,
             )
             cls.model_type = Model
-            print("Stuff is ok here", __file__, 88)
             return Model
         else:
             return cls.model_type
