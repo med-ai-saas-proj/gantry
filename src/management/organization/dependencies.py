@@ -54,7 +54,7 @@ async def getLimit(
 ) -> int | None:
     """Return effective org limit (org override or global default)."""
     org_settings = getOrgSettings()
-    settings_res = (await org_service.get_settings(org_id)).unwrap()
+    settings_res = (await org_service.getSettings(org_id)).unwrap()
     org_limit = settings_res.rate_limit
     if org_limit is not None:
         return org_limit
@@ -113,7 +113,7 @@ async def _get_permissions_or_raise(
     org_id: str,
     user_id: str,
 ) -> list[str]:
-    perms_res = await org_service.get_user_permissions(org_id, user_id)
+    perms_res = await org_service.getUserPermissions(org_id, user_id)
     return (
         perms_res.map(lambda r: r.permissions)
         .map_err(_raise_permission_fetch_error)
@@ -150,9 +150,6 @@ def requiredOrgPermission(permission: OrgPermission):
         user_info: Annotated[UserInfo, Depends(_get_user_info)],
         org_service: Annotated[OrgService, Depends(getOrgService)],
     ) -> UserInfo:
-        if _is_trusted_backend_service_account(user_info):
-            return user_info
-
         user_perms = await _get_permissions_or_raise(
             org_service, org_id, user_info["id"]
         )

@@ -36,7 +36,7 @@ conversation_router = APIRouter(
 )
 async def create_conversation(
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
     ],
     body: Annotated[CreateConversationRequest, Body()],
     conversation_service: Annotated[
@@ -61,7 +61,7 @@ async def create_conversation(
 async def get_conversation_metadata(
     conversation_uid: uuid.UUID,
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
     ],
     conversation_service: Annotated[
         ConversationService, Depends(getConversationService)
@@ -91,7 +91,7 @@ async def update_conversation_metadata(
     conversation_uid: uuid.UUID,
     body: Annotated[UpdateConversationMetadataRequest, Body()],
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
     ],
     conversation_service: Annotated[
         ConversationService, Depends(getConversationService)
@@ -116,7 +116,7 @@ async def update_conversation_metadata(
 async def delete_conversation(
     conversation_uid: uuid.UUID,
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["conversation.delete"]))
     ],
     conversation_service: Annotated[
         ConversationService, Depends(getConversationService)
@@ -139,7 +139,7 @@ async def delete_conversation(
 async def get_conversation_messages(
     conversation_uid: uuid.UUID,
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
     ],
     conversation_service: Annotated[
         ConversationService, Depends(getConversationService)
@@ -196,7 +196,7 @@ async def add_message_to_conversation(
     conversation_uid: uuid.UUID,
     body: Annotated[AddMessageRequest, Body()],
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
     ],
     conversation_service: Annotated[
         ConversationService, Depends(getConversationService)
@@ -221,7 +221,7 @@ async def delete_message_from_conversation(
     conversation_uid: uuid.UUID,
     message_seq_id: int,
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
     ],
     conversation_service: Annotated[
         ConversationService, Depends(getConversationService)
@@ -247,7 +247,7 @@ async def get_message_from_conversation(
     conversation_uid: uuid.UUID,
     message_seq_id: int,
     api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["placeholder"]))
+        ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
     ],
     conversation_service: Annotated[
         ConversationService, Depends(getConversationService)

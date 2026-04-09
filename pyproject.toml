@@ -38,6 +38,7 @@ dependencies = [
     "opentelemetry-instrumentation-system-metrics>=0.60b1",
     "opentelemetry-exporter-prometheus>=0.60b1",
     "opentelemetry-exporter-otlp-proto-http>=1.39.1",
+    "stripe>=14.4.1",
     "pyrusult",
 ]
 
@@ -67,4 +68,5 @@ dev = [
     "boto3-stubs[s3]>=1.42.33",
     "examplenv",
     "typer>=0.24.1",
+    "scalar-fastapi>=1.8.1",
 ]

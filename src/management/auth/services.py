@@ -24,6 +24,13 @@ class UnauthorizedError(RecoverableError):
     title = messages_const.UNAUTHORIZED
 
 
+class MissingOrganizationClaimError(UnauthorizedError):
+    """Raised when a regular user token has no organization claim."""
+
+    code = "missing_organization_claim"
+    detail = "The authenticated token does not include an organization claim."
+
+
 class ForbiddenError(RecoverableError):
     """Raised when user doesn't have required permissions."""
 
@@ -144,14 +151,49 @@ class AuthService:
         if account_roles:
             roles.extend(account_roles)
 
+        username = claims.get("preferred_username")
+
+        org_id = self._extractOrganizationId(claims.get("organization"))
+        if not org_id:
+            return Err(MissingOrganizationClaimError())
+
         auth_info: UserInfo = {
             "id": claims["sub"],
-            "username": claims.get("preferred_username"),
+            "username": username if isinstance(username, str) else None,
             "email": claims.get("email"),
             "roles": roles,
+            "org_id": org_id,
         }
 
         return Ok(auth_info)
+
+    def _extractOrganizationId(self, organization_claim: Any) -> str | None:
+        """Extract an organization id from supported Keycloak claim shapes."""
+        # Older mapper setups can emit a single organization string directly.
+        if isinstance(organization_claim, str):
+            return organization_claim or None
+
+        # Multivalued claims are returned as a list; use the first non-empty value.
+        if isinstance(organization_claim, list):
+            for value in organization_claim:
+                if isinstance(value, str) and value:
+                    return value
+            return None
+
+        # The current mapper can emit an object keyed by org name with nested ids.
+        if isinstance(organization_claim, dict):
+            direct_id = organization_claim.get("id")
+            if isinstance(direct_id, str) and direct_id:
+                return direct_id
+
+            # Some Keycloak shapes nest the id one level deeper under each org entry.
+            for value in organization_claim.values():
+                if isinstance(value, dict):
+                    nested_id = value.get("id")
+                    if isinstance(nested_id, str) and nested_id:
+                        return nested_id
+
+        return None
 
     def checkRole(
         self, user_info: UserInfo, role: ManagementRole

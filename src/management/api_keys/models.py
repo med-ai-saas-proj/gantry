@@ -1,12 +1,10 @@
 from src.db.base import BaseSQLModel
-from src.db.utils import (
-    WithID,
-    WithCreateUpdateTimestamp,
-)
-from src.management.projects.models import Project
+from src.db.utils import WithID, WithCreateUpdateTimestamp
+from src.management.project.models import Project
 
-from sqlalchemy import String, BigInteger, ForeignKey
+from sqlalchemy import String, Boolean, BigInteger, ForeignKey
 from sqlalchemy.orm import Mapped, relationship, mapped_column
+from sqlalchemy.dialects.postgresql import ARRAY
 
 
 class ApiKeyBaseSQLModel(BaseSQLModel):
@@ -16,19 +14,8 @@ class ApiKeyBaseSQLModel(BaseSQLModel):
     __table_args__ = {"schema": "ApiKey"}
 
 
-class Permission(WithCreateUpdateTimestamp, WithID, ApiKeyBaseSQLModel):
-    """Permission class."""
-
-    __tablename__ = "Permissions"
-
-    name: Mapped[str] = mapped_column(
-        String(1024), unique=True, nullable=False, index=True
-    )
-    description: Mapped[str] = mapped_column(String(4096), nullable=False)
-
-
 class ApiKey(WithCreateUpdateTimestamp, WithID, ApiKeyBaseSQLModel):
-    """API Key."""
+    """Project-scoped API key with dynamic text permissions."""
 
     __tablename__ = "ApiKeys"
 
@@ -39,27 +26,23 @@ class ApiKey(WithCreateUpdateTimestamp, WithID, ApiKeyBaseSQLModel):
     )
     name: Mapped[str] = mapped_column(String(1024), nullable=False)
     description: Mapped[str] = mapped_column(String(4096), nullable=False)
-
-    # expiration_date: Mapped[datetime.datetime] = mapped_column(
-    #     DateTime, nullable=True
-    # )
-    permissions: Mapped[list[Permission]] = relationship(
-        Permission, secondary=lambda: ApiKeyPermission.__table__
+    permissions: Mapped[list[str]] = mapped_column(
+        ARRAY(String(1024)),
+        nullable=False,
+        default=list,
+        server_default="{}",
     )
-
+    disabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
     project_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey(Project.id), nullable=False, index=True
+        BigInteger,
+        ForeignKey(Project.id),
+        nullable=False,
+        index=True,
     )
 
-
-class ApiKeyPermission(ApiKeyBaseSQLModel):
-    """API Key and Permission relation entity."""
-
-    __tablename__ = "ApiKeyPermissions"
-
-    apikey_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey(ApiKey.id), primary_key=True
-    )
-    permission_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey(Permission.id), primary_key=True
-    )
+    project: Mapped[Project] = relationship(Project)

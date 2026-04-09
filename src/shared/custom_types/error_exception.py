@@ -11,6 +11,7 @@ class RecoverableError(Exception):
     title: ClassVar[str]
     code: ClassVar[str]
     detail: ClassVar[str | None] = None
+    message: str | None = None
     _stack_frames: list[str] | None
     _from: Exception | None
 
@@ -60,3 +61,46 @@ class UnrecoverableError(Exception):
         if self.detail:
             res.update({"detail": self.detail})
         return res
+
+
+class NotImplementedError(RecoverableError):
+    status = 501
+    title = "Not Implemented"
+    code = "not_implemented"
+    detail = "This functionality is not implemented yet."
+
+
+class NotFoundError(RecoverableError):
+    status = 404
+    title = "Not Found"
+    code = "not_found"
+    detail = "The requested resource was not found."
+
+
+class InvalidEnumValueError(RecoverableError):
+    status = 400
+    title = "Invalid Enum Value"
+    code = "invalid_enum_value"
+    detail = "One or more enum values provided are invalid."
+
+
+class ExternalAPIError(RecoverableError):
+    status = 502
+    title = "External API Error"
+    code = "external_api_error"
+    detail = "An error occurred while communicating with an external API."
+
+    def __init__(self, message: str, from_exception: Exception | None = None):
+        super().__init__(from_exception)
+        self.message = message
+
+
+class InternalServiceError(UnrecoverableError):
+    status = 500
+    title = "Internal Service Error"
+    code = "internal_service_error"
+    detail = "An internal service error occurred. Please contact support."
+
+    def __init__(self, message: str, from_exception: Exception | None = None):
+        super().__init__(from_exception)
+        self.message = message

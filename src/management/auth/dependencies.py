@@ -1,5 +1,12 @@
 """FastAPI dependencies for authentication and authorization."""
 
+from src.shared.settings import getAppSetting
+from src.management.organization.factories import (
+    KeycloakOrgClient,
+    getKeycloakOrgClient,
+)
+from src.shared.custom_types.error_exception import RecoverableError
+
 from .roles import ManagementRole
 from .entities import UserInfo
 from .settings import getAuthSettings
@@ -9,6 +16,7 @@ from typing import Annotated
 from functools import lru_cache
 
 from fastapi import Depends, Request, Security
+from pyrusult import ResultStatus
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
@@ -32,9 +40,22 @@ def _constructOauth2Scheme(request: Request):
     return oauth2_scheme(request)
 
 
-async def getUserInfo(
+class MissingOrganizationContextError(RecoverableError):
+    """Raised when the authenticated token has no organization context."""
+
+    status = 403
+    code = "missing_org_context"
+    title = "Missing Organization Context"
+    detail = "The authenticated token does not include an organization id."
+
+
+app_settings = getAppSetting()
+
+
+async def _getUserInfo(
     token: Annotated[str, Security(_constructOauth2Scheme)],
     auth_service: Annotated[AuthService, Depends(getAuthService)],
+    kc_org_client: Annotated[KeycloakOrgClient, Depends(getKeycloakOrgClient)],
 ) -> UserInfo:
     """
     Get authenticated user info from JWT token.
@@ -42,7 +63,68 @@ async def getUserInfo(
     This is the base dependency for authentication.
     Returns UserInfo if token is valid, raises UnauthorizedError otherwise.
     """
-    return auth_service.verifyToken(token).unwrap()
+    user_info = auth_service.verifyToken(token).unwrap()
+
+    org_claim = user_info["org_id"]
+    if not org_claim:
+        return user_info
+
+    orgs_res = await kc_org_client.getMemberOrganizations(user_info["id"])
+    if orgs_res.status == ResultStatus.Err:
+        return user_info
+
+    for org in orgs_res.unwrap():
+        org_id = org.get("id")
+        if not isinstance(org_id, str) or not org_id:
+            continue
+        if org_claim in {org_id, org.get("name"), org.get("alias")}:
+            user_info["org_id"] = org_id
+            break
+
+    return user_info
+
+
+getUserInfo = _getUserInfo
+
+if app_settings.mock_auth:
+    from src.management.auth.services import UnauthorizedError
+
+    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+    # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
+    security = HTTPBearer()
+
+    async def mock_getUserInfo(
+        auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+        auth_service: Annotated[AuthService, Depends(getAuthService)],
+    ) -> UserInfo:
+        if auth.credentials == "bypass_token":
+            return UserInfo(
+                id="test_user",
+                username="test_user",
+                email="test_user@example.com",
+                roles=[],
+                org_id="test_org1",
+            )
+        raise UnauthorizedError()
+
+    getUserInfo = mock_getUserInfo
+
+
+async def getUserOrgId(
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+) -> str:
+    """Return the authenticated user's organization id from token context."""
+    return user_info["org_id"]
+
+
+async def requireUserOrgId(
+    org_id: Annotated[str, Depends(getUserOrgId)],
+) -> str:
+    """Return token org id, failing if the token has no organization context."""
+    if not org_id:
+        raise MissingOrganizationContextError()
+    return org_id
 
 
 def requireRole(role: ManagementRole):

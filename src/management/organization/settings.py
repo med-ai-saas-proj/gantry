@@ -19,6 +19,16 @@ class OrgSetting(ModifiedBaseSettings):
             "Service account client secret for Keycloak Admin API calls."
         ),
     )
+    invite_client_id: str = Field(
+        "med-ai-saas-app",
+        validation_alias="ORG_INVITE_CLIENT_ID",
+        description="OIDC client id used for invitation registration links.",
+    )
+    invite_redirect_uri: str = Field(
+        "http://localhost:3000",
+        validation_alias="ORG_INVITE_REDIRECT_URI",
+        description="Redirect URI used for invitation registration links.",
+    )
     default_rate_limit: int | None = Field(
         None,
         description=(

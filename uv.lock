@@ -272,6 +272,7 @@ dependencies = [
     { name = "redis" },
     { name = "sqlalchemy" },
     { name = "sqlalchemy-timescaledb" },
+    { name = "stripe" },
     { name = "structlog" },
     { name = "uvloop", marker = "sys_platform == 'linux'" },
 ]
@@ -286,6 +287,7 @@ dev = [
     { name = "pre-commit" },
     { name = "pyrefly" },
     { name = "ruff" },
+    { name = "scalar-fastapi" },
     { name = "typer" },
 ]
 
@@ -323,6 +325,7 @@ requires-dist = [
     { name = "redis", specifier = ">=7.0.1" },
     { name = "sqlalchemy", specifier = ">=2.0.43" },
     { name = "sqlalchemy-timescaledb", specifier = ">=0.4.1" },
+    { name = "stripe", specifier = ">=14.4.1" },
     { name = "structlog", specifier = ">=25.4.0" },
     { name = "uvloop", marker = "sys_platform == 'linux'", specifier = ">=0.22.1" },
 ]
@@ -337,6 +340,7 @@ dev = [
     { name = "pre-commit", specifier = ">=4.4.0" },
     { name = "pyrefly", specifier = ">=0.45.0" },
     { name = "ruff", specifier = ">=0.14.4" },
+    { name = "scalar-fastapi", specifier = ">=1.8.1" },
     { name = "typer", specifier = ">=0.24.1" },
 ]
 
@@ -1496,7 +1500,7 @@ wheels = [
 name = "griffelib"
 version = "2.0.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9d/82/74f4a3310cdabfbb10da554c3a672847f1ed33c6f61dd472681ce7f1fe67/griffelib-2.0.2.tar.gz", hash = "sha256:3cf20b3bc470e83763ffbf236e0076b1211bac1bc67de13daf494640f2de707e", size = 166461, upload-time = "2026-03-27T11:34:51.091Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ad/06/eccbd311c9e2b3ca45dbc063b93134c57a1ccc7607c5e545264ad092c4a9/griffelib-2.0.0.tar.gz", hash = "sha256:e504d637a089f5cab9b5daf18f7645970509bf4f53eda8d79ed71cce8bd97934", size = 166312, upload-time = "2026-03-23T21:06:55.954Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/11/8c/c9138d881c79aa0ea9ed83cbd58d5ca75624378b38cee225dcf5c42cc91f/griffelib-2.0.2-py3-none-any.whl", hash = "sha256:925c857658fb1ba40c0772c37acbc2ab650bd794d9c1b9726922e36ea4117ea1", size = 142357, upload-time = "2026-03-27T11:34:46.275Z" },
 ]
@@ -3937,6 +3941,15 @@ wheels = [
 ]
 
 [[package]]
+name = "scalar-fastapi"
+version = "1.8.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/af/95/bbbf63b38eafc93862827bda0fba415a486882642d9293f6b918145fd4f9/scalar_fastapi-1.8.1.tar.gz", hash = "sha256:eadb625d386fa94a79e5463af0aa6bcf5e02bc4d665454ed0795960987152531", size = 8258, upload-time = "2026-03-18T09:36:57.005Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/97/29/584cc791765b92a35362733875ff881df3b3d181670285eaf571a17170d7/scalar_fastapi-1.8.1-py3-none-any.whl", hash = "sha256:0ff296877d65082039eba8682fef6eafbe1cd77c5b55a3b3c0b96681eb15ca62", size = 7636, upload-time = "2026-03-18T09:36:56.224Z" },
+]
+
+[[package]]
 name = "scipy"
 version = "1.17.1"
 source = { registry = "https://pypi.org/simple" }
@@ -4175,6 +4188,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/81/69/17425771797c36cded50b7fe44e850315d039f28b15901ab44839e70b593/starlette-1.0.0.tar.gz", hash = "sha256:6a4beaf1f81bb472fd19ea9b918b50dc3a77a6f2e190a12954b25e6ed5eea149", size = 2655289, upload-time = "2026-03-22T18:29:46.779Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/c9/584bc9651441b4ba60cc4d557d8a547b5aff901af35bda3a4ee30c819b82/starlette-1.0.0-py3-none-any.whl", hash = "sha256:d3ec55e0bb321692d275455ddfd3df75fff145d009685eb40dc91fc66b03d38b", size = 72651, upload-time = "2026-03-22T18:29:45.111Z" },
+]
+
+[[package]]
+name = "stripe"
+version = "14.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/63/01/59d92650146c6340e333c22b8a238561b022e8641ba255298dfe46b4137d/stripe-14.4.1.tar.gz", hash = "sha256:e3eecfb336819326cd2ab9a93f98eb01b49c4d4d93c9d167a52a68ab99c19a88", size = 1473321, upload-time = "2026-03-06T22:59:45.822Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/35/0f/547eab75052384a72771b396a484556e5636629c031e5eafa8dc27af89ed/stripe-14.4.1-py3-none-any.whl", hash = "sha256:d6722b985dc3b4d6da01ff4fa95a975d3694a89bba96895bf17aa858073ff2b8", size = 2116642, upload-time = "2026-03-06T22:59:43.72Z" },
 ]
 
 [[package]]

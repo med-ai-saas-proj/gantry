@@ -9,3 +9,4 @@ class ApiKeyInfo(TypedDict):
     project_id: int
     org_id: str
     project_uid: str
+    hashed_key: str

@@ -1,12 +1,12 @@
 from alembic import context
-from src.db.base import BaseSQLModel
-from src.main.app import main_app
+from src.db.base import BaseSQLModel, BaseTimescaleSQLModel
 from src.db.settings import getDBSettings
 
 import asyncio
 from logging.config import fileConfig
 
 from sqlalchemy import pool
+from src.main.app import main_app
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -25,14 +25,29 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 _ = main_app
-target_metadata = [BaseSQLModel.metadata]
+target_metadata = [BaseSQLModel.metadata, BaseTimescaleSQLModel.metadata]
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
-db_uri = getDBSettings().postgres_connection_uri.encoded_string()
+
+db_uri = getDBSettings().timescale_connection_uri.encoded_string()
+
+
+def include_object(object, name, type_, reflected, compare_to):
+    schema = getattr(object, "schema", None)
+    return not (
+        (
+            schema
+            and schema.startswith("_timescaledb")
+            or schema == "information_schema"
+            or schema == "pg_catalog"
+        )
+        or name.startswith("timescaledb")
+        or getattr(object, "skip_autogenerate", None)
+    )
 
 
 def run_migrations_offline() -> None:
@@ -53,6 +68,7 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         include_schemas=True,
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -64,6 +80,7 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         include_schemas=True,
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -72,17 +89,13 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     """In this scenario we need to create an Engine
-    and associate a connection with the context.
-
-    """
+    and associate a connection with the context."""
 
     configuration = config.get_section(config.config_ini_section, {})
     configuration["sqlalchemy.url"] = db_uri
 
     connectable = async_engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
+        configuration, prefix="sqlalchemy.", poolclass=pool.NullPool
     )
 
     async with connectable.connect() as connection:
