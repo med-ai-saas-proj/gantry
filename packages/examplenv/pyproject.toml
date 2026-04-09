@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-examplenv = "examplenv.cli:main"
+examplenv = "examplenv.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.9.11,<0.10.0"]

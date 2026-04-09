@@ -92,7 +92,7 @@ def generate_example_env_file(original_file: Path, mask_all: bool) -> str:
             or in_mask_block
             or (line["comment"] and SPECIAL_COMMENT_SECRET in line["comment"])
         ) and line["value"]:
-            line["value"] = f"<YOUR_{line['key'] or ''}>"
+            line["value"] = f"'<YOUR_{line['key'] or ''}>'"
         lines.append(construct_env_line(line))
 
     lines.append("")
