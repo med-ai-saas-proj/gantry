@@ -1,6 +1,6 @@
 """FastAPI dependencies for authentication and authorization."""
 
-from src.shared.settings import getAppSetting
+from src.settings import AppSettings
 from src.management.organization.factories import (
     KeycloakOrgClient,
     getKeycloakOrgClient,
@@ -49,7 +49,7 @@ class MissingOrganizationContextError(RecoverableError):
     detail = "The authenticated token does not include an organization id."
 
 
-app_settings = getAppSetting()
+app_settings = AppSettings.get()
 
 
 async def _getUserInfo(

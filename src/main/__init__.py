@@ -34,11 +34,9 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 def mainMainMain():
     configure_mappers()
 
-    app_settings = getAppSettings()
-
     setupOtel(
-        service_name=app_settings.app_name,
-        service_version=app_settings.app_version,
+        service_name=common_const.APP_NAME,
+        service_version=common_const.APP_VERSION,
         logger=getLogger(),
     )
 

@@ -1,4 +1,5 @@
-from src.settings import getAppSettings
+from src.settings import AppSettings
+from src.shared.consts.common_const import APP_NAME
 
 from ..utils import request_id_utils
 
@@ -89,7 +90,7 @@ def configure_default_logging(
 
 @lru_cache(1)
 def getLogger() -> BoundLogger:
-    return configure_default_logging(logging.getLogger("core"))
+    return configure_default_logging(logging.getLogger(APP_NAME))
 
 
 def getServiceLogger(

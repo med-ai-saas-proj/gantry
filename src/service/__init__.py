@@ -1,8 +1,6 @@
-from src.shared.settings import getAppSetting
+from src.settings import AppSettings
 from src.shared.custom_types.error_exception import ProblemDetails
 
-# from .chat import chat_router
-# from .ai_search import ai_search_router
 from .utils.conversation import conversation_router
 from .utils.file_storage import file_storage_router
 
@@ -13,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 __all__ = ["service_app"]
 
-app_setting = getAppSetting()
+app_setting = AppSettings.get()
 
 service_app = FastAPI(
     title=app_setting.app_name,

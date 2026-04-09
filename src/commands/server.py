@@ -1,5 +1,6 @@
 from src.main import mainMainMain
 from src.settings import AppSettings
+from src.shared.consts.common_const import APP_NAME
 
 from typing import Any, Annotated
 
@@ -56,7 +57,7 @@ class _DotEnvConfigSettingsSource(PydanticBaseSettingsSource):
         return None, "", False
 
 
-class Server(AppSettings.getAppSettingsType(), cli_prog_name="gantry server"):
+class Server(AppSettings.type(), cli_prog_name=f"{APP_NAME} server"):
     config_file: Annotated[
         FilePath | None,
         Field(validation_alias=AliasChoices("config_file", "f")),
@@ -69,8 +70,9 @@ class Server(AppSettings.getAppSettingsType(), cli_prog_name="gantry server"):
     async def cli_cmd(self):
         # Args parsing is done
         # Setup logging
-        # getLogger().info("Logger configured")
-        print("Just pretendinng that the server just ran")
+        logger = setupLogger(self)
+        # print("Just pretendinng that the server just ran")
+        pass
 
     @classmethod
     def settings_customise_sources(

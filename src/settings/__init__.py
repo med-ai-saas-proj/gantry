@@ -39,9 +39,6 @@ class _AppSettings(BaseSettings):
     stage: AppStage = AppStage.DEV
     allowed_origins: list[str] = ["*"]
 
-    app_name: str = "Med-AI-SaaS"
-    app_version: str = "1.0.0"
-
 
 @final
 class AppSettings:
@@ -68,14 +65,14 @@ class AppSettings:
                 cli_avoid_json=True,
                 frozen=True,
             )
-            setting.get = lambda: getattr(cls.getAppSettings(), prefix)
+            setting.get = lambda: getattr(cls.get(), prefix)
             cls.type_arr[prefix] = setting
             return setting
 
         return wrapper
 
     @classmethod
-    def getAppSettingsType(cls) -> type[_AppSettings]:
+    def type(cls) -> type[_AppSettings]:
         # raise RuntimeError("Shit from", __file__, 80)
         if cls.model_type is None:
             Model = create_model(
@@ -89,11 +86,7 @@ class AppSettings:
             return cls.model_type
 
     @classmethod
-    def getAppSettings(cls) -> _AppSettings:
+    def get(cls) -> _AppSettings:
         if cls.model is None:
-            cls.model = cls.getAppSettingsType()()
+            cls.model = cls.type()()
         return cls.model
-
-
-def getAppSettings():
-    return AppSettings.getAppSettings()

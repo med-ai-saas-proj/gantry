@@ -40,6 +40,7 @@ dependencies = [
     "opentelemetry-exporter-otlp-proto-http>=1.39.1",
     "stripe>=14.4.1",
     "pyrusult",
+    "typer>=0.24.1",
 ]
 
 [tool.pyrefly]
@@ -67,6 +68,5 @@ dev = [
     "pyrefly>=0.45.0",
     "boto3-stubs[s3]>=1.42.33",
     "examplenv",
-    "typer>=0.24.1",
     "scalar-fastapi>=1.8.1",
 ]

@@ -1,3 +1,5 @@
+from src.shared.consts.common_const import APP_NAME
+
 from typing import Annotated
 from pathlib import Path
 
@@ -9,7 +11,9 @@ from pydantic_settings import (
 )
 
 
-class GenConfigSchema(BaseSettings, cli_prog_name="gantry gen-config-schema"):
+class GenConfigSchema(
+    BaseSettings, cli_prog_name=f"{APP_NAME} gen-config-schema"
+):
     output: Annotated[
         Path,
         Field(
@@ -24,7 +28,7 @@ class GenConfigSchema(BaseSettings, cli_prog_name="gantry gen-config-schema"):
         import json
 
         with self.output.open("w") as f:
-            schema = AppSettings.getAppSettingsType().model_json_schema()
+            schema = AppSettings.type().model_json_schema()
             json.dump(schema, f, indent=2)
 
     @classmethod

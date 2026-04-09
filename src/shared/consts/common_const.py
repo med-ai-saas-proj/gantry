@@ -6,3 +6,5 @@ ROOT_FOLDER = os.path.abspath(
 )
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
 REQUEST_ID_HEADER = "x-request-id"
+APP_NAME = "gantry"
+APP_VERSION = "0.0.3"
