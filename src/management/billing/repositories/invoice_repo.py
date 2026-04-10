@@ -4,6 +4,7 @@ from src.management.billing.type import (
     BillingInvoiceLineItemInfo,
     CreateBillingInvoiceLineItemInfo,
 )
+from src.management.project.models import Project
 
 from ..models import BillingInvoice, BillingInvoiceLineItem
 
@@ -13,7 +14,7 @@ from decimal import Decimal
 from tkinter import N
 from datetime import date, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 
 class InvoiceRepo(Repository[BillingInvoice, int]):
@@ -118,22 +119,52 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             "details": row.details,
         }
 
+    async def updateProviderInvoiceID(
+        self,
+        session,
+        invoice_id: int,
+        provider_invoice_id: str,
+    ):
+        stmt = (
+            update(BillingInvoice)
+            .where(BillingInvoice.id == invoice_id)
+            .values(provider_invoice_id=provider_invoice_id)
+        )
+        await session.execute(stmt)
+
     async def getInvoiceLineItems(
         self,
         session,
         invoice_id: int,
     ) -> Sequence[BillingInvoiceLineItemInfo]:
         # For simplicity, assume line items are stored as a JSON array in the details column of the invoice
-        stmt = select(BillingInvoiceLineItem).where(
-            BillingInvoiceLineItem.invoice_id == invoice_id
+        stmt = (
+            select(
+                BillingInvoiceLineItem.uuid,
+                BillingInvoiceLineItem.description,
+                BillingInvoiceLineItem.amount,
+                Project.uuid.label("project_uid"),
+                Project.id.label("project_id"),
+                Project.name.label("name"),
+            )
+            .select_from(BillingInvoiceLineItem)
+            .join(
+                Project,
+                BillingInvoiceLineItem.project_id == Project.id,
+                isouter=True,
+            )
+            .where(BillingInvoiceLineItem.invoice_id == invoice_id)
         )
         res = await session.execute(stmt)
-        rows = res.scalars().all()
+        rows = res.all()
         return [
             {
+                "invoice_line_uuid": row.uuid,
                 "description": row.description,
                 "amount": row.amount,
                 "project_uid": row.project_uid,
+                "project_id": row.project_id,
+                "project_name": row.name,
             }
             for row in rows
         ]

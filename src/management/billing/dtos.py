@@ -86,6 +86,7 @@ class InvoiceItemInfoResponse(BaseModel):
     description: str
     amount: Decimal
     project_uid: UUID | None
+    project_name: str | None
 
 
 class InvoiceDetailInfoResponse(InvoiceInfoResponse):

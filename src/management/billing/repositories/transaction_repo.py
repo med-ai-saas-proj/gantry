@@ -509,6 +509,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             stmt.c.transaction_count,
             stmt.c.total_amount,
             stmt.c.project_id,
+            Project.name.label("group_by_name"),
             Project.uuid.label("group_by_key"),
         ).join(
             Project,
@@ -524,6 +525,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
                 "total_amount": row.total_amount,
                 "group_by_int_key": row.project_id,
                 "group_by_uuid_key": row.group_by_key,
+                "group_by_name": row.group_by_name,
             }
             for row in rows
         ]

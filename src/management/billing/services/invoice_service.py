@@ -13,19 +13,27 @@ from src.management.billing.utils import (
     _get_billing_period,
     _get_previous_billing_period,
 )
-from src.shared.custom_types.error_exception import RecoverableError
+from src.shared.custom_types.error_exception import (
+    ExternalAPIError,
+    RecoverableError,
+)
 from src.management.billing.repositories.transaction_repo import (
     TransactionRepository,
+)
+from src.management.billing.repositories.billing_source_repo import (
+    BillingSourceRepo,
 )
 
 from ..repositories.invoice_repo import InvoiceRepo
 
+import asyncio
 from uuid import UUID
 from typing import Sequence
 from decimal import Decimal
 from datetime import datetime
 
-from pyrusult import Ok, Err, Result
+from stripe import StripeError, StripeClient
+from pyrusult import Ok, Err, Result, ResultStatus
 
 
 class InvoiceNotFoundError(RecoverableError):
@@ -41,10 +49,14 @@ class InvoiceService:
         session_manager: AsyncSessionManager,
         invoice_repo: InvoiceRepo,
         transaction_repo: TransactionRepository,
+        billing_source_repo: BillingSourceRepo,
+        stripe_client: StripeClient,
     ):
         self.session_manager = session_manager
         self.invoice_repo = invoice_repo
         self.transaction_repo = transaction_repo
+        self.billing_source_repo = billing_source_repo
+        self.stripe_client = stripe_client
 
     async def list_invoices(
         self,
@@ -113,6 +125,7 @@ class InvoiceService:
                             description=line["description"],
                             amount=line["amount"],
                             project_uid=line["project_uid"],
+                            project_name=line["project_name"],
                         )
                         for line in lines
                     ],
@@ -159,7 +172,7 @@ class InvoiceService:
             for usage in total_usage:
                 lines.append(
                     {
-                        "description": f"Usage from {usage['period_bucket'].date()}",
+                        "description": f"Usage in {usage['period_bucket'].date()}: {usage['group_by_name']}",
                         "amount": usage["total_amount"],
                         "project_id": usage["group_by_int_key"],
                     }
@@ -186,3 +199,83 @@ class InvoiceService:
                     lines=lines,
                 )
             await session.commit()
+
+    async def createInvoiceInStripe(
+        self,
+        org_id: str,
+        invoice_uid: UUID,
+    ):
+        async with self.session_manager.get_session() as session:
+            async with session.begin():
+                billing_source = await self.billing_source_repo.getForOrg(
+                    session=session,
+                    org_id=org_id,
+                )
+                if not billing_source:
+                    # No billing source configured, cannot create invoice in Stripe
+                    return Ok(None)
+                inv = await self.invoice_repo.getInvoiceInfoByUUIDWithLock(
+                    session=session,
+                    org_id=org_id,
+                    invoice_uid=invoice_uid,
+                    read=False,
+                )
+                if not inv:
+                    return Err(InvoiceNotFoundError())
+                if inv["provider_invoice_id"]:
+                    # Invoice already created in Stripe
+                    return Ok(None)
+                line_items = await self.invoice_repo.getInvoiceLineItems(
+                    session=session,
+                    invoice_id=inv["invoice_id"],
+                )
+                customer_id = billing_source.provider_id
+
+                invoice = await self.stripe_client.v1.invoices.create_async(
+                    {
+                        "customer": customer_id,
+                        "auto_advance": True,
+                        "collection_method": "charge_automatically",
+                        "idempotency_key": f"inv_{org_id}_{invoice_uid}",
+                        "description": f"Invoice for {inv['billing_period']}",
+                        "metadata": {
+                            "invoice_uid": str(invoice_uid),
+                            "org_id": org_id,
+                        },
+                    }
+                )
+                for line in line_items:
+                    await self.stripe_client.v1.invoice_items.create_async(
+                        {
+                            "amount": int(
+                                line["amount"] * 100
+                            ),  # Stripe expects amount in cents
+                            "currency": "usd",
+                            "invoice": invoice.id,
+                            "description": line["description"],
+                            "idempotency_key": f"invitem_{org_id}_{invoice_uid}_{line['invoice_line_uuid']}",
+                            "metadata": {
+                                "invoice_uid": str(invoice_uid),
+                                "invoice_line_uuid": str(
+                                    line["invoice_line_uuid"]
+                                ),
+                                "org_id": org_id,
+                                "project_uid": str(line["project_uid"])
+                                if line["project_uid"]
+                                else "",
+                            },
+                        }
+                    )
+                await self.stripe_client.v1.invoices.finalize_invoice_async(
+                    invoice.id,
+                    {
+                        "idempotency_key": f"finalize_{org_id}_{invoice_uid}",
+                    },
+                )
+                await self.invoice_repo.updateProviderInvoiceID(
+                    session=session,
+                    invoice_id=inv["invoice_id"],
+                    provider_invoice_id=invoice.id,
+                )
+                await session.commit()
+                return Ok(invoice.id)

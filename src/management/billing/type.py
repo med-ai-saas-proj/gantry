@@ -24,6 +24,7 @@ class BillingAggregateReportGroupedBy(TypedDict):
     total_amount: Decimal
     group_by_uuid_key: UUID | str
     group_by_int_key: int
+    group_by_name: str | None
 
 
 class BillingTransactionInfo(TypedDict):
@@ -51,6 +52,9 @@ class BillingInvoiceLineItemInfo(TypedDict):
     description: str
     amount: Decimal
     project_uid: UUID | None
+    invoice_line_uuid: UUID
+    project_name: str | None
+    project_id: int | None
 
 
 class CreateBillingInvoiceLineItemInfo(TypedDict):
