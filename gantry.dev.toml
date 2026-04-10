@@ -8,8 +8,8 @@ internal_workers = 2
 
 [db]
 # Required: Database connection strings
-pgvector_connection_uri = "postgresql://user:password@localhost:5432/vector_db"
-timescale_connection_uri = "postgresql://user:password@localhost:5433/timescale_db"
+timescale_connection_uri = "postgresql+asyncpg://gantry:123456@localhost:5432/gantry"
+pgvector_connection_uri = "postgresql+asyncpg://gantry:123456@localhost:5433/gantry"
 redis_connection_uri = "redis://localhost:6379/0"
 
 [apikey]
@@ -18,9 +18,9 @@ secret = "your-minimum-16-char-secret-key"
 secret_length = 32
 
 [auth]
-server_url = "http://localhost:8000/"
-client_id = "example_client"
-realm_name = "example_realm"
+server_url = "http://localhost:8080/"
+client_id = "gantry"
+realm_name = "gantry"
 
 [billing]
 # Required: Stripe API secret

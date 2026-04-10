@@ -8,8 +8,8 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "app",
     "examplenv",
+    "gantry",
     "pyrusult",
 ]
 
@@ -233,115 +233,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/96/f0/5eb65b2bb0d09ac6776f2eb54adee6abe8228ea05b20a5ad0e4945de8aac/anyio-4.12.1.tar.gz", hash = "sha256:41cfcc3a4c85d3f05c932da7c26d0201ac36f72abd4435ba90d0464a3ffed703", size = 228685, upload-time = "2026-01-06T11:45:21.246Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/38/0e/27be9fdef66e72d64c0cdc3cc2823101b80585f8119b5c112c2e8f5f7dab/anyio-4.12.1-py3-none-any.whl", hash = "sha256:d405828884fc140aa80a3c667b8beed277f1dfedec42ba031bd6ac3db606ab6c", size = 113592, upload-time = "2026-01-06T11:45:19.497Z" },
-]
-
-[[package]]
-name = "app"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "ag-ui-protocol" },
-    { name = "alembic" },
-    { name = "asyncpg" },
-    { name = "boto3" },
-    { name = "crawl4ai" },
-    { name = "cssselect" },
-    { name = "fastapi", extra = ["standard"] },
-    { name = "fastuuid" },
-    { name = "filetype" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp" },
-    { name = "opentelemetry-exporter-otlp-proto-http" },
-    { name = "opentelemetry-exporter-prometheus" },
-    { name = "opentelemetry-instrumentation" },
-    { name = "opentelemetry-instrumentation-asyncpg" },
-    { name = "opentelemetry-instrumentation-botocore" },
-    { name = "opentelemetry-instrumentation-fastapi" },
-    { name = "opentelemetry-instrumentation-httpx" },
-    { name = "opentelemetry-instrumentation-redis" },
-    { name = "opentelemetry-instrumentation-sqlalchemy" },
-    { name = "opentelemetry-instrumentation-system-metrics" },
-    { name = "opentelemetry-sdk" },
-    { name = "orjson" },
-    { name = "passlib", extra = ["bcrypt"] },
-    { name = "pydantic-ai" },
-    { name = "pydantic-settings" },
-    { name = "pyrusult" },
-    { name = "python-jose" },
-    { name = "python-keycloak" },
-    { name = "redis" },
-    { name = "sqlalchemy" },
-    { name = "sqlalchemy-timescaledb" },
-    { name = "stripe" },
-    { name = "structlog" },
-    { name = "uvloop", marker = "sys_platform == 'linux'" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "boto3-stubs", extra = ["s3"] },
-    { name = "examplenv" },
-    { name = "inquirer" },
-    { name = "mako" },
-    { name = "openapi-generator-cli", extra = ["jdk4py"] },
-    { name = "pre-commit" },
-    { name = "pyrefly" },
-    { name = "ruff" },
-    { name = "scalar-fastapi" },
-    { name = "typer" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "ag-ui-protocol", specifier = ">=0.1.9" },
-    { name = "alembic", specifier = ">=1.16.5" },
-    { name = "asyncpg", specifier = ">=0.30.0" },
-    { name = "boto3", specifier = ">=1.40.61" },
-    { name = "crawl4ai", specifier = ">=0.7.4" },
-    { name = "cssselect", specifier = ">=1.3.0" },
-    { name = "fastapi", extras = ["standard"], specifier = ">=0.135.1" },
-    { name = "fastuuid", specifier = "==0.14.0" },
-    { name = "filetype", specifier = ">=1.2.0" },
-    { name = "opentelemetry-api", specifier = ">=1.39.1" },
-    { name = "opentelemetry-exporter-otlp", specifier = ">=1.39.1" },
-    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.39.1" },
-    { name = "opentelemetry-exporter-prometheus", specifier = ">=0.60b1" },
-    { name = "opentelemetry-instrumentation", specifier = ">=0.60b1" },
-    { name = "opentelemetry-instrumentation-asyncpg", specifier = ">=0.60b1" },
-    { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.60b1" },
-    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.60b1" },
-    { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.60b1" },
-    { name = "opentelemetry-instrumentation-redis", specifier = ">=0.60b1" },
-    { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.60b1" },
-    { name = "opentelemetry-instrumentation-system-metrics", specifier = ">=0.60b1" },
-    { name = "opentelemetry-sdk", specifier = ">=1.39.1" },
-    { name = "orjson", specifier = ">=3.11.3" },
-    { name = "passlib", extras = ["bcrypt"], specifier = "==1.7.4" },
-    { name = "pydantic-ai", specifier = ">=1.70.0" },
-    { name = "pydantic-settings", specifier = ">=2.11.0" },
-    { name = "pyrusult", editable = "packages/pyrusult" },
-    { name = "python-jose", specifier = ">=3.5.0" },
-    { name = "python-keycloak", specifier = ">=5.3.1" },
-    { name = "redis", specifier = ">=7.0.1" },
-    { name = "sqlalchemy", specifier = ">=2.0.43" },
-    { name = "sqlalchemy-timescaledb", specifier = ">=0.4.1" },
-    { name = "stripe", specifier = ">=14.4.1" },
-    { name = "structlog", specifier = ">=25.4.0" },
-    { name = "uvloop", marker = "sys_platform == 'linux'", specifier = ">=0.22.1" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.42.33" },
-    { name = "examplenv", editable = "packages/examplenv" },
-    { name = "inquirer", specifier = ">=3.4.1" },
-    { name = "mako", specifier = ">=1.3.10" },
-    { name = "openapi-generator-cli", extras = ["jdk4py"], specifier = ">=7.15.0" },
-    { name = "pre-commit", specifier = ">=4.4.0" },
-    { name = "pyrefly", specifier = ">=0.45.0" },
-    { name = "ruff", specifier = ">=0.14.4" },
-    { name = "scalar-fastapi", specifier = ">=1.8.1" },
-    { name = "typer", specifier = ">=0.24.1" },
 ]
 
 [[package]]
@@ -1391,6 +1282,117 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/51/7c/f60c259dcbf4f0c47cc4ddb8f7720d2dcdc8888c8e5ad84c73ea4531cc5b/fsspec-2026.2.0.tar.gz", hash = "sha256:6544e34b16869f5aacd5b90bdf1a71acb37792ea3ddf6125ee69a22a53fb8bff", size = 313441, upload-time = "2026-02-05T21:50:53.743Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e6/ab/fb21f4c939bb440104cc2b396d3be1d9b7a9fd3c6c2a53d98c45b3d7c954/fsspec-2026.2.0-py3-none-any.whl", hash = "sha256:98de475b5cb3bd66bedd5c4679e87b4fdfe1a3bf4d707b151b3c07e58c9a2437", size = 202505, upload-time = "2026-02-05T21:50:51.819Z" },
+]
+
+[[package]]
+name = "gantry"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "ag-ui-protocol" },
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "boto3" },
+    { name = "crawl4ai" },
+    { name = "cssselect" },
+    { name = "fastapi", extra = ["standard"] },
+    { name = "fastuuid" },
+    { name = "filetype" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp" },
+    { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-exporter-prometheus" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-instrumentation-asyncpg" },
+    { name = "opentelemetry-instrumentation-botocore" },
+    { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-httpx" },
+    { name = "opentelemetry-instrumentation-redis" },
+    { name = "opentelemetry-instrumentation-sqlalchemy" },
+    { name = "opentelemetry-instrumentation-system-metrics" },
+    { name = "opentelemetry-sdk" },
+    { name = "orjson" },
+    { name = "passlib", extra = ["bcrypt"] },
+    { name = "pydantic-ai" },
+    { name = "pydantic-settings" },
+    { name = "pyrusult" },
+    { name = "python-jose" },
+    { name = "python-keycloak" },
+    { name = "redis" },
+    { name = "sqlalchemy" },
+    { name = "sqlalchemy-timescaledb" },
+    { name = "stripe" },
+    { name = "structlog" },
+    { name = "uvloop", marker = "sys_platform == 'linux'" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "boto3-stubs", extra = ["s3"] },
+    { name = "examplenv" },
+    { name = "gantry" },
+    { name = "inquirer" },
+    { name = "mako" },
+    { name = "openapi-generator-cli", extra = ["jdk4py"] },
+    { name = "pre-commit" },
+    { name = "pyrefly" },
+    { name = "ruff" },
+    { name = "scalar-fastapi" },
+    { name = "typer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "ag-ui-protocol", specifier = ">=0.1.9" },
+    { name = "alembic", specifier = ">=1.16.5" },
+    { name = "asyncpg", specifier = ">=0.30.0" },
+    { name = "boto3", specifier = ">=1.40.61" },
+    { name = "crawl4ai", specifier = ">=0.7.4" },
+    { name = "cssselect", specifier = ">=1.3.0" },
+    { name = "fastapi", extras = ["standard"], specifier = ">=0.135.1" },
+    { name = "fastuuid", specifier = "==0.14.0" },
+    { name = "filetype", specifier = ">=1.2.0" },
+    { name = "opentelemetry-api", specifier = ">=1.39.1" },
+    { name = "opentelemetry-exporter-otlp", specifier = ">=1.39.1" },
+    { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.39.1" },
+    { name = "opentelemetry-exporter-prometheus", specifier = ">=0.60b1" },
+    { name = "opentelemetry-instrumentation", specifier = ">=0.60b1" },
+    { name = "opentelemetry-instrumentation-asyncpg", specifier = ">=0.60b1" },
+    { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.60b1" },
+    { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.60b1" },
+    { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.60b1" },
+    { name = "opentelemetry-instrumentation-redis", specifier = ">=0.60b1" },
+    { name = "opentelemetry-instrumentation-sqlalchemy", specifier = ">=0.60b1" },
+    { name = "opentelemetry-instrumentation-system-metrics", specifier = ">=0.60b1" },
+    { name = "opentelemetry-sdk", specifier = ">=1.39.1" },
+    { name = "orjson", specifier = ">=3.11.3" },
+    { name = "passlib", extras = ["bcrypt"], specifier = "==1.7.4" },
+    { name = "pydantic-ai", specifier = ">=1.70.0" },
+    { name = "pydantic-settings", specifier = ">=2.11.0" },
+    { name = "pyrusult", editable = "packages/pyrusult" },
+    { name = "python-jose", specifier = ">=3.5.0" },
+    { name = "python-keycloak", specifier = ">=5.3.1" },
+    { name = "redis", specifier = ">=7.0.1" },
+    { name = "sqlalchemy", specifier = ">=2.0.43" },
+    { name = "sqlalchemy-timescaledb", specifier = ">=0.4.1" },
+    { name = "stripe", specifier = ">=14.4.1" },
+    { name = "structlog", specifier = ">=25.4.0" },
+    { name = "uvloop", marker = "sys_platform == 'linux'", specifier = ">=0.22.1" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.42.33" },
+    { name = "examplenv", editable = "packages/examplenv" },
+    { name = "gantry", editable = "." },
+    { name = "inquirer", specifier = ">=3.4.1" },
+    { name = "mako", specifier = ">=1.3.10" },
+    { name = "openapi-generator-cli", extras = ["jdk4py"], specifier = ">=7.15.0" },
+    { name = "pre-commit", specifier = ">=4.4.0" },
+    { name = "pyrefly", specifier = ">=0.45.0" },
+    { name = "ruff", specifier = ">=0.14.4" },
+    { name = "scalar-fastapi", specifier = ">=1.8.1" },
+    { name = "typer", specifier = ">=0.24.1" },
 ]
 
 [[package]]
