@@ -59,6 +59,12 @@ class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
     transaction_count: Mapped[int] = mapped_column(BigInteger)
 
 
+class TransactionStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    CAPTURED = "CAPTURED"
+    EXPIRED = "EXPIRED"
+
+
 # timescaledb hypertable doesnot allow having others unique index except primary key
 class BillingTransaction(
     WithClientUUIDWithoutUnique, BillingBaseSQLModel, WithID
@@ -90,6 +96,13 @@ class BillingTransaction(
     amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
     captured_at: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
+    )
+
+    status: Mapped[TransactionStatus] = mapped_column(
+        Enum(TransactionStatus, schema="Billing"),
+        nullable=False,
+        index=True,
+        default=TransactionStatus.PENDING,
     )
 
     # e.g. { "llm_usages": { "gpt-4o": { "input_tokens": 100, "output_tokens": 50 } } }

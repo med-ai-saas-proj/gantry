@@ -7,6 +7,7 @@ from ..type import (
     BillingTransactionInfo,
 )
 from ..models import (
+    TransactionStatus,
     BillingTransaction,
     TimescaleDBDailyBillingSummary,
 )
@@ -61,6 +62,9 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             details=details,
             captured_at=func.now() if capture else None,
             created_at=created_at,
+            status=TransactionStatus.CAPTURED
+            if capture
+            else TransactionStatus.PENDING,
         )
         await self.add(session, tx)
         return tx
