@@ -2,13 +2,16 @@ from src.db.repository import Repository
 from src.management.billing.type import (
     BillingInvoiceInfo,
     BillingInvoiceLineItemInfo,
+    CreateBillingInvoiceLineItemInfo,
 )
 
 from ..models import BillingInvoice, BillingInvoiceLineItem
 
 from uuid import UUID
 from typing import Sequence
-from datetime import datetime
+from decimal import Decimal
+from tkinter import N
+from datetime import date, datetime
 
 from sqlalchemy import func, select
 
@@ -85,6 +88,36 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             "details": row.details,
         }
 
+    async def getInvoiceInfoByUUIDWithLock(
+        self,
+        session,
+        invoice_uid: UUID,
+        org_id: str,
+        read: bool = True,
+    ) -> BillingInvoiceInfo | None:
+        stmt = select(BillingInvoice).where(
+            BillingInvoice.uuid == invoice_uid,
+            BillingInvoice.organization_id == org_id,
+        )
+        if read:
+            stmt = stmt.with_for_update(read=True)
+        else:
+            stmt = stmt.with_for_update(read=False)
+        res = await session.execute(stmt)
+        row = res.scalar_one_or_none()
+        if not row:
+            return None
+        return {
+            "invoice_id": row.id,
+            "invoice_uid": row.uuid,
+            "billing_period": row.billing_period,
+            "total_amount": row.total_amount,
+            "used_credits": row.used_credits,
+            "provider_invoice_id": row.provider_invoice_id,
+            "paid_at": row.paid_at,
+            "details": row.details,
+        }
+
     async def getInvoiceLineItems(
         self,
         session,
@@ -104,3 +137,64 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             }
             for row in rows
         ]
+
+    async def haveInvoiceForBillingPeriod(
+        self,
+        session,
+        org_id: str,
+        billing_period: date,
+    ) -> bool:
+        stmt = select(BillingInvoice).where(
+            BillingInvoice.organization_id == org_id,
+            BillingInvoice.billing_period == billing_period,
+        )
+        res = await session.execute(stmt)
+        row = res.scalar_one_or_none()
+        return row is not None
+
+    async def createInvoice(
+        self,
+        session,
+        org_id: str,
+        billing_period: date,
+        total_amount: Decimal,
+        details: dict,
+        used_credits: Decimal,
+    ) -> BillingInvoiceInfo:
+        new_inv = BillingInvoice(
+            organization_id=org_id,
+            billing_period=billing_period,
+            total_amount=total_amount,
+            provider_invoice_id=None,
+            details=details,
+            used_credits=used_credits,
+            paid_at=None,
+        )
+        session.add(new_inv)
+        await session.flush()  # to get the ID of the new invoice
+        return {
+            "invoice_id": new_inv.id,
+            "invoice_uid": new_inv.uuid,
+            "billing_period": new_inv.billing_period,
+            "total_amount": new_inv.total_amount,
+            "used_credits": new_inv.used_credits,
+            "provider_invoice_id": None,
+            "paid_at": new_inv.paid_at,
+            "details": new_inv.details,
+        }
+
+    async def createInvoiceLineItems(
+        self,
+        session,
+        invoice_id: int,
+        lines: list[CreateBillingInvoiceLineItemInfo],
+    ):
+        for line in lines:
+            new_line = BillingInvoiceLineItem(
+                invoice_id=invoice_id,
+                description=line["description"],
+                amount=line["amount"],
+                project_id=line["project_id"],
+            )
+            session.add(new_line)
+        await session.flush()

@@ -159,21 +159,26 @@ class BillingInvoice(
         String(128), nullable=False, index=True
     )
 
-    billing_period: Mapped[date] = mapped_column(
-        Date, nullable=False, unique=True
-    )
+    billing_period: Mapped[date] = mapped_column(Date, nullable=False)
 
     total_amount: Mapped[Decimal] = mapped_column(
         AMOUNT_COLUMN_TYPE, nullable=False
     )
-    provider_invoice_id: Mapped[str] = mapped_column(
-        String(128), nullable=False
+    provider_invoice_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
     )  # e.g. Stripe invoice ID
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     details: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
     used_credits: Mapped[Decimal] = mapped_column(
         AMOUNT_COLUMN_TYPE, nullable=False, default=Decimal("0")
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            organization_id, billing_period, name="uq_org_billing_period"
+        ),
+        BillingBaseSQLModel.__table_args__,
     )
 
 

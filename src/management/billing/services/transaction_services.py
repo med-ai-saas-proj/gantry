@@ -1,6 +1,13 @@
 from src.db.factories import AsyncSessionManager
 from src.shared.utils.redis import redis_get_or_load
 from src.shared.utils.uuid_utils import uuid7
+from src.management.billing.utils import (
+    _to_decimal,
+    _decimal_to_int,
+    _int_to_decimal,
+    _get_billing_period,
+    _get_next_billing_period,
+)
 from src.management.api_keys.services import ApiKeyService
 from src.shared.custom_types.error_exception import (
     RecoverableError,
@@ -13,7 +20,7 @@ from ..dtos import (
     TransactionInfoResponse,
 )
 from ..type import AggregatePeriod
-from ..models import SpendingLimitType
+from ..models import SpendingLimitType, BillingTransaction
 from ..repositories.transaction_repo import (
     TransactionRepository,
 )
@@ -26,7 +33,7 @@ import asyncio
 from uuid import UUID, uuid4
 from typing import Sequence, Awaitable, TypedDict, cast
 from decimal import Decimal
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
@@ -70,39 +77,6 @@ class _TransactionRecord(TypedDict):
     billing_period: str
 
 
-def _get_billing_period(
-    ref_time: datetime,
-) -> datetime:
-    """Return the current UTC billing period in YYYY-MM format."""
-    return ref_time.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-
-def _get_next_billing_period(current_period: datetime) -> datetime:
-    """Return the next UTC billing period in YYYY-MM format."""
-    if current_period.month == 12:
-        return current_period.replace(year=current_period.year + 1, month=1)
-    else:
-        return current_period.replace(month=current_period.month + 1)
-
-
-def _to_decimal(amount: ScaledAmount) -> Decimal:
-    """Convert a ScaledAmount to a Python Decimal.
-
-    Decimal.scaleb(n) multiplies by 10^n — exact integer arithmetic, no float.
-    """
-    return Decimal(amount["value"]).scaleb(-amount["scale"])
-
-
-def _decimal_to_int(amount: Decimal, scale: int) -> int:
-    """Convert a Decimal amount to an integer representation given a scale."""
-    return int((amount * (10**scale)).to_integral_value())
-
-
-def _int_to_decimal(amount: int, scale: int) -> Decimal:
-    """Convert an integer amount with scale back to Decimal."""
-    return Decimal(amount).scaleb(-scale)
-
-
 class ProjectNotFound(RecoverableError):
     status = 404
     code = "project_not_found"
@@ -125,8 +99,7 @@ LUA_SCRIPT_ADD_USAGE_AND_CHECK_LIMIT = """
 -- ARGV[2] = transaction json string
 -- ARGV[3] = transaction id
 -- ARGV[4] = cache TTL in seconds
--- ARGV[5] = transaction TTL in seconds
--- ARGV[6] = idempotency key TTL in seconds
+-- ARGV[5] = idempotency key TTL in seconds
 local existed_idempotency = redis.call("GET", KEYS[6])
 -- If idempotency key exists and not pending, return the existing transaction ID to ensure idempotency
 if existed_idempotency then
@@ -152,8 +125,8 @@ end
 -- Update usage
 redis.call("SET", KEYS[3], new_project_usage, "EX", ARGV[4])
 redis.call("SET", KEYS[4], new_org_usage, "EX", ARGV[4])
-redis.call("SET", KEYS[5], ARGV[2], "EX", ARGV[5])
-redis.call("SET", KEYS[6], "pending:" .. ARGV[3], "EX", ARGV[6])
+redis.call("SET", KEYS[5], ARGV[2], "EX", ARGV[4])
+redis.call("SET", KEYS[6], "pending:" .. ARGV[3], "EX", ARGV[5])
 return ARGV[3]
 """
 
@@ -598,8 +571,7 @@ class TransactionService:
                 json.dumps(transaction_record),  # ARGV[2]
                 str(transaction_uuid),  # ARGV[3]
                 self._CACHE_TTL,  # ARGV[4]
-                self._MAX_TRANSACTION_AGE,  # ARGV[5]
-                self._IDEMPOTENCY_KEY_TTL,  # ARGV[6]
+                self._IDEMPOTENCY_KEY_TTL,  # ARGV[5]
             ),
         )
         if trx_res == 0:
@@ -862,4 +834,23 @@ class TransactionService:
                     date=trx["date"],
                     captured_at=trx["captured_at"],
                 )
+            )
+
+    async def closeExpiredTransactions(self) -> None:
+        """Close expired transactions that are not captured within the max transaction age."""
+        now = datetime.now(UTC).replace(tzinfo=None)
+        expired_time = now - timedelta(seconds=self._MAX_TRANSACTION_AGE)
+
+        async with self.session_manager.get_session() as session:
+            expired_trxs = await self.transaction_repo.setTransactionsExpired(
+                session=session, expiration_time=expired_time
+            )
+            session.expunge_all()  # detach all instances to prevent accidental use after commit
+            await session.commit()
+
+        if expired_trxs:
+            self.logger.info(
+                "billing.expire_transactions",
+                count=len(expired_trxs),
+                transaction_uuids=[str(trx.uuid) for trx in expired_trxs],
             )

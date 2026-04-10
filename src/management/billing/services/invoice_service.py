@@ -4,12 +4,25 @@ from src.management.billing.dtos import (
     InvoiceItemInfoResponse,
     InvoiceDetailInfoResponse,
 )
+from src.management.billing.type import (
+    AggregatePeriod,
+    BillingInvoiceLineItemInfo,
+    CreateBillingInvoiceLineItemInfo,
+)
+from src.management.billing.utils import (
+    _get_billing_period,
+    _get_previous_billing_period,
+)
 from src.shared.custom_types.error_exception import RecoverableError
+from src.management.billing.repositories.transaction_repo import (
+    TransactionRepository,
+)
 
 from ..repositories.invoice_repo import InvoiceRepo
 
 from uuid import UUID
 from typing import Sequence
+from decimal import Decimal
 from datetime import datetime
 
 from pyrusult import Ok, Err, Result
@@ -27,9 +40,11 @@ class InvoiceService:
         self,
         session_manager: AsyncSessionManager,
         invoice_repo: InvoiceRepo,
+        transaction_repo: TransactionRepository,
     ):
         self.session_manager = session_manager
         self.invoice_repo = invoice_repo
+        self.transaction_repo = transaction_repo
 
     async def list_invoices(
         self,
@@ -103,3 +118,71 @@ class InvoiceService:
                     ],
                 )
             )
+
+    async def createInvoice(
+        self,
+        org_id: str,
+        now: datetime,
+    ):
+        current_period = _get_billing_period(now)
+        previous_period = _get_previous_billing_period(current_period)
+        previous_previous_period = _get_previous_billing_period(previous_period)
+
+        async with self.session_manager.get_session() as session:
+            have_invoice = await self.invoice_repo.haveInvoiceForBillingPeriod(
+                session=session,
+                org_id=org_id,
+                billing_period=current_period.date(),
+            )
+            if have_invoice:
+                return
+
+            have_pending = await self.transaction_repo.havePendingTransactionsForOrgInPeriod(
+                session=session,
+                org_id=org_id,
+                start_time=previous_period,
+                end_time=current_period,
+            )
+            if have_pending:
+                return
+
+            total_usage = await self.transaction_repo.sumByPeriodByProjectsGroupedByProjects(
+                session=session,
+                org_id=org_id,
+                project_ids=None,  # all projects
+                start_time=previous_previous_period,
+                end_time=previous_period,
+                period=AggregatePeriod.MONTHLY,
+                period_scale=1,
+            )
+            lines: list[CreateBillingInvoiceLineItemInfo] = []
+            for usage in total_usage:
+                lines.append(
+                    {
+                        "description": f"Usage from {usage['period_bucket'].date()}",
+                        "amount": usage["total_amount"],
+                        "project_id": usage["group_by_int_key"],
+                    }
+                )
+            total_amount = sum(line["amount"] for line in lines)
+            details = {
+                "generated_at": now.isoformat(),
+                "period_start": previous_period.isoformat(),
+                "period_end": current_period.isoformat(),
+            }
+            async with session.begin():
+                used_credits = Decimal("0")  # Placeholder for any credit logic
+                res = await self.invoice_repo.createInvoice(
+                    session=session,
+                    org_id=org_id,
+                    billing_period=current_period.date(),
+                    total_amount=total_amount,
+                    details=details,
+                    used_credits=used_credits,
+                )
+                await self.invoice_repo.createInvoiceLineItems(
+                    session=session,
+                    invoice_id=res["invoice_id"],
+                    lines=lines,
+                )
+            await session.commit()

@@ -5,6 +5,7 @@ from ..type import (
     AggregatePeriod,
     BillingAggregateReport,
     BillingTransactionInfo,
+    BillingAggregateReportGroupedBy,
 )
 from ..models import (
     TransactionStatus,
@@ -12,6 +13,7 @@ from ..models import (
     TimescaleDBDailyBillingSummary,
 )
 
+import stat
 from uuid import UUID
 from typing import Sequence
 from decimal import Decimal
@@ -79,6 +81,49 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             BillingTransaction.uuid == transaction_uid
         )
         return await self.selectOne(session, stmt)
+
+    async def setTransactionsExpired(
+        self,
+        session: AsyncSession,
+        expiration_time: datetime,
+    ) -> Sequence[BillingTransaction]:
+        """Set transactions that are pending for too long to expired."""
+        stmt = (
+            update(BillingTransaction)
+            .where(
+                BillingTransaction.captured_at.is_(None),
+                BillingTransaction.created_at < expiration_time,
+                BillingTransaction.status == TransactionStatus.PENDING,
+            )
+            .values(status=TransactionStatus.EXPIRED)
+            .returning(BillingTransaction)
+        )
+        result = await session.execute(stmt)
+        return result.scalars().all()
+
+    async def captureTransaction(
+        self,
+        session: AsyncSession,
+        transaction_uid: UUID,
+        real_amount: Decimal,
+    ) -> BillingTransaction | None:
+        """Update the transaction record with the real amount and mark as captured (called during CAPTURE)."""
+        stmt = (
+            update(BillingTransaction)
+            .where(
+                (BillingTransaction.uuid == transaction_uid)
+                & (BillingTransaction.captured_at.is_(None))
+                & (BillingTransaction.status == TransactionStatus.PENDING)
+            )
+            .values(
+                amount=real_amount,  # update to real amount
+                captured_at=func.now(),
+                status=TransactionStatus.CAPTURED,
+            )
+            .returning(BillingTransaction)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def getTransactionInfoList(
         self,
@@ -168,30 +213,6 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             "details": row.details,
             "captured_at": row.captured_at,
         }
-
-    async def captureTransaction(
-        self,
-        session: AsyncSession,
-        transaction_uid: UUID,
-        real_amount: Decimal,
-    ) -> BillingTransaction | None:
-        """Update the transaction record with the real amount and mark as captured (called during CAPTURE)."""
-        stmt = (
-            update(BillingTransaction)
-            .where(
-                (BillingTransaction.uuid == transaction_uid)
-                & (
-                    BillingTransaction.captured_at.is_(None)
-                )  # only capture if not already captured
-            )
-            .values(
-                amount=real_amount,  # update to real amount
-                captured_at=func.now(),
-            )
-            .returning(BillingTransaction)
-        )
-        result = await session.execute(stmt)
-        return result.scalar_one_or_none()
 
     async def getByApiKeys(
         self,
@@ -306,6 +327,54 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             for row in rows
         ]
 
+    # async def sumByPeriodByApiKeysGroupedByApiKeys(
+    #     self,
+    #     session: AsyncSession,
+    #     apikey_ids: list[int] | None,
+    #     org_id: str,
+    #     start_time: datetime,
+    #     end_time: datetime | None,
+    #     period: AggregatePeriod,
+    #     period_scale: int = 1,  # e.g. for period=weekly, period_scale=2 means 2-week aggregation buckets.
+    # ) -> Sequence[BillingAggregateReportGroupedBy]:
+    #     """Sum the total amount for a set of API keys in a time period."""
+    #     bucket = func.public.time_bucket(
+    #         text(f"'{period_scale} {bucket_map[period]}'"),
+    #         TimescaleDBDailyBillingSummary.bucket,
+    #     ).label("period_bucket")
+    #     stmt = select(
+    #         bucket,
+    #         func.coalesce(
+    #             func.sum(TimescaleDBDailyBillingSummary.transaction_count),
+    #             0,
+    #         ).label("transaction_count"),
+    #         func.coalesce(
+    #             func.sum(TimescaleDBDailyBillingSummary.total_amount),
+    #             Decimal("0"),
+    #         ).label("total_amount"),
+    #     ).where(
+    #         TimescaleDBDailyBillingSummary.organization_id == org_id,
+    #         TimescaleDBDailyBillingSummary.bucket >= start_time,
+    #     )
+    #     if apikey_ids is not None and len(apikey_ids) > 0:
+    #         stmt = stmt.where(
+    #             TimescaleDBDailyBillingSummary.apikey_id.in_(apikey_ids)
+    #         )
+    #     if end_time:
+    #         stmt = stmt.where(TimescaleDBDailyBillingSummary.bucket < end_time)
+    #     stmt = stmt.group_by(bucket, TimescaleDBDailyBillingSummary.apikey_id)
+    #     result = await session.execute(stmt)
+    #     rows = result.all()
+    #     return [
+    #         {
+    #             "period_bucket": row.period_bucket,
+    #             "transaction_count": row.transaction_count,
+    #             "total_amount": row.total_amount,
+    #             "group_by_key": row.apikey_id,
+    #         }
+    #         for row in rows
+    #     ]
+
     async def sumByPeriodByOrganizations(
         self,
         session: AsyncSession,
@@ -397,3 +466,81 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             }
             for row in rows
         ]
+
+    async def sumByPeriodByProjectsGroupedByProjects(
+        self,
+        session: AsyncSession,
+        project_ids: list[int] | None,
+        org_id: str,
+        start_time: datetime,
+        end_time: datetime | None,
+        period: AggregatePeriod,
+        period_scale: int = 1,  # e.g. for period=weekly, period_scale=2 means 2-week aggregation buckets.
+    ) -> Sequence[BillingAggregateReportGroupedBy]:
+        """Sum the total amount for a project in a time period."""
+        bucket = func.public.time_bucket(
+            text(f"'{period_scale} {bucket_map[period]}'"),
+            TimescaleDBDailyBillingSummary.bucket,
+        ).label("period_bucket")
+        stmt = select(
+            bucket,
+            TimescaleDBDailyBillingSummary.project_id,
+            func.coalesce(
+                func.sum(TimescaleDBDailyBillingSummary.transaction_count),
+                0,
+            ).label("transaction_count"),
+            func.coalesce(
+                func.sum(TimescaleDBDailyBillingSummary.total_amount),
+                Decimal("0"),
+            ).label("total_amount"),
+        ).where(
+            TimescaleDBDailyBillingSummary.organization_id == org_id,
+            TimescaleDBDailyBillingSummary.bucket >= start_time,
+        )
+        if project_ids is not None and len(project_ids) > 0:
+            stmt = stmt.where(
+                TimescaleDBDailyBillingSummary.project_id.in_(project_ids)
+            )
+        if end_time:
+            stmt = stmt.where(TimescaleDBDailyBillingSummary.bucket < end_time)
+        stmt = stmt.group_by(bucket, TimescaleDBDailyBillingSummary.project_id)
+        outer_stmt = select(
+            stmt.c.period_bucket,
+            stmt.c.transaction_count,
+            stmt.c.total_amount,
+            stmt.c.project_id,
+            Project.uuid.label("group_by_key"),
+        ).join(
+            Project,
+            stmt.c.project_id == Project.id,
+        )
+
+        result = await session.execute(outer_stmt)
+        rows = result.all()
+        return [
+            {
+                "period_bucket": row.period_bucket,
+                "transaction_count": row.transaction_count,
+                "total_amount": row.total_amount,
+                "group_by_int_key": row.project_id,
+                "group_by_uuid_key": row.group_by_key,
+            }
+            for row in rows
+        ]
+
+    async def havePendingTransactionsForOrgInPeriod(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> bool:
+        stmt = select(BillingTransaction.uuid).where(
+            BillingTransaction.organization_id == org_id,
+            BillingTransaction.status == TransactionStatus.PENDING,
+            BillingTransaction.created_at >= start_time,
+            BillingTransaction.created_at < end_time,
+        )
+        res = await session.execute(stmt)
+        rows = res.all()
+        return len(rows) > 0
