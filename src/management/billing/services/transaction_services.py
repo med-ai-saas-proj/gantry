@@ -307,8 +307,7 @@ class TransactionService:
             limit = await self.spending_limit_repo.getProjectLimits(
                 session, org_id, project_id, SpendingLimitType.MONTHLY
             )
-            v = limit.limit if limit else None
-            return str(_decimal_to_int(v, 8)) if v is not None else "-1"
+            return str(_decimal_to_int(limit, 8)) if limit is not None else "-1"
 
         async def load_org_limits_from_db(
             session: AsyncSession,
@@ -316,8 +315,7 @@ class TransactionService:
             limit = await self.spending_limit_repo.getOrgLimits(
                 session, org_id, SpendingLimitType.MONTHLY
             )
-            v = limit.limit if limit else None
-            return str(_decimal_to_int(v, 8)) if v is not None else "-1"
+            return str(_decimal_to_int(limit, 8)) if limit is not None else "-1"
 
         async def save_project_limits_to_redis(
             redis: Redis, project_limit: str
