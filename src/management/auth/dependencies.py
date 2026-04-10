@@ -1,6 +1,6 @@
 """FastAPI dependencies for authentication and authorization."""
 
-from src.shared.settings import getAppSetting
+from src.settings import AppStage, getAppSettings
 from src.management.organization.factories import (
     KeycloakOrgClient,
     getKeycloakOrgClient,
@@ -45,7 +45,7 @@ class MissingOrganizationContextError(RecoverableError):
     detail = "The authenticated token does not include an organization id."
 
 
-app_settings = getAppSetting()
+app_settings = getAppSettings()
 
 
 async def _getUserInfo(
@@ -82,7 +82,7 @@ async def _getUserInfo(
 
 getUserInfo = _getUserInfo
 
-if app_settings.mock_auth:
+if app_settings.stage == AppStage.DEV:
     from src.management.auth.services import UnauthorizedError
 
     from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials

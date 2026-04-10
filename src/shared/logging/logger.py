@@ -1,5 +1,7 @@
+from src.settings import AppStage, getAppSettings
+from src.shared.consts.common_const import APP_NAME
+
 from ..utils import request_id_utils
-from ..settings import getAppSetting
 
 import time
 import logging
@@ -49,7 +51,7 @@ def request_ider(_, __, event_dict):
 def configure_default_logging(
     logger: logging.Logger,
 ) -> structlog.stdlib.BoundLogger:
-    settings = getAppSetting()
+    settings = getAppSettings()
     pre_chain = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.CallsiteParameterAdder(
@@ -66,14 +68,12 @@ def configure_default_logging(
         add_open_telemetry_spans,
     ]
     processors = pre_chain
-    min_level = logging.DEBUG if settings.debug else logging.INFO
+    min_level = (
+        logging.DEBUG if settings.stage == AppStage.DEV else logging.INFO
+    )
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(min_level)
 
-    # if settings.stage == AppStage.PROD:
-    #     processors += [orjson_renderer]
-    # else:
-    #     processors += [structlog.dev.ConsoleRenderer()]
     processors += [orjson_renderer]
 
     return structlog.wrap_logger(
@@ -88,10 +88,7 @@ def configure_default_logging(
 
 @lru_cache(1)
 def getLogger() -> BoundLogger:
-    return configure_default_logging(logging.getLogger("core"))
-
-
-LOGGER: BoundLogger = getLogger()
+    return configure_default_logging(logging.getLogger(APP_NAME))
 
 
 def getServiceLogger(
@@ -99,5 +96,5 @@ def getServiceLogger(
     project_id: str | None = None,
 ) -> BoundLogger:
     if project_id:
-        return LOGGER.bind(projectId=project_id, orgId=org_id)
-    return LOGGER.bind(orgId=org_id)
+        return getLogger().bind(projectId=project_id, orgId=org_id)
+    return getLogger().bind(orgId=org_id)

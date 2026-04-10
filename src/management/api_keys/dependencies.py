@@ -1,4 +1,4 @@
-from src.shared.settings import getAppSetting
+from src.settings import AppStage, getAppSettings
 from src.management.api_keys.services import InvalidAPIKey
 
 from .entities import ApiKeyInfo
@@ -21,7 +21,7 @@ api_key_header = APIKeyHeader(
 def requiredPermissions(permissions: list[str]):
     """Dependency to verify the API key and create required permissions."""
     registerPermissions(permissions)
-    app_settings = getAppSetting()
+    app_settings = getAppSettings()
 
     async def get_api_key(
         api_key: Annotated[str, Security(api_key_header)],
@@ -45,7 +45,7 @@ def requiredPermissions(permissions: list[str]):
             )
         raise InvalidAPIKey()
 
-    if app_settings.mock_auth:
+    if app_settings.stage == AppStage.DEV:
         # If mock_auth is enabled, bypass all auth checks and return a dummy ApiKeyInfo
         return mock_get_api_key
     return get_api_key
@@ -57,7 +57,7 @@ def getApiKeyInfo(
 ):
     """Dependency to get API key info without permission checks."""
 
-    app_settings = getAppSetting()
+    app_settings = getAppSettings()
 
     async def get_api_key(
         api_key: Annotated[str, Security(api_key_header)],
@@ -81,7 +81,7 @@ def getApiKeyInfo(
             )
         raise InvalidAPIKey()
 
-    if app_settings.mock_auth:
+    if app_settings.stage == AppStage.DEV:
         # If mock_auth is enabled, bypass all auth checks and return a dummy ApiKeyInfo
         return mock_get_api_key
     return get_api_key

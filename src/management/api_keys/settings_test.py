@@ -4,7 +4,7 @@ import unittest
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from src.management.api_keys.settings import ApiKeysSetting, getApiKeysSettings
+from src.management.api_keys.settings import ApiKeysSettings, getApiKeysSettings
 
 
 class TestApiKeySettings(unittest.TestCase):
@@ -20,7 +20,7 @@ class TestApiKeySettings(unittest.TestCase):
         first = getApiKeysSettings()
         second = getApiKeysSettings()
 
-        self.assertIsInstance(first, ApiKeysSetting)
+        self.assertIsInstance(first, ApiKeysSettings)
         self.assertEqual(first.secret.get_secret_value(), "top-secret")
         self.assertEqual(first.secret_length, 48)
         self.assertIs(first, second)

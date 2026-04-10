@@ -1,5 +1,5 @@
-from src.main import app
-from src.shared.settings import getAppSetting
+from src.settings import getAppSettings
+from src.shared.consts.common_const import APP_NAME
 from src.shared.custom_types.error_exception import ProblemDetails
 
 from .billing import billing_router
@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 __all__ = ["management_app"]
 
-app_setting = getAppSetting()
+app_setting = getAppSettings()
 
 
 async def _org_delete_worker_loop():
@@ -46,10 +46,8 @@ async def lifespan(app: FastAPI):
 
 
 management_app = FastAPI(
-    title=app_setting.app_name,
-    openapi_url=app_setting.openapi_json_path
-    if app_setting.stage == "DEV"
-    else None,
+    title=APP_NAME,
+    openapi_url="/docs/openapi.json" if app_setting.stage == "DEV" else None,
     docs_url=None,
     lifespan=lifespan,
     responses={
@@ -62,7 +60,7 @@ management_app = FastAPI(
 
 management_app.add_middleware(
     CORSMiddleware,
-    allow_origins=getAppSetting().allowed_origins.split(","),
+    allow_origins=getAppSettings().allowed_origins,
     allow_credentials=True,  # keep only if you really need cookies/auth
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Content-Type", "Authorization"],
@@ -84,9 +82,9 @@ management_app.include_router(v1_router)
 
 if app_setting.stage == "DEV":
 
-    @management_app.get(app_setting.docs_url, include_in_schema=False)
+    @management_app.get("/docs", include_in_schema=False)
     async def scalar_html():
         return get_scalar_api_reference(
-            openapi_url=app_setting.openapi_json_path.lstrip("/"),
-            title=app_setting.app_name + " Management API Reference",
+            openapi_url=management_app.openapi_url.lstrip("/"),
+            title=APP_NAME + " Management API Reference",
         )

@@ -1,8 +1,11 @@
-from .settings import (
+from src.settings.observability import (
     LogsType,
     TracesType,
     MetricsType,
     ExporterProtocol,
+)
+
+from .settings import (
     getOtelSettings,
 )
 

@@ -1,5 +1,5 @@
+from src.settings import AppStage, getAppSettings
 from src.shared.consts import messages_const
-from src.shared.settings import getAppSetting
 from src.shared.logging.logger import getLogger
 from src.shared.dtos.error_output import (
     ProblemDetails,
@@ -17,13 +17,13 @@ from fastapi.responses import Response, JSONResponse
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 
 
-app_settings = getAppSetting()
+app_settings = getAppSettings()
 
 
 async def recoverableErrorHandler(
     req: Request, e: RecoverableError
 ) -> JSONResponse:
-    if app_settings.debug:
+    if app_settings.stage == AppStage.DEV:
         assert e._stack_frames is not None
         getLogger().error(
             "Error from",
@@ -47,7 +47,7 @@ async def unrecoverableErrorHandler(
         exception="".join(traceback.format_exception_only(exception)),
         stack="".join(exception._stack_frames),
     )
-    if app_settings.debug:
+    if app_settings.stage == AppStage.DEV:
         return Response("".join(exception._stack_frames), status_code=500)
     return Response(messages_const.INTERNAL_SERVER_ERROR, status_code=500)
 
@@ -78,7 +78,7 @@ async def fastapi_exception_handler(
             for error in errors
         ],
     }
-    if app_settings.debug:
+    if app_settings.stage == AppStage.DEV:
         exception_response["type"] = "fast_api_exception_handler"
     return JSONResponse(
         status_code=400,
@@ -103,7 +103,7 @@ async def pydantic_exception_handler(
             for error in errors
         ],
     }
-    if app_settings.debug:
+    if app_settings.stage == AppStage.DEV:
         exception_response["type"] = "pydantic_exception_handler"
         getLogger().error(
             "...", traceback="".join(traceback.format_exception(exception))
@@ -124,7 +124,7 @@ async def internal_exception_handler(
         "Got a weird exception here, you should definitely check your code out!",
         traceback=traceback.format_exception(exception),
     )
-    if app_settings.debug:
+    if app_settings.stage == AppStage.DEV:
         return Response(
             status_code=500,
             content="".join(traceback.format_exception(exception)),

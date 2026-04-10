@@ -1,16 +1,5 @@
-from functools import lru_cache
-
-from pydantic import RedisDsn, PostgresDsn
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from src.settings import DBSettings, AppSettings
 
 
-class DBSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="db_", case_sensitive=False)
-    pgvector_connection_uri: PostgresDsn
-    timescale_connection_uri: PostgresDsn
-    redis_connection_uri: RedisDsn
-
-
-@lru_cache(1)
 def getDBSettings():
-    return DBSettings()  # type: ignore
+    return AppSettings.get().db

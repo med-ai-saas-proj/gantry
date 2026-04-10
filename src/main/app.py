@@ -1,8 +1,8 @@
 from src.service import service_app
+from src.settings import getAppSettings
 from src.management import management_app
 from src.shared.utils import request_id_utils
 from src.shared.consts import common_const
-from src.shared.settings import getAppSetting
 from src.shared.logging.logger import getLogger
 from src.shared.dtos.error_output import (
     ProblemDetails,
@@ -15,18 +15,14 @@ from src.shared.custom_types.error_exception import (
 
 from . import exception_handlers
 from ..otel.setup import setupOtel
-from ..service.lifespan import (
-    startup as service_startup,
-    shutdown as service_shutdown,
-)
 
 import time
 import uuid
 import traceback
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from pydantic import ValidationError
+from scalar_fastapi import get_scalar_api_reference
 from sqlalchemy.orm import configure_mappers
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -35,36 +31,32 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 configure_mappers()
 doneRegisterPermission()
 
-app_settings = getAppSetting()
-
 setupOtel(
-    service_name=app_settings.app_name,
-    service_version=app_settings.app_version,
+    service_name=common_const.APP_NAME,
+    service_version=common_const.APP_VERSION,
     logger=getLogger(),
 )
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup code here
-    await service_startup(app)
-    yield
-
-    # Shutdown code here
-    await service_shutdown(app)
-
-
 main_app = FastAPI(
-    title="Med AI SaaS",
-    openapi_url="/docs/openapi.json",
-    docs_url="/docs",
+    title=common_const.APP_NAME,
+    openapi_url="/docs/openapi.json"
+    if getAppSettings().stage == "DEV"
+    else None,
+    docs_url=None,
     responses={
         400: {"model": ProblemDetails},
         401: {"model": ProblemDetails},
         422: {"model": ProblemDetails},
         500: {"model": ProblemDetails},
     },
-    lifespan=lifespan,
+)
+
+internal_app = FastAPI(
+    title=common_const.APP_NAME,
+    openapi_url="/docs/internal_openapi.json"
+    if getAppSettings().stage == "DEV"
+    else None,
+    docs_url=None,
 )
 
 
@@ -73,7 +65,6 @@ async def ready():
     return Response(status_code=200)
 
 
-@main_app.middleware("http")
 async def global_middleware(
     request: Request,
     call_next,
@@ -119,13 +110,16 @@ async def global_middleware(
         request_id_utils.reset()
 
 
+main_app.middleware("http")(global_middleware)
+internal_app.middleware("http")(global_middleware)
+
 main_app.mount("/service", service_app, "service")
 main_app.mount("/management", management_app, "management")
 
 # main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
 
 
-apps = [main_app, service_app, management_app]
+apps = [main_app, service_app, management_app, internal_app]
 
 handler_map = {
     RecoverableError: exception_handlers.recoverableErrorHandler,
@@ -140,3 +134,20 @@ for app in apps:
     for exc, handler in handler_map.items():
         app.exception_handler(exc)(handler)
     FastAPIInstrumentor.instrument_app(app)
+
+
+if getAppSettings().stage == "DEV":
+
+    @main_app.get("/docs", include_in_schema=False)
+    async def scalar_html():
+        return get_scalar_api_reference(
+            openapi_url=main_app.openapi_url.lstrip("/"),
+            title="Management API Reference",
+        )
+
+    @internal_app.get("/internal-docs", include_in_schema=False)
+    async def scalar_html2():
+        return get_scalar_api_reference(
+            openapi_url=internal_app.openapi_url.lstrip("/"),
+            title="Management API Reference",
+        )

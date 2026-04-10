@@ -1,4 +1,5 @@
-from ..settings import getAppSetting
+from src.settings import AppStage, getAppSettings
+
 from ..dtos.error_output import ProblemDetails
 
 import traceback
@@ -16,7 +17,7 @@ class RecoverableError(Exception):
 
     def __init__(self, from_exception: Exception | None = None) -> None:
         super().__init__(self.format())
-        if getAppSetting().debug:
+        if getAppSettings().stage == AppStage.DEV:
             self._stack_frames = traceback.format_stack()
         else:
             self._stack_frames = None
