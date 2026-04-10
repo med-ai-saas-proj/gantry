@@ -6,7 +6,9 @@ from src.commands.server import Server
 from src.commands.gen_config_schema import GenConfigSchema
 from src.shared.consts.common_const import APP_NAME
 
-from pydantic.fields import FieldInfo
+from typing import Annotated
+
+from pydantic import Field
 from pydantic_settings import (
     CliApp,
     BaseSettings,
@@ -26,7 +28,7 @@ class Main(BaseSettings, cli_prog_name=APP_NAME):
         cli_kebab_case="no_enums",
         cli_avoid_json=True,
     )
-    server: CliSubCommand[Server]
+    gantry: CliSubCommand[Server] = Field(alias="server")
     gen_config_schema: CliSubCommand[GenConfigSchema]
 
     def cli_cmd(self):
@@ -42,10 +44,10 @@ class Main(BaseSettings, cli_prog_name=APP_NAME):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         toml_settings = TomlPathConfigSettingsSource(
-            settings_cls, "server.config_file"
+            settings_cls, "server.config_file", "server"
         )
         dotenv_settings = DotEnvPathConfigSettingsSource(
-            settings_cls, "server.env_file"
+            settings_cls, "server.env_file", "server"
         )
         return (
             init_settings,

@@ -3,8 +3,8 @@ stage = "DEV"
 allowed_origins = "*"
 port = 8000
 internal_port = 9000
-# workers = 2
-# internal_workers = 2
+workers = 2
+internal_workers = 2
 
 [db]
 # Required: Database connection strings

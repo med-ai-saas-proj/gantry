@@ -10,21 +10,37 @@ from pydantic_settings import (
 
 
 class TomlPathConfigSettingsSource(PydanticBaseSettingsSource):
-    def __init__(self, settings_cls: type[BaseSettings], path: str):
-        self.path = path
+    def __init__(
+        self,
+        settings_cls: type[BaseSettings],
+        in_path: str,
+        out_path: str | None = None,
+    ):
+        self.in_path = in_path
+        self.out_path = out_path
         super().__init__(settings_cls)
 
     def __call__(self) -> dict[str, Any]:
-        path = self.current_state
+        in_path = self.current_state
         try:
-            items = self.path.split(".")
+            items = self.in_path.split(".")
             for item in items:
-                path = path.get(item)
+                in_path = in_path.get(item)
         except:
-            path = None
-        if path is not None:
-            tmp = TomlConfigSettingsSource(self.settings_cls, path)()
-            return {"server": tmp}
+            in_path = None
+        if in_path is not None:
+            res = TomlConfigSettingsSource(self.settings_cls, in_path)()
+            if self.out_path is None:
+                return res
+            else:
+                final_res = {}
+                tmp = final_res
+                items = self.out_path.split(".")
+                for item in items[:-1]:
+                    tmp[item] = {}
+                    tmp = tmp[item]
+                tmp[items[-1]] = res
+                return final_res
         return {}
 
     def get_field_value(
@@ -34,21 +50,37 @@ class TomlPathConfigSettingsSource(PydanticBaseSettingsSource):
 
 
 class DotEnvPathConfigSettingsSource(PydanticBaseSettingsSource):
-    def __init__(self, settings_cls: type[BaseSettings], path: str):
-        self.path = path
+    def __init__(
+        self,
+        settings_cls: type[BaseSettings],
+        in_path: str,
+        out_path: str | None = None,
+    ):
+        self.in_path = in_path
+        self.out_path = out_path
         super().__init__(settings_cls)
 
     def __call__(self) -> dict[str, Any]:
-        path = self.current_state
+        in_path = self.current_state
         try:
-            items = self.path.split(".")
+            items = self.in_path.split(".")
             for item in items:
-                path = path.get(item)
+                in_path = in_path.get(item)
         except:
-            path = None
-        if path is not None:
-            tmp = DotEnvSettingsSource(self.settings_cls, path)()
-            return {"server": tmp}
+            in_path = None
+        if in_path is not None:
+            res = DotEnvSettingsSource(self.settings_cls, in_path)()
+            if self.out_path is None:
+                return res
+            else:
+                final_res = {}
+                tmp = final_res
+                items = self.out_path.split(".")
+                for item in items[:-1]:
+                    tmp[item] = {}
+                    tmp = tmp[item]
+                tmp[items[-1]] = res
+                return final_res
         return {}
 
     def get_field_value(
