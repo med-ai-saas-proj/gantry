@@ -1,24 +1,34 @@
 from src.settings import AppSettings
 
-import os
-import threading
+from .migrate import Migrate
+
 from typing import Annotated
 
 from pydantic import Field, FilePath, AliasChoices
+from pydantic_settings import CliApp, CliSubCommand, SettingsConfigDict
 
 
 class Server(AppSettings):
-    config_file: Annotated[
+    migrate: CliSubCommand[Migrate]
+
+    gantry_config_file: Annotated[
         FilePath | None,
-        Field(validation_alias=AliasChoices("config_file", "f")),
+        Field(
+            validation_alias=AliasChoices(
+                "gantry_config_file", "config_file", "f"
+            )
+        ),
     ] = None
-    env_file: Annotated[
+    gantry_env_file: Annotated[
         FilePath | None,
-        Field(validation_alias=AliasChoices("env_file")),
+        Field(validation_alias=AliasChoices("gantry_env_file", "env_file")),
     ] = None
 
     async def cli_cmd(self):
         AppSettings._setInstance(self)
+        # if self.migrate is not None:
+        #     CliApp.run_subcommand(self)
+        #     return
 
         import asyncio
 
@@ -32,7 +42,7 @@ class Server(AppSettings):
             log_level=self.log_level.value.lower(),
         )
 
-        internal_server_config = uvicorn.run(
+        internal_server_config = uvicorn.Config(
             "src.main.app:internal_app",
             host=self.host,
             port=self.internal_port,

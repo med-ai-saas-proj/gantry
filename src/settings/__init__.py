@@ -15,7 +15,7 @@ import os
 from enum import StrEnum
 from typing import Self, Literal, ClassVar, Annotated
 
-from pydantic import Field, FilePath
+from pydantic import Field
 from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
@@ -38,11 +38,6 @@ class LogLevel(StrEnum):
     FATAL = "FATAL"
 
 
-class TMP(BaseSettings):
-    config_file: FilePath | None = None
-    env_file: FilePath | None = None
-
-
 class AppSettings(BaseSettings):
     __instance: ClassVar[AppSettings | None] = None
     model_config = SettingsConfigDict(
@@ -55,7 +50,6 @@ class AppSettings(BaseSettings):
         cli_avoid_json=True,
         cli_ignore_unknown_args=True,
     )
-    gantry: TMP | None = None
 
     stage: AppStage = AppStage.DEV
     allowed_origins: list[str] | Literal["*"] = "*"
@@ -78,39 +72,11 @@ class AppSettings(BaseSettings):
 
     @classmethod
     def get(cls) -> Self:
-        if cls.__instance is None and (
-            os.getenv("GANTRY__CONFIG_FILE") is not None
-            or os.getenv("GANTRY__ENV_FILE") is not None
-        ):
-            cls.__instance = cls()
         return cls.__instance
 
     @classmethod
     def _setInstance(cls, val: Self):
         cls.__instance = val
-
-    @classmethod
-    def settings_customise_sources(
-        cls,
-        settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
-        env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
-    ) -> tuple[PydanticBaseSettingsSource, ...]:
-        toml_settings = TomlPathConfigSettingsSource(
-            settings_cls, "gantry.config_file"
-        )
-        dotenv_settings = DotEnvPathConfigSettingsSource(
-            settings_cls, "gantry.env_file"
-        )
-        return (
-            init_settings,
-            env_settings,
-            toml_settings,
-            dotenv_settings,
-            file_secret_settings,
-        )
 
 
 def getAppSettings():

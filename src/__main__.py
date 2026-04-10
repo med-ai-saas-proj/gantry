@@ -6,8 +6,6 @@ from src.commands.server import Server
 from src.commands.gen_config_schema import GenConfigSchema
 from src.shared.consts.common_const import APP_NAME
 
-from typing import Annotated
-
 from pydantic import Field
 from pydantic_settings import (
     CliApp,
@@ -15,10 +13,11 @@ from pydantic_settings import (
     CliSubCommand,
     SettingsConfigDict,
     PydanticBaseSettingsSource,
+    get_subcommand,
 )
 
 
-class Main(BaseSettings, cli_prog_name=APP_NAME):
+class Main(Server, cli_prog_name=APP_NAME):
     model_config = SettingsConfigDict(
         cli_parse_args=True,
         case_sensitive=False,
@@ -28,11 +27,13 @@ class Main(BaseSettings, cli_prog_name=APP_NAME):
         cli_kebab_case="no_enums",
         cli_avoid_json=True,
     )
-    gantry: CliSubCommand[Server] = Field(alias="server")
     gen_config_schema: CliSubCommand[GenConfigSchema]
 
-    def cli_cmd(self):
-        CliApp.run_subcommand(self)
+    async def cli_cmd(self):
+        if get_subcommand(self, is_required=False) is not None:
+            CliApp.run_subcommand(self)
+            return
+        return await super().cli_cmd()
 
     @classmethod
     def settings_customise_sources(
@@ -44,10 +45,12 @@ class Main(BaseSettings, cli_prog_name=APP_NAME):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         toml_settings = TomlPathConfigSettingsSource(
-            settings_cls, "server.config_file", "server"
+            settings_cls,
+            "gantry_config_file",
         )
         dotenv_settings = DotEnvPathConfigSettingsSource(
-            settings_cls, "server.env_file", "server"
+            settings_cls,
+            "gantry_env_file",
         )
         return (
             init_settings,
