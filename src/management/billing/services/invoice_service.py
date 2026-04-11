@@ -1,6 +1,8 @@
 from src.db.session import AsyncSessionManager
 from src.shared.custom_types.error_exception import (
     RecoverableError,
+    NotImplementedError,
+    InternalServiceError,
 )
 
 from ..dtos import (
@@ -36,8 +38,8 @@ from typing import Sequence
 from decimal import Decimal
 from datetime import UTC, datetime
 
-from stripe import StripeError, StripeClient
-from pyrusult import Ok, Err, Result
+from stripe import Invoice, StripeError, StripeClient
+from pyrusult import Ok, Err, Result, ResultStatus
 from structlog.stdlib import BoundLogger
 
 
@@ -159,6 +161,64 @@ class InvoiceService:
                         )
                         for line in lines
                     ],
+                )
+            )
+
+    async def getInvoiceByIdPaymentLinkInProvider(
+        self,
+        org_id: str,
+        invoice_uid: UUID,
+    ) -> Result[
+        str, InvoiceNotFoundError | NotImplementedError | InternalServiceError
+    ]:
+        async with self.session_manager.get_session() as session:
+            inv = await self.invoice_repo.getReadyInvoiceInfoByUUID(
+                session=session,
+                org_id=org_id,
+                invoice_uid=invoice_uid,
+            )
+            if not inv:
+                return Err(InvoiceNotFoundError())
+
+            if not inv["provider_invoice_id"] or not inv["provider"]:
+                return Err(InvoiceNotFoundError())
+
+            if inv["provider"] == BillingSourceProvider.STRIPE:
+                invoice_res = await self.getInvoiceInStripe(
+                    inv["provider_invoice_id"]
+                )
+                if invoice_res.status == ResultStatus.Err:
+                    return invoice_res.into()
+                invoice = invoice_res.unwrap()
+                if invoice.hosted_invoice_url:
+                    return Ok(invoice.hosted_invoice_url)
+                return Err(
+                    InternalServiceError(
+                        message="Invoice does not have a hosted invoice URL in Stripe"
+                    )
+                )
+            else:
+                self.logger.error(
+                    "Unsupported billing provider for getting payment link",
+                    provider=inv["provider"],
+                    org_id=org_id,
+                )
+                return Err(NotImplementedError())
+
+    async def getInvoiceInStripe(
+        self,
+        invoice_provider_id: str,
+    ) -> Result[Invoice, InternalServiceError]:
+        try:
+            invoice = await self.stripe_client.v1.invoices.retrieve_async(
+                invoice_provider_id
+            )
+            return Ok(invoice)
+        except StripeError as e:
+            return Err(
+                InternalServiceError(
+                    message="Error retrieving invoice from Stripe",
+                    from_exception=e,
                 )
             )
 
@@ -500,6 +560,7 @@ class InvoiceService:
                 )
                 await self.invoice_repo.updateProviderInvoiceID(
                     session=session,
+                    provider=BillingSourceProvider.STRIPE,
                     invoice_id=inv["invoice_id"],
                     provider_invoice_id=invoice.id,
                 )

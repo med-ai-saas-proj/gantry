@@ -127,6 +127,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
                 "billing_period": row.billing_period,
                 "total_amount": row.total_amount,
                 "used_credits": row.used_credits,
+                "provider": row.provider,
                 "provider_invoice_id": row.provider_invoice_id,
                 "paid_at": row.paid_at,
                 "details": row.details,
@@ -160,6 +161,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             "provider_invoice_id": row.provider_invoice_id,
             "paid_at": row.paid_at,
             "details": row.details,
+            "provider": row.provider,
         }
 
     async def getInvoiceInfoByIdWithLock(
@@ -188,18 +190,20 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             "provider_invoice_id": row.provider_invoice_id,
             "paid_at": row.paid_at,
             "details": row.details,
+            "provider": row.provider,
         }
 
     async def updateProviderInvoiceID(
         self,
         session: AsyncSession,
         invoice_id: int,
+        provider: BillingSourceProvider,
         provider_invoice_id: str,
     ):
         stmt = (
             update(BillingInvoice)
             .where(BillingInvoice.id == invoice_id)
-            .values(provider_invoice_id=provider_invoice_id)
+            .values(provider=provider, provider_invoice_id=provider_invoice_id)
         )
         await session.execute(stmt)
 
@@ -268,6 +272,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             billing_period=billing_period,
             total_amount=total_amount,
             provider_invoice_id=None,
+            provider=None,
             details=details,
             used_credits=used_credits,
             paid_at=None,
@@ -280,9 +285,10 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             "billing_period": new_inv.billing_period,
             "total_amount": new_inv.total_amount,
             "used_credits": new_inv.used_credits,
-            "provider_invoice_id": None,
+            "provider_invoice_id": new_inv.provider_invoice_id,
             "paid_at": new_inv.paid_at,
             "details": new_inv.details,
+            "provider": new_inv.provider,
         }
 
     async def createInvoiceLineItems(

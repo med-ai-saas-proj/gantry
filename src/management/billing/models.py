@@ -165,6 +165,9 @@ class BillingInvoice(
     total_amount: Mapped[Decimal] = mapped_column(
         AMOUNT_COLUMN_TYPE, nullable=False
     )
+    provider: Mapped[BillingSourceProvider | None] = mapped_column(
+        Enum(BillingSourceProvider), nullable=True
+    )
     provider_invoice_id: Mapped[str | None] = mapped_column(
         String(128), nullable=True
     )  # e.g. Stripe invoice ID

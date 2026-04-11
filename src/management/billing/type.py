@@ -1,3 +1,5 @@
+from src.management.billing.models import BillingSourceProvider
+
 import enum
 from uuid import UUID
 from typing import TypedDict
@@ -42,6 +44,7 @@ class BillingInvoiceInfo(TypedDict):
     invoice_uid: UUID
     billing_period: date
     total_amount: Decimal
+    provider: BillingSourceProvider | None
     provider_invoice_id: str | None
     paid_at: datetime | None
     details: dict
