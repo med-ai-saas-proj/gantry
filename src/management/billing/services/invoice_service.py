@@ -6,7 +6,6 @@ from src.management.billing.dtos import (
 )
 from src.management.billing.type import (
     AggregatePeriod,
-    BillingInvoiceLineItemInfo,
     CreateBillingInvoiceLineItemInfo,
 )
 from src.management.billing.utils import (
@@ -20,21 +19,25 @@ from src.shared.custom_types.error_exception import (
 from src.management.billing.repositories.transaction_repo import (
     TransactionRepository,
 )
+from src.management.billing.services.billing_source_service import (
+    BillingSourceAlreadyExistsError,
+)
 from src.management.billing.repositories.billing_source_repo import (
     BillingSourceRepo,
 )
 
 from ..repositories.invoice_repo import InvoiceRepo
 
+import uuid
 import asyncio
 from uuid import UUID
-from ctypes import cast
 from typing import Sequence
 from decimal import Decimal
 from datetime import UTC, datetime
 
 from stripe import StripeError, StripeClient
 from pyrusult import Ok, Err, Result
+from structlog.stdlib import BoundLogger
 
 
 class InvoiceNotFoundError(RecoverableError):
@@ -44,15 +47,38 @@ class InvoiceNotFoundError(RecoverableError):
     detail = "The requested invoice was not found."
 
 
+class InvoiceAlreadyExistsError(RecoverableError):
+    status = 400
+    code = "invoice_already_exists"
+    title = "Invoice Already Exists"
+    detail = "An invoice for the current billing period already exists."
+
+
+class ExistingPendingTransactionsError(RecoverableError):
+    status = 400
+    code = "existing_pending_transactions"
+    title = "Existing Pending Transactions"
+    detail = "There are existing pending transactions for the organization in the current billing period. Try again later."
+
+
+class InvoiceAlreadyHasProviderInvoiceIDError(RecoverableError):
+    status = 400
+    code = "invoice_already_has_provider_invoice_id"
+    title = "Invoice Already Has Provider Invoice ID"
+    detail = "The invoice already has a provider invoice ID, cannot create another one in the billing provider."
+
+
 class InvoiceService:
     def __init__(
         self,
+        logger: BoundLogger,
         session_manager: AsyncSessionManager,
         invoice_repo: InvoiceRepo,
         transaction_repo: TransactionRepository,
         billing_source_repo: BillingSourceRepo,
         stripe_client: StripeClient,
     ):
+        self.logger = logger
         self.session_manager = session_manager
         self.invoice_repo = invoice_repo
         self.transaction_repo = transaction_repo
@@ -137,13 +163,26 @@ class InvoiceService:
         """Background task to process invoice creation and syncing with Stripe."""
         while True:
             now = datetime.now(UTC).replace(tzinfo=None)
+            task_id: uuid.UUID = uuid.uuid4()
             try:
-                await self.processingInvoices(now)
+                self.logger.info(
+                    f"Starting invoice processing task at {now.isoformat()}, Task ID: {task_id}",
+                    task_id=task_id,
+                )
+                await self.processingInvoices(task_id, now)
+                self.logger.info(
+                    f"Completed invoice processing task at {datetime.now(UTC).isoformat()}, Task ID: {task_id}",
+                    task_id=task_id,
+                )
             except Exception as e:
-                print(f"Error in processing invoices task: {e}")
+                self.logger.error(
+                    f"Error in processing invoices task, Task ID: {task_id}",
+                    error=e,
+                    task_id=task_id,
+                )
             await asyncio.sleep(60 * 30)  # Run every 30 minutes
 
-    async def processingInvoices(self, now: datetime):
+    async def processingInvoices(self, task_id: uuid.UUID, now: datetime):
         current_period = _get_billing_period(now)
         previous_period = _get_previous_billing_period(current_period)
         previous_previous_period = _get_previous_billing_period(previous_period)
@@ -158,32 +197,87 @@ class InvoiceService:
 
         for org_id in org_ids:
             try:
-                await self.createInvoice(
+                self.logger.info(
+                    f"Creating invoice for org {org_id}, Task ID: {task_id}, period: {current_period.date()}",
+                    org_id=org_id,
+                    task_id=task_id,
+                    billing_period=current_period.date(),
+                )
+                res = await self.createInvoice(
                     org_id,
                     now,
                     current_period,
                     previous_period,
                     previous_previous_period,
                 )
+                res.unwrap()
+                self.logger.info(
+                    f"Successfully created invoice for org {org_id}, Task ID: {task_id}, period: {current_period.date()}",
+                    org_id=org_id,
+                    task_id=task_id,
+                    billing_period=current_period.date(),
+                )
+            except RecoverableError as e:
+                self.logger.warning(
+                    f"Recoverable error creating invoice for org {org_id}, Task ID: {task_id}, error: {e.detail}",
+                    org_id=org_id,
+                    task_id=task_id,
+                    error=e,
+                )
             except Exception as e:
-                print(f"Error creating invoice for org {org_id}: {e}")
+                self.logger.error(
+                    f"Error creating invoice for org {org_id}, Task ID: {task_id}",
+                    error=e,
+                    task_id=task_id,
+                )
 
         async with self.session_manager.get_session() as session:
             row = await self.invoice_repo.getInvoicesToProcessInProvider(
                 session
             )
+
         for invoice_id, org_id, provider in row:
             try:
+                self.logger.info(
+                    f"Processing invoice {invoice_id} for org {org_id} in provider {provider}, Task ID: {task_id}",
+                    invoice_id=invoice_id,
+                    org_id=org_id,
+                    provider=provider,
+                    task_id=task_id,
+                )
                 if provider == BillingSourceProvider.STRIPE:
-                    await self.createInvoiceInStripe(org_id, invoice_id)
+                    res = await self.createInvoiceInStripe(org_id, invoice_id)
+                    res.unwrap()
                 else:
-                    print(
-                        f"Unsupported billing provider {provider} for org {org_id}"
+                    self.logger.error(
+                        "Unsupported billing provider",
+                        provider=provider,
+                        org_id=org_id,
                     )
+                self.logger.info(
+                    f"Successfully processed invoice {invoice_id} for org {org_id} in provider {provider}, Task ID: {task_id}",
+                    invoice_id=invoice_id,
+                    org_id=org_id,
+                    provider=provider,
+                    task_id=task_id,
+                )
             except StripeError as e:
-                print(f"Stripe error processing invoice for org {org_id}: {e}")
+                self.logger.error(
+                    "Stripe error processing invoice for org",
+                    org_id=org_id,
+                    error=e,
+                )
+            except RecoverableError as e:
+                self.logger.warning(
+                    f"Recoverable error processing invoice for org {org_id}, Task ID: {task_id}, error: {e.detail}",
+                    org_id=org_id,
+                    task_id=task_id,
+                    error=e,
+                )
             except Exception as e:
-                print(f"Error processing invoice for org {org_id}: {e}")
+                self.logger.error(
+                    "Error processing invoice for org", org_id=org_id, error=e
+                )
 
     async def createInvoice(
         self,
@@ -192,7 +286,9 @@ class InvoiceService:
         current_period: datetime,
         previous_period: datetime,
         previous_previous_period: datetime,
-    ) -> UUID | None:
+    ) -> Result[
+        UUID, InvoiceAlreadyExistsError | ExistingPendingTransactionsError
+    ]:
         async with self.session_manager.get_session() as session:
             have_invoice = await self.invoice_repo.haveInvoiceForBillingPeriod(
                 session=session,
@@ -200,7 +296,7 @@ class InvoiceService:
                 billing_period=current_period.date(),
             )
             if have_invoice:
-                return None
+                return Err(InvoiceAlreadyExistsError())
 
             have_pending = await self.transaction_repo.havePendingTransactionsForOrgInPeriod(
                 session=session,
@@ -209,7 +305,7 @@ class InvoiceService:
                 end_time=current_period,
             )
             if have_pending:
-                return None
+                return Err(ExistingPendingTransactionsError())
 
             total_usage = await self.transaction_repo.sumByPeriodByProjectsGroupedByProjects(
                 session=session,
@@ -252,13 +348,18 @@ class InvoiceService:
                 )
                 res_invoice_uid = res["invoice_uid"]
                 await session.commit()
-                return res_invoice_uid
+                return Ok(res_invoice_uid)
 
     async def createInvoiceInStripe(
         self,
         org_id: str,
         invoice_id: int,
-    ):
+    ) -> Result[
+        str,
+        BillingSourceAlreadyExistsError
+        | InvoiceNotFoundError
+        | InvoiceAlreadyHasProviderInvoiceIDError,
+    ]:
         async with self.session_manager.get_session() as session:
             async with session.begin():
                 billing_source = await self.billing_source_repo.getWithLock(
@@ -268,10 +369,11 @@ class InvoiceService:
                     read=True,
                 )
                 if not billing_source:
-                    print(
-                        f"No billing source found for org {org_id}, cannot create Stripe invoice"
+                    self.logger.error(
+                        "No billing source found for org", org_id=org_id
                     )
-                    return
+                    return Err(InvoiceNotFoundError())
+
                 inv = await self.invoice_repo.getInvoiceInfoByIdWithLock(
                     session=session,
                     invoice_id=invoice_id,
@@ -281,7 +383,8 @@ class InvoiceService:
                     return Err(InvoiceNotFoundError())
                 if inv["provider_invoice_id"]:
                     # Invoice already created in Stripe
-                    return Ok(None)
+                    return Err(InvoiceAlreadyHasProviderInvoiceIDError())
+
                 line_items = await self.invoice_repo.getInvoiceLineItems(
                     session=session,
                     invoice_id=inv["invoice_id"],
