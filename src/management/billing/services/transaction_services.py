@@ -4,6 +4,7 @@ from src.shared.utils.uuid_utils import uuid7
 from src.management.api_keys.services import ApiKeyService
 from src.shared.custom_types.error_exception import (
     RecoverableError,
+    InvalidValueError,
     InternalServiceError,
 )
 
@@ -20,7 +21,7 @@ from ..utils import (
     _get_billing_period,
     _get_next_billing_period,
 )
-from ..models import SpendingLimitType, BillingTransaction
+from ..models import SpendingLimitType
 from ..repositories.transaction_repo import (
     TransactionRepository,
 )
@@ -503,7 +504,10 @@ class TransactionService:
         req: PostRequest,
     ) -> Result[
         UUID,
-        SpendingLimitExceeded | InternalServiceError | TransactionInProgress,
+        SpendingLimitExceeded
+        | InvalidValueError
+        | InternalServiceError
+        | TransactionInProgress,
     ]:
         """Reserve spending capacity before a request is processed.
 
@@ -512,6 +516,12 @@ class TransactionService:
         now = datetime.now(UTC).replace(tzinfo=None)
         billing_period = _get_billing_period(now)
         amount = _to_decimal(req.amount)
+        if amount <= 0:
+            return Err(
+                InvalidValueError(
+                    message="Amount must be greater than or equal to 0."
+                )
+            )
         period_key = billing_period.strftime("%Y-%m")
         org_limit_key = self._ORG_SPENDING_LIMIT_KEY.format(org_id=org_id)
         project_limit_key = self._PROJECT_SPENDING_LIMIT_KEY.format(
@@ -678,7 +688,10 @@ class TransactionService:
         transaction_uid: UUID,
         real_amount: ScaledAmount,
     ) -> Result[
-        bool, TransactionNotFoundOrExpiredOrCaptured | InternalServiceError
+        bool,
+        TransactionNotFoundOrExpiredOrCaptured
+        | InvalidValueError
+        | InternalServiceError,
     ]:
         """Commit the actual charge after a request completes.
 
@@ -686,6 +699,12 @@ class TransactionService:
         """
         transaction_key = self._TRANSACTION_KEY.format(uuid=transaction_uid)
         real = _to_decimal(real_amount)
+        if real < 0:
+            return Err(
+                InvalidValueError(
+                    message="Real amount must be greater than or equal to 0."
+                )
+            )
 
         raw = await self.redis.get(transaction_key)
         if raw is None:
@@ -770,7 +789,7 @@ class TransactionService:
         )
         return Ok(True)
 
-    async def get_transactions(
+    async def getTransactions(
         self,
         org_id: str,
         project_uids: list[UUID] | None = None,
@@ -811,7 +830,7 @@ class TransactionService:
                 )
             )
 
-    async def get_transaction_by_id(
+    async def getTransactionById(
         self, org_id: str, transaction_uid: UUID
     ) -> Result[TransactionInfoResponse, TransactionNotFound]:
         """Get transaction details by transaction UUID."""

@@ -88,7 +88,7 @@ class InvoiceService:
         self.stripe_client = stripe_client
         self.credit_repo = credit_repo
 
-    async def list_invoices(
+    async def listInvoices(
         self,
         org_id: str,
         offset: int = 0,
@@ -124,7 +124,7 @@ class InvoiceService:
                 )
             )
 
-    async def get_invoice_by_id(
+    async def getInvoiceById(
         self,
         org_id: str,
         invoice_uid: UUID,
@@ -334,6 +334,25 @@ class InvoiceService:
                 "period_start": previous_period.isoformat(),
                 "period_end": current_period.isoformat(),
             }
+
+            if total_amount == 0:
+                res = await self.invoice_repo.createInvoice(
+                    session=session,
+                    org_id=org_id,
+                    billing_period=current_period.date(),
+                    total_amount=total_amount,
+                    details=details,
+                    used_credits=Decimal(0),
+                )
+                if len(lines) > 0:
+                    await self.invoice_repo.createInvoiceLineItems(
+                        session=session,
+                        invoice_id=res["invoice_id"],
+                        lines=lines,
+                    )
+                await session.commit()
+                return Ok(res["invoice_uid"])
+
             async with session.begin():
                 credit = await self.credit_repo.getCreditForOrgWithLock(
                     session=session,
@@ -341,6 +360,7 @@ class InvoiceService:
                     read=False,
                 )
                 credits_available = credit.amount if credit else Decimal(0)
+                used_credits = Decimal(0)
                 if credits_available > 0:
                     if credits_available >= total_amount:
                         used_credits = total_amount
@@ -348,11 +368,7 @@ class InvoiceService:
                     else:
                         used_credits = credits_available
                         leftover_credits = Decimal(0)
-                else:
-                    used_credits = Decimal(0)
-                    leftover_credits = Decimal(0)
-                if used_credits > 0:
-                    await self.credit_repo.updateCreditForOrg(
+                    await self.credit_repo.setCreditForOrg(
                         session=session,
                         org_id=org_id,
                         new_amount=leftover_credits,
@@ -363,6 +379,7 @@ class InvoiceService:
                         amount=-used_credits,
                         description=f"Applied credits to invoice for period {current_period.date()}",
                     )
+
                 res = await self.invoice_repo.createInvoice(
                     session=session,
                     org_id=org_id,
@@ -371,14 +388,14 @@ class InvoiceService:
                     details=details,
                     used_credits=used_credits,
                 )
-                await self.invoice_repo.createInvoiceLineItems(
-                    session=session,
-                    invoice_id=res["invoice_id"],
-                    lines=lines,
-                )
-                res_invoice_uid = res["invoice_uid"]
+                if len(lines) > 0:
+                    await self.invoice_repo.createInvoiceLineItems(
+                        session=session,
+                        invoice_id=res["invoice_id"],
+                        lines=lines,
+                    )
                 await session.commit()
-                return Ok(res_invoice_uid)
+                return Ok(res["invoice_uid"])
 
     async def createInvoiceInStripe(
         self,

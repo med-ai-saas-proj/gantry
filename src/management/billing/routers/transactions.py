@@ -76,7 +76,7 @@ async def list_transactions(
     offset: int = 0,
 ) -> PaginatedResponse[TransactionInfoResponse]:
     res, total = (
-        await billing_service.get_transactions(
+        await billing_service.getTransactions(
             org_id=user_info["org_id"],
             project_uids=project_uids,
             start_date=start_date,
@@ -102,7 +102,7 @@ async def get_transaction_details(
     ],
 ) -> ObjectResponse[TransactionInfoResponse]:
     res = (
-        await billing_service.get_transaction_by_id(
+        await billing_service.getTransactionById(
             org_id=user_info["org_id"], transaction_uid=transaction_uid
         )
     ).unwrap()

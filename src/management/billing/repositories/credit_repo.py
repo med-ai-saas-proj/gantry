@@ -4,9 +4,17 @@ from decimal import Decimal
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert
 
 
 class CreditRepo:
+    async def getCreditByOrgId(
+        self, session: AsyncSession, org_id: str
+    ) -> Credit | None:
+        stmt = select(Credit).where(Credit.organization_id == org_id)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def getCreditForOrgWithLock(
         self, session: AsyncSession, org_id: str, read: bool = True
     ) -> Credit | None:
@@ -18,7 +26,22 @@ class CreditRepo:
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def updateCreditForOrg(
+    async def addCreditForOrg(
+        self, session: AsyncSession, org_id: str, amount: Decimal = Decimal(0)
+    ):
+        stmt = (
+            insert(Credit)
+            .values(organization_id=org_id, amount=amount)
+            .on_conflict_do_update(
+                index_elements=[Credit.organization_id],
+                set_=dict(amount=Credit.amount + amount),
+            )
+            .returning(Credit)
+        )
+        result = await session.execute(stmt)
+        return result.scalar_one()
+
+    async def setCreditForOrg(
         self, session: AsyncSession, org_id: str, new_amount: Decimal
     ):
         stmt = (

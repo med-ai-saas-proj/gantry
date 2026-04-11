@@ -35,7 +35,7 @@ async def list_invoices(
     offset: int = 0,
 ) -> PaginatedResponse[InvoiceInfoResponse]:
     invoices, total = (
-        await invoice_service.list_invoices(
+        await invoice_service.listInvoices(
             org_id=user_info["org_id"],
             offset=offset,
             limit=limit,
@@ -62,7 +62,7 @@ async def get_invoice_details(
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[InvoiceDetailInfoResponse]:
     res = (
-        await invoice_service.get_invoice_by_id(
+        await invoice_service.getInvoiceById(
             org_id=user_info["org_id"], invoice_uid=invoice_uid
         )
     ).unwrap()

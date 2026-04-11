@@ -107,30 +107,6 @@ class UpdateSpendingLimitRequest(BaseModel):
     )
 
 
-class CreditInfoResponse(BaseModel):
-    credit_uid: str
-    amount: ScaledAmount
-    name: str
-    current_spent: ScaledAmount
-    start_month: int
-    start_year: int
-    exp_month: int
-    exp_year: int
-    note: str | None = None
-
-
-class AddCreditRequest(BaseModel):
-    amount: ScaledAmount
-    organization_id: str
-    name: str
-    note: str | None = None
-    amount: ScaledAmount
-    start_month: int
-    start_year: int
-    exp_month: int
-    exp_year: int
-
-
 class BillingAddress(BaseModel):
     line1: str
     line2: str
@@ -152,3 +128,12 @@ class UpdateBillingSourceRequest(BaseModel):
     new_address: BillingAddress | None
     new_email: str | None
     new_phone: str | None
+
+
+class CreditInfoResponse(BaseModel):
+    amount: Decimal
+
+
+class AddCreditRequest(BaseModel):
+    amount: ScaledAmount
+    description: str | None = None

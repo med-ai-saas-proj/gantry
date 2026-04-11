@@ -4,6 +4,7 @@ from src.db.factories import (
     getRedis,
     getSessionManager,
 )
+from src.management.billing.services.credit_service import CreditService
 
 from .settings import getBillingSetting
 from ..api_keys.factories import getApiKeyService
@@ -77,4 +78,12 @@ def getInvoiceService() -> InvoiceService:
         billing_source_repo=BillingSourceRepo(),
         stripe_client=getStripeClient(),
         credit_repo=CreditRepo(),
+    )
+
+
+@lru_cache(1)
+def getCreditService() -> CreditService:
+    return CreditService(
+        session_manager=getSessionManager(),
+        credit_repository=CreditRepo(),
     )
