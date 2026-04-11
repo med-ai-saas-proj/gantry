@@ -72,15 +72,18 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
                 BillingTransaction.status == TransactionStatus.PENDING,
             )
         ).exists()
+        created_invoce_subq = (
+            select(BillingInvoice.id).where(
+                BillingInvoice.organization_id == BillingSource.organization_id,
+                BillingInvoice.billing_period == billing_period,
+            )
+        ).exists()
+
         stmt = (
             select(BillingSource.organization_id, BillingSource.source_type)
             .select_from(BillingSource)
             .where(
-                BillingSource.organization_id.not_in(
-                    select(BillingInvoice.organization_id).where(
-                        BillingInvoice.billing_period == billing_period
-                    )
-                ),
+                ~created_invoce_subq,
                 ~pending_tx_subq,
             )
         )
