@@ -1,9 +1,4 @@
 from src.shared.settings import getAppSetting
-from src.management.billing.settings import getBillingSetting
-from src.management.billing.factories import (
-    getInvoiceService,
-    getBillingTransactionService,
-)
 from src.shared.custom_types.error_exception import ProblemDetails
 
 from .billing import billing_router
@@ -11,11 +6,6 @@ from .logging import logging_router
 from .project import project_router
 from .api_keys import apikey_router
 from .organization import org_router
-from .organization.settings import getOrgSettings
-from .organization.factories import getOrgService
-
-import asyncio
-import contextlib
 
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
@@ -27,64 +17,12 @@ __all__ = ["management_app"]
 app_setting = getAppSetting()
 
 
-async def _org_delete_worker_loop():
-    service = getOrgService()
-    while True:
-        try:  # noqa: SIM105
-            await service.processDueDeletions()
-        except Exception:
-            # Keep loop alive; failures are logged in service/global handlers.
-            pass
-        await asyncio.sleep(getOrgSettings().deletion_worker_interval_seconds)
-
-
-async def invoice_process_loop():
-    service = getInvoiceService()
-    await service.processInvoicesTask(
-        getBillingSetting().invoice_process_interval_seconds
-    )
-
-
-async def billing_process_loop():
-    trx_service = getBillingTransactionService()
-    await trx_service.closeExpiredTransactionsTask(
-        getBillingSetting().transaction_expire_check_interval_seconds
-    )
-
-
-@contextlib.asynccontextmanager
-async def lifespan(app: FastAPI):
-    org_deletion_task = asyncio.create_task(_org_delete_worker_loop())
-    billing_process_task = asyncio.create_task(billing_process_loop())
-    invoice_process_task = asyncio.create_task(invoice_process_loop())
-    yield
-    org_deletion_task.cancel()
-    billing_process_task.cancel()
-    invoice_process_task.cancel()
-
-    try:
-        await org_deletion_task
-    except Exception:
-        pass
-
-    try:
-        await billing_process_task
-    except Exception:
-        pass
-
-    try:
-        await invoice_process_task
-    except Exception:
-        pass
-
-
 management_app = FastAPI(
     title=app_setting.app_name,
     openapi_url=app_setting.openapi_json_path
     if app_setting.stage == "DEV"
     else None,
     docs_url=None,
-    lifespan=lifespan,
     responses={
         400: {"model": ProblemDetails},
         401: {"model": ProblemDetails},

@@ -186,7 +186,7 @@ return 1
 
 class TransactionService:
     _CACHE_TTL = 36000  # seconds
-    _MAX_TRANSACTION_AGE = 3600  # seconds, after which a transaction is considered expired and cannot be captured
+    _MAX_TRANSACTION_AGE = 600  # seconds, after which a transaction is considered expired and cannot be captured
     _IDEMPOTENCY_KEY_TTL = (
         3600  # seconds, how long to keep idempotency keys in cache
     )
@@ -882,7 +882,15 @@ class TransactionService:
             now = datetime.now(UTC).replace(tzinfo=None)
             task_id = uuid4()
             try:
+                self.logger.info(
+                    f"billing.close_expired_transactions_task_started, Task ID: {task_id}",
+                    task_id=str(task_id),
+                )
                 await self.closeExpiredTransactions(task_id, now)
+                self.logger.info(
+                    f"billing.close_expired_transactions_task_completed, Task ID: {task_id}",
+                    task_id=str(task_id),
+                )
             except Exception as e:
                 self.logger.error(
                     "billing.close_expired_transactions_failed",

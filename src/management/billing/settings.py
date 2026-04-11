@@ -13,12 +13,12 @@ class BillingSetting(BaseSettings):
     stripe_webhook_secret: SecretStr
 
     invoice_process_interval_seconds: int = Field(
-        600,
+        60,
         description="Interval in seconds for processing invoices in the management service",
     )
 
     transaction_expire_check_interval_seconds: int = Field(
-        600,
+        60,
         description="Interval in seconds for checking and closing expired transactions",
     )
 

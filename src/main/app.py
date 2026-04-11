@@ -19,6 +19,10 @@ from ..service.lifespan import (
     startup as service_startup,
     shutdown as service_shutdown,
 )
+from ..management.lifespan import (
+    startup as management_startup,
+    shutdown as management_shutdown,
+)
 
 import time
 import uuid
@@ -48,10 +52,12 @@ setupOtel(
 async def lifespan(app: FastAPI):
     # Startup code here
     await service_startup(app)
+    await management_startup(app)
     yield
 
     # Shutdown code here
     await service_shutdown(app)
+    await management_shutdown(app)
 
 
 main_app = FastAPI(
