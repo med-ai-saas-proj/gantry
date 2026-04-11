@@ -834,9 +834,10 @@ class TransactionService:
                 )
             )
 
-    async def closeExpiredTransactions(self) -> None:
+    async def closeExpiredTransactions(
+        self, task_id: UUID, now: datetime
+    ) -> None:
         """Close expired transactions that are not captured within the max transaction age."""
-        now = datetime.now(UTC).replace(tzinfo=None)
         expired_time = now - timedelta(seconds=self._MAX_TRANSACTION_AGE)
 
         async with self.session_manager.get_session() as session:
@@ -851,4 +852,22 @@ class TransactionService:
                 "billing.expire_transactions",
                 count=len(expired_trxs),
                 transaction_uuids=[str(trx.uuid) for trx in expired_trxs],
+                task_id=str(task_id),
             )
+
+    async def closeExpiredTransactionsTask(
+        self,
+        sleep_interval_seconds: int,
+    ):
+        while True:
+            now = datetime.now(UTC).replace(tzinfo=None)
+            task_id = uuid4()
+            try:
+                await self.closeExpiredTransactions(task_id, now)
+            except Exception as e:
+                self.logger.error(
+                    "billing.close_expired_transactions_failed",
+                    task_id=str(task_id),
+                    error=str(e),
+                )
+            await asyncio.sleep(sleep_interval_seconds)

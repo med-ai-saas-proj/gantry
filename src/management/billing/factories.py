@@ -5,7 +5,7 @@ from src.db.factories import (
     getSessionManager,
 )
 
-from .settings import getBillingSourceSetting
+from .settings import getBillingSetting
 from ..api_keys.factories import getApiKeyService
 from ...shared.logging.logger import getLogger
 from .services.invoice_service import InvoiceService
@@ -40,7 +40,7 @@ def getBillingTransactionService() -> TransactionService:
 
 @lru_cache(1)
 def getStripeClient() -> StripeClient:
-    billing_source_settings = getBillingSourceSetting()
+    billing_source_settings = getBillingSetting()
     return StripeClient(
         billing_source_settings.stripe_secret_key.get_secret_value()
     )

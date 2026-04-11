@@ -1,5 +1,9 @@
-from src.main import app
 from src.shared.settings import getAppSetting
+from src.management.billing.settings import getBillingSetting
+from src.management.billing.factories import (
+    getInvoiceService,
+    getBillingTransactionService,
+)
 from src.shared.custom_types.error_exception import ProblemDetails
 
 from .billing import billing_router
@@ -34,13 +38,42 @@ async def _org_delete_worker_loop():
         await asyncio.sleep(getOrgSettings().deletion_worker_interval_seconds)
 
 
+async def invoice_process_loop():
+    service = getInvoiceService()
+    await service.processInvoicesTask(
+        getBillingSetting().invoice_process_interval_seconds
+    )
+
+
+async def billing_process_loop():
+    trx_service = getBillingTransactionService()
+    await trx_service.closeExpiredTransactionsTask(
+        getBillingSetting().transaction_expire_check_interval_seconds
+    )
+
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     org_deletion_task = asyncio.create_task(_org_delete_worker_loop())
+    billing_process_task = asyncio.create_task(billing_process_loop())
+    invoice_process_task = asyncio.create_task(invoice_process_loop())
     yield
     org_deletion_task.cancel()
+    billing_process_task.cancel()
+    invoice_process_task.cancel()
+
     try:
         await org_deletion_task
+    except Exception:
+        pass
+
+    try:
+        await billing_process_task
+    except Exception:
+        pass
+
+    try:
+        await invoice_process_task
     except Exception:
         pass
 

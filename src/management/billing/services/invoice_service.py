@@ -159,7 +159,10 @@ class InvoiceService:
                 )
             )
 
-    async def processInvoicesTask(self):
+    async def processInvoicesTask(
+        self,
+        sleep_interval_seconds: int,
+    ):
         """Background task to process invoice creation and syncing with Stripe."""
         while True:
             now = datetime.now(UTC).replace(tzinfo=None)
@@ -180,7 +183,7 @@ class InvoiceService:
                     error=e,
                     task_id=task_id,
                 )
-            await asyncio.sleep(60 * 30)  # Run every 30 minutes
+            await asyncio.sleep(sleep_interval_seconds)
 
     async def processingInvoices(self, task_id: uuid.UUID, now: datetime):
         current_period = _get_billing_period(now)
