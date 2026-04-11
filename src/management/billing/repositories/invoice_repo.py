@@ -6,15 +6,22 @@ from src.management.billing.type import (
 )
 from src.management.project.models import Project
 
-from ..models import BillingInvoice, BillingInvoiceLineItem
+from ..models import (
+    BillingSource,
+    BillingInvoice,
+    TransactionStatus,
+    BillingTransaction,
+    BillingSourceProvider,
+    BillingInvoiceLineItem,
+)
 
 from uuid import UUID
 from typing import Sequence
 from decimal import Decimal
-from tkinter import N
 from datetime import date, datetime
 
 from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class InvoiceRepo(Repository[BillingInvoice, int]):
@@ -23,9 +30,68 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
     def __init__(self):
         super().__init__(BillingInvoice, BillingInvoice.id)
 
-    async def listInvoices(
+    async def getOrgsWithInvoicesToProcessInProvider(
+        self, session: AsyncSession
+    ) -> Sequence[tuple[int, str, BillingSourceProvider, str]]:
+        stmt = (
+            select(
+                BillingInvoice.id,
+                BillingInvoice.organization_id,
+                BillingSource.source_type.label("provider"),
+                BillingSource.provider_id.label("billing_source_provider_id"),
+            )
+            .select_from(BillingInvoice)
+            .join(
+                BillingSource,
+                BillingInvoice.organization_id == BillingSource.organization_id,
+            )
+            .where(BillingInvoice.provider_invoice_id.is_not(None))
+        )
+        res = await session.execute(stmt)
+        return [
+            (
+                row.id,
+                row.organization_id,
+                row.provider,
+                row.billing_source_provider_id,
+            )
+            for row in res.all()
+        ]
+
+    async def getOrgsWithInvoiceToCreate(
         self,
-        session,
+        session: AsyncSession,
+        billing_period: date,
+        prev_billing_period: date,
+        prev_prev_billing_period: date,
+    ) -> Sequence[tuple[str, BillingSourceProvider]]:
+        pending_tx_subq = (
+            select(BillingTransaction.id).where(
+                BillingTransaction.created_at >= prev_prev_billing_period,
+                BillingTransaction.created_at < prev_billing_period,
+                BillingTransaction.organization_id
+                == BillingSource.organization_id,
+                BillingTransaction.status == TransactionStatus.PENDING,
+            )
+        ).exists()
+        stmt = (
+            select(BillingSource.organization_id, BillingSource.source_type)
+            .select_from(BillingSource)
+            .where(
+                BillingSource.organization_id.not_in(
+                    select(BillingInvoice.organization_id).where(
+                        BillingInvoice.billing_period == billing_period
+                    )
+                ),
+                ~pending_tx_subq,
+            )
+        )
+        res = await session.execute(stmt)
+        return [(row.organization_id, row.source_type) for row in res.all()]
+
+    async def listReadyInvoices(
+        self,
+        session: AsyncSession,
         org_id: str,
         offset: int = 0,
         limit: int = 100,
@@ -37,6 +103,9 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             select(BillingInvoice, func.count().over().label("total"))
             .select_from(BillingInvoice)
             .where(self.model.organization_id == org_id)
+            .where(
+                BillingInvoice.provider_invoice_id.is_not(None)
+            )  # only return invoices that have been created in provider
         )
         if from_date is not None:
             stmt = stmt.where(BillingInvoice.billing_period >= from_date)
@@ -64,15 +133,18 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             for row in rows[0]
         ], rows[0].total if rows else 0
 
-    async def getInvoiceInfoByUUID(
+    async def getReadyInvoiceInfoByUUID(
         self,
-        session,
+        session: AsyncSession,
         invoice_uid: UUID,
         org_id: str,
     ) -> BillingInvoiceInfo | None:
         stmt = select(BillingInvoice).where(
             BillingInvoice.uuid == invoice_uid,
             BillingInvoice.organization_id == org_id,
+            BillingInvoice.provider_invoice_id.is_not(
+                None
+            ),  # only return if invoice has been created in provider
         )
         res = await session.execute(stmt)
         row = res.scalar_one_or_none()
@@ -89,16 +161,14 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             "details": row.details,
         }
 
-    async def getInvoiceInfoByUUIDWithLock(
+    async def getInvoiceInfoByIdWithLock(
         self,
-        session,
-        invoice_uid: UUID,
-        org_id: str,
+        session: AsyncSession,
+        invoice_id: int,
         read: bool = True,
     ) -> BillingInvoiceInfo | None:
         stmt = select(BillingInvoice).where(
-            BillingInvoice.uuid == invoice_uid,
-            BillingInvoice.organization_id == org_id,
+            BillingInvoice.id == invoice_id,
         )
         if read:
             stmt = stmt.with_for_update(read=True)
@@ -121,7 +191,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
 
     async def updateProviderInvoiceID(
         self,
-        session,
+        session: AsyncSession,
         invoice_id: int,
         provider_invoice_id: str,
     ):
@@ -134,7 +204,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
 
     async def getInvoiceLineItems(
         self,
-        session,
+        session: AsyncSession,
         invoice_id: int,
     ) -> Sequence[BillingInvoiceLineItemInfo]:
         # For simplicity, assume line items are stored as a JSON array in the details column of the invoice
@@ -171,7 +241,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
 
     async def haveInvoiceForBillingPeriod(
         self,
-        session,
+        session: AsyncSession,
         org_id: str,
         billing_period: date,
     ) -> bool:
@@ -185,7 +255,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
 
     async def createInvoice(
         self,
-        session,
+        session: AsyncSession,
         org_id: str,
         billing_period: date,
         total_amount: Decimal,
@@ -216,7 +286,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
 
     async def createInvoiceLineItems(
         self,
-        session,
+        session: AsyncSession,
         invoice_id: int,
         lines: list[CreateBillingInvoiceLineItemInfo],
     ):

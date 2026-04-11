@@ -23,7 +23,6 @@ from .services.aggregate_query_service import BillingAggregateQueryService
 
 from functools import lru_cache
 
-import redis
 from stripe import StripeClient
 
 
@@ -40,14 +39,19 @@ def getBillingTransactionService() -> TransactionService:
 
 
 @lru_cache(1)
-def getBillingSourceService() -> BillingSourceService:
+def getStripeClient() -> StripeClient:
     billing_source_settings = getBillingSourceSetting()
+    return StripeClient(
+        billing_source_settings.stripe_secret_key.get_secret_value()
+    )
+
+
+@lru_cache(1)
+def getBillingSourceService() -> BillingSourceService:
     return BillingSourceService(
         billing_source_repo=BillingSourceRepo(),
         session_manager=getSessionManager(),
-        stripe_client=StripeClient(
-            billing_source_settings.stripe_secret_key.get_secret_value()
-        ),
+        stripe_client=getStripeClient(),
         redis_client=getRedis(),
     )
 
@@ -67,4 +71,7 @@ def getInvoiceService() -> InvoiceService:
     return InvoiceService(
         session_manager=getSessionManager(),
         invoice_repo=InvoiceRepo(),
+        transaction_repo=TransactionRepository(),
+        billing_source_repo=BillingSourceRepo(),
+        stripe_client=getStripeClient(),
     )

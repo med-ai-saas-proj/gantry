@@ -134,6 +134,7 @@ class BillingSourceProvider(str, enum.Enum):
     # Add more providers as needed (e.g. "braintree", "square", etc.)
 
 
+# NOTE: THIS IMMUTABLE ONCE CREATED. DO NOT UPDATE/DELETE
 class BillingSource(
     WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel
 ):
