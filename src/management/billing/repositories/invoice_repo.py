@@ -44,7 +44,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
                 BillingSource,
                 BillingInvoice.organization_id == BillingSource.organization_id,
             )
-            .where(BillingInvoice.provider_invoice_id.is_not(None))
+            .where(BillingInvoice.provider_invoice_id.is_(None))
         )
         res = await session.execute(stmt)
         return [
@@ -61,12 +61,11 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
         session: AsyncSession,
         billing_period: date,
         prev_billing_period: date,
-        prev_prev_billing_period: date,
     ) -> Sequence[str]:
         pending_tx_subq = (
             select(BillingTransaction.id).where(
-                BillingTransaction.created_at >= prev_prev_billing_period,
-                BillingTransaction.created_at < prev_billing_period,
+                BillingTransaction.created_at >= prev_billing_period,
+                BillingTransaction.created_at < billing_period,
                 BillingTransaction.organization_id
                 == BillingSource.organization_id,
                 BillingTransaction.status == TransactionStatus.PENDING,
@@ -101,7 +100,18 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
         paid: bool | None = None,
     ) -> tuple[Sequence[BillingInvoiceInfo], int]:
         stmt = (
-            select(BillingInvoice, func.count().over().label("total"))
+            select(
+                BillingInvoice.id,
+                BillingInvoice.uuid,
+                BillingInvoice.billing_period,
+                BillingInvoice.total_amount,
+                BillingInvoice.provider,
+                BillingInvoice.provider_invoice_id,
+                BillingInvoice.paid_at,
+                BillingInvoice.details,
+                BillingInvoice.used_credits,
+                func.count().over().label("total"),
+            )
             .select_from(BillingInvoice)
             .where(self.model.organization_id == org_id)
             .where(
@@ -122,7 +132,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
         rows = res.all()
         return [
             {
-                "invoice_id": row.BillingInvoice.id,
+                "invoice_id": row.id,
                 "invoice_uid": row.uuid,
                 "billing_period": row.billing_period,
                 "total_amount": row.total_amount,
@@ -132,7 +142,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
                 "paid_at": row.paid_at,
                 "details": row.details,
             }
-            for row in rows[0]
+            for row in rows
         ], rows[0].total if rows else 0
 
     async def getReadyInvoiceInfoByUUID(

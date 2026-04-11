@@ -38,6 +38,7 @@ from typing import Sequence
 from decimal import Decimal
 from datetime import UTC, datetime
 
+from regex import F
 from stripe import Invoice, StripeError, StripeClient
 from pyrusult import Ok, Err, Result, ResultStatus
 from structlog.stdlib import BoundLogger
@@ -251,14 +252,12 @@ class InvoiceService:
     async def processingInvoices(self, task_id: uuid.UUID, now: datetime):
         current_period = _get_billing_period(now)
         previous_period = _get_previous_billing_period(current_period)
-        previous_previous_period = _get_previous_billing_period(previous_period)
 
         async with self.session_manager.get_session() as session:
             org_ids = await self.invoice_repo.getOrgsWithInvoiceToCreate(
                 session,
-                current_period.date(),
+                current_period,
                 previous_period,
-                previous_previous_period,
             )
 
         for org_id in org_ids:
@@ -273,7 +272,6 @@ class InvoiceService:
                     org_id,
                     current_period,
                     previous_period,
-                    previous_previous_period,
                 )
                 res.unwrap()
                 self.logger.info(
@@ -283,6 +281,7 @@ class InvoiceService:
                     billing_period=current_period.date(),
                 )
             except RecoverableError as e:
+                print(e)
                 self.logger.warning(
                     f"Recoverable error creating invoice for org {org_id}, Task ID: {task_id}, error: {e.detail}",
                     org_id=org_id,
@@ -290,6 +289,7 @@ class InvoiceService:
                     error=e,
                 )
             except Exception as e:
+                print(e)
                 self.logger.error(
                     f"Error creating invoice for org {org_id}, Task ID: {task_id}",
                     error=e,
@@ -327,6 +327,7 @@ class InvoiceService:
                     task_id=task_id,
                 )
             except StripeError as e:
+                print(e)
                 self.logger.error(
                     "Stripe error processing invoice for org",
                     org_id=org_id,
@@ -349,7 +350,6 @@ class InvoiceService:
         org_id: str,
         current_period: datetime,
         previous_period: datetime,
-        previous_previous_period: datetime,
     ) -> Result[
         UUID, InvoiceAlreadyExistsError | ExistingPendingTransactionsError
     ]:
@@ -375,13 +375,14 @@ class InvoiceService:
                 session=session,
                 org_id=org_id,
                 project_ids=None,  # all projects
-                start_time=previous_previous_period,
-                end_time=previous_period,
+                start_time=previous_period,
+                end_time=current_period,
                 period=AggregatePeriod.MONTHLY,
                 period_scale=1,
             )
             lines: list[CreateBillingInvoiceLineItemInfo] = []
             for usage in total_usage:
+                print(usage)
                 lines.append(
                     {
                         "description": f"Usage in {usage['period_bucket'].date()}: {usage['group_by_name']}",
@@ -413,49 +414,48 @@ class InvoiceService:
                 await session.commit()
                 return Ok(res["invoice_uid"])
 
-            async with session.begin():
-                credit = await self.credit_repo.getCreditForOrgWithLock(
+            credit = await self.credit_repo.getCreditForOrgWithLock(
+                session=session,
+                org_id=org_id,
+                read=False,
+            )
+            credits_available = credit.amount if credit else Decimal(0)
+            used_credits = Decimal(0)
+            if credits_available > 0:
+                if credits_available >= total_amount:
+                    used_credits = total_amount
+                    leftover_credits = credits_available - total_amount
+                else:
+                    used_credits = credits_available
+                    leftover_credits = Decimal(0)
+                await self.credit_repo.setCreditForOrg(
                     session=session,
                     org_id=org_id,
-                    read=False,
+                    new_amount=leftover_credits,
                 )
-                credits_available = credit.amount if credit else Decimal(0)
-                used_credits = Decimal(0)
-                if credits_available > 0:
-                    if credits_available >= total_amount:
-                        used_credits = total_amount
-                        leftover_credits = credits_available - total_amount
-                    else:
-                        used_credits = credits_available
-                        leftover_credits = Decimal(0)
-                    await self.credit_repo.setCreditForOrg(
-                        session=session,
-                        org_id=org_id,
-                        new_amount=leftover_credits,
-                    )
-                    await self.credit_repo.createCreditTransaction(
-                        session=session,
-                        org_id=org_id,
-                        amount=-used_credits,
-                        description=f"Applied credits to invoice for period {current_period.date()}",
-                    )
+                await self.credit_repo.createCreditTransaction(
+                    session=session,
+                    org_id=org_id,
+                    amount=-used_credits,
+                    description=f"Applied credits to invoice for period {current_period.date()}",
+                )
 
-                res = await self.invoice_repo.createInvoice(
+            res = await self.invoice_repo.createInvoice(
+                session=session,
+                org_id=org_id,
+                billing_period=current_period.date(),
+                total_amount=total_amount,
+                details=details,
+                used_credits=used_credits,
+            )
+            if len(lines) > 0:
+                await self.invoice_repo.createInvoiceLineItems(
                     session=session,
-                    org_id=org_id,
-                    billing_period=current_period.date(),
-                    total_amount=total_amount,
-                    details=details,
-                    used_credits=used_credits,
+                    invoice_id=res["invoice_id"],
+                    lines=lines,
                 )
-                if len(lines) > 0:
-                    await self.invoice_repo.createInvoiceLineItems(
-                        session=session,
-                        invoice_id=res["invoice_id"],
-                        lines=lines,
-                    )
-                await session.commit()
-                return Ok(res["invoice_uid"])
+            await session.commit()
+            return Ok(res["invoice_uid"])
 
     async def createInvoiceInStripe(
         self,
@@ -468,101 +468,109 @@ class InvoiceService:
         | InvoiceAlreadyHasProviderInvoiceIDError,
     ]:
         async with self.session_manager.get_session() as session:
-            async with session.begin():
-                billing_source = await self.billing_source_repo.getWithLock(
-                    session=session,
-                    org_id=org_id,
-                    provider=BillingSourceProvider.STRIPE,
-                    read=True,
+            billing_source = await self.billing_source_repo.getWithLock(
+                session=session,
+                org_id=org_id,
+                provider=BillingSourceProvider.STRIPE,
+                read=True,
+            )
+            if not billing_source:
+                self.logger.error(
+                    "No billing source found for org", org_id=org_id
                 )
-                if not billing_source:
-                    self.logger.error(
-                        "No billing source found for org", org_id=org_id
-                    )
-                    return Err(InvoiceNotFoundError())
+                return Err(InvoiceNotFoundError())
 
-                inv = await self.invoice_repo.getInvoiceInfoByIdWithLock(
-                    session=session,
-                    invoice_id=invoice_id,
-                    read=False,
-                )
-                if not inv:
-                    return Err(InvoiceNotFoundError())
-                if inv["provider_invoice_id"]:
-                    # Invoice already created in Stripe
-                    return Err(InvoiceAlreadyHasProviderInvoiceIDError())
+            inv = await self.invoice_repo.getInvoiceInfoByIdWithLock(
+                session=session,
+                invoice_id=invoice_id,
+                read=False,
+            )
+            if not inv:
+                return Err(InvoiceNotFoundError())
+            if inv["provider_invoice_id"]:
+                # Invoice already created in Stripe
+                return Err(InvoiceAlreadyHasProviderInvoiceIDError())
 
-                line_items = await self.invoice_repo.getInvoiceLineItems(
-                    session=session,
-                    invoice_id=inv["invoice_id"],
-                )
-                customer_id = billing_source.provider_id
-                invoice_uid = inv["invoice_uid"]
+            line_items = await self.invoice_repo.getInvoiceLineItems(
+                session=session,
+                invoice_id=inv["invoice_id"],
+            )
+            customer_id = billing_source.provider_id
+            invoice_uid = inv["invoice_uid"]
 
-                invoice = await self.stripe_client.v1.invoices.create_async(
+            invoice = await self.stripe_client.v1.invoices.create_async(
+                {
+                    "customer": customer_id,
+                    "auto_advance": False,  # we will finalize it later after adding line items
+                    "collection_method": "charge_automatically",
+                    "description": f"Invoice for {inv['billing_period']}",
+                    "metadata": {
+                        "invoice_uid": str(invoice_uid),
+                        "org_id": org_id,
+                    },
+                },
+                {
+                    "idempotency_key": f"inv_{org_id}_{invoice_uid}",
+                },
+            )
+
+            for line in line_items:
+                await self.stripe_client.v1.invoice_items.create_async(
                     {
+                        "amount": int(
+                            line["amount"] * 100
+                        ),  # Stripe expects amount in cents
+                        "currency": "usd",
+                        "invoice": invoice.id,
                         "customer": customer_id,
-                        "auto_advance": True,
-                        "collection_method": "charge_automatically",
-                        "idempotency_key": f"inv_{org_id}_{invoice_uid}",
-                        "description": f"Invoice for {inv['billing_period']}",
+                        "description": line["description"],
+                        "metadata": {
+                            "invoice_uid": str(invoice_uid),
+                            "invoice_line_uuid": str(line["invoice_line_uuid"]),
+                            "org_id": org_id,
+                            "project_uid": str(line["project_uid"])
+                            if line["project_uid"]
+                            else "",
+                        },
+                    },
+                    {
+                        "idempotency_key": f"invoice_item_{org_id}_{invoice_uid}_{line['invoice_line_uuid']}",
+                    },
+                )
+
+            if inv["used_credits"] > 0:
+                await self.stripe_client.v1.invoice_items.create_async(
+                    {
+                        "amount": int(
+                            -inv["used_credits"] * 100
+                        ),  # negative amount for credit
+                        "currency": "usd",
+                        "invoice": invoice.id,
+                        "customer": customer_id,
+                        "description": f"Applied credits",
                         "metadata": {
                             "invoice_uid": str(invoice_uid),
                             "org_id": org_id,
                         },
-                    }
-                )
-                for line in line_items:
-                    await self.stripe_client.v1.invoice_items.create_async(
-                        {
-                            "amount": int(
-                                line["amount"] * 100
-                            ),  # Stripe expects amount in cents
-                            "currency": "usd",
-                            "invoice": invoice.id,
-                            "description": line["description"],
-                            "idempotency_key": f"invitem_{org_id}_{invoice_uid}_{line['invoice_line_uuid']}",
-                            "metadata": {
-                                "invoice_uid": str(invoice_uid),
-                                "invoice_line_uuid": str(
-                                    line["invoice_line_uuid"]
-                                ),
-                                "org_id": org_id,
-                                "project_uid": str(line["project_uid"])
-                                if line["project_uid"]
-                                else "",
-                            },
-                        }
-                    )
-
-                if inv["used_credits"] > 0:
-                    await self.stripe_client.v1.invoice_items.create_async(
-                        {
-                            "amount": int(
-                                -inv["used_credits"] * 100
-                            ),  # negative amount for credit
-                            "currency": "usd",
-                            "invoice": invoice.id,
-                            "description": f"Applied credits",
-                            "idempotency_key": f"invitem_{org_id}_{invoice_uid}_credits",
-                            "metadata": {
-                                "invoice_uid": str(invoice_uid),
-                                "org_id": org_id,
-                            },
-                        }
-                    )
-
-                await self.stripe_client.v1.invoices.finalize_invoice_async(
-                    invoice.id,
+                    },
                     {
-                        "idempotency_key": f"finalize_{org_id}_{invoice_uid}",
+                        "idempotency_key": f"invoice_item_{org_id}_{invoice_uid}_credits",
                     },
                 )
-                await self.invoice_repo.updateProviderInvoiceID(
-                    session=session,
-                    provider=BillingSourceProvider.STRIPE,
-                    invoice_id=inv["invoice_id"],
-                    provider_invoice_id=invoice.id,
-                )
-                await session.commit()
-                return Ok(invoice.id)
+
+            await self.stripe_client.v1.invoices.finalize_invoice_async(
+                invoice.id,
+                {"auto_advance": True},
+                {
+                    "idempotency_key": f"finalize_{org_id}_{invoice_uid}",
+                },
+            )
+
+            await self.invoice_repo.updateProviderInvoiceID(
+                session=session,
+                provider=BillingSourceProvider.STRIPE,
+                invoice_id=inv["invoice_id"],
+                provider_invoice_id=invoice.id,
+            )
+            await session.commit()
+            return Ok(invoice.id)

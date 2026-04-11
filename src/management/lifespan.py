@@ -58,6 +58,8 @@ async def shutdown(app: FastAPI):
             await org_deletion_task
         except Exception:
             pass
+        except asyncio.CancelledError:
+            pass
 
     if billing_process_task:
         billing_process_task.cancel()
@@ -65,10 +67,14 @@ async def shutdown(app: FastAPI):
             await billing_process_task
         except Exception:
             pass
+        except asyncio.CancelledError:
+            pass
 
     if invoice_process_task:
         invoice_process_task.cancel()
         try:
             await invoice_process_task
         except Exception:
+            pass
+        except asyncio.CancelledError:
             pass

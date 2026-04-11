@@ -78,8 +78,9 @@ async def pay_invoice(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[ManualPaymentResponse]:
+    res = await invoice_service.getInvoiceByIdPaymentLinkInProvider(
+        org_id=user_info["org_id"], invoice_uid=invoice_uid
+    )
     return ObjectResponse(
-        data=ManualPaymentResponse(
-            hosted_invoice_url="https://example.com/payment"
-        )
+        data=ManualPaymentResponse(hosted_invoice_url=res.unwrap())
     )
