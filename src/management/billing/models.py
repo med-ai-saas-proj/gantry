@@ -99,7 +99,7 @@ class BillingTransaction(
     )
 
     status: Mapped[TransactionStatus] = mapped_column(
-        Enum(TransactionStatus, schema="Billing"),
+        Enum(TransactionStatus),
         nullable=False,
         index=True,
         default=TransactionStatus.PENDING,

@@ -144,6 +144,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
                 BillingTransaction.details,
                 BillingTransaction.captured_at,
                 BillingTransaction.organization_id,
+                BillingTransaction.status,
                 Project.uuid.label("project_uid"),
                 func.count().over().label("total"),
             )
@@ -170,6 +171,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
                 "project_uid": row.project_uid,
                 "details": row.details,
                 "captured_at": row.captured_at,
+                "status": row.status,
             }
             for row in rows
         ], rows[0].total if rows else 0
@@ -189,6 +191,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
                 BillingTransaction.details,
                 BillingTransaction.captured_at,
                 BillingTransaction.organization_id,
+                BillingTransaction.status,
                 Project.uuid.label("project_uid"),
             )
             .select_from(BillingTransaction)
@@ -212,6 +215,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             "project_uid": row.project_uid,
             "details": row.details,
             "captured_at": row.captured_at,
+            "status": row.status,
         }
 
     async def getByApiKeys(

@@ -1,6 +1,7 @@
 """DTOs for the billing module."""
 
-from src.management.billing.models import (
+from .models import (
+    TransactionStatus,
     BillingSourceProvider,
 )
 
@@ -71,6 +72,7 @@ class TransactionInfoResponse(BaseModel):
     project_uid: UUID
     details: dict
     captured_at: datetime | None
+    status: TransactionStatus
 
 
 class InvoiceInfoResponse(BaseModel):

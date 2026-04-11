@@ -92,6 +92,9 @@ def upgrade() -> None:
     op.drop_column("Credits", "expired_date", schema="Billing")
     op.drop_column("Credits", "current_spent", schema="Billing")
     op.drop_column("Credits", "start_date", schema="Billing")
+    op.create_primary_key(
+        op.f("Credits_pkey"), "Credits", ["organization_id"], schema="Billing"
+    )
     # ### end Alembic commands ###
 
 

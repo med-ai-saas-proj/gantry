@@ -1,4 +1,4 @@
-from src.management.billing.models import BillingSourceProvider
+from .models import TransactionStatus, BillingSourceProvider
 
 import enum
 from uuid import UUID
@@ -37,6 +37,7 @@ class BillingTransactionInfo(TypedDict):
     project_uid: UUID
     details: dict
     captured_at: datetime | None
+    status: TransactionStatus
 
 
 class BillingInvoiceInfo(TypedDict):

@@ -823,6 +823,7 @@ class TransactionService:
                             details=trx["details"],
                             date=trx["date"],
                             captured_at=trx["captured_at"],
+                            status=trx["status"],
                         )
                         for trx in transactions
                     ],
@@ -850,6 +851,7 @@ class TransactionService:
                     details=trx["details"],
                     date=trx["date"],
                     captured_at=trx["captured_at"],
+                    status=trx["status"],
                 )
             )
 
