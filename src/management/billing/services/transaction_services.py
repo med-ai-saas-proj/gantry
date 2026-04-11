@@ -797,7 +797,7 @@ class TransactionService:
         end_date: datetime | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> Result[tuple[Sequence[TransactionInfoResponse], int], None]:
+    ) -> tuple[Sequence[TransactionInfoResponse], int]:
         """List transactions with optional filters (e.g. project_id, date range, etc.). Supports pagination."""
 
         async with self.session_manager.get_session() as session:
@@ -813,22 +813,20 @@ class TransactionService:
                 offset=offset,
                 limit=limit,
             )
-            return Ok(
-                (
-                    [
-                        TransactionInfoResponse(
-                            transaction_uid=trx["transaction_uid"],
-                            project_uid=trx["project_uid"],
-                            amount=trx["amount"],
-                            details=trx["details"],
-                            date=trx["date"],
-                            captured_at=trx["captured_at"],
-                            status=trx["status"],
-                        )
-                        for trx in transactions
-                    ],
-                    total,
-                )
+            return (
+                [
+                    TransactionInfoResponse(
+                        transaction_uid=trx["transaction_uid"],
+                        project_uid=trx["project_uid"],
+                        amount=trx["amount"],
+                        details=trx["details"],
+                        date=trx["date"],
+                        captured_at=trx["captured_at"],
+                        status=trx["status"],
+                    )
+                    for trx in transactions
+                ],
+                total,
             )
 
     async def getTransactionById(

@@ -65,3 +65,9 @@ class CreateBillingInvoiceLineItemInfo(TypedDict):
     description: str
     amount: Decimal
     project_id: int | None
+
+
+class CreditTransactionInfo(TypedDict):
+    amount: Decimal
+    description: str
+    created_at: datetime

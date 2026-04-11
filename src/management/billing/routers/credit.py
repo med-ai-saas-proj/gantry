@@ -1,10 +1,14 @@
 from src.management.auth.entities import UserInfo
 from src.management.auth.dependencies import getUserInfo
-from src.shared.custom_types.responses.response import ObjectResponse
+from src.shared.custom_types.responses.response import (
+    ObjectResponse,
+    PaginatedResponse,
+)
 
 from ..dtos import (
     AddCreditRequest,
     CreditInfoResponse,
+    CreditTransactionInfoResponse,
 )
 from .router import billing_router
 from ..factories import getCreditService
@@ -38,7 +42,7 @@ async def add_credits(
     "/credits",
     description="Get available credits for the organization",
 )
-async def list_credits(
+async def get_available_credits(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     credit_service: Annotated[CreditService, Depends(getCreditService)],
 ) -> ObjectResponse[CreditInfoResponse]:
@@ -47,4 +51,27 @@ async def list_credits(
     )
     return ObjectResponse[CreditInfoResponse](
         data=CreditInfoResponse(amount=credits)
+    )
+
+
+@billing_router.get(
+    "/credits/transactions",
+    description="List credit transactions (e.g. when credits were added from promotions, refunds, or used to offset an invoice).",
+)
+async def list_credit_transactions(
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    credit_service: Annotated[CreditService, Depends(getCreditService)],
+    offset: int = 0,
+    limit: int = 100,
+) -> PaginatedResponse[CreditTransactionInfoResponse]:
+    transactions, total = await credit_service.getCreditTransactions(
+        org_id=user_info["org_id"],
+        offset=offset,
+        limit=limit,
+    )
+    return PaginatedResponse(
+        data=transactions,
+        total=total,
+        limit=limit,
+        offset=offset,
     )

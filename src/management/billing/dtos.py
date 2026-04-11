@@ -139,3 +139,9 @@ class CreditInfoResponse(BaseModel):
 class AddCreditRequest(BaseModel):
     amount: ScaledAmount
     description: str | None = None
+
+
+class CreditTransactionInfoResponse(BaseModel):
+    amount: Decimal
+    description: str
+    created_at: datetime

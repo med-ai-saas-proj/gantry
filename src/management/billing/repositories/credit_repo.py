@@ -1,8 +1,10 @@
-from src.management.billing.models import Credit, CreditTransaction
+from ..type import CreditTransactionInfo
+from ..models import Credit, CreditTransaction
 
+from typing import Sequence
 from decimal import Decimal
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 
@@ -14,6 +16,39 @@ class CreditRepo:
         stmt = select(Credit).where(Credit.organization_id == org_id)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
+
+    async def getCreditTransactions(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> tuple[Sequence[CreditTransactionInfo], int]:
+        stmt = (
+            select(
+                CreditTransaction.amount,
+                CreditTransaction.description,
+                CreditTransaction.created_at,
+                func.count().over().label("total_count"),
+            )
+            .where(CreditTransaction.organization_id == org_id)
+            .order_by(CreditTransaction.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await session.execute(stmt)
+        rows = result.all()
+        return (
+            [
+                {
+                    "amount": row.amount,
+                    "description": row.description,
+                    "created_at": row.created_at,
+                }
+                for row in rows
+            ],
+            rows[0].total_count if rows else 0,
+        )
 
     async def getCreditForOrgWithLock(
         self, session: AsyncSession, org_id: str, read: bool = True

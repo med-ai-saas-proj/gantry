@@ -1,6 +1,6 @@
 from src.db.session import AsyncSessionManager
 
-from ..dtos import ScaledAmount
+from ..dtos import ScaledAmount, CreditTransactionInfoResponse
 from ..utils import _to_decimal
 from ..repositories.credit_repo import CreditRepo
 
@@ -44,3 +44,28 @@ class CreditService:
                 )
                 await session.commit()
                 return res.amount
+
+    async def getCreditTransactions(
+        self,
+        org_id: str,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> tuple[list[CreditTransactionInfoResponse], int]:
+        async with self.session_manager.get_session() as session:
+            (
+                transactions,
+                total,
+            ) = await self.credit_repository.getCreditTransactions(
+                session, org_id, offset, limit
+            )
+            return (
+                [
+                    CreditTransactionInfoResponse(
+                        amount=tx["amount"],
+                        description=tx["description"],
+                        created_at=tx["created_at"],
+                    )
+                    for tx in transactions
+                ],
+                total,
+            )
