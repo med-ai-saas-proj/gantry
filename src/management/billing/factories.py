@@ -69,6 +69,7 @@ def getBillingAggregateQueryService() -> BillingAggregateQueryService:
 @lru_cache(1)
 def getInvoiceService() -> InvoiceService:
     return InvoiceService(
+        logger=getLogger(),
         session_manager=getSessionManager(),
         invoice_repo=InvoiceRepo(),
         transaction_repo=TransactionRepository(),
