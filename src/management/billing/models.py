@@ -109,23 +109,23 @@ class BillingTransaction(
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
-class Credit(WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel):
+class Credit(WithCreateUpdateTimestamp, BillingBaseSQLModel):
     __tablename__ = "Credits"
+
+    organization_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, index=True, primary_key=True
+    )
+    amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
+
+
+class CreditTransaction(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
+    __tablename__ = "CreditTransactions"
 
     organization_id: Mapped[str] = mapped_column(
         String(128), nullable=False, index=True
     )
-
-    name: Mapped[str] = mapped_column(String(128), nullable=False)
-    note: Mapped[str] = mapped_column(String(512), nullable=True)
-
-    start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    expired_date: Mapped[date] = mapped_column(Date, nullable=False)
-
     amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
-    current_spent: Mapped[Decimal] = mapped_column(
-        AMOUNT_COLUMN_TYPE, nullable=False, default=Decimal("0")
-    )
+    description: Mapped[str] = mapped_column(String(256), nullable=False)
 
 
 class BillingSourceProvider(str, enum.Enum):

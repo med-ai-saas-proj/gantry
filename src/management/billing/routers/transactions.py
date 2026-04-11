@@ -1,6 +1,3 @@
-from src.management.billing.dtos import (
-    TransactionInfoResponse,
-)
 from src.management.auth.entities import UserInfo
 from src.management.api_keys.entities import ApiKeyInfo
 from src.management.auth.dependencies import getUserInfo
@@ -10,7 +7,7 @@ from src.shared.custom_types.responses.response import (
     PaginatedResponse,
 )
 
-from ..dtos import PostRequest, CaptureRequest
+from ..dtos import PostRequest, CaptureRequest, TransactionInfoResponse
 from .router import billing_router
 from ..factories import TransactionService, getBillingTransactionService
 

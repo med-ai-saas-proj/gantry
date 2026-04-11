@@ -1,32 +1,33 @@
 from src.db.session import AsyncSessionManager
-from src.management.billing.dtos import (
+from src.shared.custom_types.error_exception import (
+    RecoverableError,
+)
+
+from ..dtos import (
     InvoiceInfoResponse,
     InvoiceItemInfoResponse,
     InvoiceDetailInfoResponse,
 )
-from src.management.billing.type import (
+from ..type import (
     AggregatePeriod,
     CreateBillingInvoiceLineItemInfo,
 )
-from src.management.billing.utils import (
+from ..utils import (
     _get_billing_period,
     _get_previous_billing_period,
 )
-from src.management.billing.models import BillingSourceProvider
-from src.shared.custom_types.error_exception import (
-    RecoverableError,
-)
-from src.management.billing.repositories.transaction_repo import (
+from ..models import BillingSourceProvider
+from ..repositories.credit_repo import CreditRepo
+from ..repositories.invoice_repo import InvoiceRepo
+from ..repositories.transaction_repo import (
     TransactionRepository,
 )
-from src.management.billing.services.billing_source_service import (
+from ..services.billing_source_service import (
     BillingSourceAlreadyExistsError,
 )
-from src.management.billing.repositories.billing_source_repo import (
+from ..repositories.billing_source_repo import (
     BillingSourceRepo,
 )
-
-from ..repositories.invoice_repo import InvoiceRepo
 
 import uuid
 import asyncio
@@ -77,6 +78,7 @@ class InvoiceService:
         transaction_repo: TransactionRepository,
         billing_source_repo: BillingSourceRepo,
         stripe_client: StripeClient,
+        credit_repo: CreditRepo,
     ):
         self.logger = logger
         self.session_manager = session_manager
@@ -84,6 +86,7 @@ class InvoiceService:
         self.transaction_repo = transaction_repo
         self.billing_source_repo = billing_source_repo
         self.stripe_client = stripe_client
+        self.credit_repo = credit_repo
 
     async def list_invoices(
         self,
@@ -208,7 +211,6 @@ class InvoiceService:
                 )
                 res = await self.createInvoice(
                     org_id,
-                    now,
                     current_period,
                     previous_period,
                     previous_previous_period,
@@ -285,7 +287,6 @@ class InvoiceService:
     async def createInvoice(
         self,
         org_id: str,
-        now: datetime,
         current_period: datetime,
         previous_period: datetime,
         previous_previous_period: datetime,
@@ -330,12 +331,38 @@ class InvoiceService:
                 )
             total_amount = sum([line["amount"] for line in lines], Decimal(0))
             details = {
-                "generated_at": now.isoformat(),
                 "period_start": previous_period.isoformat(),
                 "period_end": current_period.isoformat(),
             }
             async with session.begin():
-                used_credits = Decimal("0")  # Placeholder for any credit logic
+                credit = await self.credit_repo.getCreditForOrgWithLock(
+                    session=session,
+                    org_id=org_id,
+                    read=False,
+                )
+                credits_available = credit.amount if credit else Decimal(0)
+                if credits_available > 0:
+                    if credits_available >= total_amount:
+                        used_credits = total_amount
+                        leftover_credits = credits_available - total_amount
+                    else:
+                        used_credits = credits_available
+                        leftover_credits = Decimal(0)
+                else:
+                    used_credits = Decimal(0)
+                    leftover_credits = Decimal(0)
+                if used_credits > 0:
+                    await self.credit_repo.updateCreditForOrg(
+                        session=session,
+                        org_id=org_id,
+                        new_amount=leftover_credits,
+                    )
+                    await self.credit_repo.createCreditTransaction(
+                        session=session,
+                        org_id=org_id,
+                        amount=-used_credits,
+                        description=f"Applied credits to invoice for period {current_period.date()}",
+                    )
                 res = await self.invoice_repo.createInvoice(
                     session=session,
                     org_id=org_id,
@@ -430,6 +457,24 @@ class InvoiceService:
                             },
                         }
                     )
+
+                if inv["used_credits"] > 0:
+                    await self.stripe_client.v1.invoice_items.create_async(
+                        {
+                            "amount": int(
+                                -inv["used_credits"] * 100
+                            ),  # negative amount for credit
+                            "currency": "usd",
+                            "invoice": invoice.id,
+                            "description": f"Applied credits",
+                            "idempotency_key": f"invitem_{org_id}_{invoice_uid}_credits",
+                            "metadata": {
+                                "invoice_uid": str(invoice_uid),
+                                "org_id": org_id,
+                            },
+                        }
+                    )
+
                 await self.stripe_client.v1.invoices.finalize_invoice_async(
                     invoice.id,
                     {

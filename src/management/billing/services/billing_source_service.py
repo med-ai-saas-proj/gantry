@@ -8,7 +8,6 @@ from src.shared.custom_types.error_exception import (
 )
 
 from ..dtos import (
-    BillingAddress,
     BillingSourceResponse,
     BillingAddressResponse,
     AddBillingSourceRequest,

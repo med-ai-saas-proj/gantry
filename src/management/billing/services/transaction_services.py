@@ -1,13 +1,6 @@
 from src.db.factories import AsyncSessionManager
 from src.shared.utils.redis import redis_get_or_load
 from src.shared.utils.uuid_utils import uuid7
-from src.management.billing.utils import (
-    _to_decimal,
-    _decimal_to_int,
-    _int_to_decimal,
-    _get_billing_period,
-    _get_next_billing_period,
-)
 from src.management.api_keys.services import ApiKeyService
 from src.shared.custom_types.error_exception import (
     RecoverableError,
@@ -20,6 +13,13 @@ from ..dtos import (
     TransactionInfoResponse,
 )
 from ..type import AggregatePeriod
+from ..utils import (
+    _to_decimal,
+    _decimal_to_int,
+    _int_to_decimal,
+    _get_billing_period,
+    _get_next_billing_period,
+)
 from ..models import SpendingLimitType, BillingTransaction
 from ..repositories.transaction_repo import (
     TransactionRepository,

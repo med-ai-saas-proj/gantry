@@ -8,6 +8,7 @@ from src.db.factories import (
 from .settings import getBillingSetting
 from ..api_keys.factories import getApiKeyService
 from ...shared.logging.logger import getLogger
+from .repositories.credit_repo import CreditRepo
 from .services.invoice_service import InvoiceService
 from .repositories.invoice_repo import InvoiceRepo
 from .repositories.transaction_repo import TransactionRepository
@@ -75,4 +76,5 @@ def getInvoiceService() -> InvoiceService:
         transaction_repo=TransactionRepository(),
         billing_source_repo=BillingSourceRepo(),
         stripe_client=getStripeClient(),
+        credit_repo=CreditRepo(),
     )
