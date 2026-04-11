@@ -30,15 +30,14 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
     def __init__(self):
         super().__init__(BillingInvoice, BillingInvoice.id)
 
-    async def getOrgsWithInvoicesToProcessInProvider(
+    async def getInvoicesToProcessInProvider(
         self, session: AsyncSession
-    ) -> Sequence[tuple[int, str, BillingSourceProvider, str]]:
+    ) -> Sequence[tuple[int, str, BillingSourceProvider]]:
         stmt = (
             select(
                 BillingInvoice.id,
                 BillingInvoice.organization_id,
                 BillingSource.source_type.label("provider"),
-                BillingSource.provider_id.label("billing_source_provider_id"),
             )
             .select_from(BillingInvoice)
             .join(
@@ -53,7 +52,6 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
                 row.id,
                 row.organization_id,
                 row.provider,
-                row.billing_source_provider_id,
             )
             for row in res.all()
         ]
@@ -64,7 +62,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
         billing_period: date,
         prev_billing_period: date,
         prev_prev_billing_period: date,
-    ) -> Sequence[tuple[str, BillingSourceProvider]]:
+    ) -> Sequence[str]:
         pending_tx_subq = (
             select(BillingTransaction.id).where(
                 BillingTransaction.created_at >= prev_prev_billing_period,
@@ -87,7 +85,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             )
         )
         res = await session.execute(stmt)
-        return [(row.organization_id, row.source_type) for row in res.all()]
+        return [row.organization_id for row in res.all()]
 
     async def listReadyInvoices(
         self,
