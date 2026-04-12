@@ -2,8 +2,8 @@
 
 from . import services
 
-from src.shared.utils.logger import LOGGER
-from src.db.postgres.initialize import CORE_DB_SESSION_SCOPE
+from gantry.shared.utils.logger import LOGGER
+from gantry.db.postgres.initialize import CORE_DB_SESSION_SCOPE
 
 
 EXAMPLE_SERVICE = services.ExampleService(CORE_DB_SESSION_SCOPE, LOGGER)

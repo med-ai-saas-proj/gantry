@@ -131,8 +131,10 @@ services:
   timescale_db:
     image: timescale/timescaledb:latest-pg17
     container_name: timescale-db
-    env_file:
-      - .env.postgres
+    environment:
+      - POSTGRES_DB=gantry
+      - POSTGRES_USER=gantry
+      - POSTGRES_PASSWORD=123456
     ports:
       - "5432:5432"
     volumes:
@@ -155,8 +157,10 @@ services:
   vector-db:
     image: pgvector/pgvector:pg18
     container_name: postgres-pgvector
-    env_file:
-      - .env.postgres
+    environment:
+      - POSTGRES_DB=gantry
+      - POSTGRES_USER=gantry
+      - POSTGRES_PASSWORD=123456
     ports:
       - "5433:5432"
     volumes:
@@ -183,8 +187,6 @@ services:
       - "6379:6379"
     restart: unless-stopped
     command: sh -c "redis-server --requirepass $$REDIS_PASSWORD"
-    env_file:
-      - .env.redis
     volumes:
       - redis_data:/data
     deploy:

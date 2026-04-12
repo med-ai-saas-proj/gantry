@@ -1,7 +1,7 @@
 """This file contain definition of ${app_name}'s routers."""
-from src.auth.depends.auth import get_current_user
-from src.auth.entities.auth_info import AuthInfo as User
-from src.shared.utils.logger import LOGGER
+from gantry.auth.depends.auth import get_current_user
+from gantry.auth.entities.auth_info import AuthInfo as User
+from gantry.shared.utils.logger import LOGGER
 
 from typing import Annotated
 

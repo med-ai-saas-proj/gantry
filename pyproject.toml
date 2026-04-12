@@ -1,5 +1,5 @@
 [project]
-name = "app"
+name = "gantry"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -42,20 +42,24 @@ dependencies = [
     "pyrusult",
 ]
 
-[tool.pyrefly]
-project-includes = ["src", "scripts", "alembic", "templates"]
-project-excludes = ["**/.[!/.]*", "**/tests", "**/__pycache__"]
-search-path = ["."]
+[project.scripts]
+gantry = "gantry.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.9.11,<0.10.0"]
+build-backend = "uv_build"
 
 [tool.uv.workspace]
 members = [
     "packages/pyrusult",
     "packages/examplenv",
+    ".",
 ]
 
 [tool.uv.sources]
 pyrusult = { workspace = true }
 examplenv = { workspace = true }
+gantry = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -69,4 +73,10 @@ dev = [
     "examplenv",
     "typer>=0.24.1",
     "scalar-fastapi>=1.8.1",
+    "gantry",
 ]
+
+[tool.pyrefly]
+project-includes = ["src", "scripts", "alembic", "templates"]
+project-excludes = ["**/.[!/.]*", "**/tests", "**/__pycache__"]
+search-path = ["."]
