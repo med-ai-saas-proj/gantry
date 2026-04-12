@@ -7,7 +7,6 @@ from src.management.billing.dtos import (
 )
 from src.management.billing.type import AggregatePeriod
 from src.shared.utils.uuid_utils import uuid7
-from src.management.billing.models import SpendingLimitType
 from src.management.api_keys.services import ApiKeyService
 from src.management.billing.cache_keys import (
     BILLING_ORG_USAGE_KEY,
@@ -26,15 +25,14 @@ from src.management.billing.cache_keys import (
     billing_org_spending_limit_key,
     billing_project_spending_limit_key,
 )
+from src.management.project.repositories import ProjectSettingsRepository
 from src.shared.custom_types.error_exception import (
     RecoverableError,
     InternalServiceError,
 )
+from src.management.organization.repositories import OrgSettingsRepository
 from src.management.billing.repositories.transaction_repo import (
     TransactionRepository,
-)
-from src.management.billing.repositories.spending_limit_repo import (
-    SpendingLimitRepository,
 )
 
 import json
@@ -228,14 +226,16 @@ class TransactionService:
         logger: BoundLogger,
         session_manager: AsyncSessionManager,
         redis: Redis,
-        spending_limit_repo: SpendingLimitRepository,
+        org_settings_repo: OrgSettingsRepository,
+        project_settings_repo: ProjectSettingsRepository,
         transaction_repo: TransactionRepository,
         apikey_service: ApiKeyService,
     ) -> None:
         self.logger = logger
         self.session_manager = session_manager
         self.redis = redis
-        self.spending_limit_repo = spending_limit_repo
+        self.org_settings_repo = org_settings_repo
+        self.project_settings_repo = project_settings_repo
         self.transaction_repo = transaction_repo
         self.apikey_service = apikey_service
 
@@ -313,18 +313,20 @@ class TransactionService:
         async def load_project_limits_from_db(
             session: AsyncSession,
         ) -> Decimal | None:
-            limit = await self.spending_limit_repo.getProjectLimits(
-                session, org_id, project_id, SpendingLimitType.MONTHLY
+            settings = await self.project_settings_repo.getOrCreate(
+                session, project_id
             )
-            return limit.limit if limit else None
+            if settings.spending_limit is None:
+                return None
+            return Decimal(settings.spending_limit)
 
         async def load_org_limits_from_db(
             session: AsyncSession,
         ) -> Decimal | None:
-            limit = await self.spending_limit_repo.getOrgLimits(
-                session, org_id, SpendingLimitType.MONTHLY
-            )
-            return limit.limit if limit else None
+            settings = await self.org_settings_repo.getOrCreate(session, org_id)
+            if settings.spending_limit is None:
+                return None
+            return Decimal(settings.spending_limit)
 
         async def load_org_usage_from_db(
             session: AsyncSession,

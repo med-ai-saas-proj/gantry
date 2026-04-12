@@ -133,6 +133,7 @@ async def update_project_settings(
     result = await project_service.updateProjectSettings(
         project_uuid=project_id,
         rate_limit=input_data.rate_limit,
+        spending_limit=input_data.spending_limit,
         extra=input_data.extra,
     )
     return result.unwrap()

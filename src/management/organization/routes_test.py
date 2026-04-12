@@ -24,7 +24,11 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
             requested_at="2026-03-17T00:00:00",
             cancel_before="2026-04-16T00:00:00",
         )
-        settings = SimpleNamespace(rate_limit=10, extra={"theme": "dark"})
+        settings = SimpleNamespace(
+            rate_limit=10,
+            spending_limit=5000,
+            extra={"theme": "dark"},
+        )
         service.getOrgInfo = AsyncMock(return_value=Ok(info))
         service.updateOrgInfo = AsyncMock(return_value=Ok(info))
         service.requestDeleteOrg = AsyncMock(return_value=Ok(delete_req))
@@ -62,7 +66,11 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
             await routes.update_settings(
                 user_info,
                 "org-1",
-                UpdateSettingsRequest(rate_limit=10, extra={"theme": "dark"}),
+                UpdateSettingsRequest(
+                    rate_limit=10,
+                    spending_limit=5000,
+                    extra={"theme": "dark"},
+                ),
                 service,
             ),
             settings,

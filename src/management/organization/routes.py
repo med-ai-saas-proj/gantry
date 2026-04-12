@@ -158,7 +158,10 @@ async def update_settings(
 ) -> OrgSettingsResponse:
     """Replace organization settings with the submitted payload."""
     result = await org_service.updateSettings(
-        org_id, input_data.rate_limit, input_data.extra
+        org_id,
+        input_data.rate_limit,
+        input_data.spending_limit,
+        input_data.extra,
     )
     return result.unwrap()
 

@@ -195,7 +195,11 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         service = self._make_service()
         service._ensureOrgExists = AsyncMock(return_value=Ok({"id": "org-1"}))
         service.settings_repo.getOrCreate = AsyncMock(
-            return_value=SimpleNamespace(rate_limit=100, extra={"a": 1})
+            return_value=SimpleNamespace(
+                rate_limit=100,
+                spending_limit=5000,
+                extra={"a": 1},
+            )
         )
 
         # Act
@@ -204,8 +208,14 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         # Assert
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().rate_limit, 100)
+        self.assertEqual(res.unwrap().spending_limit, 5000)
         self.assertEqual(res.unwrap().extra, {"a": 1})
         self.redis.set.assert_awaited()
+        self.redis.set.assert_any_await(
+            "billing:spending_limit:org-1",
+            5000,
+            ex=36000,
+        )
 
     async def test_process_due_deletions_deletes_org_and_cleans_records(self):
         """Deletion worker should delete due orgs and clean DB records."""
@@ -318,6 +328,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         service.settings_repo.upsert = AsyncMock(
             return_value=SimpleNamespace(
                 rate_limit=90,
+                spending_limit=7000,
                 extra={"a.b": 1, "x": 2},
             )
         )
@@ -326,14 +337,21 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         res = await service.updateSettings(
             org_id="org-1",
             rate_limit=90,
+            spending_limit=7000,
             extra={"a": {"b": 1}, "x": 2},
         )
 
         # Assert
         self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().spending_limit, 7000)
         self.assertEqual(res.unwrap().extra, {"a.b": 1, "x": 2})
         service.settings_repo.upsert.assert_awaited_once()
         self.redis.set.assert_awaited()
+        self.redis.set.assert_any_await(
+            "billing:spending_limit:org-1",
+            7000,
+            ex=36000,
+        )
 
     async def test_misc_org_error_propagation_paths(self):
         """Org service should propagate upstream collaborator errors on edge paths."""
@@ -395,7 +413,9 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         )
         delete_req_err = await service.requestDeleteOrg("org-1")
         get_settings_err = await service.getSettings("org-1")
-        update_settings_err = await service.updateSettings("org-1", 10, {})
+        update_settings_err = await service.updateSettings(
+            "org-1", 10, None, {}
+        )
         self.assertTrue(delete_req_err.status == ResultStatus.Err)
         self.assertTrue(get_settings_err.status == ResultStatus.Err)
         self.assertTrue(update_settings_err.status == ResultStatus.Err)

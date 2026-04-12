@@ -224,22 +224,13 @@ class ProjectSettingsRepository(Repository[ProjectSettings, int]):
         session: AsyncSession,
         project_id: int,
     ) -> ProjectSettings:
-        stmt = (
-            select(ProjectSettings)
-            .select_from(ProjectSettings)
-            .where(ProjectSettings.project_id == project_id)
-            .limit(1)
-        )
-        found = await self.selectOne(session, stmt)
-        if found is not None:
-            return found
-
-        insert_stmt = (
-            insert(ProjectSettings)
-            .values(project_id=project_id)
-            .returning(ProjectSettings)
-        )
-        res = await session.execute(insert_stmt)
+        """Return existing settings or insert a default row atomically."""
+        insert_stmt = pg_insert(ProjectSettings).values(project_id=project_id)
+        stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[ProjectSettings.project_id],
+            set_={"project_id": insert_stmt.excluded.project_id},
+        ).returning(ProjectSettings)
+        res = await session.execute(stmt)
         return res.scalar_one()
 
     async def upsert(
@@ -247,6 +238,7 @@ class ProjectSettingsRepository(Repository[ProjectSettings, int]):
         session: AsyncSession,
         project_id: int,
         rate_limit: int | None,
+        spending_limit: int | None,
         extra: dict,
     ) -> ProjectSettings:
         stmt = (
@@ -254,12 +246,14 @@ class ProjectSettingsRepository(Repository[ProjectSettings, int]):
             .values(
                 project_id=project_id,
                 rate_limit=rate_limit,
+                spending_limit=spending_limit,
                 extra=extra,
             )
             .on_conflict_do_update(
                 index_elements=[ProjectSettings.project_id],
                 set_={
                     "rate_limit": rate_limit,
+                    "spending_limit": spending_limit,
                     "extra": extra,
                     "updated_at": func.now(),
                 },

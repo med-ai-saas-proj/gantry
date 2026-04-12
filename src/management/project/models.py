@@ -77,6 +77,12 @@ class ProjectSettings(WithCreateUpdateTimestamp, ProjectBaseSQLModel):
         default=None,
         doc="Requests per minute. NULL inherits organization/default limit.",
     )
+    spending_limit: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+        default=None,
+        doc="Monthly spending limit as a scaled integer. NULL means unlimited.",
+    )
     extra: Mapped[dict] = mapped_column(
         JSON,
         nullable=False,

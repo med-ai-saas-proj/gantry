@@ -83,6 +83,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
                 "proj-1",
                 UpdateProjectSettingsRequest(
                     rate_limit=120,
+                    spending_limit=5000,
                     extra={"mode": "burst"},
                 ),
                 service,

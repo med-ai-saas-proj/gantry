@@ -33,6 +33,7 @@ CREATE INDEX IF NOT EXISTS "ProjectMembers_user_id_idx" ON "Project"."ProjectMem
 CREATE TABLE IF NOT EXISTS "Project"."Settings" (
     project_id BIGINT NOT NULL,
     rate_limit INTEGER,
+    spending_limit BIGINT,
     extra JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,

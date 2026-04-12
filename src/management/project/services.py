@@ -1,6 +1,10 @@
 """Business logic for project management."""
 
 from src.db.factories import AsyncSessionManager
+from src.management.billing.cache_keys import (
+    BILLING_CACHE_TTL_SECONDS,
+    billing_project_spending_limit_key,
+)
 from src.management.organization.cache_keys import (
     ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
     project_rpm_limit_key,
@@ -207,6 +211,29 @@ class ProjectService:
         except Exception as exc:
             self.logger.warning(
                 "project_rpm_limit_cache_write_failed",
+                org_id=org_id,
+                project_id=project_id,
+                error=str(exc),
+            )
+
+    async def _cacheProjectSpendingLimit(
+        self,
+        org_id: str,
+        project_id: int,
+        spending_limit: int | None,
+    ) -> None:
+        """Persist the project spending limit to the billing Redis key."""
+        if self.redis is None:
+            return
+        try:
+            await self.redis.set(
+                billing_project_spending_limit_key(org_id, project_id),
+                -1 if spending_limit is None else int(spending_limit),
+                ex=BILLING_CACHE_TTL_SECONDS,
+            )
+        except Exception as exc:
+            self.logger.warning(
+                "project_spending_limit_cache_write_failed",
                 org_id=org_id,
                 project_id=project_id,
                 error=str(exc),
@@ -600,11 +627,15 @@ class ProjectService:
             settings = await self.settings_repo.getOrCreate(session, project_id)
             output = ProjectSettingsResponse(
                 rate_limit=settings.rate_limit,
+                spending_limit=settings.spending_limit,
                 extra=settings.extra or {},
             )
             await session.commit()
             await self._cacheProjectRateLimit(
                 org_id, project_id, settings.rate_limit
+            )
+            await self._cacheProjectSpendingLimit(
+                org_id, project_id, settings.spending_limit
             )
             return Ok(output)
 
@@ -612,6 +643,7 @@ class ProjectService:
         self,
         project_uuid: str,
         rate_limit: int | None,
+        spending_limit: int | None,
         extra: dict[str, Any],
     ) -> Result[
         ProjectSettingsResponse,
@@ -634,15 +666,20 @@ class ProjectService:
                 session,
                 project_id,
                 rate_limit,
+                spending_limit,
                 flattened_extra,
             )
             output = ProjectSettingsResponse(
                 rate_limit=settings.rate_limit,
+                spending_limit=settings.spending_limit,
                 extra=settings.extra or {},
             )
             await session.commit()
             await self._cacheProjectRateLimit(
                 org_id, project_id, settings.rate_limit
+            )
+            await self._cacheProjectSpendingLimit(
+                org_id, project_id, settings.spending_limit
             )
             return Ok(output)
 

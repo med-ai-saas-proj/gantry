@@ -45,6 +45,13 @@ class ProjectSettingsResponse(BaseDTO):
             "Requests per minute. null means inherit organization/default."
         ),
     )
+    spending_limit: int | None = Field(
+        None,
+        ge=0,
+        description=(
+            "Monthly spending limit as a scaled integer. null means unlimited."
+        ),
+    )
     extra: dict = Field(
         default_factory=dict,
         description="Additional settings as a flat key-value map",
@@ -58,6 +65,11 @@ class UpdateProjectSettingsRequest(BaseDTO):
         None,
         ge=1,
         description="Requests per minute; null to inherit organization limit",
+    )
+    spending_limit: int | None = Field(
+        None,
+        ge=0,
+        description="Monthly spending limit as a scaled integer; null for unlimited",
     )
     extra: dict = Field(
         default_factory=dict,

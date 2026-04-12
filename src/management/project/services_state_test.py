@@ -67,13 +67,18 @@ class TestProjectServiceState(BaseProjectServiceTest):
             )
         )
         service.settings_repo.getOrCreate = AsyncMock(
-            return_value=SimpleNamespace(rate_limit=120, extra={"burst": True})
+            return_value=SimpleNamespace(
+                rate_limit=120,
+                spending_limit=6000,
+                extra={"burst": True},
+            )
         )
 
         res = await service.getProjectSettings("proj-1")
 
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().rate_limit, 120)
+        self.assertEqual(res.unwrap().spending_limit, 6000)
         self.assertEqual(res.unwrap().extra, {"burst": True})
         self.redis.set.assert_awaited()
 
@@ -93,6 +98,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         service.settings_repo.upsert = AsyncMock(
             return_value=SimpleNamespace(
                 rate_limit=90,
+                spending_limit=7000,
                 extra={"ui.theme": "dark"},
             )
         )
@@ -100,10 +106,12 @@ class TestProjectServiceState(BaseProjectServiceTest):
         res = await service.updateProjectSettings(
             "proj-1",
             90,
+            7000,
             {"ui": {"theme": "dark"}},
         )
 
         self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().spending_limit, 7000)
         self.assertEqual(res.unwrap().extra, {"ui.theme": "dark"})
         service.settings_repo.upsert.assert_awaited_once()
         self.redis.set.assert_awaited()
@@ -122,15 +130,25 @@ class TestProjectServiceState(BaseProjectServiceTest):
             )
         )
         service.settings_repo.getOrCreate = AsyncMock(
-            return_value=SimpleNamespace(rate_limit=None, extra={})
+            return_value=SimpleNamespace(
+                rate_limit=None,
+                spending_limit=None,
+                extra={},
+            )
         )
 
         res = await service.getProjectSettings("proj-1")
 
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertIsNone(res.unwrap().rate_limit)
-        self.redis.set.assert_awaited_once_with(
+        self.assertIsNone(res.unwrap().spending_limit)
+        self.redis.set.assert_any_await(
             "organization:rpm_limit:org-1:proj:10",
+            -1,
+            ex=36000,
+        )
+        self.redis.set.assert_any_await(
+            "billing:spending_limit:org-1:proj:10",
             -1,
             ex=36000,
         )
@@ -150,20 +168,29 @@ class TestProjectServiceState(BaseProjectServiceTest):
         )
         service.settings_repo.upsert = AsyncMock(
             return_value=SimpleNamespace(
-                rate_limit=None, extra={"burst": False}
+                rate_limit=None,
+                spending_limit=None,
+                extra={"burst": False},
             )
         )
 
         res = await service.updateProjectSettings(
             "proj-1",
             None,
+            None,
             {"burst": False},
         )
 
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertIsNone(res.unwrap().rate_limit)
-        self.redis.set.assert_awaited_once_with(
+        self.assertIsNone(res.unwrap().spending_limit)
+        self.redis.set.assert_any_await(
             "organization:rpm_limit:org-1:proj:10",
+            -1,
+            ex=36000,
+        )
+        self.redis.set.assert_any_await(
+            "billing:spending_limit:org-1:proj:10",
             -1,
             ex=36000,
         )

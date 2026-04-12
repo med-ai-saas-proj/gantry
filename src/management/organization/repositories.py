@@ -23,22 +23,12 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
     async def getOrCreate(
         self, session: AsyncSession, org_id: str
     ) -> OrgSettings:
-        """Return existing settings or create default ones."""
-        stmt = (
-            select(OrgSettings)
-            .select_from(OrgSettings)
-            .where(OrgSettings.org_id == org_id)
-            .limit(1)
-        )
-        res = await session.execute(stmt)
-        existing = res.scalar_one_or_none()
-        if existing is not None:
-            return existing
-        stmt = (
-            insert(OrgSettings)
-            .values(org_id=org_id, extra={})
-            .returning(OrgSettings)
-        )
+        """Return existing settings or insert a default row atomically."""
+        insert_stmt = pg_insert(OrgSettings).values(org_id=org_id, extra={})
+        stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[OrgSettings.org_id],
+            set_={"org_id": insert_stmt.excluded.org_id},
+        ).returning(OrgSettings)
         res = await session.execute(stmt)
         return res.scalar_one()
 
@@ -47,6 +37,7 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
         session: AsyncSession,
         org_id: str,
         rate_limit: int | None,
+        spending_limit: int | None,
         extra: dict,
     ) -> OrgSettings:
         """Create or update settings for an organization."""
@@ -55,12 +46,14 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
             .values(
                 org_id=org_id,
                 rate_limit=rate_limit,
+                spending_limit=spending_limit,
                 extra=extra,
             )
             .on_conflict_do_update(
                 index_elements=[OrgSettings.org_id],
                 set_={
                     "rate_limit": rate_limit,
+                    "spending_limit": spending_limit,
                     "extra": extra,
                     "updated_at": func.now(),
                 },
