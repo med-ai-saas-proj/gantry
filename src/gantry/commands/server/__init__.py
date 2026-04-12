@@ -30,23 +30,25 @@ class Server(AppSettings):
             CliApp.run_subcommand(self)
             return
 
+        from gantry.main.app import main_app, internal_app
+
         import asyncio
 
         import uvicorn
 
         main_server_config = uvicorn.Config(
-            "src.main.app:main_app",
+            main_app,
             host=self.host,
             port=self.port,
-            workers=self.workers,
+            # workers=self.workers,
             log_level=self.log_level.value.lower(),
         )
 
         internal_server_config = uvicorn.Config(
-            "src.main.app:internal_app",
+            internal_app,
             host=self.host,
             port=self.internal_port,
-            workers=self.internal_workers,
+            # workers=self.internal_workers,
             log_level=self.log_level.value.lower(),
         )
         main_server = uvicorn.Server(main_server_config)

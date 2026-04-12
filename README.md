@@ -14,11 +14,11 @@
 ### Running the dev server
 
 1. Check out [Getting API key](#getting-api-keys)
-1. Check out [Setup env file](#setup-env-file)
+1. Copy [`example.gantry.toml`](./example.gantry.toml) to `gantry.toml` then find all the `#apikey` and put yours in.
 1. Start DBs and other services: `docker compose -f compose.dev.yaml up`
-1. Install dependency, setup libraries: `scripts/setup-dev.sh`
-1. Migrate DB: `uv run --env-file=.env alembic upgrade head`
-1. Start Server: `./scripts/dev.sh`
+1. Install dependency: `uv sync --dev --frozen`
+1. Migrate DB: `uv run gantry server -f gantry.toml migrate`
+1. Start server: `uv run gantry server -f gantry.toml`
 
 ### Some useful scripts
 
@@ -36,10 +36,3 @@
 1. clc.fitus.edu.vn is not gonna work
 1. Go to <https://programmablesearchengine.google.com/about/> and create a new customized search engine, then grab **Search engine ID**, this is `GOOGLE_PROGRAMMABLE_SEARCH_CX` env variable
 1. Go to <https://developers.google.com/custom-search/v1/introduction> and get a free api key, this is `GOOGLE_PROGRAMMABLE_SEARCH_API_KEY` env variable
-
-### Setup env file
-
-You will need to find and fill in all the `example.env` files, edit then save them as their original name but remove the `example` part (`example.env` => `.env`).
-
-1. Run this command and it will tell you what file to fill in: `find . -type f -name 'example.env*'`
-1. Most variables that is not api keys will be there for you, no need to config it all.
