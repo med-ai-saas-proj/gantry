@@ -21,6 +21,7 @@ from fastapi import Body, Depends
 
 @billing_router.post(
     "/credits",
+    tags=["admin"],  # TODO: use admin auth dependency
     description="Add credits to an organization or project (e.g. from a promotion, refund, etc.).",
 )
 async def add_credits(

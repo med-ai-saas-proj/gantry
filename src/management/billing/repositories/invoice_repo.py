@@ -89,6 +89,69 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
         res = await session.execute(stmt)
         return [row.organization_id for row in res.all()]
 
+    async def markInvoiceAsPaid(
+        self,
+        session: AsyncSession,
+        provider: BillingSourceProvider,
+        provider_id: str,
+        paid_at: datetime,
+    ) -> BillingInvoice | None:
+        stmt = (
+            update(BillingInvoice)
+            .values(paid_at=paid_at)
+            .where(
+                (BillingInvoice.provider_invoice_id == provider_id)
+                & (BillingInvoice.provider == provider)
+            )
+            .returning(BillingInvoice)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
+    async def markInvoiceAsPaidManually(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        invoice_uid: UUID,
+        paid_at: datetime,
+    ) -> BillingInvoice | None:
+        stmt = (
+            update(BillingInvoice)
+            .values(paid_at=paid_at)
+            .where(
+                (BillingInvoice.uuid == invoice_uid)
+                & (BillingInvoice.organization_id == org_id)
+                & (
+                    BillingInvoice.paid_at.is_(None)
+                )  # only allow marking as paid if it was previously unpaid
+            )
+            .returning(BillingInvoice)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
+    async def markInvoiceAsRefundedManually(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        invoice_uid: UUID,
+        refunded_at: datetime,
+    ) -> BillingInvoice | None:
+        stmt = (
+            update(BillingInvoice)
+            .values(refunded_at=refunded_at)
+            .where(
+                (BillingInvoice.uuid == invoice_uid)
+                & (BillingInvoice.organization_id == org_id)
+                & (
+                    BillingInvoice.paid_at.is_not(None)
+                )  # only allow marking as refunded if it was previously marked as paid
+            )
+            .returning(BillingInvoice)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
     async def listReadyInvoices(
         self,
         session: AsyncSession,
@@ -286,6 +349,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             details=details,
             used_credits=used_credits,
             paid_at=None,
+            refunded_at=None,
         )
         session.add(new_inv)
         await session.flush()  # to get the ID of the new invoice

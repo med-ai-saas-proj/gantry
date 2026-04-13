@@ -18,7 +18,7 @@ from ..utils import (
     _get_billing_period,
     _get_previous_billing_period,
 )
-from ..models import BillingSourceProvider
+from ..models import BillingInvoice, BillingSourceProvider
 from ..repositories.credit_repo import CreditRepo
 from ..repositories.invoice_repo import InvoiceRepo
 from ..repositories.transaction_repo import (
@@ -36,11 +36,12 @@ import asyncio
 from uuid import UUID
 from typing import Sequence
 from decimal import Decimal
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from regex import F
 from stripe import Invoice, StripeError, StripeClient
 from pyrusult import Ok, Err, Result, ResultStatus
+from sqlalchemy import update
 from structlog.stdlib import BoundLogger
 
 
@@ -90,6 +91,52 @@ class InvoiceService:
         self.billing_source_repo = billing_source_repo
         self.stripe_client = stripe_client
         self.credit_repo = credit_repo
+
+    async def markInvoiceAsPaidManually(
+        self,
+        org_id: str,
+        invoice_uid: UUID,
+    ) -> Result[None, InvoiceNotFoundError]:
+        async with self.session_manager.get_session() as session:
+            res = await self.invoice_repo.markInvoiceAsPaidManually(
+                session=session,
+                org_id=org_id,
+                invoice_uid=invoice_uid,
+                paid_at=datetime.now(UTC).replace(tzinfo=None),
+            )
+            if not res:
+                return Err(InvoiceNotFoundError())
+            return Ok(None)
+
+    async def markInvoiceAsRefundedManually(
+        self,
+        org_id: str,
+        invoice_uid: UUID,
+    ) -> Result[None, InvoiceNotFoundError]:
+        async with self.session_manager.get_session() as session:
+            res = await self.invoice_repo.markInvoiceAsRefundedManually(
+                session=session,
+                org_id=org_id,
+                invoice_uid=invoice_uid,
+                refunded_at=datetime.now(UTC).replace(tzinfo=None),
+            )
+            if not res:
+                return Err(InvoiceNotFoundError())
+            return Ok(None)
+
+    async def markInvoiceAsPaid(
+        self,
+        provider: BillingSourceProvider,
+        provider_id: str,
+        paid_at: datetime,
+    ) -> Result[None, InvoiceNotFoundError]:
+        async with self.session_manager.get_session() as session:
+            inv = self.invoice_repo.markInvoiceAsPaid(
+                session, provider, provider_id, paid_at
+            )
+            if inv is None:
+                return Err(InvoiceNotFoundError())
+            return Ok(None)
 
     async def listInvoices(
         self,

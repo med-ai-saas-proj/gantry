@@ -84,3 +84,41 @@ async def pay_invoice(
     return ObjectResponse(
         data=ManualPaymentResponse(hosted_invoice_url=res.unwrap())
     )
+
+
+@billing_router.put(
+    "/invoices/{invoice_uid}/mark_paid",
+    tags=["admin"],
+    description="Manually mark an invoice as paid. This is useful for offline payments or when payment confirmation is received outside of the normal payment flow.",
+)
+async def mark_invoice_as_paid(
+    invoice_uid: UUID,
+    user_info: Annotated[
+        UserInfo, Depends(getUserInfo)
+    ],  # TODO: use admin auth dependency
+    invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
+):
+    (
+        await invoice_service.markInvoiceAsPaidManually(
+            org_id=user_info["org_id"], invoice_uid=invoice_uid
+        )
+    ).unwrap()
+
+
+@billing_router.post(
+    "/invoices/{invoice_uid}/refund",
+    tags=["admin"],
+    description="Manually mark an invoice as refunded. This is useful for issuing refunds outside of the normal flow, such as when a refund is processed directly through the payment gateway or for offline refunds.",
+)
+async def mark_invoice_as_refunded(
+    invoice_uid: UUID,
+    user_info: Annotated[
+        UserInfo, Depends(getUserInfo)
+    ],  # TODO: use admin auth dependency
+    invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
+):
+    (
+        await invoice_service.markInvoiceAsRefundedManually(
+            org_id=user_info["org_id"], invoice_uid=invoice_uid
+        )
+    ).unwrap()
