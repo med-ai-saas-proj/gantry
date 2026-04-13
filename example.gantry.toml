@@ -15,7 +15,7 @@ secret_length = 32
 
 [auth]
 server_url = "http://localhost:8080/"
-client_id = "gantry"
+client_id = "gantry-frontend"
 realm_name = "gantry"
 
 [billing]
@@ -39,9 +39,9 @@ s3_presigned_url_expiry_seconds = 3600
 redis_cache_expiry_seconds = 3600
 
 [organization]
-keycloak_service_client_id = "gantry-service-account"
-keycloak_service_client_secret = "your-service-client-secret"
-invite_client_id = "your-invite-client-id"
+keycloak_service_client_id = "gantry-backend"
+keycloak_service_client_secret = "sW4f7NOGqpcNmpstgfYbeBoUigJoA5EX"
+invite_client_id = "gantry-backend"
 invite_redirect_uri = "http://localhost:3000"
 deletion_cancel_window_days = 30
 deletion_worker_interval_seconds = 60
