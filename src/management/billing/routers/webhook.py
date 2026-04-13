@@ -9,7 +9,7 @@ from typing import Annotated, cast
 from datetime import UTC, datetime
 
 import stripe
-from fastapi import Request, HTTPException
+from fastapi import Depends, Request, HTTPException
 
 
 @billing_router.post(
@@ -19,9 +19,9 @@ from fastapi import Request, HTTPException
 )
 async def stripe_webhook(
     request: Request,
-    billing_setting: Annotated[BillingSetting, getBillingSetting],
-    invoice_service: Annotated[InvoiceService, getInvoiceService],
-):
+    billing_setting: Annotated[BillingSetting, Depends(getBillingSetting)],
+    invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
+) -> dict:
     webhook_secret = billing_setting.stripe_webhook_secret
 
     payload = await request.body()
