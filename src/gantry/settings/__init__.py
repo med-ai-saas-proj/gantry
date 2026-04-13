@@ -56,8 +56,6 @@ class AppSettings(BaseSettings):
     host: str = "127.0.0.1"
     port: int = 8000
     internal_port: int = 9000
-    workers: Annotated[int, Field(gt=0)] = 1
-    internal_workers: Annotated[int, Field(gt=0)] = 1
     log_level: LogLevel = LogLevel.WARNING
 
     db: DBSettings

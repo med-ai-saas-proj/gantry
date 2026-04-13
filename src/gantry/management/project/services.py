@@ -234,7 +234,7 @@ class ProjectService:
         """Replace one project's permission slice inside the shared attr list."""
         attrs_res = await self.kc.getUserAttributes(user_id)
         if attrs_res.status == ResultStatus.Err:
-            return attrs_res
+            return attrs_res.into()
 
         attrs = attrs_res.unwrap()
         raw = attrs.get(PROJECT_PERMISSIONS_ATTR, [])
@@ -353,7 +353,7 @@ class ProjectService:
                 actor_user_id, organization_id
             )
             if member_res.status == ResultStatus.Err:
-                return member_res
+                return member_res.into()
 
         async with self.session_manager.get_session() as session:
             projects = await self.project_repo.listByMember(
@@ -547,11 +547,11 @@ class ProjectService:
         """List project members by intersecting project and org membership."""
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
-            return project_res
+            return project_res.into()
         project_id, org_id, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
         if active_res.status == ResultStatus.Err:
-            return active_res
+            return active_res.into()
 
         async with self.session_manager.get_session() as session:
             members = await self.membership_repo.listMembers(
@@ -566,7 +566,7 @@ class ProjectService:
             search=q,
         )
         if users_res.status == ResultStatus.Err:
-            return users_res
+            return users_res.into()
         users = users_res.unwrap()
 
         results = []
@@ -743,17 +743,17 @@ class ProjectService:
 
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
-            return project_res
+            return project_res.into()
         project_id, _, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
         if active_res.status == ResultStatus.Err:
-            return active_res
+            return active_res.into()
 
         actor_perms_res = await self._getMemberPermissions(
             project_id, project_uuid, actor_user_id
         )
         if actor_perms_res.status == ResultStatus.Err:
-            return actor_perms_res
+            return actor_perms_res.into()
         actor_perms = actor_perms_res.unwrap()
 
         if (
@@ -773,7 +773,7 @@ class ProjectService:
                 target_user_id, project_uuid
             )
             if target_perms_res.status == ResultStatus.Err:
-                return target_perms_res
+                return target_perms_res.into()
             is_removing_owner = (
                 ProjectPermission.OWNER.value in target_perms_res.unwrap()
                 and ProjectPermission.OWNER.value not in permissions
@@ -783,7 +783,7 @@ class ProjectService:
                     project_id, project_uuid
                 )
                 if owner_count_res.status == ResultStatus.Err:
-                    return owner_count_res
+                    return owner_count_res.into()
                 if owner_count_res.unwrap() <= 1:
                     return Err(LastOwnerRemovalNotAllowedError())
 
@@ -793,7 +793,7 @@ class ProjectService:
                 permissions,
             )
             if set_res.status == ResultStatus.Err:
-                return set_res
+                return set_res.into()
             return Ok(ProjectUserPermissionsResponse(permissions=permissions))
 
     async def setProjectArchived(

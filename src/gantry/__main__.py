@@ -27,7 +27,7 @@ class Main(BaseSettings, cli_prog_name=APP_NAME):
         cli_avoid_json=True,
     )
     server: CliSubCommand[Server]
-    migrate: CliSubCommand[Migrate]
+    # migrate: CliSubCommand[Migrate]
     gen_config_schema: CliSubCommand[GenConfigSchema]
 
     async def cli_cmd(self):
