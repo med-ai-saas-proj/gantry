@@ -9,23 +9,6 @@ services:
       - "4317:4317" # OTLP gRPC receiver port
       - "4318:4318" # OTLP HTTP receiver port
       - "13133:13133" # Health check port
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost:13133/",
-        ]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-    depends_on:
-      - jaeger
-      - prometheus
-      - loki
     restart: unless-stopped
     deploy:
       resources:
@@ -81,38 +64,38 @@ services:
           cpus: "0.1"
           memory: 20M
 
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: jaeger
-    command:
-      - "--badger.span-store-ttl=168h" # Retention period for traces and spans
-    user: root # to fix permission issues with badger storage (/badger/data, /badger/key)
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-      - SPAN_STORAGE_TYPE=badger
-      - BADGER_EPHEMERAL=false
-      - BADGER_DIRECTORY_VALUE=/badger/data
-      - BADGER_DIRECTORY_KEY=/badger/key
-    volumes:
-      - jaeger_data:/badger
-    ports:
-      - "16686:16686" # Jaeger UI
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "0.1"
-          memory: 50M
-        reservations:
-          cpus: "0.1"
-          memory: 20M
+  # jaeger:
+  #   image: jaegertracing/all-in-one:latest
+  #   container_name: jaeger
+  #   command:
+  #     - "--badger.span-store-ttl=168h" # Retention period for traces and spans
+  #   user: root # to fix permission issues with badger storage (/badger/data, /badger/key)
+  #   environment:
+  #     COLLECTOR_OTLP_ENABLED: true
+  #     SPAN_STORAGE_TYPE: badger
+  #     BADGER_EPHEMERAL: false
+  #     BADGER_DIRECTORY_VALUE: /badger/data
+  #     BADGER_DIRECTORY_KEY: /badger/key
+  #   volumes:
+  #     - jaeger_data:/badger
+  #   ports:
+  #     - "16686:16686" # Jaeger UI
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: "0.1"
+  #         memory: 50M
+  #       reservations:
+  #         cpus: "0.1"
+  #         memory: 20M
 
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     environment:
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      GF_AUTH_ANONYMOUS_ENABLED: true
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
     volumes:
       - grafana_data:/var/lib/grafana
       - ./asset/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
@@ -123,25 +106,22 @@ services:
       resources:
         limits:
           cpus: "0.1"
-          memory: 500M
+          memory: 300M
         reservations:
           cpus: "0.1"
-          memory: 300M
+          memory: 200M
 
   timescale_db:
     image: timescale/timescaledb:latest-pg17
     container_name: timescale-db
-    env_file:
-      - .env.postgres
+    environment:
+      POSTGRES_DB: gantry
+      POSTGRES_USER: gantry
+      POSTGRES_PASSWORD: 123456
     ports:
       - "5432:5432"
     volumes:
       - timescale_data:/var/lib/postgresql
-    healthcheck:
-      test: sh -c "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
     deploy:
       resources:
@@ -150,22 +130,19 @@ services:
           memory: 200M
         reservations:
           cpus: "0.1"
-          memory: 20M
+          memory: 100M
 
   vector-db:
     image: pgvector/pgvector:pg18
     container_name: postgres-pgvector
-    env_file:
-      - .env.postgres
+    environment:
+      POSTGRES_DB: gantry
+      POSTGRES_USER: gantry
+      POSTGRES_PASSWORD: 123456
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql
-    healthcheck:
-      test: sh -c "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"
-      interval: 10s
-      timeout: 5s
-      retries: 5
     restart: unless-stopped
     deploy:
       resources:
@@ -174,7 +151,7 @@ services:
           memory: 200M
         reservations:
           cpus: "0.1"
-          memory: 20M
+          memory: 100M
 
   redis:
     image: redis:8-alpine
@@ -182,11 +159,26 @@ services:
     ports:
       - "6379:6379"
     restart: unless-stopped
-    command: sh -c "redis-server --requirepass $$REDIS_PASSWORD"
-    env_file:
-      - .env.redis
     volumes:
       - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
+
+  mailpit:
+    image: axllent/mailpit:v1.29
+    container_name: mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+    restart: unless-stopped
+    volumes:
+      - mailpit_data:/data
     deploy:
       resources:
         limits:
@@ -200,30 +192,30 @@ services:
     image: quay.io/keycloak/keycloak:26.5.3
     container_name: keycloak
     environment:
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=admin
-      - KC_FEATURES=organization,opentelemetry-metrics,opentelemetry-logs
-      - KC_TELEMETRY_ENDPOINT=http://otelcol:4317
-      - KC_TELEMETRY_RESOURCE_ATTRIBUTES=service.name=keycloak,deployment.environment=dev
-      - KC_TRACING_ENABLED=true
-      - KC_TELEMETRY_LOGS_ENABLED=true
-      - KC_METRICS_ENABLED=true
-      - KC_TELEMETRY_METRICS_ENABLED=true
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_FEATURES: organization,opentelemetry-metrics,opentelemetry-logs
+      KC_TELEMETRY_ENDPOINT: http://otelcol:4317
+      KC_TELEMETRY_RESOURCE_ATTRIBUTES: service.name=keycloak,deployment.environment=dev
+      KC_TRACING_ENABLED: "true"
+      KC_TELEMETRY_LOGS_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_TELEMETRY_METRICS_ENABLED: "true"
     ports:
       - "8080:8080"
     command: start-dev --import-realm --http-access-log-enabled=true
     restart: unless-stopped
     volumes:
       - keycloak_data:/opt/keycloak/data
-      - ./asset/dev-realm.json:/opt/keycloak/data/import/dev-realm.json:ro
+      - ./asset/gantry-realm.json:/opt/keycloak/data/import/gantry-realm.json:ro
       - ./asset/keycloak-themes:/opt/keycloak/themes
     deploy:
       resources:
         limits:
           cpus: "1"
-          memory: 1G
+          memory: 512M
         reservations:
-          cpus: "1"
+          cpus: "0.4"
           memory: 512M
 
 volumes:
@@ -235,3 +227,4 @@ volumes:
   loki_data:
   jaeger_data:
   grafana_data:
+  mailpit_data:

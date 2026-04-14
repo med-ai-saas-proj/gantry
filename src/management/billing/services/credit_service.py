@@ -1,10 +1,10 @@
-from src.db.session import AsyncSessionManager
-
 from ..dtos import ScaledAmount, CreditTransactionInfoResponse
 from ..utils import _to_decimal
 from ..repositories.credit_repo import CreditRepo
 
 from decimal import Decimal
+
+from src.db.session import AsyncSessionManager
 
 
 class CreditService:

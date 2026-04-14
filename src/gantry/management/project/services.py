@@ -1,0 +1,821 @@
+"""Business logic for project management."""
+
+from gantry.db.factories import AsyncSessionManager
+from gantry.management.organization.permissions import (
+    OrgPermission,
+    has_permission as has_org_permission,
+)
+from gantry.shared.custom_types.error_exception import RecoverableError
+from gantry.management.organization.keycloak_client import (
+    KeycloakOrgError,
+    OrgNotFoundError,
+    KeycloakOrgClient,
+    MemberNotFoundError,
+    UserNotInOrganizationError,
+)
+
+from .dtos import (
+    ProjectInfoResponse,
+    ProjectListResponse,
+    ProjectUserResponse,
+    ProjectArchiveResponse,
+    ProjectUserListResponse,
+    ProjectUserPermissionsResponse,
+)
+from .permissions import (
+    PROJECT_PERMISSIONS_ATTR,
+    ProjectPermission,
+    has_permission,
+    decode_project_permission,
+    encode_project_permission,
+)
+from .repositories import ProjectRepository, ProjectMemberRepository
+
+from typing import Any
+
+from pyrusult import Ok, Err, Result, ResultStatus
+from structlog.stdlib import BoundLogger
+
+
+class InvalidProjectPermissionError(RecoverableError):
+    status = 400
+    code = "invalid_project_permission"
+    title = "Invalid Project Permission"
+    detail = "One or more project permissions are invalid."
+
+
+class ProjectNotFoundError(RecoverableError):
+    status = 404
+    code = "project_not_found"
+    title = "Project Not Found"
+    detail = "The specified project does not exist."
+
+
+class UserNotInProjectError(RecoverableError):
+    status = 404
+    code = "user_not_in_project"
+    title = "User Not In Project"
+    detail = "The user is not a member of this project."
+
+
+class UserAlreadyInProjectError(RecoverableError):
+    status = 409
+    code = "user_already_in_project"
+    title = "User Already In Project"
+    detail = "The user is already a member of this project."
+
+
+class InsufficientProjectPermissionError(RecoverableError):
+    status = 403
+    code = "insufficient_project_permission"
+    title = "Insufficient Project Permission"
+    detail = "You do not have the required project permission."
+
+
+class ProjectArchivedError(RecoverableError):
+    status = 409
+    code = "project_archived"
+    title = "Project Archived"
+    detail = "This project is archived and can no longer be modified."
+
+
+class OwnerRequiredForGrantError(RecoverableError):
+    status = 403
+    code = "owner_required_for_permission_grant"
+    title = "Owner Required"
+    detail = (
+        "Only project owner can grant project.users.permissions.read_write."
+    )
+
+
+class LastOwnerRemovalNotAllowedError(RecoverableError):
+    status = 403
+    code = "last_owner_removal_not_allowed"
+    title = "Last Owner Removal Not Allowed"
+    detail = "A project must have at least one owner."
+
+
+class ProjectService:
+    """Coordinate project business rules across DB state and Keycloak attrs."""
+
+    def __init__(
+        self,
+        session_manager: AsyncSessionManager,
+        logger: BoundLogger,
+        project_repo: ProjectRepository,
+        membership_repo: ProjectMemberRepository,
+        kc_client: KeycloakOrgClient,
+    ):
+        self.session_manager = session_manager
+        self.logger = logger
+        self.project_repo = project_repo
+        self.membership_repo = membership_repo
+        self.kc = kc_client
+
+    async def _ensureUserInOrg(
+        self,
+        user_id: str,
+        org_id: str,
+    ) -> Result[
+        None,
+        MemberNotFoundError | KeycloakOrgError | UserNotInOrganizationError,
+    ]:
+        """Verify that the user belongs to the owning organization."""
+        orgs_res = await self.kc.getMemberOrganizations(user_id)
+        if orgs_res.status == ResultStatus.Err:
+            return orgs_res.into()
+        for org in orgs_res.unwrap():
+            if str(org.get("id", "")) == org_id:
+                return Ok(None)
+        return Err(UserNotInOrganizationError())
+
+    async def _getProjectOrErr(
+        self, project_uuid: str
+    ) -> Result[tuple[int, str, ProjectInfoResponse], ProjectNotFoundError]:
+        """Load a project row and map it into the public DTO shape."""
+        async with self.session_manager.get_session() as session:
+            project = await self.project_repo.getByUuid(session, project_uuid)
+            if project is None:
+                return Err(ProjectNotFoundError())
+            return Ok(
+                (
+                    project.id,
+                    project.organization_id,
+                    ProjectInfoResponse(
+                        id=str(project.uuid),
+                        name=project.name,
+                        description=project.description,
+                        organization_id=project.organization_id,
+                        archived=project.is_archived,
+                    ),
+                )
+            )
+
+    def _ensureProjectActive(
+        self,
+        project_info: ProjectInfoResponse,
+    ) -> Result[None, ProjectArchivedError]:
+        """Reject operations that are not allowed on archived projects."""
+        if project_info.archived:
+            return Err(ProjectArchivedError())
+        return Ok(None)
+
+    def _extractProjectPermissions(
+        self,
+        attrs: dict[str, Any],
+        project_uuid: str,
+    ) -> list[str]:
+        """Extract project-scoped permissions from flat Keycloak attr entries."""
+        raw = attrs.get(PROJECT_PERMISSIONS_ATTR, [])
+        if isinstance(raw, str):
+            raw = [raw]
+        if isinstance(raw, list):
+            extracted: list[str] = []
+            for entry in raw:
+                if not isinstance(entry, str):
+                    continue
+                decoded = decode_project_permission(entry)
+                if decoded is None:
+                    continue
+                entry_project_uuid, permission = decoded
+                if entry_project_uuid == project_uuid:
+                    extracted.append(permission)
+            return extracted
+        return []
+
+    def _extractOrgPermissions(self, attrs: dict[str, Any]) -> list[str]:
+        """Extract organization-scoped permissions from Keycloak attrs."""
+        raw = attrs.get("org_permissions", [])
+        if isinstance(raw, str):
+            raw = [raw]
+        if isinstance(raw, list):
+            return [
+                permission for permission in raw if isinstance(permission, str)
+            ]
+        return []
+
+    async def _getOrgPermissions(
+        self,
+        org_id: str,
+        user_id: str,
+    ) -> Result[
+        list[str],
+        MemberNotFoundError | KeycloakOrgError | UserNotInOrganizationError,
+    ]:
+        """Load organization permissions for a confirmed org member."""
+        in_org_res = await self._ensureUserInOrg(user_id, org_id)
+        if in_org_res.status == ResultStatus.Err:
+            return in_org_res.into()
+
+        attrs_res = await self.kc.getUserAttributes(user_id)
+        if attrs_res.status == ResultStatus.Err:
+            return attrs_res.into()
+        return Ok(self._extractOrgPermissions(attrs_res.unwrap()))
+
+    async def _getPermissionsFromAttrs(
+        self,
+        user_id: str,
+        project_uuid: str,
+    ) -> Result[list[str], MemberNotFoundError | KeycloakOrgError]:
+        """Load project permissions for one user directly from Keycloak attrs."""
+        attrs_res = await self.kc.getUserAttributes(user_id)
+        return attrs_res.map(
+            lambda unwrapped: self._extractProjectPermissions(
+                unwrapped, project_uuid
+            )
+        )
+
+    async def _setProjectPermissions(
+        self,
+        user_id: str,
+        project_uuid: str,
+        permissions: list[str],
+    ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
+        """Replace one project's permission slice inside the shared attr list."""
+        attrs_res = await self.kc.getUserAttributes(user_id)
+        if attrs_res.status == ResultStatus.Err:
+            return attrs_res.into()
+
+        attrs = attrs_res.unwrap()
+        raw = attrs.get(PROJECT_PERMISSIONS_ATTR, [])
+        if isinstance(raw, str):
+            raw = [raw]
+        elif not isinstance(raw, list):
+            raw = []
+
+        filtered_entries = []
+        for entry in raw:
+            if not isinstance(entry, str):
+                continue
+            decoded = decode_project_permission(entry)
+            if decoded is None:
+                continue
+            entry_project_uuid, _ = decoded
+            if entry_project_uuid != project_uuid:
+                filtered_entries.append(entry)
+
+        updated_entries = filtered_entries + [
+            encode_project_permission(project_uuid, permission)
+            for permission in permissions
+        ]
+
+        return await self.kc.setUserAttribute(
+            user_id,
+            PROJECT_PERMISSIONS_ATTR,
+            updated_entries,
+        )
+
+    async def _getMemberPermissions(
+        self,
+        project_id: int,
+        project_uuid: str,
+        user_id: str,
+    ) -> Result[
+        list[str],
+        UserNotInProjectError | MemberNotFoundError | KeycloakOrgError,
+    ]:
+        """Return project permissions for a confirmed project member."""
+        async with self.session_manager.get_session() as session:
+            member = await self.membership_repo.getMembership(
+                session, project_id, user_id
+            )
+            if member is None:
+                return Err(UserNotInProjectError())
+        return await self._getPermissionsFromAttrs(user_id, project_uuid)
+
+    async def _countProjectOwners(
+        self,
+        project_id: int,
+        project_uuid: str,
+    ) -> Result[int, MemberNotFoundError | KeycloakOrgError]:
+        """Count current owners by reading project-scoped attrs of all members."""
+        async with self.session_manager.get_session() as session:
+            members = await self.membership_repo.listMembers(
+                session, project_id
+            )
+            member_user_ids = [member.user_id for member in members]
+
+        owner_count = 0
+        for member_user_id in member_user_ids:
+            perms_res = await self._getPermissionsFromAttrs(
+                member_user_id, project_uuid
+            )
+            if perms_res.status == ResultStatus.Err:
+                return perms_res
+            if ProjectPermission.OWNER.value in perms_res.unwrap():
+                owner_count += 1
+        return Ok(owner_count)
+
+    async def authorizeProjectPermission(
+        self,
+        project_uuid: str,
+        user_id: str,
+        required: ProjectPermission,
+        allow_archived: bool = False,
+    ) -> Result[
+        None,
+        ProjectNotFoundError
+        | ProjectArchivedError
+        | UserNotInProjectError
+        | MemberNotFoundError
+        | KeycloakOrgError
+        | InsufficientProjectPermissionError,
+    ]:
+        """Authorize one project permission for the given user and project."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res
+        project_id, _, project_info = project_res.unwrap()
+        if not allow_archived:
+            active_res = self._ensureProjectActive(project_info)
+            if active_res.status == ResultStatus.Err:
+                return active_res
+        perms_res = await self._getMemberPermissions(
+            project_id, project_uuid, user_id
+        )
+        if perms_res.status == ResultStatus.Err:
+            return perms_res
+        if not has_permission(perms_res.unwrap(), required):
+            return Err(InsufficientProjectPermissionError())
+        return Ok(None)
+
+    async def listUserProjects(
+        self,
+        actor_user_id: str,
+        organization_id: str | None = None,
+    ) -> Result[
+        ProjectListResponse,
+        MemberNotFoundError | KeycloakOrgError | UserNotInOrganizationError,
+    ]:
+        """List projects joined by the actor, optionally within one org."""
+        if organization_id:
+            member_res = await self._ensureUserInOrg(
+                actor_user_id, organization_id
+            )
+            if member_res.status == ResultStatus.Err:
+                return member_res.into()
+
+        async with self.session_manager.get_session() as session:
+            projects = await self.project_repo.listByMember(
+                session, actor_user_id, organization_id=organization_id
+            )
+            return Ok(
+                ProjectListResponse(
+                    total=len(projects),
+                    results=[
+                        ProjectInfoResponse(
+                            id=str(p.uuid),
+                            name=p.name,
+                            description=p.description,
+                            organization_id=p.organization_id,
+                            archived=p.is_archived,
+                        )
+                        for p in projects
+                    ],
+                )
+            )
+
+    async def _hasOrgWideProjectPermission(
+        self,
+        actor_user_id: str,
+        organization_id: str,
+        required: ProjectPermission,
+    ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
+        """Check org-wide project permissions across all joined projects in an org."""
+        async with self.session_manager.get_session() as session:
+            projects = await self.project_repo.listByMember(
+                session, actor_user_id, organization_id=organization_id
+            )
+            project_uuids = [str(project.uuid) for project in projects]
+
+        for project_uuid in project_uuids:
+            perms_res = await self._getPermissionsFromAttrs(
+                actor_user_id,
+                project_uuid,
+            )
+            if perms_res.status == ResultStatus.Err:
+                return perms_res
+            if has_permission(perms_res.unwrap(), required):
+                return Ok(True)
+        return Ok(False)
+
+    async def listOrgProjects(
+        self,
+        actor_user_id: str,
+        organization_id: str,
+    ) -> Result[
+        ProjectListResponse,
+        MemberNotFoundError
+        | KeycloakOrgError
+        | InsufficientProjectPermissionError,
+    ]:
+        """List every project in an org when actor has org-wide project access."""
+        authz_res = await self._hasOrgWideProjectPermission(
+            actor_user_id, organization_id, ProjectPermission.PROJECTS_GET_ALL
+        )
+        if authz_res.status == ResultStatus.Err:
+            return authz_res
+        if not authz_res.unwrap():
+            return Err(InsufficientProjectPermissionError())
+
+        async with self.session_manager.get_session() as session:
+            projects = await self.project_repo.listByOrg(
+                session, organization_id
+            )
+            return Ok(
+                ProjectListResponse(
+                    total=len(projects),
+                    results=[
+                        ProjectInfoResponse(
+                            id=str(p.uuid),
+                            name=p.name,
+                            description=p.description,
+                            organization_id=p.organization_id,
+                            archived=p.is_archived,
+                        )
+                        for p in projects
+                    ],
+                )
+            )
+
+    async def createProject(
+        self,
+        actor_user_id: str,
+        organization_id: str,
+        name: str,
+        description: str | None,
+    ) -> Result[
+        ProjectInfoResponse,
+        MemberNotFoundError
+        | KeycloakOrgError
+        | UserNotInOrganizationError
+        | InsufficientProjectPermissionError,
+    ]:
+        """Create a project and seed the creator as project owner."""
+        org_perms_res = await self._getOrgPermissions(
+            organization_id, actor_user_id
+        )
+        if org_perms_res.status == ResultStatus.Err:
+            return org_perms_res
+        if not has_org_permission(
+            org_perms_res.unwrap(),
+            OrgPermission.PROJECTS_CREATE,
+        ):
+            return Err(InsufficientProjectPermissionError())
+
+        async with self.session_manager.get_session() as session:
+            project = await self.project_repo.create(
+                session=session,
+                name=name,
+                description=description,
+                organization_id=organization_id,
+            )
+            await self.membership_repo.upsertMembership(
+                session=session,
+                project_id=project.id,
+                user_id=actor_user_id,
+            )
+            set_res = await self._setProjectPermissions(
+                actor_user_id,
+                str(project.uuid),
+                [ProjectPermission.OWNER.value],
+            )
+            if set_res.status == ResultStatus.Err:
+                return set_res
+            output = ProjectInfoResponse(
+                id=str(project.uuid),
+                name=project.name,
+                description=project.description,
+                organization_id=project.organization_id,
+                archived=project.is_archived,
+            )
+            await session.commit()
+            return Ok(output)
+
+    async def updateProject(
+        self,
+        project_uuid: str,
+        name: str,
+        description: str | None,
+    ) -> Result[
+        ProjectInfoResponse,
+        ProjectNotFoundError | ProjectArchivedError,
+    ]:
+        """Update mutable project metadata for one active project."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res
+        project_id, _, project_info = project_res.unwrap()
+
+        active_res = self._ensureProjectActive(project_info)
+        if active_res.status == ResultStatus.Err:
+            return active_res
+
+        async with self.session_manager.get_session() as session:
+            updated = await self.project_repo.updateById(
+                session,
+                project_id,
+                name=name,
+                description=description,
+            )
+            if updated is None:
+                return Err(ProjectNotFoundError())
+            await session.commit()
+            return Ok(
+                ProjectInfoResponse(
+                    id=str(updated.uuid),
+                    name=updated.name,
+                    description=updated.description,
+                    organization_id=updated.organization_id,
+                    archived=updated.is_archived,
+                )
+            )
+
+    async def listProjectUsers(
+        self,
+        project_uuid: str,
+        offset: int = 0,
+        limit: int = 20,
+        q: str | None = None,
+    ) -> Result[
+        ProjectUserListResponse,
+        ProjectNotFoundError
+        | ProjectArchivedError
+        | OrgNotFoundError
+        | KeycloakOrgError,
+    ]:
+        """List project members by intersecting project and org membership."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res.into()
+        project_id, org_id, project_info = project_res.unwrap()
+        active_res = self._ensureProjectActive(project_info)
+        if active_res.status == ResultStatus.Err:
+            return active_res.into()
+
+        async with self.session_manager.get_session() as session:
+            members = await self.membership_repo.listMembers(
+                session, project_id
+            )
+            user_ids = {m.user_id for m in members}
+
+        users_res = await self.kc.getOrgMembers(
+            org_id,
+            first=0,
+            max_results=1000,
+            search=q,
+        )
+        if users_res.status == ResultStatus.Err:
+            return users_res.into()
+        users = users_res.unwrap()
+
+        results = []
+        for user in users:
+            user_id = str(user.get("id", ""))
+            if user_id in user_ids:
+                results.append(
+                    ProjectUserResponse(
+                        id=user_id,
+                        username=user.get("username"),
+                        email=user.get("email"),
+                    )
+                )
+        total = len(results)
+        paged = results[offset : offset + limit]
+        return Ok(ProjectUserListResponse(total=total, results=paged))
+
+    async def addUserToProject(
+        self,
+        project_uuid: str,
+        target_user_id: str,
+    ) -> Result[
+        bool,
+        ProjectNotFoundError
+        | ProjectArchivedError
+        | MemberNotFoundError
+        | KeycloakOrgError
+        | UserNotInOrganizationError
+        | UserAlreadyInProjectError,
+    ]:
+        """Add an organization member to the project with empty project perms."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res
+        project_id, org_id, project_info = project_res.unwrap()
+        active_res = self._ensureProjectActive(project_info)
+        if active_res.status == ResultStatus.Err:
+            return active_res
+
+        in_org_res = await self._ensureUserInOrg(target_user_id, org_id)
+        if in_org_res.status == ResultStatus.Err:
+            return in_org_res
+
+        async with self.session_manager.get_session() as session:
+            existing = await self.membership_repo.getMembership(
+                session, project_id, target_user_id
+            )
+            if existing is not None:
+                return Err(UserAlreadyInProjectError())
+            await self.membership_repo.upsertMembership(
+                session=session,
+                project_id=project_id,
+                user_id=target_user_id,
+            )
+            set_res = await self._setProjectPermissions(
+                target_user_id,
+                project_uuid,
+                [],
+            )
+            if set_res.status == ResultStatus.Err:
+                return set_res
+            await session.commit()
+            return Ok(True)
+
+    async def removeUserFromProject(
+        self,
+        project_uuid: str,
+        target_user_id: str,
+    ) -> Result[
+        bool,
+        ProjectNotFoundError
+        | ProjectArchivedError
+        | UserNotInProjectError
+        | MemberNotFoundError
+        | KeycloakOrgError
+        | LastOwnerRemovalNotAllowedError,
+    ]:
+        """Remove a project member while preserving the last-owner invariant."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res
+        project_id, _, project_info = project_res.unwrap()
+        active_res = self._ensureProjectActive(project_info)
+        if active_res.status == ResultStatus.Err:
+            return active_res
+
+        async with self.session_manager.get_session() as session:
+            membership = await self.membership_repo.getMembership(
+                session, project_id, target_user_id
+            )
+            if membership is None:
+                return Err(UserNotInProjectError())
+
+            perms_res = await self._getPermissionsFromAttrs(
+                target_user_id, project_uuid
+            )
+            if perms_res.status == ResultStatus.Err:
+                return perms_res
+            if ProjectPermission.OWNER.value in perms_res.unwrap():
+                owner_count_res = await self._countProjectOwners(
+                    project_id, project_uuid
+                )
+                if owner_count_res.status == ResultStatus.Err:
+                    return owner_count_res
+                if owner_count_res.unwrap() <= 1:
+                    return Err(LastOwnerRemovalNotAllowedError())
+
+            await self.membership_repo.deleteMembership(
+                session, project_id, target_user_id
+            )
+            clear_res = await self._setProjectPermissions(
+                target_user_id,
+                project_uuid,
+                [],
+            )
+            if clear_res.status == ResultStatus.Err:
+                return clear_res
+            await session.commit()
+            return Ok(True)
+
+    async def getUserPermissions(
+        self,
+        project_uuid: str,
+        target_user_id: str,
+    ) -> Result[
+        ProjectUserPermissionsResponse,
+        ProjectNotFoundError
+        | ProjectArchivedError
+        | UserNotInProjectError
+        | MemberNotFoundError
+        | KeycloakOrgError,
+    ]:
+        """Return project-scoped permissions for one project member."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res
+        project_id, _, project_info = project_res.unwrap()
+        active_res = self._ensureProjectActive(project_info)
+        if active_res.status == ResultStatus.Err:
+            return active_res
+
+        perms_res = await self._getMemberPermissions(
+            project_id, project_uuid, target_user_id
+        )
+        if perms_res.status == ResultStatus.Err:
+            return perms_res
+
+        return Ok(
+            ProjectUserPermissionsResponse(permissions=perms_res.unwrap())
+        )
+
+    async def updateUserPermissions(
+        self,
+        project_uuid: str,
+        actor_user_id: str,
+        target_user_id: str,
+        permissions: list[str],
+    ) -> Result[
+        ProjectUserPermissionsResponse,
+        InvalidProjectPermissionError
+        | ProjectNotFoundError
+        | ProjectArchivedError
+        | UserNotInProjectError
+        | MemberNotFoundError
+        | KeycloakOrgError
+        | OwnerRequiredForGrantError
+        | LastOwnerRemovalNotAllowedError,
+    ]:
+        """Replace one member's project permissions with owner safety checks."""
+        valid = {p.value for p in ProjectPermission}
+        invalid = set(permissions) - valid
+        if invalid:
+            return Err(InvalidProjectPermissionError())
+
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res.into()
+        project_id, _, project_info = project_res.unwrap()
+        active_res = self._ensureProjectActive(project_info)
+        if active_res.status == ResultStatus.Err:
+            return active_res.into()
+
+        actor_perms_res = await self._getMemberPermissions(
+            project_id, project_uuid, actor_user_id
+        )
+        if actor_perms_res.status == ResultStatus.Err:
+            return actor_perms_res.into()
+        actor_perms = actor_perms_res.unwrap()
+
+        if (
+            ProjectPermission.USERS_PERMISSIONS_RW.value in permissions
+            and not has_permission(actor_perms, ProjectPermission.OWNER)
+        ):
+            return Err(OwnerRequiredForGrantError())
+
+        async with self.session_manager.get_session() as session:
+            target = await self.membership_repo.getMembership(
+                session, project_id, target_user_id
+            )
+            if target is None:
+                return Err(UserNotInProjectError())
+
+            target_perms_res = await self._getPermissionsFromAttrs(
+                target_user_id, project_uuid
+            )
+            if target_perms_res.status == ResultStatus.Err:
+                return target_perms_res.into()
+            is_removing_owner = (
+                ProjectPermission.OWNER.value in target_perms_res.unwrap()
+                and ProjectPermission.OWNER.value not in permissions
+            )
+            if is_removing_owner:
+                owner_count_res = await self._countProjectOwners(
+                    project_id, project_uuid
+                )
+                if owner_count_res.status == ResultStatus.Err:
+                    return owner_count_res.into()
+                if owner_count_res.unwrap() <= 1:
+                    return Err(LastOwnerRemovalNotAllowedError())
+
+            set_res = await self._setProjectPermissions(
+                target_user_id,
+                project_uuid,
+                permissions,
+            )
+            if set_res.status == ResultStatus.Err:
+                return set_res.into()
+            return Ok(ProjectUserPermissionsResponse(permissions=permissions))
+
+    async def setProjectArchived(
+        self,
+        project_uuid: str,
+        archived: bool,
+    ) -> Result[
+        ProjectArchiveResponse, ProjectNotFoundError | ProjectArchivedError
+    ]:
+        """Archive or unarchive a project after validating current state."""
+        async with self.session_manager.get_session() as session:
+            project = await self.project_repo.getByUuid(session, project_uuid)
+            if project is None:
+                return Err(ProjectNotFoundError())
+            # Archived project is immutable except owner-triggered unarchive.
+            if project.is_archived and archived:
+                return Err(ProjectArchivedError())
+            project.is_archived = archived
+            await session.flush()
+            output = ProjectArchiveResponse(
+                project_id=str(project.uuid),
+                archived=project.is_archived,
+            )
+            await session.commit()
+            return Ok(output)

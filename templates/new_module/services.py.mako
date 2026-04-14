@@ -6,7 +6,7 @@ from typing import Callable
 from contextlib import _GeneratorContextManager
 
 from structlog.stdlib import BoundLogger
-from src.db.postgres.service import PostgresService
+from gantry.db.postgres.service import PostgresService
 
 
 class ExampleServices:
