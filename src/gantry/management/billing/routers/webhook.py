@@ -1,15 +1,14 @@
-from src.management.billing.settings import BillingSetting, getBillingSetting
-
 from .router import billing_router
+from ..models import BillingSourceProvider
+from ..settings import BillingSettings, getBillingSetting
+from ..factories import getInvoiceService
+from ..services.invoice_service import InvoiceService
 
 from typing import Annotated, cast
 from datetime import UTC, datetime
 
 import stripe
 from fastapi import Depends, Request, HTTPException
-from src.management.billing.models import BillingSourceProvider
-from src.management.billing.factories import getInvoiceService
-from src.management.billing.services.invoice_service import InvoiceService
 
 
 @billing_router.post(
@@ -19,7 +18,7 @@ from src.management.billing.services.invoice_service import InvoiceService
 )
 async def stripe_webhook(
     request: Request,
-    billing_setting: Annotated[BillingSetting, Depends(getBillingSetting)],
+    billing_setting: Annotated[BillingSettings, Depends(getBillingSetting)],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> dict:
     webhook_secret = billing_setting.stripe_webhook_secret

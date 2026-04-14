@@ -1,6 +1,9 @@
 from gantry.management.auth.entities import UserInfo
 from gantry.management.auth.dependencies import getUserInfo
-from gantry.shared.custom_types.responses.response import PaginatedResponse
+from gantry.shared.custom_types.responses.response import (
+    ObjectResponse,
+    PaginatedResponse,
+)
 
 from ..dtos import (
     AddCreditRequest,
@@ -14,7 +17,6 @@ from ..services.credit_service import CreditService
 from typing import Annotated
 
 from fastapi import Body, Depends
-from src.shared.custom_types.responses.response import ObjectResponse
 
 
 @billing_router.post(

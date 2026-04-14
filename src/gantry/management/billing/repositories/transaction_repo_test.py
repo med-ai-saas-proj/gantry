@@ -1,7 +1,8 @@
 from gantry.db.factories import getSessionManager
-from gantry.management.billing.type import AggregatePeriod
 from gantry.shared.utils.uuid_utils import uuid7
-from gantry.management.billing.repositories.transaction_repo import (
+
+from ..type import AggregatePeriod
+from ..repositories.transaction_repo import (
     TransactionRepository,
 )
 

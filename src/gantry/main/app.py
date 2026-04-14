@@ -15,19 +15,10 @@ from gantry.shared.custom_types.error_exception import (
 
 from . import exception_handlers
 from ..otel.setup import setupOtel
-from ..service.lifespan import (
-    startup as service_startup,
-    shutdown as service_shutdown,
-)
-from ..management.lifespan import (
-    startup as management_startup,
-    shutdown as management_shutdown,
-)
 
 import time
 import uuid
 import traceback
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 from pydantic import ValidationError
@@ -46,25 +37,11 @@ setupOtel(
     logger=getLogger(),
 )
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup code here
-    await service_startup(app)
-    await management_startup(app)
-    yield
-
-    # Shutdown code here
-    await service_shutdown(app)
-    await management_shutdown(app)
-
-
 main_app = FastAPI(
     title=common_const.APP_NAME,
     openapi_url="/docs/openapi.json"
     if getAppSettings().stage == "DEV"
     else None,
-    lifespan=lifespan,
     docs_url=None,
     responses={
         400: {"model": ProblemDetails},
@@ -164,13 +141,17 @@ if getAppSettings().stage == "DEV":
     @main_app.get("/docs", include_in_schema=False)
     async def scalar_html():
         return get_scalar_api_reference(
-            openapi_url=main_app.openapi_url.lstrip("/"),
-            title="Management API Reference",
+            openapi_url=(main_app.openapi_url or "/docs/openapi.json").lstrip(
+                "/"
+            ),
+            title="Public API Reference",
         )
 
     @internal_app.get("/internal-docs", include_in_schema=False)
     async def scalar_html2():
         return get_scalar_api_reference(
-            openapi_url=internal_app.openapi_url.lstrip("/"),
-            title="Management API Reference",
+            openapi_url=(
+                internal_app.openapi_url or "/docs/internal_openapi.json"
+            ).lstrip("/"),
+            title="Internal API Reference",
         )

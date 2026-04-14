@@ -57,6 +57,8 @@ if app_setting.stage == "DEV":
     @management_app.get("/docs", include_in_schema=False)
     async def scalar_html():
         return get_scalar_api_reference(
-            openapi_url=management_app.openapi_url.lstrip("/"),
+            openapi_url=(
+                management_app.openapi_url or "/docs/openapi.json"
+            ).lstrip("/"),
             title=APP_NAME + " Management API Reference",
         )

@@ -13,7 +13,6 @@ from ..models import (
     TimescaleDBDailyBillingSummary,
 )
 
-import stat
 from uuid import UUID
 from typing import Sequence
 from decimal import Decimal

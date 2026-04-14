@@ -3,7 +3,7 @@ from __future__ import annotations
 from .db import DBSettings
 from .auth import AuthSettings
 from .utils import TomlPathConfigSettingsSource, DotEnvPathConfigSettingsSource
-from .billing import BillingSourceSettings
+from .billing import BillingSettings
 from .api_keys import ApiKeysSettings
 from .user_log import UserLogSettings
 from .conversation import ConversationSettings
@@ -61,7 +61,7 @@ class AppSettings(BaseSettings):
     db: DBSettings
     apikey: ApiKeysSettings
     auth: AuthSettings
-    billing: BillingSourceSettings
+    billing: BillingSettings
     user_log: UserLogSettings
     conversation: ConversationSettings
     file_storage: ObjectStorageSettings

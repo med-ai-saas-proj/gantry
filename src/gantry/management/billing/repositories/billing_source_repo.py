@@ -1,5 +1,6 @@
 from gantry.db.repository import Repository
-from gantry.management.billing.models import (
+
+from ..models import (
     BillingSource,
     BillingSourceProvider,
 )

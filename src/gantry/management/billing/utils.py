@@ -1,7 +1,7 @@
+from .dtos import ScaledAmount
+
 from decimal import Decimal
 from datetime import datetime
-
-from src.management.billing.dtos import ScaledAmount
 
 
 def _get_billing_period(

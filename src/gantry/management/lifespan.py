@@ -1,14 +1,14 @@
-from src.management.billing.settings import getBillingSetting
+from gantry.management.billing.settings import getBillingSetting
+from gantry.management.billing.factories import (
+    getInvoiceService,
+    getBillingTransactionService,
+)
+from gantry.management.organization.settings import getOrgSettings
+from gantry.management.organization.factories import getOrgService
 
 import asyncio
 
 from fastapi import FastAPI
-from src.management.billing.factories import (
-    getInvoiceService,
-    getBillingTransactionService,
-)
-from src.management.organization.settings import getOrgSettings
-from src.management.organization.factories import getOrgService
 
 
 org_deletion_task: asyncio.Task | None = None
@@ -41,7 +41,7 @@ async def billing_process_loop():
     )
 
 
-async def startup(app: FastAPI):
+async def startup():
     # Startup code here
     global org_deletion_task, billing_process_task, invoice_process_task
     org_deletion_task = asyncio.create_task(_org_delete_worker_loop())
@@ -49,7 +49,7 @@ async def startup(app: FastAPI):
     invoice_process_task = asyncio.create_task(invoice_process_loop())
 
 
-async def shutdown(app: FastAPI):
+async def shutdown():
     # Cleanup code here
     global org_deletion_task, billing_process_task, invoice_process_task
     if org_deletion_task:

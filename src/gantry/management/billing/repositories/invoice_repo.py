@@ -1,10 +1,11 @@
 from gantry.db.repository import Repository
-from gantry.management.billing.type import (
+from gantry.management.project.models import Project
+
+from ..type import (
     BillingInvoiceInfo,
     BillingInvoiceLineItemInfo,
     CreateBillingInvoiceLineItemInfo,
 )
-
 from ..models import (
     BillingSource,
     BillingInvoice,
@@ -21,7 +22,6 @@ from datetime import date, datetime
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.management.project.models import Project
 
 
 class InvoiceRepo(Repository[BillingInvoice, int]):
