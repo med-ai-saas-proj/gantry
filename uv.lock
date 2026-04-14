@@ -8,7 +8,6 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "examplenv",
     "gantry",
     "pyrusult",
 ]
@@ -954,17 +953,6 @@ wheels = [
 ]
 
 [[package]]
-name = "examplenv"
-version = "0.1.0"
-source = { editable = "packages/examplenv" }
-dependencies = [
-    { name = "typer" },
-]
-
-[package.metadata]
-requires-dist = [{ name = "typer", specifier = ">=0.20.0" }]
-
-[[package]]
 name = "exceptiongroup"
 version = "1.3.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1352,7 +1340,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "boto3-stubs", extra = ["s3"] },
-    { name = "examplenv" },
     { name = "gantry" },
     { name = "inquirer" },
     { name = "mako" },
@@ -1407,7 +1394,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.42.33" },
-    { name = "examplenv", editable = "packages/examplenv" },
     { name = "gantry", editable = "." },
     { name = "inquirer", specifier = ">=3.4.1" },
     { name = "mako", specifier = ">=1.3.10" },

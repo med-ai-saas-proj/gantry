@@ -4,10 +4,10 @@ from gantry.db.factories import (
     getRedis,
     getSessionManager,
 )
-from src.management.billing.services.credit_service import CreditService
 
 from .settings import getBillingSetting
 from ..api_keys.factories import getApiKeyService
+from .services.credit_service import CreditService
 from ...shared.logging.logger import getLogger
 from .repositories.credit_repo import CreditRepo
 from .services.invoice_service import InvoiceService
