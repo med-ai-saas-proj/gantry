@@ -21,7 +21,7 @@ async def stripe_webhook(
     billing_setting: Annotated[BillingSettings, Depends(getBillingSetting)],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> dict:
-    webhook_secret = billing_setting.stripe_webhook_secret
+    webhook_secret = billing_setting.stripe_webhook_secret.get_secret_value()
 
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")

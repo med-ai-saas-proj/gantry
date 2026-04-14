@@ -105,6 +105,7 @@ class InvoiceService:
             )
             if not res:
                 return Err(InvoiceNotFoundError())
+            await session.commit()
             return Ok(None)
 
     async def markInvoiceAsRefundedManually(
@@ -121,6 +122,7 @@ class InvoiceService:
             )
             if not res:
                 return Err(InvoiceNotFoundError())
+            await session.commit()
             return Ok(None)
 
     async def markInvoiceAsPaid(
@@ -130,11 +132,12 @@ class InvoiceService:
         paid_at: datetime,
     ) -> Result[None, InvoiceNotFoundError]:
         async with self.session_manager.get_session() as session:
-            inv = self.invoice_repo.markInvoiceAsPaid(
+            inv = await self.invoice_repo.markInvoiceAsPaid(
                 session, provider, provider_id, paid_at
             )
             if inv is None:
                 return Err(InvoiceNotFoundError())
+            await session.commit()
             return Ok(None)
 
     async def listInvoices(
