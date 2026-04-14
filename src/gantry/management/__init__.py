@@ -7,11 +7,6 @@ from .logging import logging_router
 from .project import project_router
 from .api_keys import apikey_router
 from .organization import org_router
-from .organization.settings import getOrgSettings
-from .organization.factories import getOrgService
-
-import asyncio
-import contextlib
 
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
@@ -23,33 +18,10 @@ __all__ = ["management_app"]
 app_setting = getAppSettings()
 
 
-async def _org_delete_worker_loop():
-    service = getOrgService()
-    while True:
-        try:  # noqa: SIM105
-            await service.processDueDeletions()
-        except Exception:
-            # Keep loop alive; failures are logged in service/global handlers.
-            pass
-        await asyncio.sleep(getOrgSettings().deletion_worker_interval_seconds)
-
-
-@contextlib.asynccontextmanager
-async def lifespan(app: FastAPI):
-    org_deletion_task = asyncio.create_task(_org_delete_worker_loop())
-    yield
-    org_deletion_task.cancel()
-    try:
-        await org_deletion_task
-    except Exception:
-        pass
-
-
 management_app = FastAPI(
     title=APP_NAME,
     openapi_url="/docs/openapi.json" if app_setting.stage == "DEV" else None,
     docs_url=None,
-    lifespan=lifespan,
     responses={
         400: {"model": ProblemDetails},
         401: {"model": ProblemDetails},
@@ -85,6 +57,8 @@ if app_setting.stage == "DEV":
     @management_app.get("/docs", include_in_schema=False)
     async def scalar_html():
         return get_scalar_api_reference(
-            openapi_url=management_app.openapi_url.lstrip("/"),
+            openapi_url=(
+                management_app.openapi_url or "/docs/openapi.json"
+            ).lstrip("/"),
             title=APP_NAME + " Management API Reference",
         )

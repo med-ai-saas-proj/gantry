@@ -45,28 +45,38 @@ class SpendingLimitRepository(Repository[SpendingLimit, int]):
         org_id: str,
         project_id: int,
         limit_type: SpendingLimitType,
-    ) -> SpendingLimit | None:
+    ) -> Decimal | None:
         """Get the spending limit record for an organization."""
-        stmt = select(SpendingLimit).where(
-            (SpendingLimit.organization_id == org_id)
-            & (SpendingLimit.project_id == project_id)
-            & (SpendingLimit.limit_type == limit_type)
+        stmt = (
+            select(SpendingLimit)
+            .where(
+                (SpendingLimit.organization_id == org_id)
+                & (SpendingLimit.project_id == project_id)
+                & (SpendingLimit.limit_type == limit_type)
+            )
+            .with_for_update(read=True)
         )
-        return await self.selectOne(session, stmt)
+        res = await self.selectOne(session, stmt)
+        return res.limit if res else None
 
     async def getOrgLimits(
         self,
         session: AsyncSession,
         org_id: str,
         limit_type: SpendingLimitType,
-    ) -> SpendingLimit | None:
+    ) -> Decimal | None:
         """Get the spending limit record for an organization."""
-        stmt = select(SpendingLimit).where(
-            (SpendingLimit.organization_id == org_id)
-            & (SpendingLimit.project_id.is_(None))  # global default
-            & (SpendingLimit.limit_type == limit_type)
+        stmt = (
+            select(SpendingLimit)
+            .where(
+                (SpendingLimit.organization_id == org_id)
+                & (SpendingLimit.project_id.is_(None))  # global default
+                & (SpendingLimit.limit_type == limit_type)
+            )
+            .with_for_update(read=True)
         )
-        return await self.selectOne(session, stmt)
+        res = await self.selectOne(session, stmt)
+        return res.limit if res else None
 
     async def upsert(
         self,

@@ -11,7 +11,7 @@ from uuid import UUID
 from typing import Annotated
 from datetime import datetime
 
-from fastapi import Depends
+from fastapi import Query, Depends
 
 
 @billing_router.get(
@@ -23,11 +23,13 @@ async def get_aggregate_by_projects(
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],
-    project_uids: list[UUID],  # filter by project_uid or whole organization
     period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
+    project_uids: list[UUID] | None = Query(
+        None
+    ),  # filter by project_uid or whole organization
 ) -> ListResponse[BillingAggregateReport]:
     res = (
         await billing_service.get_aggregate_by_projects(
@@ -51,11 +53,13 @@ async def get_aggregate_by_apikeys(
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],
-    apikeys: list[str],  # filter by apikey_id or whole organization
     period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
+    apikeys: list[str] | None = Query(
+        None
+    ),  # filter by apikey_id or whole organization
 ) -> ListResponse[BillingAggregateReport]:
     res = (
         await billing_service.get_aggregate_by_apikeys(

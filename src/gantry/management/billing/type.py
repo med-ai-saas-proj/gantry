@@ -1,3 +1,5 @@
+from .models import TransactionStatus, BillingSourceProvider
+
 import enum
 from uuid import UUID
 from typing import TypedDict
@@ -18,6 +20,15 @@ class BillingAggregateReport(TypedDict):
     total_amount: Decimal
 
 
+class BillingAggregateReportGroupedBy(TypedDict):
+    period_bucket: datetime
+    transaction_count: int
+    total_amount: Decimal
+    group_by_uuid_key: UUID | str
+    group_by_int_key: int
+    group_by_name: str | None
+
+
 class BillingTransactionInfo(TypedDict):
     amount: Decimal
     date: datetime
@@ -26,6 +37,7 @@ class BillingTransactionInfo(TypedDict):
     project_uid: UUID
     details: dict
     captured_at: datetime | None
+    status: TransactionStatus
 
 
 class BillingInvoiceInfo(TypedDict):
@@ -33,7 +45,8 @@ class BillingInvoiceInfo(TypedDict):
     invoice_uid: UUID
     billing_period: date
     total_amount: Decimal
-    provider_invoice_id: str
+    provider: BillingSourceProvider | None
+    provider_invoice_id: str | None
     paid_at: datetime | None
     details: dict
     used_credits: Decimal
@@ -43,3 +56,18 @@ class BillingInvoiceLineItemInfo(TypedDict):
     description: str
     amount: Decimal
     project_uid: UUID | None
+    invoice_line_uuid: UUID
+    project_name: str | None
+    project_id: int | None
+
+
+class CreateBillingInvoiceLineItemInfo(TypedDict):
+    description: str
+    amount: Decimal
+    project_id: int | None
+
+
+class CreditTransactionInfo(TypedDict):
+    amount: Decimal
+    description: str
+    created_at: datetime

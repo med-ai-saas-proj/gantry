@@ -1,18 +1,18 @@
-from gantry.management.billing.dtos import (
-    InvoiceInfoResponse,
-    ManualPaymentResponse,
-    InvoiceDetailInfoResponse,
-)
 from gantry.management.auth.entities import UserInfo
 from gantry.management.auth.dependencies import getUserInfo
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
 )
-from gantry.management.billing.services.invoice_service import InvoiceService
 
+from ..dtos import (
+    InvoiceInfoResponse,
+    ManualPaymentResponse,
+    InvoiceDetailInfoResponse,
+)
 from .router import billing_router
 from ..factories import getInvoiceService
+from ..services.invoice_service import InvoiceService
 
 from uuid import UUID
 from typing import Annotated
@@ -35,7 +35,7 @@ async def list_invoices(
     offset: int = 0,
 ) -> PaginatedResponse[InvoiceInfoResponse]:
     invoices, total = (
-        await invoice_service.list_invoices(
+        await invoice_service.listInvoices(
             org_id=user_info["org_id"],
             offset=offset,
             limit=limit,
@@ -62,7 +62,7 @@ async def get_invoice_details(
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[InvoiceDetailInfoResponse]:
     res = (
-        await invoice_service.get_invoice_by_id(
+        await invoice_service.getInvoiceById(
             org_id=user_info["org_id"], invoice_uid=invoice_uid
         )
     ).unwrap()
@@ -78,8 +78,47 @@ async def pay_invoice(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[ManualPaymentResponse]:
-    return ObjectResponse(
-        data=ManualPaymentResponse(
-            hosted_invoice_url="https://example.com/payment"
-        )
+    res = await invoice_service.getInvoiceByIdPaymentLinkInProvider(
+        org_id=user_info["org_id"], invoice_uid=invoice_uid
     )
+    return ObjectResponse(
+        data=ManualPaymentResponse(hosted_invoice_url=res.unwrap())
+    )
+
+
+@billing_router.put(
+    "/invoices/{invoice_uid}/mark_paid",
+    tags=["admin"],
+    description="Manually mark an invoice as paid. This is useful for offline payments or when payment confirmation is received outside of the normal payment flow.",
+)
+async def mark_invoice_as_paid(
+    invoice_uid: UUID,
+    user_info: Annotated[
+        UserInfo, Depends(getUserInfo)
+    ],  # TODO: use admin auth dependency
+    invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
+):
+    (
+        await invoice_service.markInvoiceAsPaidManually(
+            org_id=user_info["org_id"], invoice_uid=invoice_uid
+        )
+    ).unwrap()
+
+
+@billing_router.post(
+    "/invoices/{invoice_uid}/refund",
+    tags=["admin"],
+    description="Manually mark an invoice as refunded. This is useful for issuing refunds outside of the normal flow, such as when a refund is processed directly through the payment gateway or for offline refunds.",
+)
+async def mark_invoice_as_refunded(
+    invoice_uid: UUID,
+    user_info: Annotated[
+        UserInfo, Depends(getUserInfo)
+    ],  # TODO: use admin auth dependency
+    invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
+):
+    (
+        await invoice_service.markInvoiceAsRefundedManually(
+            org_id=user_info["org_id"], invoice_uid=invoice_uid
+        )
+    ).unwrap()

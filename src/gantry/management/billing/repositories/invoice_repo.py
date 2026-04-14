@@ -1,16 +1,27 @@
 from gantry.db.repository import Repository
-from gantry.management.billing.type import (
+from gantry.management.project.models import Project
+
+from ..type import (
     BillingInvoiceInfo,
     BillingInvoiceLineItemInfo,
+    CreateBillingInvoiceLineItemInfo,
 )
-
-from ..models import BillingInvoice, BillingInvoiceLineItem
+from ..models import (
+    BillingSource,
+    BillingInvoice,
+    TransactionStatus,
+    BillingTransaction,
+    BillingSourceProvider,
+    BillingInvoiceLineItem,
+)
 
 from uuid import UUID
 from typing import Sequence
-from datetime import datetime
+from decimal import Decimal
+from datetime import date, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class InvoiceRepo(Repository[BillingInvoice, int]):
@@ -19,9 +30,131 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
     def __init__(self):
         super().__init__(BillingInvoice, BillingInvoice.id)
 
-    async def listInvoices(
+    async def getInvoicesToProcessInProvider(
+        self, session: AsyncSession
+    ) -> Sequence[tuple[int, str, BillingSourceProvider]]:
+        stmt = (
+            select(
+                BillingInvoice.id,
+                BillingInvoice.organization_id,
+                BillingSource.source_type.label("provider"),
+            )
+            .select_from(BillingInvoice)
+            .join(
+                BillingSource,
+                BillingInvoice.organization_id == BillingSource.organization_id,
+            )
+            .where(BillingInvoice.provider_invoice_id.is_(None))
+        )
+        res = await session.execute(stmt)
+        return [
+            (
+                row.id,
+                row.organization_id,
+                row.provider,
+            )
+            for row in res.all()
+        ]
+
+    async def getOrgsWithInvoiceToCreate(
         self,
-        session,
+        session: AsyncSession,
+        billing_period: date,
+        prev_billing_period: date,
+    ) -> Sequence[str]:
+        pending_tx_subq = (
+            select(BillingTransaction.id).where(
+                BillingTransaction.created_at >= prev_billing_period,
+                BillingTransaction.created_at < billing_period,
+                BillingTransaction.organization_id
+                == BillingSource.organization_id,
+                BillingTransaction.status == TransactionStatus.PENDING,
+            )
+        ).exists()
+        created_invoce_subq = (
+            select(BillingInvoice.id).where(
+                BillingInvoice.organization_id == BillingSource.organization_id,
+                BillingInvoice.billing_period == billing_period,
+            )
+        ).exists()
+
+        stmt = (
+            select(BillingSource.organization_id, BillingSource.source_type)
+            .select_from(BillingSource)
+            .where(
+                ~created_invoce_subq,
+                ~pending_tx_subq,
+            )
+        )
+        res = await session.execute(stmt)
+        return [row.organization_id for row in res.all()]
+
+    async def markInvoiceAsPaid(
+        self,
+        session: AsyncSession,
+        provider: BillingSourceProvider,
+        provider_id: str,
+        paid_at: datetime,
+    ) -> BillingInvoice | None:
+        stmt = (
+            update(BillingInvoice)
+            .values(paid_at=paid_at)
+            .where(
+                (BillingInvoice.provider_invoice_id == provider_id)
+                & (BillingInvoice.provider == provider)
+            )
+            .returning(BillingInvoice)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
+    async def markInvoiceAsPaidManually(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        invoice_uid: UUID,
+        paid_at: datetime,
+    ) -> BillingInvoice | None:
+        stmt = (
+            update(BillingInvoice)
+            .values(paid_at=paid_at)
+            .where(
+                (BillingInvoice.uuid == invoice_uid)
+                & (BillingInvoice.organization_id == org_id)
+                & (
+                    BillingInvoice.paid_at.is_(None)
+                )  # only allow marking as paid if it was previously unpaid
+            )
+            .returning(BillingInvoice)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
+    async def markInvoiceAsRefundedManually(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        invoice_uid: UUID,
+        refunded_at: datetime,
+    ) -> BillingInvoice | None:
+        stmt = (
+            update(BillingInvoice)
+            .values(refunded_at=refunded_at)
+            .where(
+                (BillingInvoice.uuid == invoice_uid)
+                & (BillingInvoice.organization_id == org_id)
+                & (
+                    BillingInvoice.paid_at.is_not(None)
+                )  # only allow marking as refunded if it was previously marked as paid
+            )
+            .returning(BillingInvoice)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
+    async def listReadyInvoices(
+        self,
+        session: AsyncSession,
         org_id: str,
         offset: int = 0,
         limit: int = 100,
@@ -30,9 +163,23 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
         paid: bool | None = None,
     ) -> tuple[Sequence[BillingInvoiceInfo], int]:
         stmt = (
-            select(BillingInvoice, func.count().over().label("total"))
+            select(
+                BillingInvoice.id,
+                BillingInvoice.uuid,
+                BillingInvoice.billing_period,
+                BillingInvoice.total_amount,
+                BillingInvoice.provider,
+                BillingInvoice.provider_invoice_id,
+                BillingInvoice.paid_at,
+                BillingInvoice.details,
+                BillingInvoice.used_credits,
+                func.count().over().label("total"),
+            )
             .select_from(BillingInvoice)
             .where(self.model.organization_id == org_id)
+            .where(
+                BillingInvoice.provider_invoice_id.is_not(None)
+            )  # only return invoices that have been created in provider
         )
         if from_date is not None:
             stmt = stmt.where(BillingInvoice.billing_period >= from_date)
@@ -48,27 +195,31 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
         rows = res.all()
         return [
             {
-                "invoice_id": row.BillingInvoice.id,
+                "invoice_id": row.id,
                 "invoice_uid": row.uuid,
                 "billing_period": row.billing_period,
                 "total_amount": row.total_amount,
                 "used_credits": row.used_credits,
+                "provider": row.provider,
                 "provider_invoice_id": row.provider_invoice_id,
                 "paid_at": row.paid_at,
                 "details": row.details,
             }
-            for row in rows[0]
+            for row in rows
         ], rows[0].total if rows else 0
 
-    async def getInvoiceInfoByUUID(
+    async def getReadyInvoiceInfoByUUID(
         self,
-        session,
+        session: AsyncSession,
         invoice_uid: UUID,
         org_id: str,
     ) -> BillingInvoiceInfo | None:
         stmt = select(BillingInvoice).where(
             BillingInvoice.uuid == invoice_uid,
             BillingInvoice.organization_id == org_id,
+            BillingInvoice.provider_invoice_id.is_not(
+                None
+            ),  # only return if invoice has been created in provider
         )
         res = await session.execute(stmt)
         row = res.scalar_one_or_none()
@@ -83,24 +234,149 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
             "provider_invoice_id": row.provider_invoice_id,
             "paid_at": row.paid_at,
             "details": row.details,
+            "provider": row.provider,
         }
+
+    async def getInvoiceInfoByIdWithLock(
+        self,
+        session: AsyncSession,
+        invoice_id: int,
+        read: bool = True,
+    ) -> BillingInvoiceInfo | None:
+        stmt = select(BillingInvoice).where(
+            BillingInvoice.id == invoice_id,
+        )
+        if read:
+            stmt = stmt.with_for_update(read=True)
+        else:
+            stmt = stmt.with_for_update(read=False)
+        res = await session.execute(stmt)
+        row = res.scalar_one_or_none()
+        if not row:
+            return None
+        return {
+            "invoice_id": row.id,
+            "invoice_uid": row.uuid,
+            "billing_period": row.billing_period,
+            "total_amount": row.total_amount,
+            "used_credits": row.used_credits,
+            "provider_invoice_id": row.provider_invoice_id,
+            "paid_at": row.paid_at,
+            "details": row.details,
+            "provider": row.provider,
+        }
+
+    async def updateProviderInvoiceID(
+        self,
+        session: AsyncSession,
+        invoice_id: int,
+        provider: BillingSourceProvider,
+        provider_invoice_id: str,
+    ):
+        stmt = (
+            update(BillingInvoice)
+            .where(BillingInvoice.id == invoice_id)
+            .values(provider=provider, provider_invoice_id=provider_invoice_id)
+        )
+        await session.execute(stmt)
 
     async def getInvoiceLineItems(
         self,
-        session,
+        session: AsyncSession,
         invoice_id: int,
     ) -> Sequence[BillingInvoiceLineItemInfo]:
         # For simplicity, assume line items are stored as a JSON array in the details column of the invoice
-        stmt = select(BillingInvoiceLineItem).where(
-            BillingInvoiceLineItem.invoice_id == invoice_id
+        stmt = (
+            select(
+                BillingInvoiceLineItem.uuid,
+                BillingInvoiceLineItem.description,
+                BillingInvoiceLineItem.amount,
+                Project.uuid.label("project_uid"),
+                Project.id.label("project_id"),
+                Project.name.label("name"),
+            )
+            .select_from(BillingInvoiceLineItem)
+            .join(
+                Project,
+                BillingInvoiceLineItem.project_id == Project.id,
+                isouter=True,
+            )
+            .where(BillingInvoiceLineItem.invoice_id == invoice_id)
         )
         res = await session.execute(stmt)
-        rows = res.scalars().all()
+        rows = res.all()
         return [
             {
+                "invoice_line_uuid": row.uuid,
                 "description": row.description,
                 "amount": row.amount,
                 "project_uid": row.project_uid,
+                "project_id": row.project_id,
+                "project_name": row.name,
             }
             for row in rows
         ]
+
+    async def haveInvoiceForBillingPeriod(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        billing_period: date,
+    ) -> bool:
+        stmt = select(BillingInvoice).where(
+            BillingInvoice.organization_id == org_id,
+            BillingInvoice.billing_period == billing_period,
+        )
+        res = await session.execute(stmt)
+        row = res.scalar_one_or_none()
+        return row is not None
+
+    async def createInvoice(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        billing_period: date,
+        total_amount: Decimal,
+        details: dict,
+        used_credits: Decimal,
+    ) -> BillingInvoiceInfo:
+        new_inv = BillingInvoice(
+            organization_id=org_id,
+            billing_period=billing_period,
+            total_amount=total_amount,
+            provider_invoice_id=None,
+            provider=None,
+            details=details,
+            used_credits=used_credits,
+            paid_at=None,
+            refunded_at=None,
+        )
+        session.add(new_inv)
+        await session.flush()  # to get the ID of the new invoice
+        return {
+            "invoice_id": new_inv.id,
+            "invoice_uid": new_inv.uuid,
+            "billing_period": new_inv.billing_period,
+            "total_amount": new_inv.total_amount,
+            "used_credits": new_inv.used_credits,
+            "provider_invoice_id": new_inv.provider_invoice_id,
+            "paid_at": new_inv.paid_at,
+            "details": new_inv.details,
+            "provider": new_inv.provider,
+        }
+
+    async def createInvoiceLineItems(
+        self,
+        session: AsyncSession,
+        invoice_id: int,
+        lines: list[CreateBillingInvoiceLineItemInfo],
+    ):
+        for line in lines:
+            new_line = BillingInvoiceLineItem(
+                invoice_id=invoice_id,
+                description=line["description"],
+                amount=line["amount"],
+                project_id=line["project_id"],
+            )
+            session.add(new_line)
+        await session.flush()

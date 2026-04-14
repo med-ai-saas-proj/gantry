@@ -104,3 +104,14 @@ class InternalServiceError(UnrecoverableError):
     def __init__(self, message: str, from_exception: Exception | None = None):
         super().__init__(from_exception)
         self.message = message
+
+
+class InvalidValueError(RecoverableError):
+    status = 400
+    title = "Invalid Value"
+    code = "invalid_value"
+    detail = "One or more provided values are invalid."
+
+    def __init__(self, message: str, from_exception: Exception | None = None):
+        super().__init__(from_exception)
+        self.message = message

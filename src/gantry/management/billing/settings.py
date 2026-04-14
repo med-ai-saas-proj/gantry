@@ -1,5 +1,5 @@
-from gantry.settings import AppSettings, BillingSourceSettings
+from gantry.settings import AppSettings, BillingSettings
 
 
-def getBillingSourceSetting() -> BillingSourceSettings:
+def getBillingSetting() -> BillingSettings:
     return AppSettings.get().billing

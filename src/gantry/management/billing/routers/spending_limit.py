@@ -12,7 +12,7 @@ from ..factories import TransactionService, getBillingTransactionService
 from uuid import UUID
 from typing import Annotated
 
-from fastapi import Body, Depends, APIRouter
+from fastapi import Body, Depends
 
 
 @billing_router.put(

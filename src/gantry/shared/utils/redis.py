@@ -66,21 +66,21 @@ async def lock_watchdog(
             continue  # likely a connection issue, will try again on next loop
 
 
-async def redis_check_or_load[T](
+async def redis_get_or_load[T](
     redis: Redis,
     session_manager: AsyncSessionManager,
     lock_id: str,
     lock_ttl: int,
     lock_blocking_timeout: int,
-    checker: Callable[[Redis], Awaitable[bool]],
+    getter: Callable[[Redis], Awaitable[T | None]],
     loader: Callable[[AsyncSession], Awaitable[T]],
     setter: Callable[[Redis, T], Awaitable[None]],
     retry_times: int = 3,
-) -> bool:
+) -> T | None:
     """Helper to get a value from Redis or load it using the provided loader function."""
     for _ in range(retry_times):
-        if await checker(redis):
-            return True
+        if v := await getter(redis):
+            return v
         async with redis_lock(
             redis,
             f"billing:redis_get_or_load_lock:{lock_id}",
@@ -93,8 +93,8 @@ async def redis_check_or_load[T](
                 continue
 
             # Double-check after acquiring the lock
-            if await checker(redis):
-                return True
+            if v := await getter(redis):
+                return v
 
             # Load the value using the provided loader function
             try:
@@ -106,8 +106,8 @@ async def redis_check_or_load[T](
                     0.2
                 )  # Sleep before retrying on loader failure
                 continue
-            return True
+            return loaded_value
 
-    if await checker(redis):
-        return True
-    return False
+    if v := await getter(redis):
+        return v
+    return None

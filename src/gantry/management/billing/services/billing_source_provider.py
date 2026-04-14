@@ -4,6 +4,7 @@ from gantry.shared.custom_types.error_exception import (
 )
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 from pyrusult import Result
 
@@ -14,15 +15,15 @@ class BillingSourceProviderInterface(ABC):
         pass
 
     @abstractmethod
-    async def deleteCustomer(
-        self, provider_id: str
+    async def updateCustomer(
+        self, provider_id: str, req
     ) -> Result[None, ExternalAPIError | NotImplementedError]:
         pass
 
     @abstractmethod
-    async def updateCustomer(
-        self, provider_id: str, req
-    ) -> Result[None, ExternalAPIError | NotImplementedError]:
+    async def getCustomer(
+        self, provider_id: str
+    ) -> Result[Any, ExternalAPIError | NotImplementedError]:
         pass
 
     @abstractmethod

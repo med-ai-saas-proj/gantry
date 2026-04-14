@@ -59,6 +59,12 @@ class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
     transaction_count: Mapped[int] = mapped_column(BigInteger)
 
 
+class TransactionStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    CAPTURED = "CAPTURED"
+    EXPIRED = "EXPIRED"
+
+
 # timescaledb hypertable doesnot allow having others unique index except primary key
 class BillingTransaction(
     WithClientUUIDWithoutUnique, BillingBaseSQLModel, WithID
@@ -92,33 +98,34 @@ class BillingTransaction(
         DateTime, nullable=True
     )
 
+    status: Mapped[TransactionStatus] = mapped_column(
+        Enum(TransactionStatus),
+        nullable=False,
+        index=True,
+        default=TransactionStatus.PENDING,
+    )
+
     # e.g. { "llm_usages": { "gpt-4o": { "input_tokens": 100, "output_tokens": 50 } } }
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
 
-class Credit(WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel):
+class Credit(WithCreateUpdateTimestamp, BillingBaseSQLModel):
     __tablename__ = "Credits"
+
+    organization_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, index=True, primary_key=True
+    )
+    amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
+
+
+class CreditTransaction(WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel):
+    __tablename__ = "CreditTransactions"
 
     organization_id: Mapped[str] = mapped_column(
         String(128), nullable=False, index=True
     )
-
-    name: Mapped[str] = mapped_column(String(128), nullable=False)
-    note: Mapped[str] = mapped_column(String(512), nullable=True)
-
-    start_date: Mapped[date] = mapped_column(Date, nullable=False)
-    expired_date: Mapped[date] = mapped_column(Date, nullable=False)
-
     amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
-    current_spent: Mapped[Decimal] = mapped_column(
-        AMOUNT_COLUMN_TYPE, nullable=False, default=Decimal("0")
-    )
-
-
-class BillingSourceState(str, enum.Enum):
-    PENDING = "PENDING"
-    ACTIVE = "ACTIVE"
-    DELETED = "DELETED"
+    description: Mapped[str] = mapped_column(String(256), nullable=False)
 
 
 class BillingSourceProvider(str, enum.Enum):
@@ -127,13 +134,14 @@ class BillingSourceProvider(str, enum.Enum):
     # Add more providers as needed (e.g. "braintree", "square", etc.)
 
 
+# NOTE: THIS IMMUTABLE ONCE CREATED. DO NOT UPDATE/DELETE
 class BillingSource(
     WithCreateUpdateTimestamp, WithID, WithUUID, BillingBaseSQLModel
 ):
     __tablename__ = "BillingSources"
 
     organization_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, index=True
+        String(128), nullable=False, index=True, unique=True
     )
     source_type: Mapped[BillingSourceProvider] = mapped_column(
         Enum(BillingSourceProvider), nullable=False
@@ -141,11 +149,6 @@ class BillingSource(
     provider_id: Mapped[str] = mapped_column(
         String(128), nullable=False
     )  # e.g. Stripe customer ID
-    status: Mapped[BillingSourceState] = mapped_column(
-        Enum(BillingSourceState),
-        default=BillingSourceState.PENDING,
-        server_default=BillingSourceState.PENDING,
-    )
 
 
 class BillingInvoice(
@@ -157,21 +160,35 @@ class BillingInvoice(
         String(128), nullable=False, index=True
     )
 
-    billing_period: Mapped[date] = mapped_column(
-        Date, nullable=False, unique=True
-    )
+    billing_period: Mapped[date] = mapped_column(Date, nullable=False)
 
     total_amount: Mapped[Decimal] = mapped_column(
         AMOUNT_COLUMN_TYPE, nullable=False
     )
-    provider_invoice_id: Mapped[str] = mapped_column(
-        String(128), nullable=False
+    provider: Mapped[BillingSourceProvider | None] = mapped_column(
+        Enum(BillingSourceProvider), nullable=True
+    )
+    provider_invoice_id: Mapped[str | None] = mapped_column(
+        String(128), nullable=True
     )  # e.g. Stripe invoice ID
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    refunded_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
     details: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
     used_credits: Mapped[Decimal] = mapped_column(
         AMOUNT_COLUMN_TYPE, nullable=False, default=Decimal("0")
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            organization_id, billing_period, name="uq_org_billing_period"
+        ),
+        UniqueConstraint(
+            provider, provider_invoice_id, name="uq_provider_invoice"
+        ),
+        BillingBaseSQLModel.__table_args__,
     )
 
 

@@ -141,13 +141,17 @@ if getAppSettings().stage == "DEV":
     @main_app.get("/docs", include_in_schema=False)
     async def scalar_html():
         return get_scalar_api_reference(
-            openapi_url=main_app.openapi_url.lstrip("/"),
-            title="Management API Reference",
+            openapi_url=(main_app.openapi_url or "/docs/openapi.json").lstrip(
+                "/"
+            ),
+            title="Public API Reference",
         )
 
     @internal_app.get("/internal-docs", include_in_schema=False)
     async def scalar_html2():
         return get_scalar_api_reference(
-            openapi_url=internal_app.openapi_url.lstrip("/"),
-            title="Management API Reference",
+            openapi_url=(
+                internal_app.openapi_url or "/docs/internal_openapi.json"
+            ).lstrip("/"),
+            title="Internal API Reference",
         )

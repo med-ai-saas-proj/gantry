@@ -31,10 +31,30 @@ class Server(AppSettings):
             return
 
         from gantry.main.app import main_app, internal_app
+        from gantry.main.lifespan import (
+            startup as main_startup,
+            shutdown as main_shutdown,
+        )
 
         import asyncio
 
         import uvicorn
+
+        await main_startup()
+
+        from gantry.management.lifespan import (
+            startup as management_startup,
+            shutdown as management_shutdown,
+        )
+
+        await management_startup()
+
+        from gantry.service.lifespan import (
+            startup as service_startup,
+            shutdown as service_shutdown,
+        )
+
+        await service_startup()
 
         main_server_config = uvicorn.Config(
             main_app,
@@ -61,3 +81,7 @@ class Server(AppSettings):
             ],
             return_when=asyncio.FIRST_COMPLETED,
         )
+
+        await service_shutdown()
+        await management_shutdown()
+        await main_shutdown()

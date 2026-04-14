@@ -8,8 +8,7 @@ from .factories import getLogQueryService
 from typing import Literal, Annotated
 from datetime import datetime
 
-from fastapi import Depends, APIRouter
-from fastapi.params import Body, Query
+from fastapi import Body, Query, Depends, APIRouter
 
 
 logging_router = APIRouter(prefix="/logging", tags=["logging"])

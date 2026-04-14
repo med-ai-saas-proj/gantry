@@ -50,6 +50,8 @@ if app_setting.stage == "DEV":
     @service_app.get("/docs", include_in_schema=False)
     async def scalar_html():
         return get_scalar_api_reference(
-            openapi_url=service_app.openapi_url.lstrip("/"),
+            openapi_url=(
+                service_app.openapi_url or "/docs/openapi.json"
+            ).lstrip("/"),
             title="API Reference",
         )

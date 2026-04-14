@@ -1,15 +1,19 @@
 from gantry.management.auth.entities import UserInfo
 from gantry.management.auth.dependencies import getUserInfo
-from gantry.shared.custom_types.responses.response import PaginatedResponse
+from gantry.shared.custom_types.responses.response import (
+    ObjectResponse,
+    PaginatedResponse,
+)
 
 from ..dtos import (
     AddCreditRequest,
     CreditInfoResponse,
+    CreditTransactionInfoResponse,
 )
 from .router import billing_router
-from ..factories import TransactionService, getBillingTransactionService
+from ..factories import getCreditService
+from ..services.credit_service import CreditService
 
-from uuid import UUID
 from typing import Annotated
 
 from fastapi import Body, Depends
@@ -17,50 +21,58 @@ from fastapi import Body, Depends
 
 @billing_router.post(
     "/credits",
+    tags=["admin"],  # TODO: use admin auth dependency
     description="Add credits to an organization or project (e.g. from a promotion, refund, etc.).",
 )
 async def add_credits(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[
-        TransactionService, Depends(getBillingTransactionService)
-    ],
+    credit_service: Annotated[CreditService, Depends(getCreditService)],
     body: Annotated[AddCreditRequest, Body()],
-):
-    pass
+) -> ObjectResponse[CreditInfoResponse]:
+    credits = await credit_service.addCredits(
+        org_id=user_info["org_id"],
+        amount_to_add=body.amount,
+        description=body.description,
+    )
+    return ObjectResponse[CreditInfoResponse](
+        data=CreditInfoResponse(amount=credits)
+    )
 
 
 @billing_router.get(
     "/credits",
-    description="List credits for an organization or project, with filters for status (e.g. 'active', 'used', 'expired').",
+    description="Get available credits for the organization",
 )
-async def list_credits(
+async def get_available_credits(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[
-        TransactionService, Depends(getBillingTransactionService)
-    ],
-    project_uid: list[UUID]
-    | None = None,  # filter by project_uid or whole organization
-    status: str | None = None,  # e.g. "active", "used", "expired"
-    limit: int = 100,
-    offset: int = 0,
-) -> PaginatedResponse[CreditInfoResponse]:
-    pass
+    credit_service: Annotated[CreditService, Depends(getCreditService)],
+) -> ObjectResponse[CreditInfoResponse]:
+    credits = await credit_service.getAvailableCredits(
+        org_id=user_info["org_id"]
+    )
+    return ObjectResponse[CreditInfoResponse](
+        data=CreditInfoResponse(amount=credits)
+    )
 
 
 @billing_router.get(
-    "/credits",
-    description="List credits for an organization or project, with filters for status (e.g. 'active', 'used', 'expired').",
+    "/credits/transactions",
+    description="List credit transactions (e.g. when credits were added from promotions, refunds, or used to offset an invoice).",
 )
-async def list_credits_for_admin(
+async def list_credit_transactions(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[
-        TransactionService, Depends(getBillingTransactionService)
-    ],
-    project_uid: list[UUID]
-    | None = None,  # filter by project_uid or whole organization
-    org_id: list[UUID] | None = None,  # filter by org_id for admin users
-    status: str | None = None,  # e.g. "active", "used", "expired"
-    limit: int = 100,
+    credit_service: Annotated[CreditService, Depends(getCreditService)],
     offset: int = 0,
-) -> PaginatedResponse[CreditInfoResponse]:
-    pass
+    limit: int = 100,
+) -> PaginatedResponse[CreditTransactionInfoResponse]:
+    transactions, total = await credit_service.getCreditTransactions(
+        org_id=user_info["org_id"],
+        offset=offset,
+        limit=limit,
+    )
+    return PaginatedResponse(
+        data=transactions,
+        total=total,
+        limit=limit,
+        offset=offset,
+    )

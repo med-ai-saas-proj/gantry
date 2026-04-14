@@ -10,20 +10,21 @@ from gantry.shared.custom_types.responses.response import (
     PaginatedResponse,
 )
 
-from ..dtos import PostRequest, CaptureRequest
+from ..dtos import PostRequest, CaptureRequest, TransactionInfoResponse
 from .router import billing_router
-from ..factories import TransactionService, getBillingTransactionService
+from ..factories import getBillingTransactionService
+from ..services.transaction_services import TransactionService
 
 from uuid import UUID
 from typing import Annotated
 from datetime import datetime
 
-from fastapi import Body, Header, Depends
+from fastapi import Body, Query, Header, Depends
 
 
 @billing_router.post("/")
 async def post(
-    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
+    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo())],
     body: Annotated[PostRequest, Body()],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
@@ -44,7 +45,7 @@ async def post(
 @billing_router.post("/{transaction_uid}/capture")
 async def capture(
     transaction_uid: UUID,
-    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
+    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo())],
     body: Annotated[CaptureRequest, Body()],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
@@ -70,23 +71,22 @@ async def list_transactions(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-    project_uid: list[UUID]
-    | None = None,  # filter by project_uid or whole organization
+    project_uids: list[UUID] | None = Query(
+        None
+    ),  # filter by project_uid or whole organization
     start_date: datetime | None = None,  # ISO date string
     end_date: datetime | None = None,  # ISO date string
     limit: int = 100,
     offset: int = 0,
 ) -> PaginatedResponse[TransactionInfoResponse]:
-    res, total = (
-        await billing_service.get_transactions(
-            org_id=user_info["org_id"],
-            project_uids=project_uid,
-            start_date=start_date,
-            end_date=end_date,
-            limit=limit,
-            offset=offset,
-        )
-    ).unwrap()
+    res, total = await billing_service.getTransactions(
+        org_id=user_info["org_id"],
+        project_uids=project_uids,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+    )
     return PaginatedResponse[TransactionInfoResponse](
         data=res, total=total, offset=offset, limit=limit
     )
@@ -104,7 +104,7 @@ async def get_transaction_details(
     ],
 ) -> ObjectResponse[TransactionInfoResponse]:
     res = (
-        await billing_service.get_transaction_by_id(
+        await billing_service.getTransactionById(
             org_id=user_info["org_id"], transaction_uid=transaction_uid
         )
     ).unwrap()

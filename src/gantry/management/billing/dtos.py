@@ -1,7 +1,7 @@
 """DTOs for the billing module."""
 
-from gantry.management.billing.models import (
-    BillingSourceState,
+from .models import (
+    TransactionStatus,
     BillingSourceProvider,
 )
 
@@ -45,8 +45,24 @@ class BillingSourceResponse(BaseModel):
     billing_source_uid: UUID
     organization_id: str
     source_type: BillingSourceProvider
-    status: BillingSourceState
     created_at: datetime
+
+
+class BillingAddressResponse(BaseModel):
+    line1: str | None
+    line2: str | None
+    city: str | None
+    state: str | None
+    postal_code: str | None
+    country: str | None
+
+
+class BillingSourceDetailResponse(BillingSourceResponse):
+    provider_id: str
+    email: str | None
+    phone: str | None
+    name: str | None
+    billing_address: BillingAddressResponse | None
 
 
 class TransactionInfoResponse(BaseModel):
@@ -56,6 +72,7 @@ class TransactionInfoResponse(BaseModel):
     project_uid: UUID
     details: dict
     captured_at: datetime | None
+    status: TransactionStatus
 
 
 class InvoiceInfoResponse(BaseModel):
@@ -71,6 +88,7 @@ class InvoiceItemInfoResponse(BaseModel):
     description: str
     amount: Decimal
     project_uid: UUID | None
+    project_name: str | None
 
 
 class InvoiceDetailInfoResponse(InvoiceInfoResponse):
@@ -89,33 +107,6 @@ class UpdateSpendingLimitRequest(BaseModel):
     new_limit: ScaledAmount | None = (
         None  # if null, will remove spending limit and allow all charges to go through regardless of amount
     )
-    project_uid: UUID | None = (
-        None  # if null, will apply to whole organization instead of specific project
-    )
-
-
-class CreditInfoResponse(BaseModel):
-    credit_uid: str
-    amount: ScaledAmount
-    name: str
-    current_spent: ScaledAmount
-    start_month: int
-    start_year: int
-    exp_month: int
-    exp_year: int
-    note: str | None = None
-
-
-class AddCreditRequest(BaseModel):
-    amount: ScaledAmount
-    organization_id: str
-    name: str
-    note: str | None = None
-    amount: ScaledAmount
-    start_month: int
-    start_year: int
-    exp_month: int
-    exp_year: int
 
 
 class BillingAddress(BaseModel):
@@ -139,3 +130,18 @@ class UpdateBillingSourceRequest(BaseModel):
     new_address: BillingAddress | None
     new_email: str | None
     new_phone: str | None
+
+
+class CreditInfoResponse(BaseModel):
+    amount: Decimal
+
+
+class AddCreditRequest(BaseModel):
+    amount: ScaledAmount
+    description: str | None = None
+
+
+class CreditTransactionInfoResponse(BaseModel):
+    amount: Decimal
+    description: str
+    created_at: datetime
