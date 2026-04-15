@@ -95,7 +95,7 @@ class BaseProjectServiceTest(unittest.IsolatedAsyncioTestCase):
     def _make_service(self) -> ProjectService:
         self.session_manager = _DummySessionManager()
         self.redis = _DummyRedis()
-        return ProjectService(
+        service = ProjectService(
             session_manager=self.session_manager,
             logger=Mock(),
             project_repo=Mock(),
@@ -104,3 +104,5 @@ class BaseProjectServiceTest(unittest.IsolatedAsyncioTestCase):
             kc_client=Mock(),
             redis=self.redis,
         )
+        service._isOrgOwner = AsyncMock(return_value=Ok(False))
+        return service

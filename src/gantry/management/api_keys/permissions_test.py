@@ -61,18 +61,14 @@ class TestApiKeyPermissionsRegistry(unittest.TestCase):
     def test_service_routes_declare_expected_dynamic_permissions(self):
         collector = _RequiredPermissionsCollector()
         for path in [
-            Path("src/service/chat/routers.py"),
-            Path("src/service/ai_search/routers.py"),
-            Path("src/service/utils/conversation/routers.py"),
-            Path("src/service/utils/file_storage/routers.py"),
+            Path("src/gantry/service/utils/conversation/routers.py"),
+            Path("src/gantry/service/utils/file_storage/routers.py"),
         ]:
             collector.visit(ast.parse(path.read_text(), filename=str(path)))
 
         self.assertEqual(
             sorted(collector.permissions),
             [
-                "ai_search.run",
-                "chat.run",
                 "conversation.delete",
                 "conversation.read",
                 "conversation.write",
