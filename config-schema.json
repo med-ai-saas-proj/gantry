@@ -1,0 +1,426 @@
+{
+  "$defs": {
+    "ApiKeysSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "secret": {
+          "format": "password",
+          "title": "Secret",
+          "type": "string",
+          "writeOnly": true
+        },
+        "secret_length": {
+          "default": 32,
+          "exclusiveMinimum": 16,
+          "title": "Secret Length",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "secret"
+      ],
+      "title": "ApiKeysSettings",
+      "type": "object"
+    },
+    "AppStage": {
+      "enum": [
+        "DEV",
+        "PROD",
+        "STAGING"
+      ],
+      "title": "AppStage",
+      "type": "string"
+    },
+    "AuthSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "server_url": {
+          "default": "http://localhost:8000/",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Server Url",
+          "type": "string"
+        },
+        "client_id": {
+          "default": "example_client",
+          "title": "Client Id",
+          "type": "string"
+        },
+        "realm_name": {
+          "default": "example_realm",
+          "title": "Realm Name",
+          "type": "string"
+        }
+      },
+      "title": "AuthSettings",
+      "type": "object"
+    },
+    "BillingSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "stripe_secret_key": {
+          "format": "password",
+          "title": "Stripe Secret Key",
+          "type": "string",
+          "writeOnly": true
+        },
+        "stripe_webhook_secret": {
+          "format": "password",
+          "title": "Stripe Webhook Secret",
+          "type": "string",
+          "writeOnly": true
+        },
+        "invoice_process_interval_seconds": {
+          "default": 60,
+          "description": "Interval in seconds for processing invoices in the management service",
+          "title": "Invoice Process Interval Seconds",
+          "type": "integer"
+        },
+        "transaction_expire_check_interval_seconds": {
+          "default": 60,
+          "description": "Interval in seconds for checking and closing expired transactions",
+          "title": "Transaction Expire Check Interval Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stripe_secret_key",
+        "stripe_webhook_secret"
+      ],
+      "title": "BillingSettings",
+      "type": "object"
+    },
+    "ConversationSettings": {
+      "additionalProperties": false,
+      "description": "Settings for file storage configuration.",
+      "properties": {
+        "cache_ttl": {
+          "default": 600,
+          "title": "Cache Ttl",
+          "type": "integer"
+        },
+        "cache_limit": {
+          "default": 50,
+          "title": "Cache Limit",
+          "type": "integer"
+        }
+      },
+      "title": "ConversationSettings",
+      "type": "object"
+    },
+    "DBSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "pgvector_connection_uri": {
+          "format": "multi-host-uri",
+          "minLength": 1,
+          "title": "Pgvector Connection Uri",
+          "type": "string"
+        },
+        "timescale_connection_uri": {
+          "format": "multi-host-uri",
+          "minLength": 1,
+          "title": "Timescale Connection Uri",
+          "type": "string"
+        },
+        "redis_connection_uri": {
+          "format": "uri",
+          "minLength": 1,
+          "title": "Redis Connection Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pgvector_connection_uri",
+        "timescale_connection_uri",
+        "redis_connection_uri"
+      ],
+      "title": "DBSettings",
+      "type": "object"
+    },
+    "ExporterProtocol": {
+      "enum": [
+        "grpc",
+        "http/protobuf"
+      ],
+      "title": "ExporterProtocol",
+      "type": "string"
+    },
+    "LogLevel": {
+      "enum": [
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR",
+        "CRITICAL",
+        "FATAL"
+      ],
+      "title": "LogLevel",
+      "type": "string"
+    },
+    "LogsType": {
+      "enum": [
+        "otlp",
+        "disabled"
+      ],
+      "title": "LogsType",
+      "type": "string"
+    },
+    "MetricsType": {
+      "enum": [
+        "otlp",
+        "prometheus",
+        "disabled"
+      ],
+      "title": "MetricsType",
+      "type": "string"
+    },
+    "ObjectStorageSettings": {
+      "additionalProperties": false,
+      "description": "Settings for file storage configuration.",
+      "properties": {
+        "s3_bucket_name": {
+          "title": "S3 Bucket Name",
+          "type": "string"
+        },
+        "s3_region_name": {
+          "title": "S3 Region Name",
+          "type": "string"
+        },
+        "s3_access_key_id": {
+          "title": "S3 Access Key Id",
+          "type": "string"
+        },
+        "s3_secret_access_key": {
+          "title": "S3 Secret Access Key",
+          "type": "string"
+        },
+        "s3_endpoint_url": {
+          "title": "S3 Endpoint Url",
+          "type": "string"
+        },
+        "s3_presigned_url_expiry_seconds": {
+          "default": 3600,
+          "title": "S3 Presigned Url Expiry Seconds",
+          "type": "integer"
+        },
+        "redis_cache_expiry_seconds": {
+          "default": 3600,
+          "title": "Redis Cache Expiry Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "s3_bucket_name",
+        "s3_region_name",
+        "s3_access_key_id",
+        "s3_secret_access_key",
+        "s3_endpoint_url"
+      ],
+      "title": "ObjectStorageSettings",
+      "type": "object"
+    },
+    "ObservabilitySettings": {
+      "additionalProperties": false,
+      "properties": {
+        "exporter_otlp_endpoint": {
+          "default": "http://localhost:4317/",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Exporter Otlp Endpoint",
+          "type": "string"
+        },
+        "exporter_otlp_protocol": {
+          "$ref": "#/$defs/ExporterProtocol",
+          "default": "grpc"
+        },
+        "traces": {
+          "$ref": "#/$defs/TracesType",
+          "default": "disabled"
+        },
+        "metrics": {
+          "$ref": "#/$defs/MetricsType",
+          "default": "disabled"
+        },
+        "logs": {
+          "$ref": "#/$defs/LogsType",
+          "default": "disabled"
+        },
+        "prometheus_port": {
+          "default": 9000,
+          "title": "Prometheus Port",
+          "type": "integer"
+        }
+      },
+      "title": "ObservabilitySettings",
+      "type": "object"
+    },
+    "OrgSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "keycloak_service_client_id": {
+          "default": "med-ai-saas-backend",
+          "description": "Service account client id for Keycloak Admin API calls.",
+          "title": "Keycloak Service Client Id",
+          "type": "string"
+        },
+        "keycloak_service_client_secret": {
+          "description": "Service account client secret for Keycloak Admin API calls.",
+          "title": "Keycloak Service Client Secret",
+          "type": "string"
+        },
+        "invite_client_id": {
+          "description": "OIDC client id used for invitation registration links.",
+          "title": "Invite Client Id",
+          "type": "string"
+        },
+        "invite_redirect_uri": {
+          "default": "http://localhost:3000",
+          "description": "Redirect URI used for invitation registration links.",
+          "title": "Invite Redirect Uri",
+          "type": "string"
+        },
+        "default_rate_limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Global default rate-limit (requests/min). Individual orgs can override this.",
+          "title": "Default Rate Limit"
+        },
+        "deletion_cancel_window_days": {
+          "default": 30,
+          "description": "How many days an org deletion request can be canceled before hard deletion.",
+          "minimum": 1,
+          "title": "Deletion Cancel Window Days",
+          "type": "integer"
+        },
+        "deletion_worker_interval_seconds": {
+          "default": 60,
+          "description": "Background worker interval for processing due deletions.",
+          "minimum": 5,
+          "title": "Deletion Worker Interval Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "keycloak_service_client_secret",
+        "invite_client_id"
+      ],
+      "title": "OrgSettings",
+      "type": "object"
+    },
+    "TracesType": {
+      "enum": [
+        "otlp",
+        "disabled"
+      ],
+      "title": "TracesType",
+      "type": "string"
+    },
+    "UserLogSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "loki_url": {
+          "default": "http://localhost:3100/",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Loki Url",
+          "type": "string"
+        }
+      },
+      "title": "UserLogSettings",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "stage": {
+      "$ref": "#/$defs/AppStage",
+      "default": "DEV"
+    },
+    "allowed_origins": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        {
+          "const": "*",
+          "type": "string"
+        }
+      ],
+      "default": "*",
+      "title": "Allowed Origins"
+    },
+    "host": {
+      "default": "127.0.0.1",
+      "title": "Host",
+      "type": "string"
+    },
+    "port": {
+      "default": 8000,
+      "title": "Port",
+      "type": "integer"
+    },
+    "internal_port": {
+      "default": 9000,
+      "title": "Internal Port",
+      "type": "integer"
+    },
+    "log_level": {
+      "$ref": "#/$defs/LogLevel",
+      "default": "WARNING"
+    },
+    "db": {
+      "$ref": "#/$defs/DBSettings"
+    },
+    "apikey": {
+      "$ref": "#/$defs/ApiKeysSettings"
+    },
+    "auth": {
+      "$ref": "#/$defs/AuthSettings"
+    },
+    "billing": {
+      "$ref": "#/$defs/BillingSettings"
+    },
+    "user_log": {
+      "$ref": "#/$defs/UserLogSettings"
+    },
+    "conversation": {
+      "$ref": "#/$defs/ConversationSettings"
+    },
+    "file_storage": {
+      "$ref": "#/$defs/ObjectStorageSettings"
+    },
+    "organization": {
+      "$ref": "#/$defs/OrgSettings"
+    },
+    "observability": {
+      "$ref": "#/$defs/ObservabilitySettings"
+    }
+  },
+  "required": [
+    "db",
+    "apikey",
+    "auth",
+    "billing",
+    "user_log",
+    "conversation",
+    "file_storage",
+    "organization",
+    "observability"
+  ],
+  "title": "AppSettings",
+  "type": "object"
+}

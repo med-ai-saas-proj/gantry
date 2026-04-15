@@ -1,0 +1,56 @@
+#:schema config-schema.json
+stage = "DEV"
+allowed_origins = "*"
+port = 8000
+internal_port = 9000
+
+[db]
+timescale_connection_uri = "postgresql+asyncpg://gantry:123456@localhost:5432/gantry"
+pgvector_connection_uri = "postgresql+asyncpg://gantry:123456@localhost:5433/gantry"
+redis_connection_uri = "redis://localhost:6379/0"
+
+[apikey]
+secret = "your-minimum-16-char-secret-key"
+secret_length = 32
+
+[auth]
+server_url = "http://localhost:8080/"
+client_id = "gantry-frontend"
+realm_name = "gantry"
+
+[billing]
+stripe_secret_key = "sk_test_example_key" #apikey
+stripe_webhook_secret = ""                #apikey
+
+[user_log]
+loki_url = "http://localhost:3100/"
+
+[conversation]
+cache_ttl = 600
+cache_limit = 50
+
+[file_storage]
+# Required: S3 / Object Storage configuration
+s3_bucket_name = "my-app-bucket"             #apikey
+s3_region_name = "us-east-1"                 #apikey
+s3_access_key_id = "AKIA..."                 #apikey
+s3_secret_access_key = "secret-key"          #apikey
+s3_endpoint_url = "https://s3.amazonaws.com" #apikey
+s3_presigned_url_expiry_seconds = 3600
+redis_cache_expiry_seconds = 3600
+
+[organization]
+keycloak_service_client_id = "gantry-backend"
+keycloak_service_client_secret = "sW4f7NOGqpcNmpstgfYbeBoUigJoA5EX"
+invite_client_id = "gantry-backend"
+invite_redirect_uri = "http://localhost:3000"
+deletion_cancel_window_days = 30
+deletion_worker_interval_seconds = 60
+
+[observability]
+exporter_otlp_endpoint = "http://localhost:4317/"
+exporter_otlp_protocol = "grpc"
+traces = "disabled"
+metrics = "disabled"
+logs = "disabled"
+prometheus_port = 9000

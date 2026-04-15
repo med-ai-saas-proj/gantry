@@ -1,7 +1,7 @@
 from alembic import context
-from src.db.base import BaseSQLModel, BaseTimescaleSQLModel
-from src.main.app import main_app
-from src.db.settings import getDBSettings
+from gantry.db.base import BaseSQLModel, BaseTimescaleSQLModel
+from gantry.main.app import main_app
+from gantry.db.settings import getDBSettings
 
 import asyncio
 from logging.config import fileConfig
@@ -106,8 +106,12 @@ async def run_async_migrations() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
+    connectable = config.attributes.get("connection", None)
 
-    asyncio.run(run_async_migrations())
+    if connectable is None:
+        asyncio.run(run_async_migrations())
+    else:
+        do_run_migrations(connectable)
 
 
 if context.is_offline_mode():
