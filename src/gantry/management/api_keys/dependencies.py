@@ -46,7 +46,7 @@ def _inject_api_key_context_headers(
 def requiredPermissions(permissions: list[str]):
     """Dependency to verify the API key and create required permissions."""
     registerPermissions(permissions)
-    app_settings = getAppSettings()
+    # app_settings = getAppSettings()
 
     async def get_api_key(
         request: Request,
@@ -58,35 +58,35 @@ def requiredPermissions(permissions: list[str]):
         _inject_api_key_context_headers(request, api_key_info)
         return api_key_info
 
-    async def mock_get_api_key(
-        request: Request,
-        api_key: Annotated[str, Security(api_key_header)],
-        api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
-    ) -> ApiKeyInfo:
-        if api_key == "bypass_key":
-            api_key_info = ApiKeyInfo(
-                api_key_id=0,
-                api_key_uuid=str(uuid.UUID(int=0)),
-                user_id="test_user",
-                project_id=0,
-                project_uuid=str(uuid.UUID(int=0)),
-                org_id="test_org1",
-                organization_uuid="test_org1",
-                project_uid=str(uuid.UUID(int=0)),
-                hashed_key="mock_hashed_key",
-                permissions=permissions,
-                rpm_limit_organization=-1,
-                rpm_limit_project=-1,
-                spending_limit_organization=-1,
-                spending_limit_project=-1,
-            )
-            _inject_api_key_context_headers(request, api_key_info)
-            return api_key_info
-        raise InvalidAPIKey()
+    # async def mock_get_api_key(
+    #     request: Request,
+    #     api_key: Annotated[str, Security(api_key_header)],
+    #     api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
+    # ) -> ApiKeyInfo:
+    #     if api_key == "bypass_key":
+    #         api_key_info = ApiKeyInfo(
+    #             api_key_id=0,
+    #             api_key_uuid=str(uuid.UUID(int=0)),
+    #             user_id="test_user",
+    #             project_id=0,
+    #             project_uuid=str(uuid.UUID(int=0)),
+    #             org_id="test_org1",
+    #             organization_uuid="test_org1",
+    #             project_uid=str(uuid.UUID(int=0)),
+    #             hashed_key="mock_hashed_key",
+    #             permissions=permissions,
+    #             rpm_limit_organization=-1,
+    #             rpm_limit_project=-1,
+    #             spending_limit_organization=-1,
+    #             spending_limit_project=-1,
+    #         )
+    #         _inject_api_key_context_headers(request, api_key_info)
+    #         return api_key_info
+    #     raise InvalidAPIKey()
 
-    if app_settings.stage == AppStage.DEV:
-        # If mock_auth is enabled, bypass all auth checks and return a dummy ApiKeyInfo
-        return mock_get_api_key
+    # if app_settings.stage == AppStage.DEV:
+    #     # If mock_auth is enabled, bypass all auth checks and return a dummy ApiKeyInfo
+    #     return mock_get_api_key
     return get_api_key
 
 
@@ -97,29 +97,29 @@ async def getApiKeyInfo(
 ):
     """Dependency to get API key info without permission checks."""
 
-    app_settings = getAppSettings()
+    # app_settings = getAppSettings()
 
-    if app_settings.stage == AppStage.DEV:
-        if api_key == "bypass_key":
-            api_key_info = ApiKeyInfo(
-                api_key_id=0,
-                api_key_uuid=str(uuid.UUID(int=0)),
-                user_id="test_user",
-                project_id=0,
-                project_uuid=str(uuid.UUID(int=0)),
-                org_id="test_org1",
-                organization_uuid="test_org1",
-                project_uid=str(uuid.UUID(int=0)),
-                hashed_key="mock_hashed_key",
-                permissions=[],
-                rpm_limit_organization=-1,
-                rpm_limit_project=-1,
-                spending_limit_organization=-1,
-                spending_limit_project=-1,
-            )
-            _inject_api_key_context_headers(request, api_key_info)
-            return api_key_info
-        raise InvalidAPIKey()
+    # if app_settings.stage == AppStage.DEV:
+    #     if api_key == "bypass_key":
+    #         api_key_info = ApiKeyInfo(
+    #             api_key_id=0,
+    #             api_key_uuid=str(uuid.UUID(int=0)),
+    #             user_id="test_user",
+    #             project_id=0,
+    #             project_uuid=str(uuid.UUID(int=0)),
+    #             org_id="test_org1",
+    #             organization_uuid="test_org1",
+    #             project_uid=str(uuid.UUID(int=0)),
+    #             hashed_key="mock_hashed_key",
+    #             permissions=[],
+    #             rpm_limit_organization=-1,
+    #             rpm_limit_project=-1,
+    #             spending_limit_organization=-1,
+    #             spending_limit_project=-1,
+    #         )
+    #         _inject_api_key_context_headers(request, api_key_info)
+    #         return api_key_info
+    #     raise InvalidAPIKey()
 
     user_info = await api_key_service.parseApiKey(api_key)
     api_key_info = user_info.unwrap()

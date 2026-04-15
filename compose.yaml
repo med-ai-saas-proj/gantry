@@ -43,6 +43,8 @@ services:
         reservations:
           cpus: "0.1"
           memory: 20M
+    profile:
+      - full
 
   loki:
     image: grafana/loki:latest
@@ -64,31 +66,33 @@ services:
           cpus: "0.1"
           memory: 20M
 
-  # jaeger:
-  #   image: jaegertracing/all-in-one:latest
-  #   container_name: jaeger
-  #   command:
-  #     - "--badger.span-store-ttl=168h" # Retention period for traces and spans
-  #   user: root # to fix permission issues with badger storage (/badger/data, /badger/key)
-  #   environment:
-  #     COLLECTOR_OTLP_ENABLED: true
-  #     SPAN_STORAGE_TYPE: badger
-  #     BADGER_EPHEMERAL: false
-  #     BADGER_DIRECTORY_VALUE: /badger/data
-  #     BADGER_DIRECTORY_KEY: /badger/key
-  #   volumes:
-  #     - jaeger_data:/badger
-  #   ports:
-  #     - "16686:16686" # Jaeger UI
-  #   restart: unless-stopped
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: "0.1"
-  #         memory: 50M
-  #       reservations:
-  #         cpus: "0.1"
-  #         memory: 20M
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    command:
+      - "--badger.span-store-ttl=168h" # Retention period for traces and spans
+    user: root # to fix permission issues with badger storage (/badger/data, /badger/key)
+    environment:
+      COLLECTOR_OTLP_ENABLED: true
+      SPAN_STORAGE_TYPE: badger
+      BADGER_EPHEMERAL: false
+      BADGER_DIRECTORY_VALUE: /badger/data
+      BADGER_DIRECTORY_KEY: /badger/key
+    volumes:
+      - jaeger_data:/badger
+    ports:
+      - "16686:16686" # Jaeger UI
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
+    profile:
+      - full
 
   grafana:
     image: grafana/grafana:latest
@@ -110,6 +114,8 @@ services:
         reservations:
           cpus: "0.1"
           memory: 200M
+    profile:
+      - full
 
   timescale_db:
     image: timescale/timescaledb:latest-pg17

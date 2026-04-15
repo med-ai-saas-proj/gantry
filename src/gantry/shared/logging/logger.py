@@ -10,6 +10,7 @@ from functools import lru_cache
 import orjson
 import structlog
 from opentelemetry import trace
+from structlog.dev import ConsoleRenderer
 from structlog.stdlib import BoundLogger
 from structlog.processors import CallsiteParameter
 
@@ -74,7 +75,9 @@ def configure_default_logging(
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(min_level)
 
-    processors += [orjson_renderer]
+    processors += [
+        orjson_renderer if settings.stage != AppStage.DEV else ConsoleRenderer()
+    ]
 
     return structlog.wrap_logger(
         logger,

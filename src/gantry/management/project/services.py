@@ -473,7 +473,7 @@ class ProjectService:
                 project_uuid,
             )
             if perms_res.status == ResultStatus.Err:
-                return perms_res
+                return perms_res.into()
             if has_permission(perms_res.unwrap(), required):
                 return Ok(True)
         return Ok(False)
@@ -493,7 +493,7 @@ class ProjectService:
             actor_user_id, organization_id, ProjectPermission.PROJECTS_GET_ALL
         )
         if authz_res.status == ResultStatus.Err:
-            return authz_res
+            return authz_res.into()
         if not authz_res.unwrap():
             return Err(InsufficientProjectPermissionError())
 
@@ -560,7 +560,7 @@ class ProjectService:
                 [ProjectPermission.OWNER.value],
             )
             if set_res.status == ResultStatus.Err:
-                return set_res
+                return set_res.into()
             output = ProjectInfoResponse(
                 id=str(project.uuid),
                 name=project.name,
@@ -583,12 +583,12 @@ class ProjectService:
         """Update mutable project metadata for one active project."""
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
-            return project_res
+            return project_res.into()
         project_id, _, project_info = project_res.unwrap()
 
         active_res = self._ensureProjectActive(project_info)
         if active_res.status == ResultStatus.Err:
-            return active_res
+            return active_res.into()
 
         async with self.session_manager.get_session() as session:
             updated = await self.project_repo.updateById(

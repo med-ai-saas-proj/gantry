@@ -132,6 +132,7 @@ class KeycloakOrgClient:
                 grant_type="client_credentials",
                 client_id=self.service_client_id,
                 client_secret_key=self.service_client_secret,
+                verify=True,
             )
             self._connection = conn
             self._admin = KeycloakAdmin(connection=conn)

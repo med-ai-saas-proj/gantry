@@ -520,7 +520,9 @@
       ],
       "clientRoles": {
         "realm-management": [
-          "manage-users"
+          "manage-users",
+          "view-users",
+          "manage-realm"
         ],
         "gantry-backend": [
           "uma_protection"
@@ -832,7 +834,7 @@
         "http://localhost:3000/*"
       ],
       "webOrigins": [
-        "http://localhost:3000"
+        "http://localhost:3000/*"
       ],
       "notBefore": 0,
       "bearerOnly": false,

@@ -1,5 +1,5 @@
 from gantry.service import service_app
-from gantry.settings import getAppSettings
+from gantry.settings import AppStage, getAppSettings
 from gantry.management import management_app
 from gantry.shared.utils import request_id_utils
 from gantry.shared.consts import common_const
@@ -40,7 +40,7 @@ setupOtel(
 main_app = FastAPI(
     title=common_const.APP_NAME,
     openapi_url="/docs/openapi.json"
-    if getAppSettings().stage == "DEV"
+    if getAppSettings().stage == AppStage.DEV
     else None,
     docs_url=None,
     responses={
@@ -54,7 +54,7 @@ main_app = FastAPI(
 internal_app = FastAPI(
     title=common_const.APP_NAME,
     openapi_url="/docs/internal_openapi.json"
-    if getAppSettings().stage == "DEV"
+    if getAppSettings().stage == AppStage.DEV
     else None,
     docs_url=None,
 )
@@ -136,7 +136,7 @@ for app in apps:
     FastAPIInstrumentor.instrument_app(app)
 
 
-if getAppSettings().stage == "DEV":
+if getAppSettings().stage == AppStage.DEV:
 
     @main_app.get("/docs", include_in_schema=False)
     async def scalar_html():

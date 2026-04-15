@@ -1,4 +1,4 @@
-from gantry.settings import getAppSettings
+from gantry.settings import AppStage, getAppSettings
 from gantry.shared.consts.common_const import APP_NAME
 from gantry.shared.custom_types.error_exception import ProblemDetails
 
@@ -16,7 +16,9 @@ app_setting = getAppSettings()
 
 service_app = FastAPI(
     title=APP_NAME,
-    openapi_url="/docs/openapi.json" if app_setting.stage == "DEV" else None,
+    openapi_url="/docs/openapi.json"
+    if app_setting.stage == AppStage.DEV
+    else None,
     docs_url=None,
     responses={
         400: {"model": ProblemDetails},
@@ -45,7 +47,7 @@ v1_router.include_router(conversation_router)
 # service_app.include_router(api_router)
 service_app.include_router(v1_router)
 
-if app_setting.stage == "DEV":
+if app_setting.stage == AppStage.DEV:
 
     @service_app.get("/docs", include_in_schema=False)
     async def scalar_html():

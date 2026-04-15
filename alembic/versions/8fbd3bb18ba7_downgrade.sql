@@ -1,0 +1,1 @@
+ALTER TABLE "Project"."Projects" DROP COLUMN is_archived;
