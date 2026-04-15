@@ -35,6 +35,32 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
         self.assertIn(".project_id", str(stmt))
         self.assertIn("ORDER BY", str(stmt))
 
+    async def test_get_context_by_hashed_key_builds_joined_lookup(self):
+        execute_res = Mock()
+        execute_res.mappings.return_value.first.return_value = {
+            "api_key_id": 11,
+            "user_id": "u1",
+            "project_id": 7,
+            "hashed_key": "hashed",
+            "permissions": ["chat.run"],
+            "disabled": False,
+            "project_uuid": "proj-1",
+            "organization_uuid": "org-1",
+            "organization_rate_limit": 10,
+            "project_rate_limit": 55,
+        }
+        self.session.execute = AsyncMock(return_value=execute_res)
+
+        result = await self.repo.getContextByHashedKey(self.session, "hashed")
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["organization_uuid"], "org-1")
+        self.assertEqual(result["rpm_limit_organization"], 10)
+        self.assertEqual(result["rpm_limit_project"], 55)
+        stmt = self.session.execute.await_args.args[0]
+        self.assertIn("JOIN", str(stmt))
+        self.assertIn("organization_id", str(stmt))
+
     async def test_count_by_project_id_returns_scalar_count(self):
         execute_res = Mock()
         execute_res.scalar_one.return_value = 3

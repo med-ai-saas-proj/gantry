@@ -56,7 +56,7 @@
       "title": "AuthSettings",
       "type": "object"
     },
-    "BillingSourceSettings": {
+    "BillingSettings": {
       "additionalProperties": false,
       "properties": {
         "stripe_secret_key": {
@@ -64,12 +64,31 @@
           "title": "Stripe Secret Key",
           "type": "string",
           "writeOnly": true
+        },
+        "stripe_webhook_secret": {
+          "format": "password",
+          "title": "Stripe Webhook Secret",
+          "type": "string",
+          "writeOnly": true
+        },
+        "invoice_process_interval_seconds": {
+          "default": 60,
+          "description": "Interval in seconds for processing invoices in the management service",
+          "title": "Invoice Process Interval Seconds",
+          "type": "integer"
+        },
+        "transaction_expire_check_interval_seconds": {
+          "default": 60,
+          "description": "Interval in seconds for checking and closing expired transactions",
+          "title": "Transaction Expire Check Interval Seconds",
+          "type": "integer"
         }
       },
       "required": [
-        "stripe_secret_key"
+        "stripe_secret_key",
+        "stripe_webhook_secret"
       ],
-      "title": "BillingSourceSettings",
+      "title": "BillingSettings",
       "type": "object"
     },
     "ConversationSettings": {
@@ -359,18 +378,6 @@
       "title": "Internal Port",
       "type": "integer"
     },
-    "workers": {
-      "default": 1,
-      "exclusiveMinimum": 0,
-      "title": "Workers",
-      "type": "integer"
-    },
-    "internal_workers": {
-      "default": 1,
-      "exclusiveMinimum": 0,
-      "title": "Internal Workers",
-      "type": "integer"
-    },
     "log_level": {
       "$ref": "#/$defs/LogLevel",
       "default": "WARNING"
@@ -385,7 +392,7 @@
       "$ref": "#/$defs/AuthSettings"
     },
     "billing": {
-      "$ref": "#/$defs/BillingSourceSettings"
+      "$ref": "#/$defs/BillingSettings"
     },
     "user_log": {
       "$ref": "#/$defs/UserLogSettings"

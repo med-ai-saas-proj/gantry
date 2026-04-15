@@ -20,6 +20,7 @@ realm_name = "gantry"
 
 [billing]
 stripe_secret_key = "sk_test_example_key" #apikey
+stripe_webhook_secret = ""                #apikey
 
 [user_log]
 loki_url = "http://localhost:3100/"

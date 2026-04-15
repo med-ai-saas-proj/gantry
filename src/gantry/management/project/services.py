@@ -1,6 +1,14 @@
 """Business logic for project management."""
 
 from gantry.db.factories import AsyncSessionManager
+from gantry.management.billing.cache_keys import (
+    BILLING_CACHE_TTL_SECONDS,
+    billing_project_spending_limit_key,
+)
+from gantry.management.organization.cache_keys import (
+    ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
+    project_rpm_limit_key,
+)
 from gantry.management.organization.permissions import (
     OrgPermission,
     has_permission as has_org_permission,
@@ -19,6 +27,7 @@ from .dtos import (
     ProjectListResponse,
     ProjectUserResponse,
     ProjectArchiveResponse,
+    ProjectSettingsResponse,
     ProjectUserListResponse,
     ProjectUserPermissionsResponse,
 )
@@ -29,11 +38,16 @@ from .permissions import (
     decode_project_permission,
     encode_project_permission,
 )
-from .repositories import ProjectRepository, ProjectMemberRepository
+from .repositories import (
+    ProjectRepository,
+    ProjectMemberRepository,
+    ProjectSettingsRepository,
+)
 
 from typing import Any
 
 from pyrusult import Ok, Err, Result, ResultStatus
+from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 
 
@@ -104,13 +118,17 @@ class ProjectService:
         logger: BoundLogger,
         project_repo: ProjectRepository,
         membership_repo: ProjectMemberRepository,
+        settings_repo: ProjectSettingsRepository,
         kc_client: KeycloakOrgClient,
+        redis: Redis | None = None,
     ):
         self.session_manager = session_manager
         self.logger = logger
         self.project_repo = project_repo
         self.membership_repo = membership_repo
+        self.settings_repo = settings_repo
         self.kc = kc_client
+        self.redis = redis
 
     async def _ensureUserInOrg(
         self,
@@ -159,6 +177,67 @@ class ProjectService:
         if project_info.archived:
             return Err(ProjectArchivedError())
         return Ok(None)
+
+    def _flattenSettings(
+        self,
+        data: dict[str, Any],
+        prefix: str = "",
+    ) -> dict[str, Any]:
+        """Flatten nested project settings into dot-delimited keys."""
+        flattened: dict[str, Any] = {}
+        for key, value in data.items():
+            full_key = f"{prefix}.{key}" if prefix else key
+            if isinstance(value, dict):
+                flattened.update(self._flattenSettings(value, full_key))
+            else:
+                flattened[full_key] = value
+        return flattened
+
+    async def _cacheProjectRateLimit(
+        self,
+        org_id: str,
+        project_id: int,
+        rate_limit: int | None,
+    ) -> None:
+        """Persist project RPM to Redis for fast API-key lookups."""
+        if self.redis is None:
+            return
+        try:
+            await self.redis.set(
+                project_rpm_limit_key(org_id, project_id),
+                -1 if rate_limit is None else int(rate_limit),
+                ex=ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
+            )
+        except Exception as exc:
+            self.logger.warning(
+                "project_rpm_limit_cache_write_failed",
+                org_id=org_id,
+                project_id=project_id,
+                error=str(exc),
+            )
+
+    async def _cacheProjectSpendingLimit(
+        self,
+        org_id: str,
+        project_id: int,
+        spending_limit: int | None,
+    ) -> None:
+        """Persist the project spending limit to the billing Redis key."""
+        if self.redis is None:
+            return
+        try:
+            await self.redis.set(
+                billing_project_spending_limit_key(org_id, project_id),
+                -1 if spending_limit is None else int(spending_limit),
+                ex=BILLING_CACHE_TTL_SECONDS,
+            )
+        except Exception as exc:
+            self.logger.warning(
+                "project_spending_limit_cache_write_failed",
+                org_id=org_id,
+                project_id=project_id,
+                error=str(exc),
+            )
 
     def _extractProjectPermissions(
         self,
@@ -530,6 +609,79 @@ class ProjectService:
                     archived=updated.is_archived,
                 )
             )
+
+    async def getProjectSettings(
+        self,
+        project_uuid: str,
+    ) -> Result[
+        ProjectSettingsResponse,
+        ProjectNotFoundError,
+    ]:
+        """Fetch settings for one project, creating an empty row when missing."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res
+        project_id, org_id, _ = project_res.unwrap()
+
+        async with self.session_manager.get_session() as session:
+            settings = await self.settings_repo.getOrCreate(session, project_id)
+            output = ProjectSettingsResponse(
+                rate_limit=settings.rate_limit,
+                spending_limit=settings.spending_limit,
+                extra=settings.extra or {},
+            )
+            await session.commit()
+            await self._cacheProjectRateLimit(
+                org_id, project_id, settings.rate_limit
+            )
+            await self._cacheProjectSpendingLimit(
+                org_id, project_id, settings.spending_limit
+            )
+            return Ok(output)
+
+    async def updateProjectSettings(
+        self,
+        project_uuid: str,
+        rate_limit: int | None,
+        spending_limit: int | None,
+        extra: dict[str, Any],
+    ) -> Result[
+        ProjectSettingsResponse,
+        ProjectNotFoundError | ProjectArchivedError,
+    ]:
+        """Persist project settings and refresh the RPM cache."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res
+        project_id, org_id, project_info = project_res.unwrap()
+
+        active_res = self._ensureProjectActive(project_info)
+        if active_res.status == ResultStatus.Err:
+            return active_res
+
+        flattened_extra = self._flattenSettings(extra)
+
+        async with self.session_manager.get_session() as session:
+            settings = await self.settings_repo.upsert(
+                session,
+                project_id,
+                rate_limit,
+                spending_limit,
+                flattened_extra,
+            )
+            output = ProjectSettingsResponse(
+                rate_limit=settings.rate_limit,
+                spending_limit=settings.spending_limit,
+                extra=settings.extra or {},
+            )
+            await session.commit()
+            await self._cacheProjectRateLimit(
+                org_id, project_id, settings.rate_limit
+            )
+            await self._cacheProjectSpendingLimit(
+                org_id, project_id, settings.spending_limit
+            )
+            return Ok(output)
 
     async def listProjectUsers(
         self,

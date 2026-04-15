@@ -25,27 +25,31 @@ class TestApiKeyFactories(unittest.TestCase):
         )()
         with (
             patch(
-                "src.management.api_keys.factories.getApiKeysSettings",
+                "gantry.management.api_keys.factories.getApiKeysSettings",
                 return_value=settings,
             ),
             patch(
-                "src.management.api_keys.factories.getLogger",
+                "gantry.management.api_keys.factories.getLogger",
                 return_value="logger",
             ),
             patch(
-                "src.management.api_keys.factories.getSessionManager",
+                "gantry.management.api_keys.factories.getSessionManager",
                 return_value="session-manager",
             ),
             patch(
-                "src.management.api_keys.factories.ApiKeyRepository",
+                "gantry.management.api_keys.factories.getRedis",
+                return_value="redis-client",
+            ),
+            patch(
+                "gantry.management.api_keys.factories.ApiKeyRepository",
                 return_value="api-key-repo",
             ),
             patch(
-                "src.management.api_keys.factories.ProjectRepository",
+                "gantry.management.api_keys.factories.ProjectRepository",
                 return_value="project-repo",
             ),
             patch(
-                "src.management.api_keys.factories.ApiKeyService"
+                "gantry.management.api_keys.factories.ApiKeyService"
             ) as service_cls,
         ):
             service_cls.return_value = "api-key-service"
@@ -61,4 +65,5 @@ class TestApiKeyFactories(unittest.TestCase):
             api_key_repo="api-key-repo",
             project_repo="project-repo",
             session_manager="session-manager",
+            redis="redis-client",
         )

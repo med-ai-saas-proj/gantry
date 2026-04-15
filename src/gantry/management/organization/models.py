@@ -9,7 +9,7 @@ from gantry.db.utils import WithID, WithCreateUpdateTimestamp
 
 from datetime import datetime
 
-from sqlalchemy import JSON, String, Integer, DateTime, func
+from sqlalchemy import JSON, String, Integer, DateTime, BigInteger, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 
@@ -33,6 +33,12 @@ class OrgSettings(WithCreateUpdateTimestamp, OrgBaseSQLModel):
         nullable=True,
         default=None,
         doc="Requests per minute. NULL inherits global default.",
+    )
+    spending_limit: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+        default=None,
+        doc="Monthly spending limit as a scaled integer. NULL means unlimited.",
     )
     extra: Mapped[dict] = mapped_column(
         JSON,

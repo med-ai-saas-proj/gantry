@@ -5,6 +5,7 @@ CREATE SCHEMA IF NOT EXISTS "Organization";
 CREATE TABLE IF NOT EXISTS "Organization"."Settings" (
     org_id VARCHAR(128) NOT NULL,
     rate_limit INTEGER,
+    spending_limit BIGINT,
     extra JSON NOT NULL DEFAULT '{}',
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,

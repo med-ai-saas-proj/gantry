@@ -53,6 +53,148 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertEqual(len(res.unwrap().results), 1)
         self.assertEqual(res.unwrap().results[0].id, "u2")
 
+    async def test_get_project_settings_creates_missing_row_and_writes_cache(
+        self,
+    ):
+        service = self._make_service()
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok(
+                (
+                    10,
+                    "org-1",
+                    SimpleNamespace(archived=False),
+                )
+            )
+        )
+        service.settings_repo.getOrCreate = AsyncMock(
+            return_value=SimpleNamespace(
+                rate_limit=120,
+                spending_limit=6000,
+                extra={"burst": True},
+            )
+        )
+
+        res = await service.getProjectSettings("proj-1")
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().rate_limit, 120)
+        self.assertEqual(res.unwrap().spending_limit, 6000)
+        self.assertEqual(res.unwrap().extra, {"burst": True})
+        self.redis.set.assert_awaited()
+
+    async def test_update_project_settings_flattens_extra_and_updates_cache(
+        self,
+    ):
+        service = self._make_service()
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok(
+                (
+                    10,
+                    "org-1",
+                    SimpleNamespace(archived=False),
+                )
+            )
+        )
+        service.settings_repo.upsert = AsyncMock(
+            return_value=SimpleNamespace(
+                rate_limit=90,
+                spending_limit=7000,
+                extra={"ui.theme": "dark"},
+            )
+        )
+
+        res = await service.updateProjectSettings(
+            "proj-1",
+            90,
+            7000,
+            {"ui": {"theme": "dark"}},
+        )
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().spending_limit, 7000)
+        self.assertEqual(res.unwrap().extra, {"ui.theme": "dark"})
+        service.settings_repo.upsert.assert_awaited_once()
+        self.redis.set.assert_awaited()
+
+    async def test_get_project_settings_caches_negative_one_for_missing_rate_limit(
+        self,
+    ):
+        service = self._make_service()
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok(
+                (
+                    10,
+                    "org-1",
+                    SimpleNamespace(archived=False),
+                )
+            )
+        )
+        service.settings_repo.getOrCreate = AsyncMock(
+            return_value=SimpleNamespace(
+                rate_limit=None,
+                spending_limit=None,
+                extra={},
+            )
+        )
+
+        res = await service.getProjectSettings("proj-1")
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertIsNone(res.unwrap().rate_limit)
+        self.assertIsNone(res.unwrap().spending_limit)
+        self.redis.set.assert_any_await(
+            "organization:rpm_limit:org-1:proj:10",
+            -1,
+            ex=36000,
+        )
+        self.redis.set.assert_any_await(
+            "billing:spending_limit:org-1:proj:10",
+            -1,
+            ex=36000,
+        )
+
+    async def test_update_project_settings_caches_negative_one_for_missing_rate_limit(
+        self,
+    ):
+        service = self._make_service()
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok(
+                (
+                    10,
+                    "org-1",
+                    SimpleNamespace(archived=False),
+                )
+            )
+        )
+        service.settings_repo.upsert = AsyncMock(
+            return_value=SimpleNamespace(
+                rate_limit=None,
+                spending_limit=None,
+                extra={"burst": False},
+            )
+        )
+
+        res = await service.updateProjectSettings(
+            "proj-1",
+            None,
+            None,
+            {"burst": False},
+        )
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertIsNone(res.unwrap().rate_limit)
+        self.assertIsNone(res.unwrap().spending_limit)
+        self.redis.set.assert_any_await(
+            "organization:rpm_limit:org-1:proj:10",
+            -1,
+            ex=36000,
+        )
+        self.redis.set.assert_any_await(
+            "billing:spending_limit:org-1:proj:10",
+            -1,
+            ex=36000,
+        )
+
     async def test_list_project_users_propagates_org_member_lookup_error(self):
         """Project user listing should return upstream org-member lookup errors."""
         # Arrange

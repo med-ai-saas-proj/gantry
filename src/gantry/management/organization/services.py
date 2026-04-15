@@ -4,6 +4,10 @@ Orchestrates the Keycloak admin client and Postgres repositories.
 """
 
 from gantry.db.factories import AsyncSessionManager
+from gantry.management.billing.cache_keys import (
+    BILLING_CACHE_TTL_SECONDS,
+    billing_org_spending_limit_key,
+)
 from gantry.shared.custom_types.error_exception import RecoverableError
 
 from .dtos import (
@@ -17,6 +21,10 @@ from .dtos import (
     UserPermissionsResponse,
 )
 from .settings import getOrgSettings
+from .cache_keys import (
+    ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
+    organization_rpm_limit_key,
+)
 from .permissions import OrgPermission, has_permission
 from .repositories import (
     OrgSettingsRepository,
@@ -35,6 +43,7 @@ from typing import Any
 from datetime import UTC, datetime, timedelta
 
 from pyrusult import Ok, Err, Result, ResultStatus
+from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 
 
@@ -160,17 +169,57 @@ class OrgService:
         deletion_repo: OrgDeletionRequestRepository,
         session_manager: AsyncSessionManager,
         logger: BoundLogger,
+        redis: Redis | None = None,
     ):
         self.kc = kc_client
         self.settings_repo = settings_repo
         self.deletion_repo = deletion_repo
         self.session_manager = session_manager
         self.logger = logger
+        self.redis = redis
 
     def _computeCancelBefore(self, requested_at: datetime) -> datetime:
         """Compute the deletion cancellation deadline from settings."""
         days = getOrgSettings().deletion_cancel_window_days
         return requested_at + timedelta(days=days)
+
+    async def _cacheOrgRateLimit(
+        self, org_id: str, rate_limit: int | None
+    ) -> None:
+        """Persist the org RPM limit to Redis for fast downstream reads."""
+        if self.redis is None:
+            return
+        try:
+            await self.redis.set(
+                organization_rpm_limit_key(org_id),
+                -1 if rate_limit is None else int(rate_limit),
+                ex=ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
+            )
+        except Exception as exc:
+            self.logger.warning(
+                "organization_rpm_limit_cache_write_failed",
+                org_id=org_id,
+                error=str(exc),
+            )
+
+    async def _cacheOrgSpendingLimit(
+        self, org_id: str, spending_limit: int | None
+    ) -> None:
+        """Persist the org spending limit to the billing Redis key."""
+        if self.redis is None:
+            return
+        try:
+            await self.redis.set(
+                billing_org_spending_limit_key(org_id),
+                -1 if spending_limit is None else int(spending_limit),
+                ex=BILLING_CACHE_TTL_SECONDS,
+            )
+        except Exception as exc:
+            self.logger.warning(
+                "organization_spending_limit_cache_write_failed",
+                org_id=org_id,
+                error=str(exc),
+            )
 
     async def _ensureOrgExists(
         self, org_id: str
@@ -487,15 +536,19 @@ class OrgService:
             settings = await self.settings_repo.getOrCreate(session, org_id)
             output = OrgSettingsResponse(
                 rate_limit=settings.rate_limit,
+                spending_limit=settings.spending_limit,
                 extra=settings.extra or {},
             )
             await session.commit()
+            await self._cacheOrgRateLimit(org_id, settings.rate_limit)
+            await self._cacheOrgSpendingLimit(org_id, settings.spending_limit)
             return Ok(output)
 
     async def updateSettings(
         self,
         org_id: str,
         rate_limit: int | None,
+        spending_limit: int | None,
         extra: dict[str, Any],
     ) -> Result[OrgSettingsResponse, OrgNotFoundError | KeycloakOrgError]:
         """Persist organization settings after flattening nested extra data."""
@@ -507,13 +560,20 @@ class OrgService:
 
         async with self.session_manager.get_session() as session:
             settings = await self.settings_repo.upsert(
-                session, org_id, rate_limit, flattened_extra
+                session,
+                org_id,
+                rate_limit,
+                spending_limit,
+                flattened_extra,
             )
             output = OrgSettingsResponse(
                 rate_limit=settings.rate_limit,
+                spending_limit=settings.spending_limit,
                 extra=settings.extra or {},
             )
             await session.commit()
+            await self._cacheOrgRateLimit(org_id, settings.rate_limit)
+            await self._cacheOrgSpendingLimit(org_id, settings.spending_limit)
             return Ok(output)
 
     # users

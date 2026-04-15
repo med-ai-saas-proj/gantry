@@ -24,7 +24,7 @@ from fastapi import Body, Query, Header, Depends
 
 @billing_router.post("/")
 async def post(
-    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo())],
+    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
     body: Annotated[PostRequest, Body()],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
@@ -45,7 +45,7 @@ async def post(
 @billing_router.post("/{transaction_uid}/capture")
 async def capture(
     transaction_uid: UUID,
-    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo())],
+    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
     body: Annotated[CaptureRequest, Body()],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
@@ -66,7 +66,7 @@ async def capture(
     "/transactions",
     description="List transactions with optional filters (e.g. project_id, date range, etc.). Supports pagination.",
 )
-async def list_transactions(
+async def listTransactions(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
@@ -79,14 +79,16 @@ async def list_transactions(
     limit: int = 100,
     offset: int = 0,
 ) -> PaginatedResponse[TransactionInfoResponse]:
-    res, total = await billing_service.getTransactions(
-        org_id=user_info["org_id"],
-        project_uids=project_uids,
-        start_date=start_date,
-        end_date=end_date,
-        limit=limit,
-        offset=offset,
-    )
+    res, total = (
+        await billing_service.getTransactions(
+            org_id=user_info["org_id"],
+            project_uids=project_uids,
+            start_date=start_date,
+            end_date=end_date,
+            limit=limit,
+            offset=offset,
+        )
+    ).unwrap()
     return PaginatedResponse[TransactionInfoResponse](
         data=res, total=total, offset=offset, limit=limit
     )
@@ -96,7 +98,7 @@ async def list_transactions(
     "/transactions/{transaction_uid}",
     description="Get details for a specific transaction, including amount, date, associated project, etc.",
 )
-async def get_transaction_details(
+async def getTransactionDetails(
     transaction_uid: UUID,
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[

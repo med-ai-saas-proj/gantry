@@ -30,6 +30,18 @@ CREATE TABLE IF NOT EXISTS "Project"."ProjectMembers" (
 
 CREATE INDEX IF NOT EXISTS "ProjectMembers_user_id_idx" ON "Project"."ProjectMembers" (user_id);
 
+CREATE TABLE IF NOT EXISTS "Project"."Settings" (
+    project_id BIGINT NOT NULL,
+    rate_limit INTEGER,
+    spending_limit BIGINT,
+    extra JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT now() NOT NULL,
+    CONSTRAINT "ProjectSettings_pkey" PRIMARY KEY (project_id),
+    CONSTRAINT "ProjectSettings_project_id_fkey"
+        FOREIGN KEY (project_id) REFERENCES "Project"."Projects" (id) ON DELETE CASCADE
+);
+
 ALTER TABLE "Organization"."Settings"
     ALTER COLUMN extra TYPE JSONB
     USING extra::jsonb;

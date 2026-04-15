@@ -3,7 +3,7 @@
 from gantry.db.repository import Repository
 from gantry.shared.utils.uuid_utils import uuid7
 
-from .models import Project, ProjectMember
+from .models import Project, ProjectMember, ProjectSettings
 
 from uuid import UUID
 
@@ -211,3 +211,67 @@ class ProjectMemberRepository(Repository[ProjectMember, int]):
         )
         res = await session.execute(stmt)
         return int(res.scalar() or 0)
+
+
+class ProjectSettingsRepository(Repository[ProjectSettings, int]):
+    """Repository for project settings."""
+
+    def __init__(self):
+        super().__init__(ProjectSettings, ProjectSettings.project_id)
+
+    async def getOrCreate(
+        self,
+        session: AsyncSession,
+        project_id: int,
+    ) -> ProjectSettings:
+        """Return existing settings or insert a default row atomically."""
+        insert_stmt = pg_insert(ProjectSettings).values(project_id=project_id)
+        stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[ProjectSettings.project_id],
+            set_={"project_id": insert_stmt.excluded.project_id},
+        ).returning(ProjectSettings)
+        res = await session.execute(stmt)
+        return res.scalar_one()
+
+    async def upsert(
+        self,
+        session: AsyncSession,
+        project_id: int,
+        rate_limit: int | None,
+        spending_limit: int | None,
+        extra: dict,
+    ) -> ProjectSettings:
+        stmt = (
+            pg_insert(ProjectSettings)
+            .values(
+                project_id=project_id,
+                rate_limit=rate_limit,
+                spending_limit=spending_limit,
+                extra=extra,
+            )
+            .on_conflict_do_update(
+                index_elements=[ProjectSettings.project_id],
+                set_={
+                    "rate_limit": rate_limit,
+                    "spending_limit": spending_limit,
+                    "extra": extra,
+                    "updated_at": func.now(),
+                },
+            )
+            .returning(ProjectSettings)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one()
+
+    async def deleteByProjectId(
+        self,
+        session: AsyncSession,
+        project_id: int,
+    ) -> bool:
+        stmt = (
+            delete(ProjectSettings)
+            .where(ProjectSettings.project_id == project_id)
+            .returning(ProjectSettings.project_id)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none() is not None

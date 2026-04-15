@@ -1,11 +1,15 @@
 """Factory functions for Project module singletons."""
 
-from gantry.db.factories import getSessionManager
+from gantry.db.factories import getRedis, getSessionManager
 from gantry.shared.logging.logger import getLogger
 from gantry.management.organization.factories import getKeycloakOrgClient
 
 from .services import ProjectService
-from .repositories import ProjectRepository, ProjectMemberRepository
+from .repositories import (
+    ProjectRepository,
+    ProjectMemberRepository,
+    ProjectSettingsRepository,
+)
 
 from functools import lru_cache
 
@@ -18,5 +22,7 @@ def getProjectService() -> ProjectService:
         logger=getLogger(),
         project_repo=ProjectRepository(),
         membership_repo=ProjectMemberRepository(),
+        settings_repo=ProjectSettingsRepository(),
         kc_client=getKeycloakOrgClient(),
+        redis=getRedis(),
     )

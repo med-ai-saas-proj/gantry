@@ -21,15 +21,15 @@ class TestOrganizationFactories(unittest.TestCase):
         )
         with (
             patch(
-                "src.management.organization.factories.getAuthSettings",
+                "gantry.management.organization.factories.getAuthSettings",
                 return_value=auth,
             ),
             patch(
-                "src.management.organization.factories.getOrgSettings",
+                "gantry.management.organization.factories.getOrgSettings",
                 return_value=org_settings,
             ),
             patch(
-                "src.management.organization.factories.KeycloakOrgClient"
+                "gantry.management.organization.factories.KeycloakOrgClient"
             ) as mock_cls,
         ):
             mock_cls.return_value = "kc-client"
@@ -49,27 +49,31 @@ class TestOrganizationFactories(unittest.TestCase):
     def test_get_org_service_builds_singleton(self):
         with (
             patch(
-                "src.management.organization.factories.getKeycloakOrgClient",
+                "gantry.management.organization.factories.getKeycloakOrgClient",
                 return_value="kc-client",
             ),
             patch(
-                "src.management.organization.factories.OrgSettingsRepository",
+                "gantry.management.organization.factories.OrgSettingsRepository",
                 return_value="settings-repo",
             ),
             patch(
-                "src.management.organization.factories.OrgDeletionRequestRepository",
+                "gantry.management.organization.factories.OrgDeletionRequestRepository",
                 return_value="deletion-repo",
             ),
             patch(
-                "src.management.organization.factories.getSessionManager",
+                "gantry.management.organization.factories.getSessionManager",
                 return_value="session-manager",
             ),
             patch(
-                "src.management.organization.factories.getLogger",
+                "gantry.management.organization.factories.getRedis",
+                return_value="redis-client",
+            ),
+            patch(
+                "gantry.management.organization.factories.getLogger",
                 return_value="logger",
             ),
             patch(
-                "src.management.organization.factories.OrgService"
+                "gantry.management.organization.factories.OrgService"
             ) as mock_cls,
         ):
             mock_cls.return_value = "org-service"
@@ -85,4 +89,5 @@ class TestOrganizationFactories(unittest.TestCase):
             deletion_repo="deletion-repo",
             session_manager="session-manager",
             logger="logger",
+            redis="redis-client",
         )

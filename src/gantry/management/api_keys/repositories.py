@@ -1,8 +1,9 @@
 """API key repository."""
 
 from gantry.db.repository import Repository
-from gantry.management.project.models import Project
-from gantry.management.api_keys.entities import ApiKeyInfo
+from gantry.management.project.models import Project, ProjectSettings
+from gantry.management.api_keys.entities import ApiKeyInfo, ApiKeyContextRecord
+from gantry.management.organization.models import OrgSettings
 
 from .models import ApiKey
 
@@ -29,6 +30,63 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         )
         return await self.selectOne(session, stmt)
 
+    async def getContextByHashedKey(
+        self,
+        session: AsyncSession,
+        hashed_key: str,
+    ) -> ApiKeyContextRecord | None:
+        stmt = (
+            select(
+                ApiKey.id.label("api_key_id"),
+                ApiKey.user_id,
+                ApiKey.project_id,
+                ApiKey.hashed_key,
+                ApiKey.permissions,
+                ApiKey.disabled,
+                Project.uuid.label("project_uuid"),
+                Project.organization_id.label("organization_uuid"),
+                OrgSettings.rate_limit.label("organization_rate_limit"),
+                ProjectSettings.rate_limit.label("project_rate_limit"),
+            )
+            .select_from(ApiKey)
+            .join(Project, ApiKey.project_id == Project.id)
+            .outerjoin(
+                OrgSettings,
+                OrgSettings.org_id == Project.organization_id,
+            )
+            .outerjoin(
+                ProjectSettings,
+                ProjectSettings.project_id == Project.id,
+            )
+            .where(ApiKey.hashed_key == hashed_key)
+            .limit(1)
+        )
+        row = (await session.execute(stmt)).mappings().first()
+        if row is None:
+            return None
+        return ApiKeyContextRecord(
+            api_key_id=int(row["api_key_id"]),
+            user_id=str(row["user_id"]),
+            project_id=int(row["project_id"]),
+            organization_uuid=str(row["organization_uuid"]),
+            project_uuid=str(row["project_uuid"]),
+            hashed_key=str(row["hashed_key"]),
+            permissions=list(row["permissions"] or []),
+            disabled=bool(row["disabled"]),
+            rpm_limit_organization=(
+                int(row["organization_rate_limit"])
+                if row["organization_rate_limit"] is not None
+                else -1
+            ),
+            rpm_limit_project=(
+                int(row["project_rate_limit"])
+                if row["project_rate_limit"] is not None
+                else -1
+            ),
+            spending_limit_organization=-1,
+            spending_limit_project=-1,
+        )
+
     async def getByHashedKeys(
         self, session: AsyncSession, hashed_keys: list[str]
     ) -> Sequence[ApiKeyInfo]:
@@ -38,6 +96,7 @@ class ApiKeyRepository(Repository[ApiKey, int]):
                 ApiKey.user_id,
                 ApiKey.project_id,
                 ApiKey.id,
+                ApiKey.permissions,
                 Project.uuid.label("project_uid"),
                 Project.organization_id,
             )
@@ -49,15 +108,23 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         return [
             ApiKeyInfo(
                 {
-                    "api_key_id": key.id,
-                    "user_id": str(key.user_id),
-                    "project_id": key.project_id,
-                    "project_uid": str(key.project_uid),
-                    "org_id": key.organization_id,
-                    "hashed_key": key.hashed_key,
+                    "api_key_id": int(key["id"]),
+                    "api_key_uuid": "",
+                    "user_id": str(key["user_id"]),
+                    "project_id": int(key["project_id"]),
+                    "project_uuid": str(key["project_uid"]),
+                    "project_uid": str(key["project_uid"]),
+                    "org_id": str(key["organization_id"]),
+                    "organization_uuid": str(key["organization_id"]),
+                    "hashed_key": str(key["hashed_key"]),
+                    "permissions": list(key["permissions"] or []),
+                    "rpm_limit_organization": -1,
+                    "rpm_limit_project": -1,
+                    "spending_limit_organization": -1,
+                    "spending_limit_project": -1,
                 }
             )
-            for key in result.scalars().all()
+            for key in result.mappings().all()
         ]
 
     async def getByProjectId(

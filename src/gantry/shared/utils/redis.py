@@ -111,3 +111,48 @@ async def redis_get_or_load[T](
     if v := await getter(redis):
         return v
     return None
+
+
+async def redis_check_or_load[T](
+    redis: Redis,
+    session_manager: AsyncSessionManager,
+    lock_id: str,
+    lock_ttl: int,
+    lock_blocking_timeout: int,
+    checker: Callable[[Redis], Awaitable[bool]],
+    loader: Callable[[AsyncSession], Awaitable[T]],
+    setter: Callable[[Redis, T], Awaitable[None]],
+    retry_times: int = 3,
+) -> bool:
+    """Helper to get a value from Redis or load it using the provided loader function."""
+    for _ in range(retry_times):
+        if await checker(redis):
+            return True
+        async with redis_lock(
+            redis,
+            f"billing:redis_get_or_load_lock:{lock_id}",
+            lock_ttl=lock_ttl,
+            blocking_timeout=lock_blocking_timeout,
+        ) as lock_acquired:
+            if not lock_acquired:
+                # Failed to acquire lock, likely another process is loading the value. Wait and retry.
+                await asyncio.sleep(0.2)
+                continue
+
+            # Double-check after acquiring the lock
+            if await checker(redis):
+                return True
+
+            # Load the value using the provided loader function
+            try:
+                async with session_manager.get_session() as session:
+                    loaded_value = await loader(session)
+                    await setter(redis, loaded_value)
+            except Exception as e:
+                await asyncio.sleep(
+                    0.2
+                )  # Sleep before retrying on loader failure
+                continue
+            return True
+
+    return bool(await checker(redis))

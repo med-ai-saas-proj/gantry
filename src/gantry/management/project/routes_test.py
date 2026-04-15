@@ -5,6 +5,7 @@ from gantry.management.project.dtos import (
     CreateProjectRequest,
     UpdateProjectRequest,
     AddProjectUserRequest,
+    UpdateProjectSettingsRequest,
     ProjectUserPermissionsRequest,
 )
 from gantry.management.project.permissions import (
@@ -25,6 +26,10 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         service.listUserProjects = AsyncMock(return_value=Ok("user-projects"))
         service.createProject = AsyncMock(return_value=Ok("created"))
         service.updateProject = AsyncMock(return_value=Ok("updated"))
+        service.getProjectSettings = AsyncMock(return_value=Ok("settings"))
+        service.updateProjectSettings = AsyncMock(
+            return_value=Ok("settings-updated")
+        )
 
         self.assertEqual(
             (await routes.list_project_permissions()).permissions,
@@ -63,6 +68,27 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
                 service,
             ),
             "updated",
+        )
+        self.assertEqual(
+            await routes.get_project_settings(
+                {"id": "u1", "roles": []},
+                "proj-1",
+                service,
+            ),
+            "settings",
+        )
+        self.assertEqual(
+            await routes.update_project_settings(
+                {"id": "u1", "roles": []},
+                "proj-1",
+                UpdateProjectSettingsRequest(
+                    rate_limit=120,
+                    spending_limit=5000,
+                    extra={"mode": "burst"},
+                ),
+                service,
+            ),
+            "settings-updated",
         )
 
     async def test_membership_and_permission_routes(self):

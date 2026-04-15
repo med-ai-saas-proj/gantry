@@ -4,6 +4,8 @@ from gantry.db.factories import (
     getRedis,
     getSessionManager,
 )
+from gantry.management.project.repositories import ProjectSettingsRepository
+from gantry.management.organization.repositories import OrgSettingsRepository
 
 from .settings import getBillingSetting
 from ..api_keys.factories import getApiKeyService
@@ -20,7 +22,6 @@ from .services.billing_source_service import (
 from .repositories.billing_source_repo import (
     BillingSourceRepo,
 )
-from .repositories.spending_limit_repo import SpendingLimitRepository
 from .services.aggregate_query_service import BillingAggregateQueryService
 
 from functools import lru_cache
@@ -34,7 +35,8 @@ def getBillingTransactionService() -> TransactionService:
         logger=getLogger(),
         session_manager=getSessionManager(),
         redis=getRedis(),
-        spending_limit_repo=SpendingLimitRepository(),
+        org_settings_repo=OrgSettingsRepository(),
+        project_settings_repo=ProjectSettingsRepository(),
         transaction_repo=TransactionRepository(),
         apikey_service=getApiKeyService(),
     )

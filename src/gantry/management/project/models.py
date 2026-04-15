@@ -6,8 +6,10 @@ from gantry.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     String,
     Boolean,
+    Integer,
     DateTime,
     BigInteger,
     ForeignKey,
@@ -56,4 +58,35 @@ class ProjectMember(WithCreateUpdateTimestamp, ProjectBaseSQLModel):
         nullable=False,
         server_default=func.now(),
         init=False,
+    )
+
+
+class ProjectSettings(WithCreateUpdateTimestamp, ProjectBaseSQLModel):
+    """Per-project settings stored in Postgres."""
+
+    __tablename__ = "Settings"
+
+    project_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey(Project.id, ondelete="CASCADE"),
+        primary_key=True,
+    )
+    rate_limit: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        default=None,
+        doc="Requests per minute. NULL inherits organization/default limit.",
+    )
+    spending_limit: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+        default=None,
+        doc="Monthly spending limit as a scaled integer. NULL means unlimited.",
+    )
+    extra: Mapped[dict] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+        server_default="{}",
+        doc="Additional flat key-value settings.",
     )
