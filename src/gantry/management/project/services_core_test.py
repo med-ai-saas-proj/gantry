@@ -238,6 +238,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         service._getProjectOrErr = AsyncMock(
             return_value=Ok((1, "org-1", active_info))
         )
+        service._isOrgOwner = AsyncMock(return_value=Ok(False))
         service._getMemberPermissions = AsyncMock(
             return_value=Ok([ProjectPermission.OWNER.value])
         )
@@ -251,6 +252,30 @@ class TestProjectServiceCore(BaseProjectServiceTest):
 
         # Assert
         self.assertTrue(result.status == ResultStatus.Ok)
+
+    async def test_authorize_project_permission_org_owner_bypasses_membership(
+        self,
+    ):
+        """Organization owner should pass project auth without project membership."""
+        # Arrange
+        service = self._make_service()
+        active_info = SimpleNamespace(archived=False)
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((1, "org-1", active_info))
+        )
+        service._isOrgOwner = AsyncMock(return_value=Ok(True))
+        service._getMemberPermissions = AsyncMock()
+
+        # Act
+        result = await service.authorizeProjectPermission(
+            "project-uuid",
+            "u-org-owner",
+            ProjectPermission.USERS_REMOVE,
+        )
+
+        # Assert
+        self.assertTrue(result.status == ResultStatus.Ok)
+        service._getMemberPermissions.assert_not_awaited()
 
     async def test_project_owner_can_read_other_user_permissions_via_inherited_rw(
         self,
@@ -544,6 +569,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Org project list should return DTO when actor has permission."""
         # Arrange
         service = self._make_service()
+        service._isOrgOwner = AsyncMock(return_value=Ok(False))
         service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(True))
         service.project_repo.listByOrg = AsyncMock(
             return_value=[
@@ -564,10 +590,37 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().total, 1)
 
+    async def test_list_org_projects_org_owner_can_view_all(self):
+        """Organization owner should list every project in the organization."""
+        # Arrange
+        service = self._make_service()
+        service._isOrgOwner = AsyncMock(return_value=Ok(True))
+        service._hasOrgWideProjectPermission = AsyncMock()
+        service.project_repo.listByOrg = AsyncMock(
+            return_value=[
+                SimpleNamespace(
+                    uuid="p1",
+                    name="P1",
+                    description=None,
+                    organization_id="org-1",
+                    is_archived=False,
+                )
+            ]
+        )
+
+        # Act
+        res = await service.listOrgProjects("u-org-owner", "org-1")
+
+        # Assert
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().total, 1)
+        service._hasOrgWideProjectPermission.assert_not_awaited()
+
     async def test_list_org_projects_denied_without_org_wide_permission(self):
         """Org project listing should fail without projects.get_all."""
         # Arrange
         service = self._make_service()
+        service._isOrgOwner = AsyncMock(return_value=Ok(False))
         service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(False))
 
         # Act

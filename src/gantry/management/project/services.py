@@ -291,6 +291,27 @@ class ProjectService:
             return attrs_res.into()
         return Ok(self._extractOrgPermissions(attrs_res.unwrap()))
 
+    async def _isOrgOwner(
+        self,
+        org_id: str,
+        user_id: str,
+    ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
+        """Return whether the actor is organization owner for the project org."""
+        org_perms_res = await self._getOrgPermissions(org_id, user_id)
+        if org_perms_res.status == ResultStatus.Err:
+            if isinstance(
+                org_perms_res.err(),
+                UserNotInOrganizationError,
+            ):
+                return Ok(False)
+            return org_perms_res.into()
+        return Ok(
+            has_org_permission(
+                org_perms_res.unwrap(),
+                OrgPermission.OWNER,
+            )
+        )
+
     async def _getPermissionsFromAttrs(
         self,
         user_id: str,
@@ -404,11 +425,16 @@ class ProjectService:
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
             return project_res
-        project_id, _, project_info = project_res.unwrap()
+        project_id, org_id, project_info = project_res.unwrap()
         if not allow_archived:
             active_res = self._ensureProjectActive(project_info)
             if active_res.status == ResultStatus.Err:
                 return active_res
+        org_owner_res = await self._isOrgOwner(org_id, user_id)
+        if org_owner_res.status == ResultStatus.Err:
+            return org_owner_res
+        if org_owner_res.unwrap():
+            return Ok(None)
         perms_res = await self._getMemberPermissions(
             project_id, project_uuid, user_id
         )
@@ -489,13 +515,19 @@ class ProjectService:
         | InsufficientProjectPermissionError,
     ]:
         """List every project in an org when actor has org-wide project access."""
-        authz_res = await self._hasOrgWideProjectPermission(
-            actor_user_id, organization_id, ProjectPermission.PROJECTS_GET_ALL
-        )
-        if authz_res.status == ResultStatus.Err:
-            return authz_res.into()
-        if not authz_res.unwrap():
-            return Err(InsufficientProjectPermissionError())
+        org_owner_res = await self._isOrgOwner(organization_id, actor_user_id)
+        if org_owner_res.status == ResultStatus.Err:
+            return org_owner_res.into()
+        if not org_owner_res.unwrap():
+            authz_res = await self._hasOrgWideProjectPermission(
+                actor_user_id,
+                organization_id,
+                ProjectPermission.PROJECTS_GET_ALL,
+            )
+            if authz_res.status == ResultStatus.Err:
+                return authz_res.into()
+            if not authz_res.unwrap():
+                return Err(InsufficientProjectPermissionError())
 
         async with self.session_manager.get_session() as session:
             projects = await self.project_repo.listByOrg(
@@ -896,23 +928,27 @@ class ProjectService:
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
             return project_res.into()
-        project_id, _, project_info = project_res.unwrap()
+        project_id, org_id, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
         if active_res.status == ResultStatus.Err:
             return active_res.into()
 
-        actor_perms_res = await self._getMemberPermissions(
-            project_id, project_uuid, actor_user_id
-        )
-        if actor_perms_res.status == ResultStatus.Err:
-            return actor_perms_res.into()
-        actor_perms = actor_perms_res.unwrap()
+        org_owner_res = await self._isOrgOwner(org_id, actor_user_id)
+        if org_owner_res.status == ResultStatus.Err:
+            return org_owner_res.into()
+        if not org_owner_res.unwrap():
+            actor_perms_res = await self._getMemberPermissions(
+                project_id, project_uuid, actor_user_id
+            )
+            if actor_perms_res.status == ResultStatus.Err:
+                return actor_perms_res.into()
+            actor_perms = actor_perms_res.unwrap()
 
-        if (
-            ProjectPermission.USERS_PERMISSIONS_RW.value in permissions
-            and not has_permission(actor_perms, ProjectPermission.OWNER)
-        ):
-            return Err(OwnerRequiredForGrantError())
+            if (
+                ProjectPermission.USERS_PERMISSIONS_RW.value in permissions
+                and not has_permission(actor_perms, ProjectPermission.OWNER)
+            ):
+                return Err(OwnerRequiredForGrantError())
 
         async with self.session_manager.get_session() as session:
             target = await self.membership_repo.getMembership(

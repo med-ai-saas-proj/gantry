@@ -168,6 +168,41 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().permissions, ["project.users.get_all"])
 
+    async def test_org_owner_can_update_permissions_without_project_membership(
+        self,
+    ):
+        """Organization owner should bypass project membership checks."""
+        # Arrange
+        service = self._make_service()
+        active_info = SimpleNamespace(archived=False)
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((10, "org-1", active_info))
+        )
+        service._isOrgOwner = AsyncMock(return_value=Ok(True))
+        service._getMemberPermissions = AsyncMock()
+        service.membership_repo.getMembership = AsyncMock(
+            return_value=SimpleNamespace(user_id="target")
+        )
+        service._getPermissionsFromAttrs = AsyncMock(return_value=Ok([]))
+        service.kc.getUserAttributes = AsyncMock(return_value=Ok({}))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
+
+        # Act
+        res = await service.updateUserPermissions(
+            "proj-1",
+            "u-org-owner",
+            "target",
+            ["project.users.permissions.read_write"],
+        )
+
+        # Assert
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(
+            res.unwrap().permissions,
+            ["project.users.permissions.read_write"],
+        )
+        service._getMemberPermissions.assert_not_awaited()
+
     async def test_update_user_permissions_cannot_remove_last_owner(self):
         """Permission updates should reject stripping owner from the last owner."""
         # Arrange
