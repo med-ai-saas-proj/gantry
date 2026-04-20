@@ -16,6 +16,34 @@ class FileRepository(Repository):
         """Initialize FileRepository."""
         super().__init__(File, File.id)
 
+    async def getIdsByUUIDs(
+        self,
+        session: AsyncSession,
+        file_uids: Sequence[uuid.UUID],
+        project_id: int,
+    ) -> Sequence[int]:
+        """Get file IDs by UUIDs."""
+        stmt = select(File.id).where(
+            File.uuid.in_(file_uids) & (File.project_id == project_id)
+        )
+        res = await session.execute(stmt)
+        file_ids = res.scalars().all()
+        return file_ids
+
+    async def getAvailableByIds(
+        self, session: AsyncSession, file_ids: Sequence[int]
+    ) -> Sequence[File]:
+        """Get files by IDs."""
+        stmt = (
+            select(File)
+            .select_from(File)
+            .where(
+                (File.id.in_(file_ids)) & (File.status == FileStatus.AVAILABLE)
+            )
+        )
+        res = await session.execute(stmt)
+        return res.scalars().all()
+
     async def getAvailableByUUID(
         self, session: AsyncSession, file_uuid: uuid.UUID, project_id: int
     ) -> File | None:

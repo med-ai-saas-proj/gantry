@@ -77,3 +77,15 @@ class WithCreateUpdateTimestamp(MappedAsDataclass, kw_only=True):
         nullable=False,
         init=False,
     )
+
+
+class WithCreateTimestamp(MappedAsDataclass, kw_only=True):
+    """Add created_at to table."""
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        # default=datetime.now(UTC).replace(tzinfo=None),
+        server_default=func.now(),
+        nullable=False,
+        init=False,
+    )

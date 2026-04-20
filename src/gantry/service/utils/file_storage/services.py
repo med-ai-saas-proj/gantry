@@ -196,7 +196,7 @@ class FileStorageService:
             return Ok(
                 FileRecord(
                     {
-                        "id": json_data["id"],
+                        "uid": uuid.UUID(json_data["uid"]),
                         "filename": json_data["filename"],
                         "storage_path": json_data["storage_path"],
                         "mime_type": json_data["mime_type"],
@@ -217,7 +217,7 @@ class FileStorageService:
                 return Err(FileNotFoundInSystemError())
 
             res: FileRecord = {
-                "id": str(file_record.uuid),
+                "uid": file_record.uuid,
                 "filename": file_record.original_filename,
                 "storage_path": file_record.filepath,
                 "mime_type": file_record.mime_type,
@@ -287,7 +287,7 @@ class FileStorageService:
             )
             return [
                 {
-                    "id": str(file_record.uuid),
+                    "uid": file_record.uuid,
                     "filename": file_record.original_filename,
                     "storage_path": file_record.filepath,
                     "mime_type": file_record.mime_type,

@@ -82,29 +82,29 @@ async def _getUserInfo(
 
 getUserInfo = _getUserInfo
 
-# if app_settings.stage == AppStage.DEV:
-#     from gantry.management.auth.services import UnauthorizedError
+if app_settings.stage == AppStage.DEV:
+    from gantry.management.auth.services import UnauthorizedError
 
-#     from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-#     # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
-#     security = HTTPBearer()
+    # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
+    security = HTTPBearer()
 
-#     async def mock_getUserInfo(
-#         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-#         auth_service: Annotated[AuthService, Depends(getAuthService)],
-#     ) -> UserInfo:
-#         if auth.credentials == "bypass_token":
-#             return UserInfo(
-#                 id="test_user",
-#                 username="test_user",
-#                 email="test_user@example.com",
-#                 roles=[],
-#                 org_id="test_org1",
-#             )
-#         raise UnauthorizedError()
+    async def mock_getUserInfo(
+        auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+        auth_service: Annotated[AuthService, Depends(getAuthService)],
+    ) -> UserInfo:
+        if auth.credentials == "bypass_token":
+            return UserInfo(
+                id="test_user",
+                username="test_user",
+                email="test_user@example.com",
+                roles=[],
+                org_id="test_org1",
+            )
+        raise UnauthorizedError()
 
-#     getUserInfo = mock_getUserInfo
+    getUserInfo = mock_getUserInfo
 
 
 async def getUserOrgId(

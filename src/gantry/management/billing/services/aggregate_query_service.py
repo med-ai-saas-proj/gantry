@@ -1,7 +1,7 @@
 from gantry.db.session import AsyncSessionManager
 from gantry.management.projects.models import Project
+from gantry.management.project.services import ProjectNotFoundError
 from gantry.management.api_keys.services import ApiKeyService, InvalidAPIKey
-from gantry.shared.custom_types.error_exception import RecoverableError
 
 from ..type import AggregatePeriod, BillingAggregateReport
 from ..repositories.transaction_repo import TransactionRepository
@@ -13,17 +13,6 @@ from datetime import UTC, datetime
 from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import select
 from structlog.stdlib import BoundLogger
-
-
-class ProjectNotFound(RecoverableError):
-    status = 404
-    code = "project_not_found"
-    title = "Project Not Found"
-    detail = "One or more project UUIDs were not found in the organization."
-
-    def __init__(self, message: str):
-        super().__init__()
-        self.message = message
 
 
 class BillingAggregateQueryService:
@@ -47,7 +36,7 @@ class BillingAggregateQueryService:
         end_time: datetime | None,
         aggregate_period: AggregatePeriod,
         period_scale: int,
-    ) -> Result[Sequence[BillingAggregateReport], ProjectNotFound]:
+    ) -> Result[Sequence[BillingAggregateReport], ProjectNotFoundError]:
         """Fetch the current total_amount for the given project/org/period."""
         if project_uids is not None and len(project_uids) > 0:
             async with self.session_manager.get_session() as session:
@@ -63,7 +52,7 @@ class BillingAggregateQueryService:
                 missing_project_uids = set(project_uids) - existed_project_uids
                 if missing_project_uids:
                     return Err(
-                        ProjectNotFound(
+                        ProjectNotFoundError(
                             message=f"Project UUIDs not found: {', '.join(str(uid) for uid in missing_project_uids)}"
                         )
                     )

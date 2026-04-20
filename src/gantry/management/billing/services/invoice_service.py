@@ -35,12 +35,10 @@ import asyncio
 from uuid import UUID
 from typing import Sequence
 from decimal import Decimal
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
-from regex import F
 from stripe import Invoice, StripeError, StripeClient
 from pyrusult import Ok, Err, Result, ResultStatus
-from sqlalchemy import update
 from structlog.stdlib import BoundLogger
 
 

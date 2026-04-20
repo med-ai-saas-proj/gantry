@@ -95,7 +95,7 @@ async def list_files(
     )
     return [
         FileInfoResponse(
-            id=str(file_info["id"]),
+            id=str(file_info["uid"]),
             filename=file_info["filename"],
             mime_type=file_info["mime_type"],
             size=file_info["size"],
@@ -168,7 +168,7 @@ async def get_file_info_and_presigned_url(
         )
     ).unwrap()
     return FileInfoWithPresignedURLResponse(
-        id=str(file_info["id"]),
+        id=str(file_info["uid"]),
         filename=file_info["filename"],
         mime_type=file_info["mime_type"],
         size=file_info["size"],
@@ -200,7 +200,7 @@ async def get_file_info(
         )
     ).unwrap()
     return FileInfoResponse(
-        id=str(file_info["id"]),
+        id=str(file_info["uid"]),
         filename=file_info["filename"],
         mime_type=file_info["mime_type"],
         size=file_info["size"],

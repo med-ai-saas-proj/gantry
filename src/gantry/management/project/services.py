@@ -64,6 +64,15 @@ class ProjectNotFoundError(RecoverableError):
     title = "Project Not Found"
     detail = "The specified project does not exist."
 
+    def __init__(
+        self,
+        from_exception: Exception | None = None,
+        message: str | None = None,
+    ):
+        super().__init__(from_exception)
+        if message is not None:
+            self.message = message
+
 
 class UserNotInProjectError(RecoverableError):
     status = 404

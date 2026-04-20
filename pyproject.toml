@@ -41,6 +41,7 @@ dependencies = [
     "stripe>=14.4.1",
     "pyrusult",
     "apscheduler>=3.11.2",
+    "pgvector>=0.4.2",
 ]
 
 [project.scripts]

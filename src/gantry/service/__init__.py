@@ -2,6 +2,7 @@ from gantry.settings import AppStage, getAppSettings
 from gantry.shared.consts.common_const import APP_NAME
 from gantry.shared.custom_types.error_exception import ProblemDetails
 
+from .utils.rag import rag_router
 from .utils.conversation import conversation_router
 from .utils.file_storage import file_storage_router
 
@@ -38,6 +39,7 @@ service_app.add_middleware(
 )
 
 v1_router = APIRouter(prefix="/v1", tags=["service"], include_in_schema=True)
+v1_router.include_router(rag_router)
 v1_router.include_router(file_storage_router)
 v1_router.include_router(conversation_router)
 
