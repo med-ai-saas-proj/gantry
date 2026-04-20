@@ -1,3 +1,4 @@
+from gantry.service.utils.rag.type import ChunkSplitterType
 from gantry.service.utils.file_storage.dtos import FileInfoResponse
 
 from uuid import UUID
@@ -19,6 +20,11 @@ class AddRagFileRequest(BaseModel):
     """DTO for adding a file (with embedding) to a RAG bucket."""
 
     file_uid: UUID
+    chunk_splitter: ChunkSplitterType = Field(
+        default=ChunkSplitterType.recursive
+    )
+    chunk_size: int = Field(default=1000, gt=0)
+    chunk_overlap: int = Field(default=150, ge=0)
 
 
 class RagEmbeddingResponse(BaseModel):

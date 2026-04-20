@@ -6,6 +6,7 @@ from datetime import datetime
 class FileRecord(TypedDict):
     """Representation of a file record in storage."""
 
+    id: int
     uid: UUID
     filename: str
     mime_type: str

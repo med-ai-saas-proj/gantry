@@ -41,9 +41,7 @@ class RagMetadata(WithCreateTimestamp, WithID, RagBaseSQLModel):
         index=True,
         nullable=False,
     )
-
     model_name: Mapped[str] = mapped_column(Text, nullable=False)
-    bucket_params: Mapped[RagParameters] = mapped_column(JSONB, nullable=False)
 
 
 class RagData(WithCreateTimestamp, WithID, RagBaseSQLModel):

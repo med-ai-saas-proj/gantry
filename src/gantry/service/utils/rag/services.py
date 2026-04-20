@@ -4,6 +4,7 @@ from gantry.service.utils.rag.type import (
     RagParameters,
     VectorOpsType,
     VectorIndexType,
+    ChunkSplitterType,
     RagEmbeddingRecord,
 )
 from gantry.service.utils.rag.utils import (
@@ -16,15 +17,28 @@ from gantry.service.utils.rag.models import RagMetadata
 from gantry.service.utils.rag.settings import RagSettings
 from gantry.management.project.repositories import ProjectRepository
 from gantry.service.utils.file_storage.types import FileRecord
-from gantry.service.utils.file_storage.services import FileNotFoundInSystemError
-from gantry.shared.custom_types.error_exception import RecoverableError
+from gantry.service.utils.file_storage.services import (
+    FileStorageService,
+    FileNotFoundInSystemError,
+)
+from gantry.shared.custom_types.error_exception import (
+    RecoverableError,
+    InternalServiceError,
+)
 from gantry.service.utils.file_storage.repositories import FileRepository
 
+import io
+import re
+import csv
+import json
 import uuid
+import importlib
 from typing import Sequence
 
-from pyrusult import Ok, Err, Result
-from sqlalchemy import text, select
+from openai import AsyncOpenAI
+from pyrusult import Ok, Err, Result, ResultStatus
+from sqlalchemy import func, text, delete, select
+from sqlalchemy.dialects.postgresql import insert
 
 
 class BucketNotFoundError(RecoverableError):
@@ -41,15 +55,376 @@ class RagService:
         project_repo: ProjectRepository,
         file_repo: FileRepository,
         setting: RagSettings,
+        file_storage_service: FileStorageService,
+        openai_client: AsyncOpenAI | None = None,
     ):
         self.session_manager = session_manager
         self.project_repo = project_repo
         self.file_repo = file_repo
         self.setting = setting
+        self.file_storage_service = file_storage_service
+        if openai_client:
+            self.openai_client = openai_client
+        elif setting.openai_api_key:
+            self.openai_client = AsyncOpenAI(
+                api_key=setting.openai_api_key.get_secret_value()
+            )
+        else:
+            self.openai_client = AsyncOpenAI()
 
-    def getTableName(
-        self, dimension: int, index_params: IndexParams, ops_type: VectorOpsType
+    def _splitByCharacterWindow(
+        self,
+        text_content: str,
+        chunk_size: int,
+        chunk_overlap: int,
+    ) -> list[str]:
+        chunks: list[str] = []
+        step = max(1, chunk_size - chunk_overlap)
+        for start in range(0, len(text_content), step):
+            chunk = text_content[start : start + chunk_size].strip()
+            if chunk:
+                chunks.append(chunk)
+        return chunks
+
+    def _splitByTokenWindow(
+        self,
+        text_content: str,
+        chunk_size: int,
+        chunk_overlap: int,
+    ) -> list[str]:
+        tokens = text_content.split()
+        if not tokens:
+            return []
+        chunks: list[str] = []
+        step = max(1, chunk_size - chunk_overlap)
+        for start in range(0, len(tokens), step):
+            chunk = " ".join(tokens[start : start + chunk_size]).strip()
+            if chunk:
+                chunks.append(chunk)
+        return chunks
+
+    def _splitByRecursiveSeparators(
+        self,
+        text_content: str,
+        chunk_size: int,
+        chunk_overlap: int,
+    ) -> list[str]:
+        paragraphs = [part.strip() for part in text_content.split("\n\n")]
+        chunks: list[str] = []
+        for paragraph in paragraphs:
+            if not paragraph:
+                continue
+            if len(paragraph) <= chunk_size:
+                chunks.append(paragraph)
+                continue
+            chunks.extend(
+                self._splitByCharacterWindow(
+                    paragraph,
+                    chunk_size,
+                    chunk_overlap,
+                )
+            )
+        return chunks
+
+    def _splitByMarkdownSections(
+        self,
+        text_content: str,
+        chunk_size: int,
+        chunk_overlap: int,
+    ) -> list[str]:
+        pattern = re.compile(r"(?m)^#{1,6}\s+")
+        starts = [match.start() for match in pattern.finditer(text_content)]
+        if not starts:
+            return self._splitByRecursiveSeparators(
+                text_content,
+                chunk_size,
+                chunk_overlap,
+            )
+        starts.append(len(text_content))
+        sections: list[str] = []
+        for i in range(len(starts) - 1):
+            section = text_content[starts[i] : starts[i + 1]].strip()
+            if section:
+                sections.append(section)
+        chunks: list[str] = []
+        for section in sections:
+            if len(section) <= chunk_size:
+                chunks.append(section)
+                continue
+            chunks.extend(
+                self._splitByCharacterWindow(
+                    section,
+                    chunk_size,
+                    chunk_overlap,
+                )
+            )
+        return chunks
+
+    def _splitBySpaCyLikeSentences(
+        self,
+        text_content: str,
+        chunk_size: int,
+        chunk_overlap: int,
+    ) -> list[str]:
+        sentences = [
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+", text_content)
+            if sentence.strip()
+        ]
+        if not sentences:
+            return []
+        chunks: list[str] = []
+        current: list[str] = []
+        current_len = 0
+        for sentence in sentences:
+            sentence_len = len(sentence)
+            if current and current_len + sentence_len > chunk_size:
+                chunks.append(" ".join(current))
+                if chunk_overlap > 0:
+                    overlap_text = " ".join(current)
+                    overlap_slice = overlap_text[-chunk_overlap:].strip()
+                    current = [overlap_slice] if overlap_slice else []
+                    current_len = len(overlap_slice)
+                else:
+                    current = []
+                    current_len = 0
+            current.append(sentence)
+            current_len += sentence_len + 1
+        if current:
+            chunks.append(" ".join(current))
+        return [chunk for chunk in chunks if chunk.strip()]
+
+    def _splitContent(
+        self,
+        text_content: str,
+        chunk_splitter: ChunkSplitterType,
+        chunk_size: int,
+        chunk_overlap: int,
+    ) -> list[str]:
+        if chunk_splitter in (
+            ChunkSplitterType.simple,
+            ChunkSplitterType.character,
+        ):
+            return self._splitByCharacterWindow(
+                text_content,
+                chunk_size,
+                chunk_overlap,
+            )
+        if chunk_splitter == ChunkSplitterType.recursive:
+            return self._splitByRecursiveSeparators(
+                text_content,
+                chunk_size,
+                chunk_overlap,
+            )
+        if chunk_splitter == ChunkSplitterType.token:
+            return self._splitByTokenWindow(
+                text_content,
+                chunk_size,
+                chunk_overlap,
+            )
+        if chunk_splitter == ChunkSplitterType.markdown:
+            return self._splitByMarkdownSections(
+                text_content,
+                chunk_size,
+                chunk_overlap,
+            )
+        if chunk_splitter == ChunkSplitterType.paragraph:
+            parts = [part.strip() for part in text_content.split("\n\n")]
+            return [part for part in parts if part]
+        if chunk_splitter == ChunkSplitterType.line:
+            parts = [part.strip() for part in text_content.splitlines()]
+            return [part for part in parts if part]
+        if chunk_splitter == ChunkSplitterType.spacy:
+            return self._splitBySpaCyLikeSentences(
+                text_content,
+                chunk_size,
+                chunk_overlap,
+            )
+        return self._splitByRecursiveSeparators(
+            text_content,
+            chunk_size,
+            chunk_overlap,
+        )
+
+    @staticmethod
+    def _stringifyTable(
+        rows: Sequence[Sequence[object | None]],
     ) -> str:
+        serialized_rows: list[str] = []
+        for row in rows:
+            parts: list[str] = []
+            for cell in row:
+                parts.append("" if cell is None else str(cell).strip())
+            line = "\t".join(parts).strip()
+            if line:
+                serialized_rows.append(line)
+        return "\n".join(serialized_rows).strip()
+
+    def _extractFromPdf(self, content: bytes) -> str:
+        pypdf_module = importlib.import_module("pypdf")
+        pdf_reader = getattr(pypdf_module, "PdfReader")
+
+        reader = pdf_reader(io.BytesIO(content))
+        chunks: list[str] = []
+        for page in reader.pages:
+            page_text = page.extract_text() or ""
+            page_text = page_text.strip()
+            if page_text:
+                chunks.append(page_text)
+        return "\n\n".join(chunks).strip()
+
+    def _extractFromDocx(self, content: bytes) -> str:
+        docx_module = importlib.import_module("docx")
+        docx_document = getattr(docx_module, "Document")
+
+        document = docx_document(io.BytesIO(content))
+        parts: list[str] = []
+        for paragraph in document.paragraphs:
+            text_part = paragraph.text.strip()
+            if text_part:
+                parts.append(text_part)
+        for table in document.tables:
+            table_rows: list[list[object | None]] = []
+            for row in table.rows:
+                table_rows.append([cell.text.strip() for cell in row.cells])
+            table_text = self._stringifyTable(table_rows)
+            if table_text:
+                parts.append(table_text)
+        return "\n\n".join(parts).strip()
+
+    @staticmethod
+    def _extractFromDelimitedText(content: bytes, delimiter: str) -> str:
+        text_content = content.decode("utf-8", errors="ignore")
+        reader = csv.reader(io.StringIO(text_content), delimiter=delimiter)
+        rows = [row for row in reader]
+        return RagService._stringifyTable(rows)
+
+    def _extractFromExcel(self, content: bytes) -> str:
+        openpyxl_module = importlib.import_module("openpyxl")
+        load_workbook = getattr(openpyxl_module, "load_workbook")
+
+        workbook = load_workbook(
+            io.BytesIO(content),
+            read_only=True,
+            data_only=True,
+        )
+        sheets: list[str] = []
+        for worksheet in workbook.worksheets:
+            rows: list[list[object | None]] = []
+            for row in worksheet.iter_rows(values_only=True):
+                rows.append(list(row))
+            table_text = self._stringifyTable(rows)
+            if table_text:
+                sheets.append(f"# Sheet: {worksheet.title}\n{table_text}")
+        return "\n\n".join(sheets).strip()
+
+    @staticmethod
+    def _extractFromJson(content: bytes) -> str:
+        parsed = json.loads(content.decode("utf-8", errors="ignore"))
+        if isinstance(parsed, list):
+            return "\n".join(
+                json.dumps(item, ensure_ascii=False) for item in parsed
+            ).strip()
+        if isinstance(parsed, dict):
+            return json.dumps(parsed, ensure_ascii=False, indent=2).strip()
+        return str(parsed).strip()
+
+    @staticmethod
+    def _extractFromJsonLines(content: bytes) -> str:
+        lines = content.decode("utf-8", errors="ignore").splitlines()
+        parsed_lines: list[str] = []
+        for line in lines:
+            clean = line.strip()
+            if not clean:
+                continue
+            parsed_lines.append(
+                json.dumps(json.loads(clean), ensure_ascii=False)
+            )
+        return "\n".join(parsed_lines).strip()
+
+    @staticmethod
+    def _extractFromParquet(content: bytes) -> str:
+        parquet = importlib.import_module("pyarrow.parquet")
+
+        table = parquet.read_table(io.BytesIO(content))
+        return "\n".join(
+            json.dumps(row, default=str, ensure_ascii=False)
+            for row in table.to_pylist()
+        ).strip()
+
+    @staticmethod
+    def _extractFromFeather(content: bytes) -> str:
+        feather = importlib.import_module("pyarrow.feather")
+
+        table = feather.read_table(io.BytesIO(content))
+        return "\n".join(
+            json.dumps(row, default=str, ensure_ascii=False)
+            for row in table.to_pylist()
+        ).strip()
+
+    def _extractTextContent(
+        self,
+        file_info: FileRecord,
+        content: bytes,
+    ) -> Result[str, InternalServiceError]:
+        filename = file_info["filename"].lower()
+        mime_type = (file_info.get("mime_type") or "").lower()
+
+        is_pdf = filename.endswith(".pdf") or "application/pdf" in mime_type
+        is_docx = (
+            filename.endswith(".docx")
+            or "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            in mime_type
+        )
+        is_csv = filename.endswith(".csv") or "text/csv" in mime_type
+        is_tsv = (
+            filename.endswith(".tsv")
+            or "text/tab-separated-values" in mime_type
+        )
+        is_xlsx = (
+            filename.endswith(".xlsx")
+            or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            in mime_type
+        )
+        is_json = filename.endswith(".json") or "application/json" in mime_type
+        is_jsonl = filename.endswith(".jsonl") or filename.endswith(".ndjson")
+        is_parquet = (
+            filename.endswith(".parquet")
+            or "application/vnd.apache.parquet" in mime_type
+        )
+        is_feather = filename.endswith(".feather")
+
+        try:
+            if is_pdf:
+                return Ok(self._extractFromPdf(content))
+            if is_docx:
+                return Ok(self._extractFromDocx(content))
+            if is_csv:
+                return Ok(self._extractFromDelimitedText(content, ","))
+            if is_tsv:
+                return Ok(self._extractFromDelimitedText(content, "\t"))
+            if is_xlsx:
+                return Ok(self._extractFromExcel(content))
+            if is_json:
+                return Ok(self._extractFromJson(content))
+            if is_jsonl:
+                return Ok(self._extractFromJsonLines(content))
+            if is_parquet:
+                return Ok(self._extractFromParquet(content))
+            if is_feather:
+                return Ok(self._extractFromFeather(content))
+            return Ok(content.decode("utf-8", errors="ignore").strip())
+        except Exception as exc:
+            return Err(
+                InternalServiceError(
+                    message=f"Failed to parse file content: {exc}"
+                )
+            )
+
+    def getTableName(self, rag_store_parameters: RagParameters) -> str:
+        dimension = rag_store_parameters["dimension"]
+        index_params = rag_store_parameters["index_params"]
+        ops_type = rag_store_parameters["ops_type"]
         if index_params["index_type"] == VectorIndexType.hnsw:
             m = (
                 index_params["m"]
@@ -77,9 +452,10 @@ class RagService:
     def getIndexName(
         self,
         table_name: str,
-        index_params: IndexParams,
-        ops_type: VectorOpsType,
+        rag_store_parameters: RagParameters,
     ) -> str:
+        index_params = rag_store_parameters["index_params"]
+        ops_type = rag_store_parameters["ops_type"]
         if index_params["index_type"] == VectorIndexType.hnsw:
             m = (
                 index_params["m"]
@@ -106,13 +482,15 @@ class RagService:
 
     async def createBucket(
         self,
-        dimension: int,
-        index_params: IndexParams,
-        ops_type: VectorOpsType,
     ):
         async with self.session_manager.get_session() as session:
-            table_name = self.getTableName(dimension, index_params, ops_type)
-            index_name = self.getIndexName(table_name, index_params, ops_type)
+            table_name = self.getTableName(self.setting.rag_store_parameters)
+            index_name = self.getIndexName(
+                table_name, self.setting.rag_store_parameters
+            )
+            ops_type = self.setting.rag_store_parameters["ops_type"]
+            index_params = self.setting.rag_store_parameters["index_params"]
+            dimension = self.setting.rag_store_parameters["dimension"]
             await create_embedding_table(
                 session, table_name, dimension=dimension
             )
@@ -125,8 +503,96 @@ class RagService:
         self,
         file_uid: uuid.UUID,
         project_id: int,
-    ) -> Result[None, BucketNotFoundError | FileNotFoundInSystemError]:
-        pass
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+    ) -> Result[
+        None,
+        BucketNotFoundError | FileNotFoundInSystemError | InternalServiceError,
+    ]:
+        res = await self.file_storage_service.getFileInfoAndContent(
+            file_uid, project_id
+        )
+        if res.status == ResultStatus.Err:
+            return res.into()
+        file_info, content = res.unwrap()
+
+        text_content_res = self._extractTextContent(file_info, content)
+        if text_content_res.status == ResultStatus.Err:
+            return text_content_res.into()
+        text_content = text_content_res.unwrap()
+        if not text_content:
+            return Ok(None)
+
+        chunks = self._splitContent(
+            text_content,
+            chunk_splitter,
+            chunk_size,
+            chunk_overlap,
+        )
+        if not chunks:
+            return Ok(None)
+
+        embedding_response = await self.openai_client.embeddings.create(
+            model=self.setting.embedding_model,
+            input=chunks,
+        )
+        embeddings = [item.embedding for item in embedding_response.data]
+        if not embeddings:
+            return Ok(None)
+        if len(embeddings) != len(chunks):
+            return Err(
+                InternalServiceError(
+                    message="Failed to generate embeddings for all chunks."
+                )
+            )
+
+        async with self.session_manager.get_session() as session:
+            table_name = self.getTableName(self.setting.rag_store_parameters)
+
+            DynamicBucket = get_orm_class(table_name, len(embeddings[0]))
+
+            await session.execute(
+                insert(RagMetadata)
+                .values(
+                    file_id=file_info["id"],
+                    project_id=project_id,
+                    model_name=self.setting.embedding_model,
+                )
+                .on_conflict_do_update(
+                    index_elements=[
+                        RagMetadata.file_id,
+                        RagMetadata.project_id,
+                    ],
+                    set_={
+                        "created_at": func.now(),
+                        "model_name": self.setting.embedding_model,
+                    },
+                )
+                .returning(RagMetadata.id)
+            )
+
+            await session.execute(
+                delete(DynamicBucket).where(
+                    DynamicBucket.file_id == file_info["id"],
+                    DynamicBucket.project_id == project_id,
+                )
+            )
+            session.add_all(
+                [
+                    DynamicBucket(
+                        embedding=embedding,
+                        file_id=file_info["id"],
+                        text=chunk,
+                        project_id=project_id,
+                    )
+                    for chunk, embedding in zip(chunks, embeddings)
+                ]
+            )
+            await session.flush()
+            await session.commit()
+
+        return Ok(None)
 
     async def addEmbedding(
         self,
@@ -141,12 +607,7 @@ class RagService:
             )
             if not file_info:
                 return Err(FileNotFoundInSystemError())
-            rag_parameters = self.setting.rag_parameters
-            table_name = self.getTableName(
-                rag_parameters["dimension"],
-                rag_parameters["index_params"],
-                rag_parameters["ops_type"],
-            )
+            table_name = self.getTableName(self.setting.rag_store_parameters)
             DynamicBucket = get_orm_class(
                 table_name, 0
             )  # dimension is not needed for insertion
@@ -178,6 +639,7 @@ class RagService:
             )
             return [
                 {
+                    "id": file_info.id,
                     "uid": file_info.uuid,
                     "filename": file_info.original_filename,
                     "mime_type": file_info.mime_type,
@@ -197,23 +659,17 @@ class RagService:
         top_k: int = 5,
     ) -> Sequence[RagEmbeddingRecord]:
         async with self.session_manager.get_session() as session:
-            rag_parameters = self.setting.rag_parameters
-            table_name = self.getTableName(
-                rag_parameters["dimension"],
-                rag_parameters["index_params"],
-                rag_parameters["ops_type"],
-            )
+            table_name = self.getTableName(self.setting.rag_store_parameters)
+            ops_type = self.setting.rag_store_parameters["ops_type"]
             DynamicBucket = get_orm_class(table_name, len(embedding))
-            if rag_parameters["ops_type"] == VectorOpsType.cosine:
+            if ops_type == VectorOpsType.cosine:
                 distance_func = "embedding <=> :embedding"
-            elif rag_parameters["ops_type"] == VectorOpsType.l2:
+            elif ops_type == VectorOpsType.l2:
                 distance_func = "embedding <-> :embedding"
-            elif rag_parameters["ops_type"] == VectorOpsType.ip:
+            elif ops_type == VectorOpsType.ip:
                 distance_func = "embedding <#> :embedding"
             else:
-                raise ValueError(
-                    f"Unsupported ops type: {rag_parameters['ops_type']}"
-                )
+                raise ValueError(f"Unsupported ops type: {ops_type}")
             stmt = select(DynamicBucket)
             resolved_file_ids: Sequence[int] = []
             if file_uids:
@@ -252,6 +708,7 @@ class RagService:
                         "embedding": record["embedding"],
                         "created_at": record["created_at"],
                         "file_info": {
+                            "id": file_info_map[record["file_id"]].id,
                             "uid": file_info_map[record["file_id"]].uuid,
                             "filename": file_info_map[
                                 record["file_id"]

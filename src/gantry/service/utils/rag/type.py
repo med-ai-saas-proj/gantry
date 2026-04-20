@@ -1,10 +1,8 @@
 from gantry.service.utils.file_storage.types import FileRecord
 
 import enum
-from typing import Sequence, TypedDict
+from typing import Literal, Sequence, TypedDict
 from datetime import datetime
-
-from alembic.environment import Literal
 
 
 class RagEmbeddingRecord(TypedDict):
@@ -43,3 +41,14 @@ class RagParameters(TypedDict):
     dimension: int
     index_params: IndexParams
     ops_type: VectorOpsType
+
+
+class ChunkSplitterType(str, enum.Enum):
+    simple = "simple"
+    character = "character"
+    recursive = "recursive"
+    token = "token"
+    markdown = "markdown"
+    paragraph = "paragraph"
+    line = "line"
+    spacy = "spacy"

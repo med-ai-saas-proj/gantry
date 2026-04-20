@@ -1,5 +1,9 @@
+from gantry.service.utils.rag.factories import getRagService
+
+
 async def startup():
-    # Startup code here
+    rag_service = getRagService()
+    await rag_service.createBucket()
     pass
 
 

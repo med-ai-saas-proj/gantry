@@ -7,12 +7,15 @@ from gantry.service.utils.rag.type import (
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings
 
 
 class RagSettings(BaseSettings):
-    rag_parameters: RagParameters = Field(
+    openai_api_key: SecretStr | None = Field(default=None)
+    embedding_model: str = Field(default="text-embedding-3-small")
+
+    rag_store_parameters: RagParameters = Field(
         default={
             "dimension": 1536,
             "index_params": {

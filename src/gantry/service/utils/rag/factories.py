@@ -1,6 +1,7 @@
 from gantry.db.factories import getSessionManager
 from gantry.service.utils.rag.settings import getRagSettings
 from gantry.management.project.repositories import ProjectRepository
+from gantry.service.utils.file_storage.factories import getFileStorageService
 from gantry.service.utils.file_storage.repositories import FileRepository
 
 from .services import RagService
@@ -17,4 +18,5 @@ def getRagService():
         ProjectRepository(),
         FileRepository(),
         getRagSettings(),
+        getFileStorageService(),
     )

@@ -86,6 +86,9 @@ async def add_file(
         await rag_service.addFile(
             body.file_uid,
             api_key_info["project_id"],
+            body.chunk_splitter,
+            body.chunk_size,
+            body.chunk_overlap,
         )
     ).unwrap()
 
