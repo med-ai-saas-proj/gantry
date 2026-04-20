@@ -142,7 +142,7 @@ async def query_bucket(
     results = await rag_service.querySimilar(
         api_key_info["project_id"],
         body.embedding,
-        body.file_ids,
+        body.filters,
         body.top_k,
     )
     return [

@@ -37,13 +37,24 @@ class RagEmbeddingResponse(BaseModel):
     created_at: datetime
 
 
+class QueryFilterByFileMetadata(BaseModel):
+    """DTO for querying RAG embeddings with file metadata filters."""
+
+    file_metadata_filters: dict[str, str | int | float]
+
+
+class QueryFilterByFileUid(BaseModel):
+    """DTO for querying RAG embeddings with file UID filters."""
+
+    file_uids: Sequence[UUID]
+
+
 class QueryRagSimilarRequest(BaseModel):
     """DTO for similarity search within a bucket."""
 
     embedding: Sequence[float]
-    file_ids: Sequence[UUID] | None = None
-    file_metadata_filters: dict | None = None
     top_k: int = Field(default=5, gt=0, le=100)
+    filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None
 
 
 class EmbeddingTaskResponse(BaseModel):

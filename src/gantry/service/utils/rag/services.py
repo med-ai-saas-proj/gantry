@@ -1,4 +1,8 @@
 from gantry.db.session import AsyncSessionManager
+from gantry.service.utils.rag.dtos import (
+    QueryFilterByFileUid,
+    QueryFilterByFileMetadata,
+)
 from gantry.service.utils.rag.type import (
     IndexParams,
     EmbeddingTask,
@@ -861,9 +865,9 @@ class RagService:
         self,
         project_id: int,
         embedding: Sequence[float],
-        file_uids: Sequence[uuid.UUID] | None = None,
+        filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
         top_k: int = 5,
-    ) -> Sequence[RagEmbeddingRecord]:
+    ) -> Result[Sequence[RagEmbeddingRecord], FileNotFoundInSystemError]:
         async with self.session_manager.get_session() as session:
             table_name = self.getTableName(self.setting.rag_store_parameters)
             ops_type = self.setting.rag_store_parameters["ops_type"]
@@ -878,10 +882,30 @@ class RagService:
                 raise ValueError(f"Unsupported ops type: {ops_type}")
             stmt = select(DynamicBucket)
             resolved_file_ids: Sequence[int] = []
-            if file_uids:
-                resolved_file_ids = await self.file_repo.getIdsByUUIDs(
-                    session, file_uids, project_id
+            if isinstance(filters, QueryFilterByFileUid):
+                resolved_files = await self.file_repo.getAvailableIdsByUUIDs(
+                    session, filters.file_uids, project_id
                 )
+                missing_uids = set(filters.file_uids) - set(
+                    file_info.uuid for file_info in resolved_files
+                )
+                if missing_uids:
+                    return Err(
+                        FileNotFoundInSystemError(
+                            message=f"Some file UUIDs not found: {', '.join(str(uid) for uid in missing_uids)}"
+                        )
+                    )
+                resolved_file_ids = [
+                    file_info.id for file_info in resolved_files
+                ]
+            elif isinstance(filters, QueryFilterByFileMetadata):
+                resolved_files = await self.file_repo.getAvailableIdsByMetadata(
+                    session, filters.file_metadata_filters, project_id
+                )
+                resolved_file_ids = [
+                    file_info.id for file_info in resolved_files
+                ]
+
             if resolved_file_ids:
                 stmt = stmt.where(DynamicBucket.file_id.in_(resolved_file_ids))
             stmt = stmt.order_by(text(distance_func)).limit(top_k)
@@ -937,4 +961,4 @@ class RagService:
                         },
                     }
                 )
-            return records
+            return Ok(results)

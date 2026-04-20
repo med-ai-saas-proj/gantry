@@ -24,6 +24,14 @@ class FileNotFoundInSystemError(RecoverableError):
     title = "File not found"
     detail = "The requested file was not found in storage."
 
+    def __init__(
+        self,
+        message: str | None = None,
+        from_exception: Exception | None = None,
+    ):
+        super().__init__(from_exception=from_exception)
+        self.message = message
+
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client

@@ -5,7 +5,7 @@ from .models import File, FileStatus
 import uuid
 from typing import Sequence
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import text, delete, select, update
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 
@@ -16,19 +16,44 @@ class FileRepository(Repository):
         """Initialize FileRepository."""
         super().__init__(File, File.id)
 
-    async def getIdsByUUIDs(
+    async def getAvailableIdsByUUIDs(
         self,
         session: AsyncSession,
         file_uids: Sequence[uuid.UUID],
         project_id: int,
-    ) -> Sequence[int]:
+    ) -> Sequence[File]:
         """Get file IDs by UUIDs."""
-        stmt = select(File.id).where(
-            File.uuid.in_(file_uids) & (File.project_id == project_id)
+        stmt = select(File).where(
+            File.uuid.in_(file_uids)
+            & (File.project_id == project_id)
+            & (File.status == FileStatus.AVAILABLE)
         )
         res = await session.execute(stmt)
-        file_ids = res.scalars().all()
-        return file_ids
+        files = res.scalars().all()
+        return files
+
+    async def getAvailableIdsByMetadata(
+        self,
+        session: AsyncSession,
+        metadata_filters: dict[str, str | int | float],
+        project_id: int,
+    ) -> Sequence[File]:
+        """Get file IDs by metadata filters."""
+        stmt = select(File).where(
+            (File.project_id == project_id)
+            & (File.status == FileStatus.AVAILABLE)
+            & text(
+                " AND ".join(
+                    [
+                        f"extra_metadata ->> :{key} = :{key}"
+                        for key in metadata_filters.keys()
+                    ]
+                )
+            )
+        )
+        res = await session.execute(stmt.params(**metadata_filters))
+        files = res.scalars().all()
+        return files
 
     async def getAvailableByIds(
         self, session: AsyncSession, file_ids: Sequence[int]
