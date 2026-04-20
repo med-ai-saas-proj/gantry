@@ -1,50 +1,26 @@
 from gantry.management.auth.entities import UserInfo
-from gantry.management.api_keys.entities import ApiKeyInfo
 from gantry.management.auth.dependencies import getUserInfo
 from gantry.service.utils.file_storage.dtos import FileInfoResponse
-from gantry.management.api_keys.dependencies import requiredPermissions
 
-from .dtos import (
+from ..dtos import (
+    AddRagFileRequest,
     RagEmbeddingResponse,
-    AddRagEmbeddingRequest,
     QueryRagSimilarRequest,
     RagBucketConfigResponse,
 )
-from .services import RagService
-from .factories import getRagService
+from .routers import rag_router
+from ..services import RagService
+from ..factories import getRagService
 
 from typing import Annotated
 
-from fastapi import Body, Depends, Security, APIRouter, HTTPException
-from pyrusult import ResultStatus
+from fastapi import Body, Depends, Security, APIRouter
 
 
-rag_router = APIRouter(prefix="/rag", tags=["rag"])
+rag_user_router = APIRouter(tags=["rag-user"])
 
 
-@rag_router.get(
-    "/",
-    summary="List RAG bucket configurations",
-    description="Endpoint to list all RAG bucket configurations.",
-    response_model=list[RagBucketConfigResponse],
-)
-async def get_all_config_api(
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["rag.read"]))
-    ],
-    rag_service: Annotated[RagService, Depends(getRagService)],
-):
-    buckets = await rag_service.getConfiguredBuckets()
-    return [
-        RagBucketConfigResponse(
-            bucket_idx=i,
-            parms=bucket,
-        )
-        for i, bucket in enumerate(buckets)
-    ]
-
-
-@rag_router.get(
+@rag_user_router.get(
     "/",
     summary="List RAG bucket configurations",
     description="Endpoint to list all RAG bucket configurations.",
@@ -64,32 +40,28 @@ async def get_all_config_user(
     ]
 
 
-@rag_router.post(
+@rag_user_router.post(
     "/{bucket_idx}/embeddings",
     summary="Add an embedding to a RAG bucket.",
     description="Endpoint to add a new embedding row to a RAG bucket.",
     status_code=204,
 )
-async def add_embedding(
+async def add_file(
     bucket_idx: int,
-    body: Annotated[AddRagEmbeddingRequest, Body()],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["rag.write"]))
-    ],
+    body: Annotated[AddRagFileRequest, Body()],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ):
-    added = await rag_service.addEmbedding(
-        bucket_idx,
-        body.text,
-        body.embedding,
-        body.file_uid,
-        api_key_info["project_id"],
-    )
-    if added.status == ResultStatus.Err:
-        raise HTTPException(status_code=404, detail="RAG bucket not found.")
+    (
+        await rag_service.addFile(
+            bucket_idx,
+            body.file_uid,
+            api_key_info["project_id"],
+        )
+    ).unwrap()
 
 
-@rag_router.get(
+@rag_user_router.get(
     "/{bucket_idx}/files",
     summary="List files in a RAG bucket.",
     description="Endpoint to list distinct file ids stored in a RAG bucket.",
@@ -97,9 +69,7 @@ async def add_embedding(
 )
 async def get_bucket_files(
     bucket_idx: int,
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["rag.read"]))
-    ],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ):
     return await rag_service.getFilesInBucket(
@@ -107,7 +77,7 @@ async def get_bucket_files(
     )
 
 
-@rag_router.post(
+@rag_user_router.post(
     "/{bucket_idx}/query",
     summary="Query a RAG bucket.",
     description="Endpoint to run a similarity search against a RAG bucket.",
@@ -116,9 +86,7 @@ async def get_bucket_files(
 async def query_bucket(
     bucket_idx: int,
     body: Annotated[QueryRagSimilarRequest, Body()],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["rag.read"]))
-    ],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ):
     results = await rag_service.querySimilar(
@@ -144,3 +112,6 @@ async def query_bucket(
         )
         for result in results
     ]
+
+
+rag_router.include_router(rag_user_router, prefix="/user")

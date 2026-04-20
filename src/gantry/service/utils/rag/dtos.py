@@ -23,6 +23,12 @@ class AddRagEmbeddingRequest(BaseModel):
     file_uid: UUID
 
 
+class AddRagFileRequest(BaseModel):
+    """DTO for adding a file (with embedding) to a RAG bucket."""
+
+    file_uid: UUID
+
+
 class RagEmbeddingResponse(BaseModel):
     """DTO for embedding query results."""
 

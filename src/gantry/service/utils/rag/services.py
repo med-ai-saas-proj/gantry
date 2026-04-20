@@ -122,6 +122,14 @@ class RagService:
     async def getConfiguredBuckets(self) -> list[BucketParameters]:
         return self.setting.buckets
 
+    async def addFile(
+        self,
+        bucket_idx: int,
+        file_uid: uuid.UUID,
+        project_id: int,
+    ) -> Result[None, BucketNotFoundError | FileNotFoundInSystemError]:
+        pass
+
     async def addEmbedding(
         self,
         bucket_idx: int,

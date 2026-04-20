@@ -1,16 +1,17 @@
 from gantry.management.api_keys.entities import ApiKeyInfo
 from gantry.management.api_keys.dependencies import requiredPermissions
 
-from .dtos import (
+from ..dtos import (
     FileInfoResponse,
     FileUploadResponse,
     FilePresignedURLResponse,
     UpdateFileMetadataRequest,
     FileInfoWithPresignedURLResponse,
 )
-from .utils import detect_file_type
-from .services import FileStorageService
-from .factories import getFileStorageService
+from .router import file_storage_router
+from ..utils import detect_file_type
+from ..services import FileStorageService
+from ..factories import getFileStorageService
 
 import uuid
 import mimetypes
@@ -27,10 +28,10 @@ from fastapi import (
 from starlette.responses import RedirectResponse
 
 
-file_storage_router = APIRouter(prefix="/file-storage", tags=["file-storage"])
+file_storage_service_router = APIRouter(tags=["file-storage-service"])
 
 
-@file_storage_router.post(
+@file_storage_service_router.post(
     "/",
     summary="Upload a file to the file storage service.",
     description="Endpoint to upload a file to the file storage service.",
@@ -75,7 +76,7 @@ async def upload_file(
     )
 
 
-@file_storage_router.get(
+@file_storage_service_router.get(
     "/",
     summary="List files in the file storage service.",
     description="Endpoint to list files in the file storage service.",
@@ -106,7 +107,7 @@ async def list_files(
     ]
 
 
-@file_storage_router.get(
+@file_storage_service_router.get(
     "/{file_id}/download",
     summary="Download a file by file ID.",
     description="Endpoint to download a file by its file ID.",
@@ -143,7 +144,7 @@ async def download_file(
     return RedirectResponse(url=presigned_url)
 
 
-@file_storage_router.get(
+@file_storage_service_router.get(
     "/{file_id}",
     summary="Get file info and presigned URL by file ID.",
     description="Endpoint to retrieve file info and a presigned URL for downloading the file by file ID.",
@@ -178,7 +179,7 @@ async def get_file_info_and_presigned_url(
     )
 
 
-@file_storage_router.get(
+@file_storage_service_router.get(
     "/{file_id}/info",
     summary="Get file info by file ID.",
     description="Endpoint to retrieve file info by file ID.",
@@ -209,7 +210,7 @@ async def get_file_info(
     )
 
 
-@file_storage_router.get(
+@file_storage_service_router.get(
     "/{file_id}/presigned-url",
     summary="Get presigned URL for file download.",
     description="Endpoint to generate a presigned URL for downloading the file.",
@@ -235,7 +236,7 @@ async def get_file_presigned_url(
     )
 
 
-@file_storage_router.delete(
+@file_storage_service_router.delete(
     "/{file_id}",
     summary="Delete a file by file ID.",
     description="Endpoint to delete a file from storage by its file ID.",
@@ -259,7 +260,7 @@ async def delete_file(
     return None
 
 
-@file_storage_router.put(
+@file_storage_service_router.put(
     "/{file_id}/metadata",
     summary="Update file metadata by file ID.",
     description="Endpoint to update file metadata by file ID.",
@@ -282,3 +283,8 @@ async def update_file_metadata(
         )
     ).unwrap()
     return None
+
+
+file_storage_router.include_router(
+    file_storage_service_router, prefix="/service"
+)
