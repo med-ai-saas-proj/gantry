@@ -39,7 +39,7 @@ class IVFFlatIndexParams(TypedDict):
 type IndexParams = HNSWIndexParams | IVFFlatIndexParams
 
 
-class BucketParameters(TypedDict):
+class RagParameters(TypedDict):
     dimension: int
     index_params: IndexParams
     ops_type: VectorOpsType

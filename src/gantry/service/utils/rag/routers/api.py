@@ -1,6 +1,4 @@
-from gantry.management.auth.entities import UserInfo
 from gantry.management.api_keys.entities import ApiKeyInfo
-from gantry.management.auth.dependencies import getUserInfo
 from gantry.service.utils.file_storage.dtos import FileInfoResponse
 from gantry.management.api_keys.dependencies import requiredPermissions
 
@@ -9,7 +7,6 @@ from ..dtos import (
     RagEmbeddingResponse,
     AddRagEmbeddingRequest,
     QueryRagSimilarRequest,
-    RagBucketConfigResponse,
 )
 from .routers import rag_router
 from ..services import RagService
@@ -24,28 +21,6 @@ from fastapi import Body, Depends, Security, APIRouter
 rag_service_router = APIRouter(tags=["rag-service"])
 
 
-@rag_service_router.get(
-    "/",
-    summary="List RAG bucket configurations",
-    description="Endpoint to list all RAG bucket configurations.",
-    response_model=list[RagBucketConfigResponse],
-)
-async def get_all_config_api(
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["rag.read"]))
-    ],
-    rag_service: Annotated[RagService, Depends(getRagService)],
-):
-    buckets = await rag_service.getConfiguredBuckets()
-    return [
-        RagBucketConfigResponse(
-            bucket_idx=i,
-            parms=bucket,
-        )
-        for i, bucket in enumerate(buckets)
-    ]
-
-
 @rag_service_router.post(
     "/{bucket_idx}/embeddings",
     summary="Add an embedding to a RAG bucket.",
@@ -53,7 +28,6 @@ async def get_all_config_api(
     status_code=204,
 )
 async def add_embedding(
-    bucket_idx: int,
     body: Annotated[AddRagEmbeddingRequest, Body()],
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["rag.write"]))
@@ -62,7 +36,6 @@ async def add_embedding(
 ):
     (
         await rag_service.addEmbedding(
-            bucket_idx,
             body.text,
             body.embedding,
             body.file_uid,
@@ -77,15 +50,12 @@ async def add_embedding(
     description="Endpoint to list distinct file ids stored in a RAG bucket.",
 )
 async def get_bucket_files(
-    bucket_idx: int,
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["rag.read"]))
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> Sequence[FileInfoResponse]:
-    res = await rag_service.getFilesInBucket(
-        bucket_idx, api_key_info["project_id"]
-    )
+    res = await rag_service.getFilesInBucket(api_key_info["project_id"])
     return [
         FileInfoResponse(
             id=str(file_info["uid"]),
@@ -106,7 +76,6 @@ async def get_bucket_files(
     status_code=204,
 )
 async def add_file(
-    bucket_idx: int,
     body: Annotated[AddRagFileRequest, Body()],
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["rag.write"]))
@@ -115,7 +84,6 @@ async def add_file(
 ):
     (
         await rag_service.addFile(
-            bucket_idx,
             body.file_uid,
             api_key_info["project_id"],
         )
@@ -129,7 +97,6 @@ async def add_file(
     response_model=list[RagEmbeddingResponse],
 )
 async def query_bucket(
-    bucket_idx: int,
     body: Annotated[QueryRagSimilarRequest, Body()],
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["rag.read"]))
@@ -137,7 +104,6 @@ async def query_bucket(
     rag_service: Annotated[RagService, Depends(getRagService)],
 ):
     results = await rag_service.querySimilar(
-        bucket_idx,
         api_key_info["project_id"],
         body.embedding,
         body.file_ids,

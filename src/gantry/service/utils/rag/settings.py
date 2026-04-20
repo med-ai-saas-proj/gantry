@@ -1,8 +1,8 @@
 from gantry.service.utils.rag.type import (
     IndexParams,
+    RagParameters,
     VectorOpsType,
     VectorIndexType,
-    BucketParameters,
 )
 
 from functools import lru_cache
@@ -12,19 +12,16 @@ from pydantic_settings import BaseSettings
 
 
 class RagSettings(BaseSettings):
-    buckets: list[BucketParameters] = Field(
-        default=[
-            {
-                "dimension": 1536,
-                "index_params": {
-                    "index_type": VectorIndexType.hnsw,
-                    "m": 16,
-                    "ef_construction": 200,
-                },
-                "ops_type": VectorOpsType.cosine,
-            }
-        ],
-        min_length=1,
+    rag_parameters: RagParameters = Field(
+        default={
+            "dimension": 1536,
+            "index_params": {
+                "index_type": VectorIndexType.hnsw,
+                "m": 16,
+                "ef_construction": 200,
+            },
+            "ops_type": VectorOpsType.cosine,
+        }
     )
 
 

@@ -6,7 +6,6 @@ from ..dtos import (
     AddRagFileRequest,
     RagEmbeddingResponse,
     QueryRagSimilarRequest,
-    RagBucketConfigResponse,
 )
 from .routers import rag_router
 from ..services import RagService
@@ -20,26 +19,6 @@ from fastapi import Body, Depends, Security, APIRouter
 rag_user_router = APIRouter(tags=["rag-user"])
 
 
-@rag_user_router.get(
-    "/",
-    summary="List RAG bucket configurations",
-    description="Endpoint to list all RAG bucket configurations.",
-    response_model=list[RagBucketConfigResponse],
-)
-async def get_all_config_user(
-    user_info: Annotated[UserInfo, Security(getUserInfo)],
-    rag_service: Annotated[RagService, Depends(getRagService)],
-):
-    buckets = await rag_service.getConfiguredBuckets()
-    return [
-        RagBucketConfigResponse(
-            bucket_idx=i,
-            parms=bucket,
-        )
-        for i, bucket in enumerate(buckets)
-    ]
-
-
 @rag_user_router.post(
     "/{bucket_idx}/embeddings",
     summary="Add an embedding to a RAG bucket.",
@@ -47,14 +26,12 @@ async def get_all_config_user(
     status_code=204,
 )
 async def add_file(
-    bucket_idx: int,
     body: Annotated[AddRagFileRequest, Body()],
     user_info: Annotated[UserInfo, Security(getUserInfo)],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ):
     (
         await rag_service.addFile(
-            bucket_idx,
             body.file_uid,
             api_key_info["project_id"],
         )
@@ -67,13 +44,10 @@ async def add_file(
     description="Endpoint to list distinct file ids stored in a RAG bucket.",
 )
 async def get_bucket_files(
-    bucket_idx: int,
     user_info: Annotated[UserInfo, Security(getUserInfo)],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> Sequence[FileInfoResponse]:
-    res = await rag_service.getFilesInBucket(
-        bucket_idx, api_key_info["project_id"]
-    )
+    res = await rag_service.getFilesInBucket(api_key_info["project_id"])
     return [
         FileInfoResponse(
             id=str(file_info["uid"]),
@@ -94,13 +68,11 @@ async def get_bucket_files(
     response_model=list[RagEmbeddingResponse],
 )
 async def query_bucket(
-    bucket_idx: int,
     body: Annotated[QueryRagSimilarRequest, Body()],
     user_info: Annotated[UserInfo, Security(getUserInfo)],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ):
     results = await rag_service.querySimilar(
-        bucket_idx,
         api_key_info["project_id"],
         body.embedding,
         body.file_ids,

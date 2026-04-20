@@ -1,9 +1,9 @@
 from gantry.db.session import AsyncSessionManager
 from gantry.service.utils.rag.type import (
     IndexParams,
+    RagParameters,
     VectorOpsType,
     VectorIndexType,
-    BucketParameters,
     RagEmbeddingRecord,
 )
 from gantry.service.utils.rag.utils import (
@@ -12,6 +12,7 @@ from gantry.service.utils.rag.utils import (
     drop_embedding_table,
     create_embedding_table,
 )
+from gantry.service.utils.rag.models import RagMetadata
 from gantry.service.utils.rag.settings import RagSettings
 from gantry.management.project.repositories import ProjectRepository
 from gantry.service.utils.file_storage.types import FileRecord
@@ -22,7 +23,6 @@ from gantry.service.utils.file_storage.repositories import FileRepository
 import uuid
 from typing import Sequence
 
-from openai import files
 from pyrusult import Ok, Err, Result
 from sqlalchemy import text, select
 
@@ -121,12 +121,8 @@ class RagService:
             )
             await session.commit()
 
-    async def getConfiguredBuckets(self) -> list[BucketParameters]:
-        return self.setting.buckets
-
     async def addFile(
         self,
-        bucket_idx: int,
         file_uid: uuid.UUID,
         project_id: int,
     ) -> Result[None, BucketNotFoundError | FileNotFoundInSystemError]:
@@ -134,7 +130,6 @@ class RagService:
 
     async def addEmbedding(
         self,
-        bucket_idx: int,
         text: str,
         embedding: Sequence[float],
         file_uid: uuid.UUID,
@@ -146,15 +141,15 @@ class RagService:
             )
             if not file_info:
                 return Err(FileNotFoundInSystemError())
-            buckets = await self.getConfiguredBuckets()
-            if not buckets:
-                return Err(BucketNotFoundError())
-            bucket = buckets[bucket_idx]
+            rag_parameters = self.setting.rag_parameters
             table_name = self.getTableName(
-                bucket["dimension"], bucket["index_params"], bucket["ops_type"]
+                rag_parameters["dimension"],
+                rag_parameters["index_params"],
+                rag_parameters["ops_type"],
             )
-
-            DynamicBucket = get_orm_class(table_name, len(embedding))
+            DynamicBucket = get_orm_class(
+                table_name, 0
+            )  # dimension is not needed for insertion
             new_record = DynamicBucket(
                 embedding=embedding,
                 file_id=file_info.id,
@@ -168,24 +163,13 @@ class RagService:
 
     async def getFilesInBucket(
         self,
-        bucket_idx: int,
         project_id: int,
     ) -> Sequence[FileRecord]:
         async with self.session_manager.get_session() as session:
-            buckets = await self.getConfiguredBuckets()
-            if not buckets:
-                return []
-            bucket = buckets[bucket_idx]
-            table_name = self.getTableName(
-                bucket["dimension"], bucket["index_params"], bucket["ops_type"]
-            )
-            DynamicBucket = get_orm_class(
-                table_name, 0
-            )  # dimension is not needed for query
             result = await session.execute(
-                select(DynamicBucket.file_id)
-                .where(DynamicBucket.project_id == project_id)
-                .distinct()
+                select(RagMetadata.file_id).where(
+                    RagMetadata.project_id == project_id
+                )
             )
             rows = result.scalars().all()
             file_ids = [row for row in rows]
@@ -207,29 +191,29 @@ class RagService:
 
     async def querySimilar(
         self,
-        bucket_idx: int,
         project_id: int,
         embedding: Sequence[float],
         file_uids: Sequence[uuid.UUID] | None = None,
         top_k: int = 5,
     ) -> Sequence[RagEmbeddingRecord]:
         async with self.session_manager.get_session() as session:
-            buckets = await self.getConfiguredBuckets()
-            if not buckets:
-                return []
-            bucket = buckets[bucket_idx]
+            rag_parameters = self.setting.rag_parameters
             table_name = self.getTableName(
-                bucket["dimension"], bucket["index_params"], bucket["ops_type"]
+                rag_parameters["dimension"],
+                rag_parameters["index_params"],
+                rag_parameters["ops_type"],
             )
             DynamicBucket = get_orm_class(table_name, len(embedding))
-            if bucket["ops_type"] == VectorOpsType.cosine:
+            if rag_parameters["ops_type"] == VectorOpsType.cosine:
                 distance_func = "embedding <=> :embedding"
-            elif bucket["ops_type"] == VectorOpsType.l2:
+            elif rag_parameters["ops_type"] == VectorOpsType.l2:
                 distance_func = "embedding <-> :embedding"
-            elif bucket["ops_type"] == VectorOpsType.ip:
+            elif rag_parameters["ops_type"] == VectorOpsType.ip:
                 distance_func = "embedding <#> :embedding"
             else:
-                raise ValueError(f"Unsupported ops type: {bucket['ops_type']}")
+                raise ValueError(
+                    f"Unsupported ops type: {rag_parameters['ops_type']}"
+                )
             stmt = select(DynamicBucket)
             resolved_file_ids: Sequence[int] = []
             if file_uids:

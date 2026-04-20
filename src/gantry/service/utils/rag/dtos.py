@@ -1,4 +1,3 @@
-from gantry.service.utils.rag.type import BucketParameters
 from gantry.service.utils.file_storage.dtos import FileInfoResponse
 
 from uuid import UUID
@@ -6,13 +5,6 @@ from typing import Sequence
 from datetime import datetime
 
 from pydantic import Field, BaseModel
-
-
-class RagBucketConfigResponse(BaseModel):
-    """DTO for RAG bucket configuration details."""
-
-    bucket_idx: int
-    parms: BucketParameters
 
 
 class AddRagEmbeddingRequest(BaseModel):
