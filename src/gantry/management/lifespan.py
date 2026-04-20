@@ -36,7 +36,7 @@ async def invoice_process_loop():
 
 async def billing_process_loop():
     trx_service = getBillingTransactionService()
-    await trx_service.checkExpiredTransactionsTask(
+    await trx_service.closeExpiredTransactionsTask(
         getBillingSetting().transaction_expire_check_interval_seconds
     )
 
