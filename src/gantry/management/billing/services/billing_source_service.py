@@ -1,10 +1,5 @@
 from gantry.db.session import AsyncSessionManager
 from gantry.shared.utils.redis import redis_lock
-from gantry.management.billing.dtos import (
-    BillingSourceResponse,
-    AddBillingSourceRequest,
-    UpdateBillingSourceRequest,
-)
 from gantry.shared.custom_types.error_exception import (
     ExternalAPIError,
     RecoverableError,

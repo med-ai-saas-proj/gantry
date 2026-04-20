@@ -1,9 +1,5 @@
 """Shared Redis cache keys and TTLs for billing flows."""
 
-BILLING_CACHE_TTL_SECONDS = 36000
-BILLING_MAX_TRANSACTION_AGE_SECONDS = 3600
-BILLING_POST_IDEMPOTENCY_KEY_TTL_SECONDS = 3600
-
 BILLING_TRANSACTION_KEY = "billing:trx:{uuid}"
 BILLING_PROJECT_SPENDING_LIMIT_KEY = (
     "billing:spending_limit:{org_id}:proj:{project_id}"
