@@ -14,6 +14,7 @@ from gantry.service.utils.rag.utils import (
 )
 from gantry.service.utils.rag.settings import RagSettings
 from gantry.management.project.repositories import ProjectRepository
+from gantry.service.utils.file_storage.types import FileRecord
 from gantry.service.utils.file_storage.services import FileNotFoundInSystemError
 from gantry.shared.custom_types.error_exception import RecoverableError
 from gantry.service.utils.file_storage.repositories import FileRepository
@@ -21,6 +22,7 @@ from gantry.service.utils.file_storage.repositories import FileRepository
 import uuid
 from typing import Sequence
 
+from openai import files
 from pyrusult import Ok, Err, Result
 from sqlalchemy import text, select
 
@@ -168,7 +170,7 @@ class RagService:
         self,
         bucket_idx: int,
         project_id: int,
-    ) -> list[int]:
+    ) -> Sequence[FileRecord]:
         async with self.session_manager.get_session() as session:
             buckets = await self.getConfiguredBuckets()
             if not buckets:
@@ -185,7 +187,23 @@ class RagService:
                 .where(DynamicBucket.project_id == project_id)
                 .distinct()
             )
-            return list(result.scalars().all())
+            rows = result.scalars().all()
+            file_ids = [row for row in rows]
+            files_info = await self.file_repo.getAvailableByIds(
+                session, file_ids
+            )
+            return [
+                {
+                    "uid": file_info.uuid,
+                    "filename": file_info.original_filename,
+                    "mime_type": file_info.mime_type,
+                    "size": file_info.size_in_bytes,
+                    "created_at": file_info.created_at,
+                    "extra_metadata": file_info.extra_metadata,
+                    "storage_path": file_info.filepath,
+                }
+                for file_info in files_info
+            ]
 
     async def querySimilar(
         self,

@@ -16,9 +16,9 @@ from ..services import RagService
 from ..factories import getRagService
 
 from typing import Annotated
+from collections.abc import Sequence
 
-from fastapi import Body, Depends, Security, APIRouter, HTTPException
-from pyrusult import ResultStatus
+from fastapi import Body, Depends, Security, APIRouter
 
 
 rag_service_router = APIRouter(tags=["rag-service"])
@@ -75,7 +75,6 @@ async def add_embedding(
     "/{bucket_idx}/files",
     summary="List files in a RAG bucket.",
     description="Endpoint to list distinct file ids stored in a RAG bucket.",
-    response_model=list[int],
 )
 async def get_bucket_files(
     bucket_idx: int,
@@ -83,10 +82,21 @@ async def get_bucket_files(
         ApiKeyInfo, Security(requiredPermissions(["rag.read"]))
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
-):
-    return await rag_service.getFilesInBucket(
+) -> Sequence[FileInfoResponse]:
+    res = await rag_service.getFilesInBucket(
         bucket_idx, api_key_info["project_id"]
     )
+    return [
+        FileInfoResponse(
+            id=str(file_info["uid"]),
+            filename=file_info["filename"],
+            mime_type=file_info["mime_type"],
+            size=file_info["size"],
+            created_at=file_info["created_at"],
+            extra_metadata=file_info["extra_metadata"],
+        )
+        for file_info in res
+    ]
 
 
 @rag_service_router.post(
