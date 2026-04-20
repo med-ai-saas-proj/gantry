@@ -1,7 +1,6 @@
 from gantry.db.factories import AsyncSessionManager
 from gantry.shared.utils.redis import redis_get_or_load
 from gantry.shared.utils.uuid_utils import uuid7
-from gantry.management.api_keys.services import ApiKeyService
 from gantry.management.project.repositories import ProjectSettingsRepository
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,

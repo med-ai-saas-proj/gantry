@@ -28,7 +28,7 @@ rag_service_router = APIRouter(tags=["rag-service"])
     "/embeddings",
     summary="Add an embedding row to a RAG bucket.",
     description="Endpoint to add a new embedding row to a RAG bucket.",
-    status_code=204,
+    status_code=201,
 )
 async def add_embedding(
     body: Annotated[AddRagEmbeddingRequest, Body()],
@@ -76,7 +76,7 @@ async def get_bucket_files(
     "/files",
     summary="Add a file to a RAG bucket.",
     description="Endpoint to add a new file to a RAG bucket.",
-    status_code=204,
+    status_code=201,
 )
 async def add_file(
     body: Annotated[AddRagFileRequest, Body()],

@@ -3,7 +3,6 @@ from gantry.db.utils import (
     WithID,
     WithCreateTimestamp,
 )
-from gantry.service.utils.rag.type import RagParameters
 from gantry.management.project.models import Project
 from gantry.service.utils.file_storage.models import File
 

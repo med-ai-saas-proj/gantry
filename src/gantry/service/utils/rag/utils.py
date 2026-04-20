@@ -1,8 +1,4 @@
-from gantry.service.utils.rag.type import (
-    IndexParams,
-    VectorOpsType,
-    VectorIndexType,
-)
+from gantry.settings.rag import IndexParams, VectorOpsType, VectorIndexType
 from gantry.service.utils.rag.models import RagData
 
 from typing import cast

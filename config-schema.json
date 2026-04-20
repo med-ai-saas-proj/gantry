@@ -317,6 +317,55 @@
       "title": "OrgSettings",
       "type": "object"
     },
+    "RagSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "openai_api_key": {
+          "format": "password",
+          "title": "Openai Api Key",
+          "type": "string",
+          "writeOnly": true
+        },
+        "embedding_model": {
+          "title": "Embedding Model",
+          "type": "string"
+        },
+        "rag_store_dimension": {
+          "default": 1536,
+          "title": "Rag Store Dimension",
+          "type": "integer"
+        },
+        "rag_store_index_type": {
+          "$ref": "#/$defs/VectorIndexType",
+          "default": "hnsw"
+        },
+        "rag_store_index_params_hnsw_m": {
+          "default": 16,
+          "title": "Rag Store Index Params Hnsw M",
+          "type": "integer"
+        },
+        "rag_store_index_params_hnsw_ef_construction": {
+          "default": 200,
+          "title": "Rag Store Index Params Hnsw Ef Construction",
+          "type": "integer"
+        },
+        "rag_store_index_params_ivfflat_lists": {
+          "default": 100,
+          "title": "Rag Store Index Params Ivfflat Lists",
+          "type": "integer"
+        },
+        "rag_store_ops_type": {
+          "$ref": "#/$defs/VectorOpsType",
+          "default": "vector_cosine_ops"
+        }
+      },
+      "required": [
+        "openai_api_key",
+        "embedding_model"
+      ],
+      "title": "RagSettings",
+      "type": "object"
+    },
     "TracesType": {
       "enum": [
         "otlp",
@@ -339,6 +388,23 @@
       },
       "title": "UserLogSettings",
       "type": "object"
+    },
+    "VectorIndexType": {
+      "enum": [
+        "ivfflat",
+        "hnsw"
+      ],
+      "title": "VectorIndexType",
+      "type": "string"
+    },
+    "VectorOpsType": {
+      "enum": [
+        "vector_l2_ops",
+        "vector_cosine_ops",
+        "vector_ip_ops"
+      ],
+      "title": "VectorOpsType",
+      "type": "string"
     }
   },
   "additionalProperties": false,
@@ -408,6 +474,9 @@
     },
     "observability": {
       "$ref": "#/$defs/ObservabilitySettings"
+    },
+    "rag": {
+      "$ref": "#/$defs/RagSettings"
     }
   },
   "required": [
@@ -419,7 +488,8 @@
     "conversation",
     "file_storage",
     "organization",
-    "observability"
+    "observability",
+    "rag"
   ],
   "title": "AppSettings",
   "type": "object"

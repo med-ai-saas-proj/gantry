@@ -25,7 +25,7 @@ rag_user_router = APIRouter(tags=["rag-user"])
     "/files",
     summary="Add a file to a RAG bucket.",
     description="Endpoint to add a new file to a RAG bucket.",
-    status_code=204,
+    status_code=201,
 )
 async def add_file(
     body: Annotated[AddRagFileRequest, Body()],
@@ -67,7 +67,7 @@ async def get_bucket_files(
     ]
 
 
-@rag_service_router.get(
+@rag_user_router.get(
     "/files/{task_id}",
     summary="Get RAG file embedding task status.",
     description="Endpoint to get the status of an asynchronous RAG file embedding task.",

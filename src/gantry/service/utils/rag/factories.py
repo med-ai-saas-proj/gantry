@@ -22,7 +22,14 @@ def getRagService():
         FileRepository(),
         getRagSettings(),
         getFileStorageService(),
-        AsyncOpenAI(api_key=getRagSettings().openai_api_key.get_secret_value()),
+        AsyncOpenAI(
+            api_key=getRagSettings().openai_api_key.get_secret_value(),
+            base_url=getRagSettings().openai_base_url,
+        )
+        if getRagSettings().openai_base_url
+        else AsyncOpenAI(
+            api_key=getRagSettings().openai_api_key.get_secret_value(),
+        ),
         getRedis(),
         getLogger(),
     )

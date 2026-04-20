@@ -1,14 +1,11 @@
 from gantry.db.session import AsyncSessionManager
+from gantry.settings.rag import RagParameters, VectorOpsType, VectorIndexType
 from gantry.service.utils.rag.dtos import (
     QueryFilterByFileUid,
     QueryFilterByFileMetadata,
 )
 from gantry.service.utils.rag.type import (
-    IndexParams,
     EmbeddingTask,
-    RagParameters,
-    VectorOpsType,
-    VectorIndexType,
     ChunkSplitterType,
     RagEmbeddingRecord,
 )
