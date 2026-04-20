@@ -25,6 +25,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         service.listOrgProjects = AsyncMock(return_value=Ok("org-projects"))
         service.listUserProjects = AsyncMock(return_value=Ok("user-projects"))
         service.createProject = AsyncMock(return_value=Ok("created"))
+        service.getProject = AsyncMock(return_value=Ok("project"))
         service.updateProject = AsyncMock(return_value=Ok("updated"))
         service.getProjectSettings = AsyncMock(return_value=Ok("settings"))
         service.updateProjectSettings = AsyncMock(
@@ -59,6 +60,14 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
                 service,
             ),
             "created",
+        )
+        self.assertEqual(
+            await routes.get_project(
+                {"id": "u1", "roles": []},
+                "proj-1",
+                service,
+            ),
+            "project",
         )
         self.assertEqual(
             await routes.update_project(

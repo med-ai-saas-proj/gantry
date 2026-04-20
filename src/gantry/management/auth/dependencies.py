@@ -12,7 +12,7 @@ from .entities import UserInfo
 from .settings import getAuthSettings
 from .factories import AuthService, getAuthService
 
-from typing import Annotated
+from typing import Any, Annotated
 
 from fastapi import Depends, Security
 from pyrusult import ResultStatus
@@ -48,10 +48,18 @@ class MissingOrganizationContextError(RecoverableError):
 app_settings = getAppSettings()
 
 
+def _get_project_service():
+    """Lazy import project service factory to avoid auth/project cycles."""
+    from gantry.management.project.factories import getProjectService
+
+    return getProjectService()
+
+
 async def _getUserInfo(
     token: Annotated[str, Security(oauth_2_scheme)],
     auth_service: Annotated[AuthService, Depends(getAuthService)],
     kc_org_client: Annotated[KeycloakOrgClient, Depends(getKeycloakOrgClient)],
+    project_service: Annotated[Any, Depends(_get_project_service)],
 ) -> UserInfo:
     """
     Get authenticated user info from JWT token.
@@ -76,6 +84,25 @@ async def _getUserInfo(
         if org_claim in {org_id, org.get("name"), org.get("alias")}:
             user_info["org_id"] = org_id
             break
+
+    if user_info["org_id"]:
+        projects_res = await project_service.listAccessibleProjects(
+            actor_user_id=user_info["id"],
+            organization_id=user_info["org_id"],
+        )
+        if projects_res.status == ResultStatus.Ok:
+            user_info["projects"] = [
+                {
+                    "id": project.id,
+                    "name": project.name,
+                    "description": project.description,
+                    "organization_id": project.organization_id,
+                    "archived": project.archived,
+                }
+                for project in projects_res.unwrap().results
+            ]
+        else:
+            user_info["projects"] = []
 
     return user_info
 
