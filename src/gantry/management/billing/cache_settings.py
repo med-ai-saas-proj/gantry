@@ -1,5 +1,6 @@
 """Shared Redis cache keys and TTLs for billing flows."""
 
+BILLING_CACHE_TTL_SECONDS = 3600  # 1 hour
 BILLING_TRANSACTION_KEY = "billing:trx:{uuid}"
 BILLING_PROJECT_SPENDING_LIMIT_KEY = (
     "billing:spending_limit:{org_id}:proj:{project_id}"

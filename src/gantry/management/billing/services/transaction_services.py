@@ -17,13 +17,14 @@ from ..dtos import (
 )
 from ..type import AggregatePeriod
 from ..utils import (
-    _to_decimal,
-    _decimal_to_int,
-    _int_to_decimal,
-    _get_billing_period,
-    _get_next_billing_period,
+    get_billing_period,
+    decimal_to_scaled_int,
+    scaled_int_to_decimal,
+    get_next_billing_period,
+    scaled_amount_to_decimal,
 )
-from ..cache_keys import (
+from ..cache_settings import (
+    BILLING_CACHE_TTL_SECONDS,
     billing_org_usage_key,
     billing_transaction_key,
     billing_project_usage_key,
@@ -191,7 +192,6 @@ return 1
 
 
 class TransactionService:
-    _CACHE_TTL = 36000  # seconds
     _MAX_TRANSACTION_AGE = 600  # seconds, after which a transaction is considered expired and cannot be captured
     _IDEMPOTENCY_KEY_TTL = (
         3600  # seconds, how long to keep idempotency keys in cache
@@ -205,7 +205,6 @@ class TransactionService:
         org_settings_repo: OrgSettingsRepository,
         project_settings_repo: ProjectSettingsRepository,
         transaction_repo: TransactionRepository,
-        apikey_service: ApiKeyService,
     ) -> None:
         self.logger = logger
         self.session_manager = session_manager
@@ -213,7 +212,6 @@ class TransactionService:
         self.org_settings_repo = org_settings_repo
         self.project_settings_repo = project_settings_repo
         self.transaction_repo = transaction_repo
-        self.apikey_service = apikey_service
 
     async def getSpendingLimits(
         self, org_id: str, project_id: int
@@ -233,12 +231,12 @@ class TransactionService:
             return res.into()
         org_limit_raw, project_limit_raw = res.unwrap()
         org_limit = (
-            _int_to_decimal(int(org_limit_raw), 8)
+            scaled_int_to_decimal(int(org_limit_raw), 8)
             if org_limit_raw != "-1"
             else None
         )
         project_limit = (
-            _int_to_decimal(int(project_limit_raw), 8)
+            scaled_int_to_decimal(int(project_limit_raw), 8)
             if project_limit_raw != "-1"
             else None
         )
@@ -248,7 +246,7 @@ class TransactionService:
         self, org_id: str, project_id: int, ref_time: datetime
     ) -> Result[tuple[Decimal, Decimal], InternalServiceError]:
         """Get current usage for the organization and project in the billing period."""
-        billing_period = _get_billing_period(ref_time)
+        billing_period = get_billing_period(ref_time)
         billing_period_str = billing_period.strftime("%Y-%m")
         org_usage_key = billing_org_usage_key(
             org_id=org_id, period=billing_period_str
@@ -268,8 +266,8 @@ class TransactionService:
         if res.status == ResultStatus.Err:
             return res.into()
         org_usage_raw, project_usage_raw = res.unwrap()
-        org_usage = _int_to_decimal(int(org_usage_raw), 8)
-        project_usage = _int_to_decimal(int(project_usage_raw), 8)
+        org_usage = scaled_int_to_decimal(int(org_usage_raw), 8)
+        project_usage = scaled_int_to_decimal(int(project_usage_raw), 8)
         return Ok((org_usage, project_usage))
 
     async def _getOrLoadSpendingLimitsToRedis(
@@ -286,7 +284,7 @@ class TransactionService:
                 Awaitable[str | None],
                 redis.getex(
                     project_limit_key,
-                    ex=self._CACHE_TTL,
+                    ex=BILLING_CACHE_TTL_SECONDS,
                 ),
             )
             return v
@@ -296,7 +294,7 @@ class TransactionService:
                 Awaitable[str | None],
                 redis.getex(
                     org_limit_key,
-                    ex=self._CACHE_TTL,
+                    ex=BILLING_CACHE_TTL_SECONDS,
                 ),
             )
             return v
@@ -308,7 +306,7 @@ class TransactionService:
                 session, project_id
             )
             return (
-                str(_decimal_to_int(Decimal(settings.spending_limit), 8))
+                str(decimal_to_scaled_int(Decimal(settings.spending_limit), 8))
                 if settings is not None and settings.spending_limit is not None
                 else "-1"
             )
@@ -318,7 +316,7 @@ class TransactionService:
         ) -> str:
             settings = await self.org_settings_repo.getOrCreate(session, org_id)
             return (
-                str(_decimal_to_int(Decimal(settings.spending_limit), 8))
+                str(decimal_to_scaled_int(Decimal(settings.spending_limit), 8))
                 if settings is not None and settings.spending_limit is not None
                 else "-1"
             )
@@ -329,14 +327,14 @@ class TransactionService:
             await redis.set(
                 project_limit_key,
                 project_limit,
-                ex=self._CACHE_TTL,
+                ex=BILLING_CACHE_TTL_SECONDS,
             )
 
         async def save_org_limits_to_redis(redis: Redis, org_limit: str):
             await redis.set(
                 org_limit_key,
                 org_limit,
-                ex=self._CACHE_TTL,
+                ex=BILLING_CACHE_TTL_SECONDS,
             )
 
         org_limit, project_limit = await asyncio.gather(
@@ -387,14 +385,14 @@ class TransactionService:
         org_usage_key: str,
         project_usage_key: str,
     ) -> Result[tuple[str, str], InternalServiceError]:
-        next_billing_period = _get_next_billing_period(billing_period)
+        next_billing_period = get_next_billing_period(billing_period)
 
         async def get_org_usage(redis: Redis) -> str | None:
             v = await cast(
                 Awaitable[str | None],
                 redis.getex(
                     org_usage_key,
-                    ex=self._CACHE_TTL,
+                    ex=BILLING_CACHE_TTL_SECONDS,
                 ),
             )
             return v
@@ -404,7 +402,7 @@ class TransactionService:
                 Awaitable[str | None],
                 redis.getex(
                     project_usage_key,
-                    ex=self._CACHE_TTL,
+                    ex=BILLING_CACHE_TTL_SECONDS,
                 ),
             )
             return v
@@ -425,7 +423,7 @@ class TransactionService:
                 if usage and len(usage) > 0
                 else Decimal(0)
             )
-            return str(_decimal_to_int(v, 8))
+            return str(decimal_to_scaled_int(v, 8))
 
         async def load_project_usage_from_db(
             session: AsyncSession,
@@ -444,20 +442,20 @@ class TransactionService:
                 if usage and len(usage) > 0
                 else Decimal(0)
             )
-            return str(_decimal_to_int(v, 8))
+            return str(decimal_to_scaled_int(v, 8))
 
         async def save_org_usage_to_redis(redis: Redis, org_usage: str):
             await redis.set(
                 org_usage_key,
                 org_usage,
-                ex=self._CACHE_TTL,
+                ex=BILLING_CACHE_TTL_SECONDS,
             )
 
         async def save_project_usage_to_redis(redis: Redis, project_usage: str):
             await redis.set(
                 project_usage_key,
                 project_usage,
-                ex=self._CACHE_TTL,
+                ex=BILLING_CACHE_TTL_SECONDS,
             )
 
         org_usage, project_usage = await asyncio.gather(
@@ -519,8 +517,8 @@ class TransactionService:
         Returns Ok(transaction_uuid) on success.
         """
         now = datetime.now(UTC).replace(tzinfo=None)
-        billing_period = _get_billing_period(now)
-        amount = _to_decimal(req.amount)
+        billing_period = get_billing_period(now)
+        amount = scaled_amount_to_decimal(req.amount)
         if amount <= 0:
             return Err(
                 InvalidValueError(
@@ -578,10 +576,10 @@ class TransactionService:
                 org_usage_key,
                 trx_key,
                 idempotency_cache_key,
-                str(_decimal_to_int(amount, 8)),  # ARGV[1]
+                str(decimal_to_scaled_int(amount, 8)),  # ARGV[1]
                 json.dumps(transaction_record),  # ARGV[2]
                 str(transaction_uuid),  # ARGV[3]
-                self._CACHE_TTL,  # ARGV[4]
+                BILLING_CACHE_TTL_SECONDS,  # ARGV[4]
                 self._IDEMPOTENCY_KEY_TTL,  # ARGV[5]
             ),
         )
@@ -651,9 +649,9 @@ class TransactionService:
                     org_usage_key,
                     trx_key,
                     idempotency_cache_key,
-                    str(_decimal_to_int(amount, 8)),
+                    str(decimal_to_scaled_int(amount, 8)),
                     str(transaction_uuid),
-                    self._CACHE_TTL,
+                    BILLING_CACHE_TTL_SECONDS,
                 ),
             )
             return Err(
@@ -701,7 +699,7 @@ class TransactionService:
         Returns Ok(True) on success.
         """
         transaction_key = billing_transaction_key(str(transaction_uid))
-        real = _to_decimal(real_amount)
+        real = scaled_amount_to_decimal(real_amount)
         if real < 0:
             return Err(
                 InvalidValueError(
@@ -718,7 +716,7 @@ class TransactionService:
                 if not trx_:
                     return Err(TransactionNotFoundOrExpiredOrCaptured())
                 amount = trx_.amount
-                billing_period = _get_billing_period(trx_.created_at)
+                billing_period = get_billing_period(trx_.created_at)
                 billing_period_str = billing_period.strftime("%Y-%m")
         else:
             trx: _TransactionRecord = json.loads(raw)
@@ -730,7 +728,7 @@ class TransactionService:
             ):
                 return Err(TransactionNotFoundOrExpiredOrCaptured())
 
-            amount = _to_decimal(trx["amount"])
+            amount = scaled_amount_to_decimal(trx["amount"])
             billing_period_str = trx["billing_period"]
             billing_period = datetime.strptime(
                 trx["billing_period"], "%Y-%m"
@@ -777,8 +775,8 @@ class TransactionService:
                 project_usage_key,
                 org_usage_key,
                 transaction_key,
-                str(_decimal_to_int(delta, 8)),
-                self._CACHE_TTL,
+                str(decimal_to_scaled_int(delta, 8)),
+                BILLING_CACHE_TTL_SECONDS,
             ),
         )
 

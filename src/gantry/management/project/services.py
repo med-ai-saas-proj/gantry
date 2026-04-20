@@ -1,7 +1,8 @@
 """Business logic for project management."""
 
 from gantry.db.factories import AsyncSessionManager
-from gantry.management.billing.cache_keys import (
+from gantry.management.billing.utils import int_to_scaled_int
+from gantry.management.billing.cache_settings import (
     BILLING_CACHE_TTL_SECONDS,
     billing_project_spending_limit_key,
 )
@@ -237,7 +238,9 @@ class ProjectService:
         try:
             await self.redis.set(
                 billing_project_spending_limit_key(org_id, project_id),
-                -1 if spending_limit is None else int(spending_limit),
+                -1
+                if spending_limit is None
+                else int_to_scaled_int(spending_limit, 8),
                 ex=BILLING_CACHE_TTL_SECONDS,
             )
         except Exception as exc:

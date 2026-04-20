@@ -2,10 +2,6 @@
 
 from gantry.db.factories import AsyncSessionManager
 from gantry.management.project.services import ProjectNotFoundError
-from gantry.management.billing.cache_keys import (
-    billing_org_spending_limit_key,
-    billing_project_spending_limit_key,
-)
 from gantry.management.project.repositories import ProjectRepository
 from gantry.management.organization.settings import getOrgSettings
 from gantry.management.organization.cache_keys import (
@@ -16,6 +12,9 @@ from gantry.management.organization.cache_keys import (
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
+)
+from gantry.management.billing.services.transaction_services import (
+    TransactionService,
 )
 
 from .dtos import (
@@ -125,6 +124,7 @@ class ApiKeyService:
         api_key_repo: ApiKeyRepository,
         project_repo: ProjectRepository,
         session_manager: AsyncSessionManager,
+        billing_transaction_service: TransactionService,
         redis: Redis | None = None,
     ):
         self.logger = logger
@@ -144,6 +144,7 @@ class ApiKeyService:
         self.session_manager = session_manager
         self.redis = redis
         self.default_org_rate_limit = getOrgSettings().default_rate_limit
+        self.billing_transaction_service = billing_transaction_service
 
     def _createApiKeySecret(self) -> str:
         return secrets.token_urlsafe(self.api_key_secret_length)
@@ -356,16 +357,16 @@ class ApiKeyService:
             await self._writeCachedRpmLimit(project_rpm_key, project_rpm_limit)
         context["rpm_limit_project"] = project_rpm_limit
 
-        context["spending_limit_project"] = await self._readCachedSpendingLimit(
-            billing_project_spending_limit_key(
-                context["organization_uuid"],
-                context["project_id"],
+        spending_limit = (
+            await self.billing_transaction_service.getSpendingLimits(
+                context["organization_uuid"], context["project_id"]
             )
+        ).unwrap()
+        context["spending_limit_project"] = int(
+            spending_limit[0] if spending_limit[0] is not None else -1
         )
-        context[
-            "spending_limit_organization"
-        ] = await self._readCachedSpendingLimit(
-            billing_org_spending_limit_key(context["organization_uuid"])
+        context["spending_limit_organization"] = int(
+            spending_limit[1] if spending_limit[1] is not None else -1
         )
         return context
 

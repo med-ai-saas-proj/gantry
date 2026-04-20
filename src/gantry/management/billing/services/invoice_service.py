@@ -14,8 +14,8 @@ from ..type import (
     CreateBillingInvoiceLineItemInfo,
 )
 from ..utils import (
-    _get_billing_period,
-    _get_previous_billing_period,
+    get_billing_period,
+    get_previous_billing_period,
 )
 from ..models import BillingSourceProvider
 from ..repositories.credit_repo import CreditRepo
@@ -297,8 +297,8 @@ class InvoiceService:
             await asyncio.sleep(sleep_interval_seconds)
 
     async def processingInvoices(self, task_id: uuid.UUID, now: datetime):
-        current_period = _get_billing_period(now)
-        previous_period = _get_previous_billing_period(current_period)
+        current_period = get_billing_period(now)
+        previous_period = get_previous_billing_period(current_period)
 
         async with self.session_manager.get_session() as session:
             org_ids = await self.invoice_repo.getOrgsWithInvoiceToCreate(

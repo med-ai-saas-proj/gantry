@@ -1,5 +1,6 @@
 from gantry.db.factories import getRedis, getSessionManager
 from gantry.shared.logging.logger import getLogger
+from gantry.management.billing.factories import getBillingTransactionService
 from gantry.management.project.repositories import ProjectRepository
 
 from .services import ApiKeyService
@@ -23,4 +24,5 @@ def getApiKeyService():
         project_repo=ProjectRepository(),
         session_manager=getSessionManager(),
         redis=getRedis(),
+        billing_transaction_service=getBillingTransactionService(),
     )

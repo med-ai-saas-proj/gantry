@@ -139,12 +139,14 @@ async def query_bucket(
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ):
-    results = await rag_service.querySimilar(
-        api_key_info["project_id"],
-        body.embedding,
-        body.filters,
-        body.top_k,
-    )
+    results = (
+        await rag_service.querySimilar(
+            api_key_info["project_id"],
+            body.embedding,
+            body.filters,
+            body.top_k,
+        )
+    ).unwrap()
     return [
         RagEmbeddingResponse(
             file_info=FileInfoResponse(
