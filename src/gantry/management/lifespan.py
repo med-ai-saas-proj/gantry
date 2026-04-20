@@ -8,8 +8,6 @@ from gantry.management.organization.factories import getOrgService
 
 import asyncio
 
-from fastapi import FastAPI
-
 
 org_deletion_task: asyncio.Task | None = None
 billing_process_task: asyncio.Task | None = None

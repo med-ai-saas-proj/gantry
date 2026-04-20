@@ -12,7 +12,7 @@ from pydantic_settings import BaseSettings
 
 
 class RagSettings(BaseSettings):
-    openai_api_key: SecretStr | None = Field(default=None)
+    openai_api_key: SecretStr
     embedding_model: str = Field(default="text-embedding-3-small")
 
     rag_store_parameters: RagParameters = Field(

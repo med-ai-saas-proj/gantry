@@ -8,6 +8,8 @@ from .services import RagService
 
 from functools import lru_cache
 
+from openai import AsyncOpenAI
+
 
 @lru_cache(1)
 def getRagService():
@@ -19,4 +21,5 @@ def getRagService():
         FileRepository(),
         getRagSettings(),
         getFileStorageService(),
+        AsyncOpenAI(api_key=getRagSettings().openai_api_key.get_secret_value()),
     )

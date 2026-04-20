@@ -1,6 +1,11 @@
 from gantry.service.utils.rag.factories import getRagService
 
 
+async def rag_embedding_proccess_loop():
+    rag_service = getRagService()
+    await rag_service.processEmbeddingQueue()
+
+
 async def startup():
     rag_service = getRagService()
     await rag_service.createBucket()

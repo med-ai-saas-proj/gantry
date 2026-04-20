@@ -1,8 +1,11 @@
 from gantry.service.utils.file_storage.types import FileRecord
 
 import enum
+import uuid
 from typing import Literal, Sequence, TypedDict
 from datetime import datetime
+
+from alembic.util import status
 
 
 class RagEmbeddingRecord(TypedDict):
@@ -52,3 +55,16 @@ class ChunkSplitterType(str, enum.Enum):
     paragraph = "paragraph"
     line = "line"
     spacy = "spacy"
+
+
+class EmbeddingTask(TypedDict):
+    task_id: str
+    file_uid: uuid.UUID
+    project_id: int
+    chunk_splitter: ChunkSplitterType
+    chunk_size: int
+    chunk_overlap: int
+    status: Literal[
+        "pending", "completed", "failed_and_retrying", "failed_and_dropped"
+    ]
+    failed_reason: str | None
