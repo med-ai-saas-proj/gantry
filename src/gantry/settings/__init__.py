@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from gantry.settings.rag import RagSettings
+
 from .db import DBSettings
 from .auth import AuthSettings
 from .utils import TomlPathConfigSettingsSource, DotEnvPathConfigSettingsSource
@@ -67,6 +69,7 @@ class AppSettings(BaseSettings):
     file_storage: ObjectStorageSettings
     organization: OrgSettings
     observability: ObservabilitySettings
+    rag: RagSettings
 
     @classmethod
     def get(cls) -> Self:
