@@ -42,6 +42,7 @@ from openai import AsyncOpenAI
 from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import func, text, delete, select
 from redis.asyncio import Redis
+from structlog.stdlib import BoundLogger
 from sqlalchemy.dialects.postgresql import insert
 
 
@@ -50,6 +51,13 @@ class BucketNotFoundError(RecoverableError):
     code = "bucket_not_found"
     title = "Bucket not found"
     detail = "The requested bucket was not found in storage."
+
+
+class TaskNotFoundError(RecoverableError):
+    status = 404
+    code = "task_not_found"
+    title = "Task not found"
+    detail = "The requested task was not found or has expired."
 
 
 class RagService:
@@ -62,6 +70,7 @@ class RagService:
         file_storage_service: FileStorageService,
         openai_client: AsyncOpenAI,
         redis: Redis,
+        logger: BoundLogger,
     ):
         self.session_manager = session_manager
         self.project_repo = project_repo
@@ -70,6 +79,7 @@ class RagService:
         self.file_storage_service = file_storage_service
         self.openai_client = openai_client
         self.redis = redis
+        self.logger = logger
 
     def _splitByCharacterWindow(
         self,
@@ -504,102 +514,153 @@ class RagService:
     REDIS_TASK_RESULT = "rag_embedding_task_results:{task_id}"
     TASK_TTL = 60 * 60 * 24 * 7
 
-    async def processEmbeddingQueue(
+    async def processEmbeddingTask(
         self,
     ):
         while True:
-            task = await cast(
-                Awaitable[list],
-                self.redis.blpop(self.REDIS_TASK_QUEUE, timeout=30),
-            )
-            if not task:
-                continue
-            task_id = str(task[1])
-            result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
-
-            task_info = await cast(
-                Awaitable[str | bytes | None], self.redis.get(result_key)
-            )
-            if not task_info:
-                print(f"Task with ID {task_id} not found in Redis. Skipping.")
-                continue
-            task_dict = json.loads(task_info)
-
             try:
-                (
-                    await self.processEmbedding(
-                        file_uid=uuid.UUID(task_dict["file_uid"]),
-                        project_id=task_dict["project_id"],
-                        chunk_splitter=ChunkSplitterType(
-                            task_dict["chunk_splitter"]
+                await self.processEmbeddingQueue()
+            except Exception as exc:
+                self.logger.error(
+                    f"Error in embedding task processor loop", exc_info=exc
+                )
+                continue
+
+    async def processEmbeddingQueue(
+        self,
+    ):
+        task = await cast(
+            Awaitable[list],
+            self.redis.blpop(self.REDIS_TASK_QUEUE, timeout=30),
+        )
+        if not task:
+            return
+        task_id = str(task[1])
+        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
+
+        task_info = await cast(
+            Awaitable[str | bytes | None], self.redis.get(result_key)
+        )
+        if not task_info:
+            self.logger.error(
+                f"Task with ID {task_id} not found in Redis may have expired or been deleted."
+            )
+            return
+        task_dict = json.loads(task_info)
+
+        try:
+            self.logger.info(
+                f"Processing embedding task with ID {task_id}",
+                task_id=task_id,
+                task_info=task_dict,
+            )
+            (
+                await self.processEmbedding(
+                    file_uid=uuid.UUID(task_dict["file_uid"]),
+                    project_id=task_dict["project_id"],
+                    chunk_splitter=ChunkSplitterType(
+                        task_dict["chunk_splitter"]
+                    ),
+                    chunk_size=task_dict["chunk_size"],
+                    chunk_overlap=task_dict["chunk_overlap"],
+                )
+            ).unwrap()
+            task_dict["status"] = "completed"
+            async with self.redis.pipeline() as pipe:
+                await cast(
+                    Awaitable[None],
+                    pipe.set(
+                        result_key, json.dumps(task_dict), ex=self.TASK_TTL
+                    ),
+                )
+                await cast(
+                    Awaitable[None],
+                    pipe.hdel(self.REDIS_TASK_RETRY_HASH, task_id),
+                )
+                await pipe.execute()
+            self.logger.info(
+                f"Successfully processed embedding task with ID {task_id}.",
+                task_id=task_id,
+                task_info=task_dict,
+            )
+        except Exception as exc:
+            self.logger.error(
+                f"Error processing embedding task with ID {task_id}",
+                exc_info=exc,
+                task_id=task_id,
+                task_info=task_dict,
+            )
+            retry_time = await cast(
+                Awaitable[int],
+                self.redis.hincrby(self.REDIS_TASK_RETRY_HASH, task_id, 1),
+            )
+            if int(retry_time) <= self.EMBEDDING_TASK_RETRY_LIMIT:
+                self.logger.error(
+                    f"Embedding task with ID {task_id} failed on attempt {retry_time}. Retrying...",
+                    task_id=task_id,
+                    retry_attempt=retry_time,
+                    task_info=task_dict,
+                    exc_info=exc,
+                )
+                task_dict["status"] = "failed_and_retrying"
+                task_dict["failed_reason"] = str(exc)
+                async with self.redis.pipeline() as pipe:
+                    await cast(
+                        Awaitable[None],
+                        pipe.set(
+                            result_key, json.dumps(task_dict), ex=self.TASK_TTL
                         ),
-                        chunk_size=task_dict["chunk_size"],
-                        chunk_overlap=task_dict["chunk_overlap"],
                     )
-                ).unwrap()
-                task_dict["status"] = "completed"
+                    await cast(
+                        Awaitable[None],
+                        pipe.rpush(self.REDIS_TASK_QUEUE, task_id),
+                    )
+                    await pipe.execute()
+            else:
+                self.logger.error(
+                    f"Embedding task with ID {task_id} has exceeded retry limit.",
+                    task_id=task_id,
+                    retry_attempt=retry_time,
+                    task_info=task_dict,
+                )
+                task_dict["status"] = "failed_and_dropped"
+                task_dict["failed_reason"] = str(exc)
                 await cast(
                     Awaitable[None],
                     self.redis.set(
                         result_key, json.dumps(task_dict), ex=self.TASK_TTL
                     ),
                 )
-            except Exception as exc:
-                print(
-                    f"Error processing embedding task with ID {task_id}: {exc}"
-                )
-                retry_time = await cast(
-                    Awaitable[int],
-                    self.redis.hincrby(self.REDIS_TASK_RETRY_HASH, task_id, 1),
-                )
-                if int(retry_time) <= self.EMBEDDING_TASK_RETRY_LIMIT:
-                    print(
-                        f"Embedding task with ID {task_id} failed with error: {exc}. Retrying ({retry_time}/{self.EMBEDDING_TASK_RETRY_LIMIT})..."
-                    )
-                    task_dict["status"] = "failed_and_retrying"
-                    task_dict["failed_reason"] = str(exc)
-                    await cast(
-                        Awaitable[None],
-                        self.redis.set(
-                            result_key, json.dumps(task_dict), ex=self.TASK_TTL
-                        ),
-                    )
-                    await cast(
-                        Awaitable[None],
-                        self.redis.rpush(self.REDIS_TASK_QUEUE, task_id),
-                    )
-                else:
-                    print(
-                        f"Embedding task with ID {task_id} has exceeded retry limit. Error: {exc}"
-                    )
-                    task_dict["status"] = "failed_and_dropped"
-                    task_dict["failed_reason"] = str(exc)
-                    await cast(
-                        Awaitable[None],
-                        self.redis.set(
-                            result_key, json.dumps(task_dict), ex=self.TASK_TTL
-                        ),
-                    )
-                continue
 
     async def addFile(
         self,
         file_uid: uuid.UUID,
         project_id: int,
+        project_uuid: uuid.UUID,
         chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
-    ):
+    ) -> Result[str, FileNotFoundInSystemError]:
         task_id = str(uuid.uuid4())
-        task_dict = {
-            "task_id": task_id,
-            "file_uid": str(file_uid),
-            "project_id": project_id,
-            "chunk_splitter": chunk_splitter.value,
-            "chunk_size": chunk_size,
-            "chunk_overlap": chunk_overlap,
-            "status": "pending",
-        }
+        async with self.session_manager.get_session() as session:
+            file_info = await self.file_repo.getAvailableByUUID(
+                session, file_uid, project_id
+            )
+            if not file_info:
+                return Err(FileNotFoundInSystemError())
+
+            task_dict = {
+                "task_id": task_id,
+                "file_id": file_info.id,
+                "file_uid": str(file_uid),
+                "project_id": project_id,
+                "project_uuid": str(project_uuid),
+                "chunk_splitter": chunk_splitter.value,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "status": "pending",
+            }
+
         result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
         async with self.redis.pipeline() as pipe:
             await cast(
@@ -610,28 +671,38 @@ class RagService:
                 Awaitable[None], pipe.rpush(self.REDIS_TASK_QUEUE, task_id)
             )
             await pipe.execute()
-        return task_id
+
+        return Ok(task_id)
 
     async def getTaskStatus(
         self,
         task_id: str,
-    ) -> EmbeddingTask | None:
+        project_id: int,
+    ) -> Result[EmbeddingTask, TaskNotFoundError]:
         result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
         task_info = await cast(
             Awaitable[str | bytes | None], self.redis.get(result_key)
         )
         if not task_info:
-            return None
+            return Err(TaskNotFoundError())
+
         task_dict = json.loads(task_info)
-        return EmbeddingTask(
-            task_id=task_dict["task_id"],
-            file_uid=uuid.UUID(task_dict["file_uid"]),
-            project_id=task_dict["project_id"],
-            chunk_splitter=ChunkSplitterType(task_dict["chunk_splitter"]),
-            chunk_size=task_dict["chunk_size"],
-            chunk_overlap=task_dict["chunk_overlap"],
-            status=task_dict["status"],
-            failed_reason=task_dict.get("failed_reason"),
+        if task_dict.get("project_id") != project_id:
+            return Err(TaskNotFoundError())
+
+        return Ok(
+            EmbeddingTask(
+                task_id=task_dict["task_id"],
+                file_id=task_dict["file_id"],
+                file_uid=uuid.UUID(task_dict["file_uid"]),
+                project_id=task_dict["project_id"],
+                project_uuid=uuid.UUID(task_dict["project_uuid"]),
+                chunk_splitter=ChunkSplitterType(task_dict["chunk_splitter"]),
+                chunk_size=task_dict["chunk_size"],
+                chunk_overlap=task_dict["chunk_overlap"],
+                status=task_dict["status"],
+                failed_reason=task_dict.get("failed_reason"),
+            )
         )
 
     async def processEmbedding(

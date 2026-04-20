@@ -59,8 +59,10 @@ class ChunkSplitterType(str, enum.Enum):
 
 class EmbeddingTask(TypedDict):
     task_id: str
+    file_id: int
     file_uid: uuid.UUID
     project_id: int
+    project_uuid: uuid.UUID
     chunk_splitter: ChunkSplitterType
     chunk_size: int
     chunk_overlap: int

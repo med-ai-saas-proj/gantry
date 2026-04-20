@@ -6,6 +6,7 @@ from typing import Sequence
 from datetime import datetime
 
 from pydantic import Field, BaseModel
+from alembic.environment import Literal
 
 
 class AddRagEmbeddingRequest(BaseModel):
@@ -41,4 +42,19 @@ class QueryRagSimilarRequest(BaseModel):
 
     embedding: Sequence[float]
     file_ids: Sequence[UUID] | None = None
+    file_metadata_filters: dict | None = None
     top_k: int = Field(default=5, gt=0, le=100)
+
+
+class EmbeddingTaskResponse(BaseModel):
+    """DTO for RAG embedding task status response."""
+
+    task_id: str
+    file_uid: UUID
+    project_uuid: UUID
+    chunk_splitter: ChunkSplitterType
+    chunk_size: int
+    chunk_overlap: int
+    status: Literal[
+        "pending", "completed", "failed_and_retrying", "failed_and_dropped"
+    ]

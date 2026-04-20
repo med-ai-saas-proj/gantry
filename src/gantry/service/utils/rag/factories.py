@@ -1,4 +1,5 @@
-from gantry.db.factories import getSessionManager
+from gantry.db.factories import getRedis, getSessionManager
+from gantry.shared.logging.logger import getLogger
 from gantry.service.utils.rag.settings import getRagSettings
 from gantry.management.project.repositories import ProjectRepository
 from gantry.service.utils.file_storage.factories import getFileStorageService
@@ -22,4 +23,6 @@ def getRagService():
         getRagSettings(),
         getFileStorageService(),
         AsyncOpenAI(api_key=getRagSettings().openai_api_key.get_secret_value()),
+        getRedis(),
+        getLogger(),
     )
