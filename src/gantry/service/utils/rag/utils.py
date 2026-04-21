@@ -42,11 +42,18 @@ async def create_embedding_table(
         id BIGSERIAL PRIMARY KEY,
         embedding VECTOR({dimension}),
         file_id BIGINT NOT NULL REFERENCES "FileStorage"."Files"(id) ON DELETE CASCADE,
-        project_id BIGINT NOT NULL REFERENCES "Management"."Projects"(id) ON DELETE CASCADE,
+        project_id BIGINT NOT NULL REFERENCES "Project"."Projects"(id) ON DELETE CASCADE,
         text TEXT,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );""")
+    await session.execute(sql)
+    sql = text(f"""
+    CREATE INDEX IF NOT EXISTS "{table_name}_file_id_idx" ON "Rag"."{table_name}" (file_id);
+    """)
+    await session.execute(sql)
+    sql = text(f"""
+    CREATE INDEX IF NOT EXISTS "{table_name}_project_id_idx" ON "Rag"."{table_name}" (project_id);
+    """)
     await session.execute(sql)
 
 

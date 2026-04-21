@@ -444,14 +444,16 @@ class RagService:
                 if index_params and index_params.get("ef_construction")
                 else 64
             )
-            return f"rag_{dimension}_hnsw_{ops_type.value}_m{m}_ef{ef_construction}"
+            return f"rag_data_dim{dimension}_hnsw_{ops_type.value}_m{m}_ef{ef_construction}"
         elif index_params["index_type"] == VectorIndexType.ivfflat:
             lists = (
                 index_params["lists"]
                 if index_params and index_params.get("lists")
                 else 100
             )
-            return f"rag_{dimension}_ivfflat_{ops_type.value}_lists{lists}"
+            return (
+                f"rag_data_dim{dimension}_ivfflat_{ops_type.value}_lists{lists}"
+            )
         else:
             raise ValueError(
                 f"Unsupported index type: {index_params['index_type']}"

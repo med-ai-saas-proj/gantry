@@ -35,6 +35,10 @@ target_metadata = [BaseSQLModel.metadata, BaseTimescaleSQLModel.metadata]
 
 db_uri = getDBSettings().timescale_connection_uri.encoded_string()
 
+ignored_name = ["daily_billing_summary", "RagData"]
+
+ingored_contains = ["rag_data_"]
+
 
 def include_object(object, name, type_, reflected, compare_to):
     schema = getattr(object, "schema", None)
@@ -46,7 +50,8 @@ def include_object(object, name, type_, reflected, compare_to):
             or schema == "pg_catalog"
         )
         or name.startswith("timescaledb")
-        or getattr(object, "skip_autogenerate", None)
+        or name in ignored_name
+        or any(substr in name for substr in ingored_contains)
     )
 
 

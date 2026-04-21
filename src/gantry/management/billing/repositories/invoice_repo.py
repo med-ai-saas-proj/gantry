@@ -285,7 +285,6 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
         session: AsyncSession,
         invoice_id: int,
     ) -> Sequence[BillingInvoiceLineItemInfo]:
-        # For simplicity, assume line items are stored as a JSON array in the details column of the invoice
         stmt = (
             select(
                 BillingInvoiceLineItem.uuid,

@@ -8,7 +8,6 @@ from gantry.db.utils import (
 from gantry.management.project.models import Project
 from gantry.service.utils.conversation.types import MessagePart
 
-from typing import TypedDict
 from datetime import datetime
 
 from sqlalchemy import String, ForeignKey, FetchedValue
@@ -37,26 +36,6 @@ class Conversation(
         index=True,
     )
     extra_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-
-
-#
-# class MessagePart(TypedDict):
-#     """Represents a part of a message in a conversation."""
-#
-#     part_kind: str
-#     timestamp: Optional[str]
-#     content: Any
-#     tool_name: Optional[str]
-#     tool_call_id: Optional[str]
-#     metadata: Any | None
-#
-#     provider_details: Any | None
-#     id: str | None
-#
-#     provider_name: str | None
-#     signature: str | None
-#
-#     args: Any
 
 
 class Message(WithID, WithUUID, ConversationBaseSQLModel):

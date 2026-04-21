@@ -6,7 +6,6 @@ from gantry.db.utils import WithID, WithUUID, WithCreateUpdateTimestamp
 from datetime import datetime
 
 from sqlalchemy import (
-    JSON,
     String,
     Boolean,
     Integer,
@@ -16,6 +15,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 class ProjectBaseSQLModel(BaseSQLModel):
@@ -84,7 +84,7 @@ class ProjectSettings(WithCreateUpdateTimestamp, ProjectBaseSQLModel):
         doc="Monthly spending limit as a scaled integer. NULL means unlimited.",
     )
     extra: Mapped[dict] = mapped_column(
-        JSON,
+        JSONB,
         nullable=False,
         default=dict,
         server_default="{}",

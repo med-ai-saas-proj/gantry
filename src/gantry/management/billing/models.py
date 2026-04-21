@@ -13,6 +13,7 @@ from datetime import date, datetime
 from sqlalchemy import (
     Date,
     Enum,
+    Index,
     String,
     Numeric,
     DateTime,
@@ -45,7 +46,7 @@ class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
     """
 
     __tablename__ = "daily_billing_summary"
-    __table_args__ = {"schema": "Billing", "skip_autogenerate": True}
+    __table_args__ = {"schema": "Billing"}
 
     bucket: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), primary_key=True
@@ -106,6 +107,11 @@ class BillingTransaction(
 
     # e.g. { "llm_usages": { "gpt-4o": { "input_tokens": 100, "output_tokens": 50 } } }
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    __table_args__ = (
+        Index("BillingTransactions_created_at_idx", created_at.desc()),
+        BillingBaseSQLModel.__table_args__,
+    )
 
 
 class Credit(WithCreateUpdateTimestamp, BillingBaseSQLModel):

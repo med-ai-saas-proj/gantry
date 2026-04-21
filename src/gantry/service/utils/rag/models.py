@@ -44,8 +44,7 @@ class RagMetadata(WithCreateTimestamp, WithID, RagBaseSQLModel):
 
 
 class RagData(WithCreateTimestamp, WithID, RagBaseSQLModel):
-    __abstract__ = True
-
+    __tablename__ = "RagData"
     file_id: Mapped[int] = mapped_column(
         BigInteger,
         ForeignKey(File.id, ondelete="CASCADE"),
