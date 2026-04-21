@@ -3,10 +3,10 @@ from gantry.management.auth.dependencies import getUserInfo
 from gantry.service.utils.file_storage.dtos import FileInfoResponse
 
 from ..dtos import (
+    RagQueryResponse,
     AddRagFileRequest,
-    RagEmbeddingResponse,
     EmbeddingTaskResponse,
-    QueryRagSimilarRequest,
+    QueryRagQueryByTextRequest,
 )
 from .routers import rag_router
 from ..services import RagService
@@ -21,39 +21,16 @@ from fastapi import Body, Depends, Security, APIRouter
 rag_user_router = APIRouter(tags=["rag-user"])
 
 
-@rag_user_router.post(
-    "/files",
-    summary="Add a file to a RAG bucket.",
-    description="Endpoint to add a new file to a RAG bucket.",
-    status_code=201,
-)
-async def add_file(
-    body: Annotated[AddRagFileRequest, Body()],
-    user_info: Annotated[UserInfo, Security(getUserInfo)],
-    rag_service: Annotated[RagService, Depends(getRagService)],
-):
-    (
-        await rag_service.addFile(
-            body.file_uid,
-            api_key_info["project_id"],
-            uuid.UUID(api_key_info["project_uuid"]),
-            body.chunk_splitter,
-            body.chunk_size,
-            body.chunk_overlap,
-        )
-    ).unwrap()
-
-
 @rag_user_router.get(
     "/files",
-    summary="List files in a RAG bucket.",
-    description="Endpoint to list distinct file ids stored in a RAG bucket.",
+    summary="List files in a RAG.",
+    description="Endpoint to list distinct file ids stored in a RAG.",
 )
-async def get_bucket_files(
+async def get_files(
     user_info: Annotated[UserInfo, Security(getUserInfo)],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> Sequence[FileInfoResponse]:
-    res = await rag_service.getFilesInBucket(api_key_info["project_id"])
+    res = await rag_service.getFilesInRag(api_key_info["project_id"])
     return [
         FileInfoResponse(
             id=str(file_info["uid"]),
@@ -65,6 +42,30 @@ async def get_bucket_files(
         )
         for file_info in res
     ]
+
+
+@rag_user_router.post(
+    "/files",
+    summary="Add a file to a RAG.",
+    description="Endpoint to add a new file to a RAG.",
+    status_code=201,
+)
+async def add_file(
+    body: Annotated[AddRagFileRequest, Body()],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
+    rag_service: Annotated[RagService, Depends(getRagService)],
+) -> str:
+    task_id = (
+        await rag_service.addFile(
+            body.file_uid,
+            api_key_info["project_id"],
+            uuid.UUID(api_key_info["project_uuid"]),
+            body.chunk_splitter,
+            body.chunk_size,
+            body.chunk_overlap,
+        )
+    ).unwrap()
+    return task_id
 
 
 @rag_user_router.get(
@@ -94,26 +95,26 @@ async def get_task_status(
 
 
 @rag_user_router.post(
-    "/query",
-    summary="Query a RAG bucket.",
-    description="Endpoint to run a similarity search against a RAG bucket.",
-    response_model=list[RagEmbeddingResponse],
+    "/query/text",
+    summary="Query a RAG by text.",
+    description="Endpoint to run a similarity search against a RAG by text. The service will generate an embedding for the query text and then run the similarity search.",
+    response_model=list[RagQueryResponse],
 )
-async def query_bucket(
-    body: Annotated[QueryRagSimilarRequest, Body()],
+async def query_similar_by_text(
+    body: Annotated[QueryRagQueryByTextRequest, Body()],
     user_info: Annotated[UserInfo, Security(getUserInfo)],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ):
     results = (
-        await rag_service.querySimilar(
+        await rag_service.querySimilarByText(
             api_key_info["project_id"],
-            body.embedding,
+            body.query_text,
             body.filters,
             body.top_k,
         )
     ).unwrap()
     return [
-        RagEmbeddingResponse(
+        RagQueryResponse(
             file_info=FileInfoResponse(
                 id=str(result["file_info"]["uid"]),
                 filename=result["file_info"]["filename"],

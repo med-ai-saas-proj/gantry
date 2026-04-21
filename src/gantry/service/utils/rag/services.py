@@ -1,22 +1,5 @@
 from gantry.db.session import AsyncSessionManager
-from gantry.settings.rag import RagParameters, VectorOpsType, VectorIndexType
-from gantry.service.utils.rag.dtos import (
-    QueryFilterByFileUid,
-    QueryFilterByFileMetadata,
-)
-from gantry.service.utils.rag.type import (
-    EmbeddingTask,
-    ChunkSplitterType,
-    RagEmbeddingRecord,
-)
-from gantry.service.utils.rag.utils import (
-    get_orm_class,
-    create_vector_index,
-    drop_embedding_table,
-    create_embedding_table,
-)
-from gantry.service.utils.rag.models import RagMetadata
-from gantry.service.utils.rag.settings import RagSettings
+from gantry.settings.rag import VectorOpsType
 from gantry.management.project.repositories import ProjectRepository
 from gantry.service.utils.file_storage.types import FileRecord
 from gantry.service.utils.file_storage.services import (
@@ -28,6 +11,25 @@ from gantry.shared.custom_types.error_exception import (
     InternalServiceError,
 )
 from gantry.service.utils.file_storage.repositories import FileRepository
+
+from .dtos import (
+    QueryFilterByFileUid,
+    QueryFilterByFileMetadata,
+)
+from .type import (
+    EmbeddingTask,
+    ChunkSplitterType,
+    RagEmbeddingRecord,
+)
+from .utils import (
+    getIndexName,
+    getTableName,
+    get_orm_class,
+    create_vector_index,
+    create_embedding_table,
+)
+from .models import RagMetadata
+from .settings import RagSettings
 
 import io
 import re
@@ -57,6 +59,21 @@ class TaskNotFoundError(RecoverableError):
     code = "task_not_found"
     title = "Task not found"
     detail = "The requested task was not found or has expired."
+
+
+class InvalidEmbeddingDimensionError(RecoverableError):
+    status = 400
+    code = "invalid_embedding_dimension"
+    title = "Invalid embedding dimension"
+    detail = "The provided embedding does not match the expected dimension for this bucket."
+
+    def __init__(
+        self,
+        message: str | None = None,
+        from_exception: Exception | None = None,
+    ):
+        super().__init__(from_exception)
+        self.message = message
 
 
 class RagService:
@@ -429,73 +446,12 @@ class RagService:
                 )
             )
 
-    def getTableName(self, rag_store_parameters: RagParameters) -> str:
-        dimension = rag_store_parameters["dimension"]
-        index_params = rag_store_parameters["index_params"]
-        ops_type = rag_store_parameters["ops_type"]
-        if index_params["index_type"] == VectorIndexType.hnsw:
-            m = (
-                index_params["m"]
-                if index_params and index_params.get("m")
-                else 16
-            )
-            ef_construction = (
-                index_params["ef_construction"]
-                if index_params and index_params.get("ef_construction")
-                else 64
-            )
-            return f"rag_data_dim{dimension}_hnsw_{ops_type.value}_m{m}_ef{ef_construction}"
-        elif index_params["index_type"] == VectorIndexType.ivfflat:
-            lists = (
-                index_params["lists"]
-                if index_params and index_params.get("lists")
-                else 100
-            )
-            return (
-                f"rag_data_dim{dimension}_ivfflat_{ops_type.value}_lists{lists}"
-            )
-        else:
-            raise ValueError(
-                f"Unsupported index type: {index_params['index_type']}"
-            )
-
-    def getIndexName(
-        self,
-        table_name: str,
-        rag_store_parameters: RagParameters,
-    ) -> str:
-        index_params = rag_store_parameters["index_params"]
-        ops_type = rag_store_parameters["ops_type"]
-        if index_params["index_type"] == VectorIndexType.hnsw:
-            m = (
-                index_params["m"]
-                if index_params and index_params.get("m")
-                else 16
-            )
-            ef_construction = (
-                index_params["ef_construction"]
-                if index_params and index_params.get("ef_construction")
-                else 64
-            )
-            return f"idx_{table_name}_embedding_{ops_type.value}_hnsw_m{m}_ef{ef_construction}"
-        elif index_params["index_type"] == VectorIndexType.ivfflat:
-            lists = (
-                index_params["lists"]
-                if index_params and index_params.get("lists")
-                else 100
-            )
-            return f"idx_{table_name}_embedding_{ops_type.value}_ivfflat_lists{lists}"
-        else:
-            raise ValueError(
-                f"Unsupported index type: {index_params['index_type']}"
-            )
-
     async def createBucket(
         self,
     ):
         async with self.session_manager.get_session() as session:
-            table_name = self.getTableName(self.setting.rag_store_parameters)
-            index_name = self.getIndexName(
+            table_name = getTableName(self.setting.rag_store_parameters)
+            index_name = getIndexName(
                 table_name, self.setting.rag_store_parameters
             )
             ops_type = self.setting.rag_store_parameters["ops_type"]
@@ -715,7 +671,10 @@ class RagService:
         chunk_overlap: int = 150,
     ) -> Result[
         None,
-        BucketNotFoundError | FileNotFoundInSystemError | InternalServiceError,
+        BucketNotFoundError
+        | FileNotFoundInSystemError
+        | InternalServiceError
+        | InvalidEmbeddingDimensionError,
     ]:
         res = await self.file_storage_service.getFileInfoAndContent(
             file_uid, project_id
@@ -753,11 +712,18 @@ class RagService:
                     message="Failed to generate embeddings for all chunks."
                 )
             )
+        target_dimension = self.setting.rag_store_parameters["dimension"]
+        table_name = getTableName(self.setting.rag_store_parameters)
+        for embedding in embeddings:
+            if len(embedding) != target_dimension:
+                return Err(
+                    InvalidEmbeddingDimensionError(
+                        message=f"Generated embedding dimension {len(embedding)} does not match expected dimension {target_dimension}."
+                    )
+                )
 
         async with self.session_manager.get_session() as session:
-            table_name = self.getTableName(self.setting.rag_store_parameters)
-
-            DynamicBucket = get_orm_class(table_name, len(embeddings[0]))
+            DynamicBucket = get_orm_class(table_name, target_dimension)
 
             await session.execute(
                 insert(RagMetadata)
@@ -807,17 +773,28 @@ class RagService:
         embedding: Sequence[float],
         file_uid: uuid.UUID,
         project_id: int,
-    ) -> Result[None, BucketNotFoundError | FileNotFoundInSystemError]:
+    ) -> Result[
+        None,
+        BucketNotFoundError
+        | FileNotFoundInSystemError
+        | InvalidEmbeddingDimensionError,
+    ]:
+        target_dimension = self.setting.rag_store_parameters["dimension"]
+        table_name = getTableName(self.setting.rag_store_parameters)
+        if len(embedding) != target_dimension:
+            return Err(
+                InvalidEmbeddingDimensionError(
+                    message=f"Embedding dimension {len(embedding)} does not match expected dimension {target_dimension}."
+                )
+            )
+
         async with self.session_manager.get_session() as session:
             file_info = await self.file_repo.getAvailableByUUID(
                 session, file_uid, project_id
             )
             if not file_info:
                 return Err(FileNotFoundInSystemError())
-            table_name = self.getTableName(self.setting.rag_store_parameters)
-            DynamicBucket = get_orm_class(
-                table_name, 0
-            )  # dimension is not needed for insertion
+            DynamicBucket = get_orm_class(table_name, target_dimension)
             new_record = DynamicBucket(
                 embedding=embedding,
                 file_id=file_info.id,
@@ -829,7 +806,7 @@ class RagService:
             await session.commit()
             return Ok(None)
 
-    async def getFilesInBucket(
+    async def getFilesInRag(
         self,
         project_id: int,
     ) -> Sequence[FileRecord]:
@@ -858,17 +835,62 @@ class RagService:
                 for file_info in files_info
             ]
 
-    async def querySimilar(
+    async def querySimilarByText(
+        self,
+        project_id: int,
+        query: str,
+        filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
+        top_k: int = 5,
+    ) -> Result[
+        Sequence[RagEmbeddingRecord],
+        FileNotFoundInSystemError
+        | InvalidEmbeddingDimensionError
+        | InternalServiceError,
+    ]:
+        embedding_response = await self.openai_client.embeddings.create(
+            model=self.setting.embedding_model,
+            input=[query],
+        )
+        if (
+            not embedding_response.data
+            or not embedding_response.data[0].embedding
+        ):
+            return Err(
+                InternalServiceError(
+                    message="Failed to generate embedding for the query."
+                )
+            )
+
+        query_embedding = embedding_response.data[0].embedding
+        return await self.querySimilarByVector(
+            project_id=project_id,
+            embedding=query_embedding,
+            filters=filters,
+            top_k=top_k,
+        )
+
+    async def querySimilarByVector(
         self,
         project_id: int,
         embedding: Sequence[float],
         filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
         top_k: int = 5,
-    ) -> Result[Sequence[RagEmbeddingRecord], FileNotFoundInSystemError]:
+    ) -> Result[
+        Sequence[RagEmbeddingRecord],
+        FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
+    ]:
+        target_dimension = self.setting.rag_store_parameters["dimension"]
+        ops_type = self.setting.rag_store_parameters["ops_type"]
+        table_name = getTableName(self.setting.rag_store_parameters)
+        if len(embedding) != target_dimension:
+            return Err(
+                InvalidEmbeddingDimensionError(
+                    message=f"Embedding dimension {len(embedding)} does not match expected dimension {target_dimension}."
+                )
+            )
+
         async with self.session_manager.get_session() as session:
-            table_name = self.getTableName(self.setting.rag_store_parameters)
-            ops_type = self.setting.rag_store_parameters["ops_type"]
-            DynamicBucket = get_orm_class(table_name, len(embedding))
+            DynamicBucket = get_orm_class(table_name, target_dimension)
             if ops_type == VectorOpsType.cosine:
                 distance_func = "embedding <=> :embedding"
             elif ops_type == VectorOpsType.l2:

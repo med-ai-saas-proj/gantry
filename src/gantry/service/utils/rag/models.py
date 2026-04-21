@@ -7,13 +7,11 @@ from gantry.management.project.models import Project
 from gantry.service.utils.file_storage.models import File
 
 from typing import Sequence
-from pyexpat import model
 
 from sqlalchemy import Text, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 from pgvector.sqlalchemy import VECTOR
 from sqlalchemy.sql.schema import ForeignKey
-from sqlalchemy.dialects.postgresql import JSONB
 
 
 class RagBaseSQLModel(BaseSQLModel):

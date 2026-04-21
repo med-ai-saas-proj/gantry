@@ -1,12 +1,12 @@
-from gantry.service.utils.rag.type import ChunkSplitterType
 from gantry.service.utils.file_storage.dtos import FileInfoResponse
 
+from .type import ChunkSplitterType
+
 from uuid import UUID
-from typing import Sequence
+from typing import Literal, Sequence
 from datetime import datetime
 
 from pydantic import Field, BaseModel
-from alembic.environment import Literal
 
 
 class AddRagEmbeddingRequest(BaseModel):
@@ -28,8 +28,8 @@ class AddRagFileRequest(BaseModel):
     chunk_overlap: int = Field(default=150, ge=0)
 
 
-class RagEmbeddingResponse(BaseModel):
-    """DTO for embedding query results."""
+class RagQueryResponse(BaseModel):
+    """DTO for RAG query response."""
 
     file_info: FileInfoResponse
     text: str
@@ -49,10 +49,18 @@ class QueryFilterByFileUid(BaseModel):
     file_uids: Sequence[UUID]
 
 
-class QueryRagSimilarRequest(BaseModel):
+class QueryRagSimilaritySearchRequest(BaseModel):
     """DTO for similarity search within a bucket."""
 
     embedding: Sequence[float]
+    top_k: int = Field(default=5, gt=0, le=100)
+    filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None
+
+
+class QueryRagQueryByTextRequest(BaseModel):
+    """DTO for querying RAG embeddings by text."""
+
+    query_text: str
     top_k: int = Field(default=5, gt=0, le=100)
     filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None
 

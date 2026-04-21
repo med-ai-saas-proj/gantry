@@ -1,7 +1,7 @@
 import enum
 from typing import Literal, TypedDict
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings
 
 

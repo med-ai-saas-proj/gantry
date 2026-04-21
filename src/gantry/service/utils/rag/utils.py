@@ -1,5 +1,11 @@
-from gantry.settings.rag import IndexParams, VectorOpsType, VectorIndexType
-from gantry.service.utils.rag.models import RagData
+from gantry.settings.rag import (
+    IndexParams,
+    RagParameters,
+    VectorOpsType,
+    VectorIndexType,
+)
+
+from .models import RagData
 
 from typing import cast
 
@@ -20,8 +26,9 @@ def get_orm_class(table_name, dimension) -> type[RagData]:
         Column("embedding", VECTOR(dimension)),
         Column("file_id", Integer, nullable=False),
         Column("text", Text, nullable=True),
-        Column("created_at", DateTime),
-        Column("updated_at", DateTime),
+        Column(
+            "created_at", DateTime, nullable=False, server_default=text("NOW()")
+        ),
         Column("project_id", Integer, nullable=False),
         schema="Rag",
     )
@@ -93,8 +100,55 @@ async def drop_embedding_table(session: AsyncSession, table_name: str):
     await session.execute(sql)
 
 
-if __name__ == "__main__":
-    EmbeddingModel = get_orm_class("user_embeddings_v1", 512)
-    new_record = EmbeddingModel(
-        embedding=[0.1, 0.2], file_id=123, text="sample text", project_id=0
-    )
+def getTableName(rag_store_parameters: RagParameters) -> str:
+    dimension = rag_store_parameters["dimension"]
+    index_params = rag_store_parameters["index_params"]
+    ops_type = rag_store_parameters["ops_type"]
+    if index_params["index_type"] == VectorIndexType.hnsw:
+        m = index_params["m"] if index_params and index_params.get("m") else 16
+        ef_construction = (
+            index_params["ef_construction"]
+            if index_params and index_params.get("ef_construction")
+            else 64
+        )
+        return f"rag_data_dim{dimension}_hnsw_{ops_type.value}_m{m}_ef{ef_construction}"
+    elif index_params["index_type"] == VectorIndexType.ivfflat:
+        lists = (
+            index_params["lists"]
+            if index_params and index_params.get("lists")
+            else 100
+        )
+        return f"rag_data_dim{dimension}_ivfflat_{ops_type.value}_lists{lists}"
+    else:
+        raise ValueError(
+            f"Unsupported index type: {index_params['index_type']}"
+        )
+
+
+def getIndexName(
+    table_name: str,
+    rag_store_parameters: RagParameters,
+) -> str:
+    index_params = rag_store_parameters["index_params"]
+    ops_type = rag_store_parameters["ops_type"]
+    if index_params["index_type"] == VectorIndexType.hnsw:
+        m = index_params["m"] if index_params and index_params.get("m") else 16
+        ef_construction = (
+            index_params["ef_construction"]
+            if index_params and index_params.get("ef_construction")
+            else 64
+        )
+        return f"idx_{table_name}_embedding_{ops_type.value}_hnsw_m{m}_ef{ef_construction}"
+    elif index_params["index_type"] == VectorIndexType.ivfflat:
+        lists = (
+            index_params["lists"]
+            if index_params and index_params.get("lists")
+            else 100
+        )
+        return (
+            f"idx_{table_name}_embedding_{ops_type.value}_ivfflat_lists{lists}"
+        )
+    else:
+        raise ValueError(
+            f"Unsupported index type: {index_params['index_type']}"
+        )

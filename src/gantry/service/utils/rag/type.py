@@ -5,8 +5,6 @@ import uuid
 from typing import Literal, Sequence, TypedDict
 from datetime import datetime
 
-from alembic.util import status
-
 
 class RagEmbeddingRecord(TypedDict):
     file_info: FileRecord
