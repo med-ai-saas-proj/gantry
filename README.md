@@ -11,6 +11,9 @@
 
 - Run `./scripts/tidy.sh` to format and sort imports. THIS IS VERY IMPORTANT!!!
 
+### How to run alembic
+- `GANTRY_SERVER__CONFIG_FILE=example.gantry.toml uv run alembic`
+
 ### How to quickly run the server (For development and testing) 
 
 1. Check out [Getting API key](#getting-api-keys)

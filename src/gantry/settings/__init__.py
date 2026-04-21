@@ -39,7 +39,7 @@ class LogLevel(StrEnum):
 
 
 class AppSettings(BaseSettings):
-    __instance: ClassVar[AppSettings | None] = None
+    __instance: ClassVar[Self | None] = None
     model_config = SettingsConfigDict(
         # cli_parse_args=True,
         case_sensitive=False,
@@ -70,6 +70,17 @@ class AppSettings(BaseSettings):
 
     @classmethod
     def get(cls) -> Self:
+        if cls.__instance is None:
+            # raise RuntimeError("AppSettings is loaded before initialize")
+            from src.gantry.__main__ import Main
+
+            import sys
+
+            tmp = sys.argv
+            sys.argv = ["gantry", "server"]
+            main = Main()
+            cls.__instance = main.server
+            sys.argv = tmp
         return cls.__instance
 
     @classmethod

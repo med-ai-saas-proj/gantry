@@ -3,7 +3,6 @@ from gantry.settings import (
     DotEnvPathConfigSettingsSource,
 )
 from gantry.commands.server import Server
-from gantry.commands.server.migrate import Migrate
 from gantry.commands.gen_config_schema import GenConfigSchema
 from gantry.shared.consts.common_const import APP_NAME
 
@@ -25,6 +24,7 @@ class Main(BaseSettings, cli_prog_name=APP_NAME):
         cli_implicit_flags=True,
         cli_kebab_case="no_enums",
         cli_avoid_json=True,
+        env_prefix="GANTRY_",
     )
     server: CliSubCommand[Server]
     # migrate: CliSubCommand[Migrate]
