@@ -163,10 +163,8 @@ class AuthService:
             "email": claims.get("email"),
             "roles": roles,
             "org_id": org_id,
+            "project_ids": self._extractProjectIds(claims, roles) or [],
         }
-        project_ids = self._extractProjectIds(claims, roles)
-        if project_ids:
-            auth_info["project_ids"] = project_ids
 
         return Ok(auth_info)
 
@@ -201,19 +199,13 @@ class AuthService:
     @staticmethod
     def _extractProjectIdsFromEntries(entries: list[str]) -> list[str]:
         """Extract distinct project ids from flat token entries like `proj:perm`."""
-        project_ids: list[str] = []
         seen: set[str] = set()
         for entry in entries:
-            if not isinstance(entry, str):
-                continue
             project_id, separator, permission = entry.partition(":")
             if not separator or not project_id or not permission:
                 continue
-            if project_id in seen:
-                continue
             seen.add(project_id)
-            project_ids.append(project_id)
-        return project_ids
+        return sorted(seen)
 
     def _extractProjectIds(
         self,

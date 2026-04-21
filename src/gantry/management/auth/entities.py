@@ -1,4 +1,4 @@
-from typing import TypedDict, NotRequired
+from typing import TypedDict
 
 
 class UserInfo(TypedDict):
@@ -7,4 +7,4 @@ class UserInfo(TypedDict):
     email: str | None
     roles: list[str]
     org_id: str
-    project_ids: NotRequired[list[str]]
+    project_ids: list[str]

@@ -63,6 +63,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
                 "email": "a@test",
                 "roles": [],
                 "org_id": "org-name",
+                "project_ids": [],
             }
         )
         kc_org_client = Mock()
@@ -126,7 +127,16 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_user_org_id_and_require_user_org_id(self):
         self.assertEqual(
-            await getUserOrgId({"id": "u1", "roles": [], "org_id": "org-1"}),
+            (
+                await getUserOrgId(
+                    {
+                        "id": "u1",
+                        "roles": [],
+                        "org_id": "org-1",
+                        "project_ids": [],
+                    }
+                )
+            ),
             "org-1",
         )
         self.assertEqual(await requireUserOrgId("org-1"), "org-1")
