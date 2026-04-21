@@ -223,8 +223,6 @@ class AuthService:
         else:
             project_entries = []
 
-        # Some environments flatten these entries into the role list instead of
-        # emitting a dedicated `project_permissions` claim.
         return self._extractProjectIdsFromEntries(project_entries or roles)
 
     def checkRole(
