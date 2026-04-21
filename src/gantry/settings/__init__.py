@@ -11,15 +11,12 @@ from .file_storage import ObjectStorageSettings
 from .organization import OrgSettings
 from .observability import ObservabilitySettings
 
-import os
 from enum import StrEnum
-from typing import Self, Literal, ClassVar, Annotated
+from typing import Self, Literal, ClassVar
 
-from pydantic import Field
 from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
-    PydanticBaseSettingsSource,
 )
 
 
@@ -72,7 +69,7 @@ class AppSettings(BaseSettings):
     def get(cls) -> Self:
         if cls.__instance is None:
             # raise RuntimeError("AppSettings is loaded before initialize")
-            from src.gantry.__main__ import Main
+            from gantry.__main__ import Main
 
             import sys
 
