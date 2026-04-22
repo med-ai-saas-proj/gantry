@@ -205,7 +205,7 @@ class AuthService:
             if not separator or not project_id or not permission:
                 continue
             seen.add(project_id)
-        return sorted(seen)
+        return list(seen)
 
     def _extractProjectIds(
         self,
