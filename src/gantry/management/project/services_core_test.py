@@ -488,6 +488,41 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Ok)
         service._ensureUserInOrg.assert_awaited_once_with("u1", "org-1")
 
+    async def test_list_accessible_projects_uses_org_wide_view_for_org_owner(
+        self,
+    ):
+        """Org owners should see every project in the organization."""
+        service = self._make_service()
+        service._isOrgOwner = AsyncMock(return_value=Ok(True))
+        service.project_repo.listByOrg = AsyncMock(
+            return_value=[
+                SimpleNamespace(
+                    uuid="p1",
+                    name="P1",
+                    description=None,
+                    organization_id="org-1",
+                    is_archived=False,
+                )
+            ]
+        )
+
+        res = await service.listAccessibleProjects("u1", "org-1")
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().total, 1)
+
+    async def test_list_accessible_projects_uses_membership_for_non_owner(self):
+        """Non-owners should see only projects they joined in the org."""
+        service = self._make_service()
+        service._isOrgOwner = AsyncMock(return_value=Ok(False))
+        service.listUserProjects = AsyncMock(return_value=Ok("joined-projects"))
+
+        res = await service.listAccessibleProjects("u1", "org-1")
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap(), "joined-projects")
+        service.listUserProjects.assert_awaited_once_with("u1", "org-1")
+
     async def test_has_org_wide_permission_true_and_false(self):
         """Org-wide permission check should respect membership permissions."""
         # Arrange
@@ -629,3 +664,67 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         # Assert
         self.assertTrue(res.status == ResultStatus.Err)
         self.assertIsInstance(res.err(), InsufficientProjectPermissionError)
+
+    async def test_get_project_returns_project_for_org_owner(self):
+        """Organization owner should read any project in the same org."""
+        service = self._make_service()
+        project_info = SimpleNamespace(
+            id="proj-1",
+            name="P1",
+            description=None,
+            organization_id="org-1",
+            archived=False,
+        )
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((1, "org-1", project_info))
+        )
+        service._isOrgOwner = AsyncMock(return_value=Ok(True))
+
+        res = await service.getProject("proj-1", "u-owner")
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().id, "proj-1")
+
+    async def test_get_project_returns_project_for_member(self):
+        """Project member should read the project metadata."""
+        service = self._make_service()
+        project_info = SimpleNamespace(
+            id="proj-1",
+            name="P1",
+            description=None,
+            organization_id="org-1",
+            archived=False,
+        )
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((1, "org-1", project_info))
+        )
+        service._isOrgOwner = AsyncMock(return_value=Ok(False))
+        service.membership_repo.getMembership = AsyncMock(
+            return_value=SimpleNamespace(project_id=1, user_id="u1")
+        )
+
+        res = await service.getProject("proj-1", "u1")
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().id, "proj-1")
+
+    async def test_get_project_denies_non_member_non_owner(self):
+        """Users outside the project should not read project metadata."""
+        service = self._make_service()
+        project_info = SimpleNamespace(
+            id="proj-1",
+            name="P1",
+            description=None,
+            organization_id="org-1",
+            archived=False,
+        )
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((1, "org-1", project_info))
+        )
+        service._isOrgOwner = AsyncMock(return_value=Ok(False))
+        service.membership_repo.getMembership = AsyncMock(return_value=None)
+
+        res = await service.getProject("proj-1", "u1")
+
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertEqual(res.err().code, "user_not_in_project")

@@ -16,10 +16,6 @@ from gantry.management.auth.dependencies import (
 )
 
 
-class _DummyErr(Exception):
-    pass
-
-
 class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
     async def test_get_user_info_resolves_claim_org_id_from_memberships(self):
         auth_service = Mock()
@@ -28,8 +24,9 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
                 "id": "u1",
                 "username": "alice",
                 "email": "a@test",
-                "roles": [],
+                "roles": ["proj-1:project.owner"],
                 "org_id": "11111111-1111-1111-1111-111111111111",
+                "project_ids": ["proj-1"],
             }
         )
         kc_org_client = Mock()
@@ -45,11 +42,16 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        user_info = await getUserInfo("token", auth_service, kc_org_client)
+        user_info = await getUserInfo(
+            "token",
+            auth_service,
+            kc_org_client,
+        )
 
         self.assertEqual(
             user_info["org_id"], "11111111-1111-1111-1111-111111111111"
         )
+        self.assertEqual(user_info["project_ids"], ["proj-1"])
         kc_org_client.getMemberOrganizations.assert_awaited_once_with("u1")
 
     async def test_get_user_info_resolves_org_name_claim_to_org_id(self):
@@ -61,6 +63,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
                 "email": "a@test",
                 "roles": [],
                 "org_id": "org-name",
+                "project_ids": [],
             }
         )
         kc_org_client = Mock()
@@ -70,7 +73,11 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        user_info = await getUserInfo("token", auth_service, kc_org_client)
+        user_info = await getUserInfo(
+            "token",
+            auth_service,
+            kc_org_client,
+        )
 
         self.assertEqual(user_info["org_id"], "org-1")
 
@@ -82,11 +89,54 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
         kc_org_client = Mock()
 
         with self.assertRaises(MissingOrganizationClaimError):
-            await getUserInfo("token", auth_service, kc_org_client)
+            await getUserInfo(
+                "token",
+                auth_service,
+                kc_org_client,
+            )
+
+    async def test_get_user_info_keeps_project_ids_from_verify_token(
+        self,
+    ):
+        auth_service = Mock()
+        auth_service.verifyToken.return_value = Ok(
+            {
+                "id": "u1",
+                "username": "alice",
+                "email": "a@test",
+                "roles": [
+                    "proj-1:project.settings.read",
+                    "proj-2:project.owner",
+                ],
+                "org_id": "org-1",
+                "project_ids": ["proj-1", "proj-2"],
+            }
+        )
+        kc_org_client = Mock()
+        kc_org_client.getMemberOrganizations = AsyncMock(
+            return_value=Ok([{"id": "org-1", "name": "org-name"}])
+        )
+
+        user_info = await getUserInfo(
+            "token",
+            auth_service,
+            kc_org_client,
+        )
+
+        self.assertEqual(user_info["project_ids"], ["proj-1", "proj-2"])
 
     async def test_get_user_org_id_and_require_user_org_id(self):
         self.assertEqual(
-            await getUserOrgId({"id": "u1", "roles": [], "org_id": "org-1"}),
+            (
+                await getUserOrgId(
+                    {
+                        "id": "u1",
+                        "roles": [],
+                        "org_id": "org-1",
+                        "project_ids": [],
+                    }
+                )
+            ),
             "org-1",
         )
         self.assertEqual(await requireUserOrgId("org-1"), "org-1")

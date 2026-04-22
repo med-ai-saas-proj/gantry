@@ -77,6 +77,20 @@ async def create_project(
     return result.unwrap()
 
 
+@project_router.get("/{project_id}", response_model=ProjectInfoResponse)
+async def get_project(
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    project_id: Annotated[str, Path()],
+    project_service: Annotated[ProjectService, Depends(getProjectService)],
+) -> ProjectInfoResponse:
+    """Return one project when the actor can access it."""
+    result = await project_service.getProject(
+        project_uuid=project_id,
+        actor_user_id=user_info["id"],
+    )
+    return result.unwrap()
+
+
 @project_router.put("/{project_id}", response_model=ProjectInfoResponse)
 async def update_project(
     user_info: Annotated[

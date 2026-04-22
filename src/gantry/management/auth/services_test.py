@@ -27,6 +27,10 @@ class TestAuthService(unittest.TestCase):
                 "preferred_username": "alice",
                 "email": "alice@test",
                 "organization": "org-1",
+                "project_permissions": [
+                    "proj-1:project.owner",
+                    "proj-2:project.settings.read",
+                ],
                 "realm_access": {"roles": ["r1"]},
                 "resource_access": {
                     "med-ai-saas-app": {"roles": ["r2"]},
@@ -39,6 +43,46 @@ class TestAuthService(unittest.TestCase):
         self.assertTrue(result.status == ResultStatus.Ok)
         self.assertEqual(result.unwrap()["org_id"], "org-1")
         self.assertEqual(result.unwrap()["roles"], ["r1", "r2", "r3"])
+        self.assertEqual(result.unwrap()["project_ids"], ["proj-1", "proj-2"])
+
+    def test_map_claims_extracts_project_ids_from_role_entries(self):
+        result = self.service._mapClaimsToAuthInfo(
+            {
+                "sub": "user-1",
+                "preferred_username": "alice",
+                "email": "alice@test",
+                "organization": "org-1",
+                "realm_access": {
+                    "roles": [
+                        "proj-1:project.owner",
+                        "proj-2:project.settings.read",
+                        "not-a-project-role",
+                    ]
+                },
+                "azp": "med-ai-saas-app",
+            }
+        )
+
+        self.assertTrue(result.status == ResultStatus.Ok)
+        self.assertEqual(result.unwrap()["project_ids"], ["proj-1", "proj-2"])
+
+    def test_map_claims_deduplicates_project_ids(self):
+        result = self.service._mapClaimsToAuthInfo(
+            {
+                "sub": "user-1",
+                "preferred_username": "alice",
+                "email": "alice@test",
+                "organization": "org-1",
+                "project_permissions": [
+                    "proj-1:project.owner",
+                    "proj-1:project.settings.write",
+                ],
+                "azp": "med-ai-saas-app",
+            }
+        )
+
+        self.assertTrue(result.status == ResultStatus.Ok)
+        self.assertEqual(result.unwrap()["project_ids"], ["proj-1"])
 
     def test_map_claims_supports_multivalued_organization_claim(self):
         result = self.service._mapClaimsToAuthInfo(

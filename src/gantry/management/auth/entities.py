@@ -7,3 +7,4 @@ class UserInfo(TypedDict):
     email: str | None
     roles: list[str]
     org_id: str
+    project_ids: list[str]

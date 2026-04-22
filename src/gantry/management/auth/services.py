@@ -163,6 +163,7 @@ class AuthService:
             "email": claims.get("email"),
             "roles": roles,
             "org_id": org_id,
+            "project_ids": self._extractProjectIds(claims, roles) or [],
         }
 
         return Ok(auth_info)
@@ -194,6 +195,35 @@ class AuthService:
                         return nested_id
 
         return None
+
+    @staticmethod
+    def _extractProjectIdsFromEntries(entries: list[str]) -> list[str]:
+        """Extract distinct project ids from flat token entries like `proj:perm`."""
+        seen: set[str] = set()
+        for entry in entries:
+            project_id, separator, permission = entry.partition(":")
+            if not separator or not project_id or not permission:
+                continue
+            seen.add(project_id)
+        return list(seen)
+
+    def _extractProjectIds(
+        self,
+        claims: dict[str, Any],
+        roles: list[str],
+    ) -> list[str]:
+        """Extract project ids directly from token-carried project permission entries."""
+        raw = claims.get("project_permissions", [])
+        if isinstance(raw, str):
+            project_entries = [raw]
+        elif isinstance(raw, list):
+            project_entries = [
+                entry for entry in raw if isinstance(entry, str)
+            ]
+        else:
+            project_entries = []
+
+        return self._extractProjectIdsFromEntries(project_entries or roles)
 
     def checkRole(
         self, user_info: UserInfo, role: ManagementRole
