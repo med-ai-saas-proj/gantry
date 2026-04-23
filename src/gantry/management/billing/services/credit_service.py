@@ -1,7 +1,7 @@
 from gantry.db.session import AsyncSessionManager
 
 from ..dtos import ScaledAmount, CreditTransactionInfoResponse
-from ..utils import _to_decimal
+from ..utils import scaled_amount_to_decimal
 from ..repositories.credit_repo import CreditRepo
 
 from decimal import Decimal
@@ -29,7 +29,7 @@ class CreditService:
         amount_to_add: ScaledAmount,
         description: str | None = None,
     ) -> Decimal:
-        amount = _to_decimal(amount_to_add)
+        amount = scaled_amount_to_decimal(amount_to_add)
         if amount <= 0:
             raise ValueError("Amount to add must be greater than 0.")
         description = description or "Added credits"

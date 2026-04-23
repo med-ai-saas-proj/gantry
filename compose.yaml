@@ -118,7 +118,7 @@ services:
       - full
 
   timescale_db:
-    image: timescale/timescaledb:latest-pg17
+    image: timescale/timescaledb:latest-pg18
     container_name: timescale-db
     environment:
       POSTGRES_DB: gantry

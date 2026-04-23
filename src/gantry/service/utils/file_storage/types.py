@@ -1,3 +1,4 @@
+from uuid import UUID
 from typing import TypedDict
 from datetime import datetime
 
@@ -5,7 +6,8 @@ from datetime import datetime
 class FileRecord(TypedDict):
     """Representation of a file record in storage."""
 
-    id: str
+    id: int
+    uid: UUID
     filename: str
     mime_type: str
     size: int

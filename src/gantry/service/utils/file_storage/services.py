@@ -24,6 +24,14 @@ class FileNotFoundInSystemError(RecoverableError):
     title = "File not found"
     detail = "The requested file was not found in storage."
 
+    def __init__(
+        self,
+        message: str | None = None,
+        from_exception: Exception | None = None,
+    ):
+        super().__init__(from_exception=from_exception)
+        self.message = message
+
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.client import S3Client
@@ -149,6 +157,20 @@ class FileStorageService:
         )
         return Ok(file_content)
 
+    async def getFileInfoAndContent(
+        self, file_uuid: uuid.UUID, project_id: int
+    ) -> Result[tuple[FileRecord, bytes], FileNotFoundInSystemError]:
+        """Retrieve file info and content by UUID."""
+        res = await self.getFileInfo(file_uuid, project_id)
+        if res.status == ResultStatus.Err:
+            return res.into()
+        file_record = res.unwrap()
+        file_content = await asyncio.to_thread(
+            self._loadFileContentFromStorage,
+            file_record["storage_path"],
+        )
+        return Ok((file_record, file_content))
+
     async def getFileUrl(
         self, file_uuid: uuid.UUID, project_id: int
     ) -> Result[str, FileNotFoundInSystemError]:
@@ -197,6 +219,7 @@ class FileStorageService:
                 FileRecord(
                     {
                         "id": json_data["id"],
+                        "uid": uuid.UUID(json_data["uid"]),
                         "filename": json_data["filename"],
                         "storage_path": json_data["storage_path"],
                         "mime_type": json_data["mime_type"],
@@ -217,7 +240,8 @@ class FileStorageService:
                 return Err(FileNotFoundInSystemError())
 
             res: FileRecord = {
-                "id": str(file_record.uuid),
+                "id": file_record.id,
+                "uid": file_record.uuid,
                 "filename": file_record.original_filename,
                 "storage_path": file_record.filepath,
                 "mime_type": file_record.mime_type,
@@ -287,7 +311,8 @@ class FileStorageService:
             )
             return [
                 {
-                    "id": str(file_record.uuid),
+                    "id": file_record.id,
+                    "uid": file_record.uuid,
                     "filename": file_record.original_filename,
                     "storage_path": file_record.filepath,
                     "mime_type": file_record.mime_type,

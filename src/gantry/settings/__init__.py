@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from gantry.settings.rag import RagSettings
+
 from .db import DBSettings
 from .auth import AuthSettings
 from .utils import TomlPathConfigSettingsSource, DotEnvPathConfigSettingsSource
@@ -50,6 +52,7 @@ class AppSettings(BaseSettings):
         cli_ignore_unknown_args=True,
     )
 
+    rag: RagSettings
     stage: Annotated[
         AppStage,
         Field(description="Application deployment stage."),

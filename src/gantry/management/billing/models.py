@@ -46,7 +46,7 @@ class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
     """
 
     __tablename__ = "daily_billing_summary"
-    __table_args__ = {"schema": "Billing", "skip_autogenerate": True}
+    __table_args__ = {"schema": "Billing"}
 
     bucket: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), primary_key=True
@@ -107,6 +107,11 @@ class BillingTransaction(
 
     # e.g. { "llm_usages": { "gpt-4o": { "input_tokens": 100, "output_tokens": 50 } } }
     details: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    __table_args__ = (
+        Index("BillingTransactions_created_at_idx", created_at.desc()),
+        BillingBaseSQLModel.__table_args__,
+    )
 
 
 class Credit(WithCreateUpdateTimestamp, BillingBaseSQLModel):
@@ -209,39 +214,3 @@ class BillingInvoiceLineItem(
     project_id: Mapped[int | None] = mapped_column(
         BigInteger, nullable=True, index=True
     )  # optional link to project
-
-
-class SpendingLimitType(str, enum.Enum):
-    MONTHLY = "monthly"
-    # DAILY = "daily"
-
-
-class SpendingLimit(
-    WithCreateUpdateTimestamp, WithID, BillingBaseSQLModel, WithUUID
-):
-    __tablename__ = "SpendingLimits"
-
-    organization_id: Mapped[str] = mapped_column(
-        String(128), nullable=False, index=True
-    )
-    project_id: Mapped[int] = mapped_column(
-        BigInteger, nullable=True, unique=True, index=True
-    )
-
-    limit_type: Mapped[SpendingLimitType] = mapped_column(
-        Enum(SpendingLimitType, schema="Billing"), nullable=False
-    )
-    limit: Mapped[Decimal | None] = mapped_column(
-        AMOUNT_COLUMN_TYPE, nullable=True
-    )
-
-    __table_args__ = (
-        UniqueConstraint(organization_id, project_id, name="uq_spending_limit"),
-        Index(
-            "ix_spending_limits_org",
-            organization_id,
-            unique=True,
-            postgresql_where=project_id.is_(None),  # global default record
-        ),
-        BillingBaseSQLModel.__table_args__,
-    )

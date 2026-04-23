@@ -38,7 +38,6 @@ def getBillingTransactionService() -> TransactionService:
         org_settings_repo=OrgSettingsRepository(),
         project_settings_repo=ProjectSettingsRepository(),
         transaction_repo=TransactionRepository(),
-        apikey_service=getApiKeyService(),
     )
 
 

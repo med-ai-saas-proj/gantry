@@ -1,21 +1,21 @@
 from gantry.db.session import AsyncSessionManager
-from gantry.management.billing.dtos import (
-    InvoiceInfoResponse,
-    InvoiceItemInfoResponse,
-    InvoiceDetailInfoResponse,
-)
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
     InternalServiceError,
 )
 
+from ..dtos import (
+    InvoiceInfoResponse,
+    InvoiceItemInfoResponse,
+    InvoiceDetailInfoResponse,
+)
 from ..type import (
     AggregatePeriod,
     CreateBillingInvoiceLineItemInfo,
 )
 from ..utils import (
-    _get_billing_period,
-    _get_previous_billing_period,
+    get_billing_period,
+    get_previous_billing_period,
 )
 from ..models import BillingSourceProvider
 from ..repositories.credit_repo import CreditRepo
@@ -35,12 +35,10 @@ import asyncio
 from uuid import UUID
 from typing import Sequence
 from decimal import Decimal
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
-from regex import F
 from stripe import Invoice, StripeError, StripeClient
 from pyrusult import Ok, Err, Result, ResultStatus
-from sqlalchemy import update
 from structlog.stdlib import BoundLogger
 
 
@@ -299,8 +297,8 @@ class InvoiceService:
             await asyncio.sleep(sleep_interval_seconds)
 
     async def processingInvoices(self, task_id: uuid.UUID, now: datetime):
-        current_period = _get_billing_period(now)
-        previous_period = _get_previous_billing_period(current_period)
+        current_period = get_billing_period(now)
+        previous_period = get_previous_billing_period(current_period)
 
         async with self.session_manager.get_session() as session:
             org_ids = await self.invoice_repo.getOrgsWithInvoiceToCreate(

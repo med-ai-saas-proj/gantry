@@ -1,12 +1,12 @@
-from gantry.management.billing.dtos import (
-    AddBillingSourceRequest,
-    UpdateBillingSourceRequest,
-)
 from gantry.shared.custom_types.error_exception import (
     ExternalAPIError,
     NotImplementedError,
 )
 
+from ..dtos import (
+    AddBillingSourceRequest,
+    UpdateBillingSourceRequest,
+)
 from .billing_source_provider import BillingSourceProviderInterface
 
 from types import CoroutineType
