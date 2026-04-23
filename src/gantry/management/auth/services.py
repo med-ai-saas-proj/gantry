@@ -217,9 +217,7 @@ class AuthService:
         if isinstance(raw, str):
             project_entries = [raw]
         elif isinstance(raw, list):
-            project_entries = [
-                entry for entry in raw if isinstance(entry, str)
-            ]
+            project_entries = [entry for entry in raw if isinstance(entry, str)]
         else:
             project_entries = []
 

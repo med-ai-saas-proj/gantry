@@ -24,16 +24,29 @@ class Server(AppSettings):
         Field(validation_alias=AliasChoices("env_file")),
     ] = None
 
-    async def cli_cmd(self):
+    def cli_cmd(self):
         AppSettings._setInstance(self)
         if get_subcommand(self, is_required=False) is not None:
             CliApp.run_subcommand(self)
             return
 
+        import asyncio
+
+        asyncio.run(self._serve())
+
+    async def _serve(self):
         from gantry.main.app import main_app, internal_app
         from gantry.main.lifespan import (
             startup as main_startup,
             shutdown as main_shutdown,
+        )
+        from gantry.service.lifespan import (
+            startup as service_startup,
+            shutdown as service_shutdown,
+        )
+        from gantry.management.lifespan import (
+            startup as management_startup,
+            shutdown as management_shutdown,
         )
 
         import asyncio
@@ -41,19 +54,7 @@ class Server(AppSettings):
         import uvicorn
 
         await main_startup()
-
-        from gantry.management.lifespan import (
-            startup as management_startup,
-            shutdown as management_shutdown,
-        )
-
         await management_startup()
-
-        from gantry.service.lifespan import (
-            startup as service_startup,
-            shutdown as service_shutdown,
-        )
-
         await service_startup()
 
         main_server_config = uvicorn.Config(
@@ -74,12 +75,9 @@ class Server(AppSettings):
         main_server = uvicorn.Server(main_server_config)
         internal_server = uvicorn.Server(internal_server_config)
 
-        await asyncio.wait(
-            [
-                asyncio.create_task(main_server.serve()),
-                asyncio.create_task(internal_server.serve()),
-            ],
-            return_when=asyncio.FIRST_COMPLETED,
+        await asyncio.gather(
+            main_server.serve(),
+            internal_server.serve(),
         )
 
         await service_shutdown()

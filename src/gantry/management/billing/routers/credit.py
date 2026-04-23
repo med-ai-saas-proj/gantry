@@ -6,7 +6,6 @@ from gantry.shared.custom_types.responses.response import (
 )
 
 from ..dtos import (
-    AddCreditRequest,
     CreditInfoResponse,
     CreditTransactionInfoResponse,
 )
@@ -16,27 +15,7 @@ from ..services.credit_service import CreditService
 
 from typing import Annotated
 
-from fastapi import Body, Depends
-
-
-@billing_router.post(
-    "/credits",
-    tags=["admin"],  # TODO: use admin auth dependency
-    description="Add credits to an organization or project (e.g. from a promotion, refund, etc.).",
-)
-async def add_credits(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    credit_service: Annotated[CreditService, Depends(getCreditService)],
-    body: Annotated[AddCreditRequest, Body()],
-) -> ObjectResponse[CreditInfoResponse]:
-    credits = await credit_service.addCredits(
-        org_id=user_info["org_id"],
-        amount_to_add=body.amount,
-        description=body.description,
-    )
-    return ObjectResponse[CreditInfoResponse](
-        data=CreditInfoResponse(amount=credits)
-    )
+from fastapi import Depends
 
 
 @billing_router.get(

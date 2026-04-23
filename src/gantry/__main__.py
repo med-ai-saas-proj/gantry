@@ -30,7 +30,7 @@ class Main(BaseSettings, cli_prog_name=APP_NAME):
     # migrate: CliSubCommand[Migrate]
     gen_config_schema: CliSubCommand[GenConfigSchema]
 
-    async def cli_cmd(self):
+    def cli_cmd(self):
         CliApp.run_subcommand(self)
 
     @classmethod

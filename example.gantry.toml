@@ -47,6 +47,23 @@ invite_redirect_uri = "http://localhost:3000"
 deletion_cancel_window_days = 30
 deletion_worker_interval_seconds = 60
 
+[api_gateway]
+permissions = [
+    { id = "objects:read", name = "Read Objects", description = "Allow reading objects" },
+    { id = "objects:write", name = "Write Objects", description = "Allow creating objects" },
+]
+
+[api_gateway.routes.get_objects]
+address = "https://api.restful-api.dev/objects"
+required_perms = ["objects:read"]
+rate_limit = 60
+
+[api_gateway.routes.create_object]
+address = "https://api.restful-api.dev/objects"
+required_perms = ["objects:read", "objects:write"]
+auto_charge = 1
+rate_limit = 30
+
 [observability]
 exporter_otlp_endpoint = "http://localhost:4317/"
 exporter_otlp_protocol = "grpc"
