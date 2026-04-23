@@ -1,6 +1,7 @@
 from enum import Enum
+from typing import Annotated
 
-from pydantic import HttpUrl
+from pydantic import Field, HttpUrl
 from pydantic_settings import BaseSettings
 
 
@@ -26,11 +27,31 @@ class ExporterProtocol(str, Enum):
 
 
 class ObservabilitySettings(BaseSettings):
-    exporter_otlp_endpoint: HttpUrl = HttpUrl("http://localhost:4317")
-    exporter_otlp_protocol: ExporterProtocol = ExporterProtocol.grpc
+    exporter_otlp_endpoint: Annotated[
+        HttpUrl,
+        Field(description="OTLP exporter endpoint URL."),
+    ] = HttpUrl("http://localhost:4317")
+    exporter_otlp_protocol: Annotated[
+        ExporterProtocol,
+        Field(description="OTLP exporter protocol (gRPC or HTTP)."),
+    ] = ExporterProtocol.grpc
 
-    traces: TracesType = TracesType.disabled
-    metrics: MetricsType = MetricsType.disabled
-    logs: LogsType = LogsType.disabled
+    traces: Annotated[
+        TracesType,
+        Field(description="Traces exporter type."),
+    ] = TracesType.disabled
+    metrics: Annotated[
+        MetricsType,
+        Field(description="Metrics exporter type."),
+    ] = MetricsType.disabled
+    logs: Annotated[
+        LogsType,
+        Field(description="Logs exporter type."),
+    ] = LogsType.disabled
 
-    prometheus_port: int = 9000
+    prometheus_port: Annotated[
+        int,
+        Field(
+            description="Port for the Prometheus metrics endpoint.",
+        ),
+    ] = 9000
