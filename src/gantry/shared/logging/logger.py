@@ -9,7 +9,7 @@ from functools import lru_cache
 
 import orjson
 import structlog
-from opentelemetry import trace
+from opentelemetry import _logs, trace
 from structlog.dev import ConsoleRenderer
 from structlog.stdlib import BoundLogger
 from structlog.processors import CallsiteParameter
@@ -69,11 +69,23 @@ def configure_default_logging(
         add_open_telemetry_spans,
     ]
     processors = pre_chain
-    min_level = (
-        logging.DEBUG if settings.stage == AppStage.DEV else logging.INFO
-    )
+    # min_level = (
+    #     logging.DEBUG if settings.stage == AppStage.DEV else logging.INFO
+    # )
+    min_level = settings.log_level.value
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(min_level)
+
+    otel_logger_provider = _logs.get_logger_provider()
+    if hasattr(otel_logger_provider, "add_log_record_processor"):
+        from opentelemetry.sdk._logs import LoggingHandler
+
+        logger.addHandler(
+            LoggingHandler(
+                level=logging.NOTSET,
+                logger_provider=otel_logger_provider,
+            )
+        )
 
     processors += [
         orjson_renderer if settings.stage != AppStage.DEV else ConsoleRenderer()

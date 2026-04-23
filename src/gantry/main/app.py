@@ -2,8 +2,11 @@ from gantry.service import service_app
 from gantry.settings import AppStage, getAppSettings
 from gantry.management import management_app
 from gantry.shared.utils import request_id_utils
+from gantry.otel.settings import getOtelSettings
 from gantry.shared.consts import common_const
+from gantry.management.billing import internal_billing_router
 from gantry.shared.logging.logger import getLogger
+from gantry.settings.observability import MetricsType
 from gantry.shared.dtos.error_output import (
     ProblemDetails,
 )
@@ -34,7 +37,6 @@ doneRegisterPermission()
 setupOtel(
     service_name=common_const.APP_NAME,
     service_version=common_const.APP_VERSION,
-    logger=getLogger(),
 )
 
 main_app = FastAPI(
@@ -118,6 +120,12 @@ main_app.mount("/management", management_app, "management")
 
 # main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
 
+internal_app.include_router(internal_billing_router)
+
+if getOtelSettings().metrics == MetricsType.prometheus:
+    from prometheus_client import make_asgi_app
+
+    internal_app.mount("/metrics", make_asgi_app(), "prometheus")
 
 apps = [main_app, service_app, management_app, internal_app]
 
