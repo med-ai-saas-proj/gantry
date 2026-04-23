@@ -10,35 +10,35 @@ class OrgSettings(BaseSettings):
     keycloak_service_client_id: Annotated[
         str,
         Field(
-            description="Service account client id for Keycloak Admin API calls."
+            description="Service account client id for Keycloak Admin API calls.",
         ),
     ] = "med-ai-saas-backend"
 
     keycloak_service_client_secret: Annotated[
         str,
         Field(
-            description="Service account client secret for Keycloak Admin API calls."
+            description="Service account client secret for Keycloak Admin API calls.",
         ),
     ]
 
     invite_client_id: Annotated[
         str,
         Field(
-            description="OIDC client id used for invitation registration links."
+            description="OIDC client id used for invitation registration links.",
         ),
     ]
 
     invite_redirect_uri: Annotated[
         str,
         Field(
-            description="Redirect URI used for invitation registration links."
+            description="Redirect URI used for invitation registration links.",
         ),
     ] = "http://localhost:3000"
 
     default_rate_limit: Annotated[
         int | None,
         Field(
-            description="Global default rate-limit (requests/min). Individual orgs can override this."
+            description="Global default rate-limit (requests/min). Individual orgs can override this.",
         ),
     ] = None
 

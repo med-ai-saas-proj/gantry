@@ -157,6 +157,18 @@ class ProjectService:
                 return Ok(None)
         return Err(UserNotInOrganizationError())
 
+    async def _isProjectMember(
+        self,
+        project_id: int,
+        user_id: str,
+    ) -> bool:
+        """Return whether the user is a direct member of the project."""
+        async with self.session_manager.get_session() as session:
+            membership = await self.membership_repo.getMembership(
+                session, project_id, user_id
+            )
+            return membership is not None
+
     async def _getProjectOrErr(
         self, project_uuid: str
     ) -> Result[tuple[int, str, ProjectInfoResponse], ProjectNotFoundError]:
@@ -492,6 +504,43 @@ class ProjectService:
                 )
             )
 
+    async def listAccessibleProjects(
+        self,
+        actor_user_id: str,
+        organization_id: str,
+    ) -> Result[
+        ProjectListResponse,
+        MemberNotFoundError | KeycloakOrgError | UserNotInOrganizationError,
+    ]:
+        """List projects the actor can access in one organization."""
+        org_owner_res = await self._isOrgOwner(
+            organization_id,
+            actor_user_id,
+        )
+        if org_owner_res.status == ResultStatus.Err:
+            return org_owner_res.into()
+        if org_owner_res.unwrap():
+            async with self.session_manager.get_session() as session:
+                projects = await self.project_repo.listByOrg(
+                    session, organization_id
+                )
+                return Ok(
+                    ProjectListResponse(
+                        total=len(projects),
+                        results=[
+                            ProjectInfoResponse(
+                                id=str(p.uuid),
+                                name=p.name,
+                                description=p.description,
+                                organization_id=p.organization_id,
+                                archived=p.is_archived,
+                            )
+                            for p in projects
+                        ],
+                    )
+                )
+        return await self.listUserProjects(actor_user_id, organization_id)
+
     async def _hasOrgWideProjectPermission(
         self,
         actor_user_id: str,
@@ -614,6 +663,34 @@ class ProjectService:
             )
             await session.commit()
             return Ok(output)
+
+    async def getProject(
+        self,
+        project_uuid: str,
+        actor_user_id: str,
+    ) -> Result[
+        ProjectInfoResponse,
+        ProjectNotFoundError
+        | MemberNotFoundError
+        | KeycloakOrgError
+        | UserNotInProjectError,
+    ]:
+        """Return one project if the actor can access it."""
+        project_res = await self._getProjectOrErr(project_uuid)
+        if project_res.status == ResultStatus.Err:
+            return project_res.into()
+        project_id, org_id, project_info = project_res.unwrap()
+
+        org_owner_res = await self._isOrgOwner(org_id, actor_user_id)
+        if org_owner_res.status == ResultStatus.Err:
+            return org_owner_res.into()
+        if org_owner_res.unwrap():
+            return Ok(project_info)
+
+        if await self._isProjectMember(project_id, actor_user_id):
+            return Ok(project_info)
+
+        return Err(UserNotInProjectError())
 
     async def updateProject(
         self,

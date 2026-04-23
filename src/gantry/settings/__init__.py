@@ -8,12 +8,12 @@ from .utils import TomlPathConfigSettingsSource, DotEnvPathConfigSettingsSource
 from .billing import BillingSettings
 from .api_keys import ApiKeysSettings
 from .user_log import UserLogSettings
+from .api_gateway import ApiGatewaySettings
 from .conversation import ConversationSettings
 from .file_storage import ObjectStorageSettings
 from .organization import OrgSettings
 from .observability import ObservabilitySettings
 
-import os
 from enum import StrEnum
 from typing import Self, Literal, ClassVar, Annotated
 
@@ -21,7 +21,6 @@ from pydantic import Field
 from pydantic_settings import (
     BaseSettings,
     SettingsConfigDict,
-    PydanticBaseSettingsSource,
 )
 
 
@@ -53,29 +52,78 @@ class AppSettings(BaseSettings):
         cli_ignore_unknown_args=True,
     )
 
-    stage: AppStage = AppStage.DEV
-    allowed_origins: list[str] | Literal["*"] = "*"
-    host: str = "127.0.0.1"
-    port: int = 8000
-    internal_port: int = 9000
-    log_level: LogLevel = LogLevel.WARNING
-
-    db: DBSettings
-    apikey: ApiKeysSettings
-    auth: AuthSettings
-    billing: BillingSettings
-    user_log: UserLogSettings
-    conversation: ConversationSettings
-    file_storage: ObjectStorageSettings
-    organization: OrgSettings
-    observability: ObservabilitySettings
     rag: RagSettings
+    stage: Annotated[
+        AppStage,
+        Field(description="Application deployment stage."),
+    ] = AppStage.DEV
+    allowed_origins: Annotated[
+        list[str] | Literal["*"],
+        Field(description="CORS allowed origins. Use '*' to allow all."),
+    ] = "*"
+    host: Annotated[
+        str,
+        Field(description="Host address to bind the server to."),
+    ] = "127.0.0.1"
+    port: Annotated[
+        int,
+        Field(description="Port for the public-facing main application."),
+    ] = 8000
+    internal_port: Annotated[
+        int,
+        Field(description="Port for the internal API and metrics."),
+    ] = 9000
+    log_level: Annotated[
+        LogLevel,
+        Field(description="Minimum log level for the application."),
+    ] = LogLevel.WARNING
+
+    db: Annotated[
+        DBSettings,
+        Field(description="Database connection settings."),
+    ]
+    apikey: Annotated[
+        ApiKeysSettings,
+        Field(description="API key generation and validation settings."),
+    ]
+    auth: Annotated[
+        AuthSettings,
+        Field(description="Keycloak authentication settings."),
+    ]
+    billing: Annotated[
+        BillingSettings,
+        Field(description="Stripe billing and invoice settings."),
+    ]
+    user_log: Annotated[
+        UserLogSettings,
+        Field(description="User activity log settings."),
+    ]
+    conversation: Annotated[
+        ConversationSettings,
+        Field(description="Conversation caching settings."),
+    ]
+    file_storage: Annotated[
+        ObjectStorageSettings,
+        Field(description="S3-compatible object storage settings."),
+    ]
+    organization: Annotated[
+        OrgSettings,
+        Field(description="Organization management settings."),
+    ]
+    observability: Annotated[
+        ObservabilitySettings,
+        Field(description="OpenTelemetry observability settings."),
+    ]
+    api_gateway: Annotated[
+        ApiGatewaySettings,
+        Field(description="API gateway routing and permissions."),
+    ]
 
     @classmethod
     def get(cls) -> Self:
         if cls.__instance is None:
             # raise RuntimeError("AppSettings is loaded before initialize")
-            from src.gantry.__main__ import Main
+            from gantry.__main__ import Main
 
             import sys
 

@@ -1,9 +1,118 @@
 {
   "$defs": {
+    "ApiGatewayPermission": {
+      "properties": {
+        "id": {
+          "description": "Unique permission identifier.",
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "description": "Human-readable permission name.",
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "description": "Explanation of what this permission grants.",
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description"
+      ],
+      "title": "ApiGatewayPermission",
+      "type": "object"
+    },
+    "ApiGatewayRoute": {
+      "properties": {
+        "address": {
+          "description": "Upstream service address for this route.",
+          "title": "Address",
+          "type": "string"
+        },
+        "required_perms": {
+          "default": [],
+          "description": "Permission IDs required to access this route.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Perms",
+          "type": "array"
+        },
+        "auto_hold": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Credits to hold automatically per request.",
+          "title": "Auto Hold"
+        },
+        "auto_charge": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Credits to charge automatically per request.",
+          "title": "Auto Charge"
+        },
+        "rate_limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum requests per minute for this route.",
+          "title": "Rate Limit"
+        }
+      },
+      "required": [
+        "address"
+      ],
+      "title": "ApiGatewayRoute",
+      "type": "object"
+    },
+    "ApiGatewaySettings": {
+      "properties": {
+        "permissions": {
+          "default": [],
+          "description": "Available API gateway permissions.",
+          "items": {
+            "$ref": "#/$defs/ApiGatewayPermission"
+          },
+          "title": "Permissions",
+          "type": "array"
+        },
+        "routes": {
+          "$ref": "#/$defs/Routes",
+          "default": {},
+          "description": "Route definitions keyed by route name."
+        }
+      },
+      "title": "ApiGatewaySettings",
+      "type": "object"
+    },
     "ApiKeysSettings": {
       "additionalProperties": false,
       "properties": {
         "secret": {
+          "description": "Secret key used for API key HMAC signing.",
           "format": "password",
           "title": "Secret",
           "type": "string",
@@ -11,6 +120,7 @@
         },
         "secret_length": {
           "default": 32,
+          "description": "Length of generated API key secrets.",
           "exclusiveMinimum": 16,
           "title": "Secret Length",
           "type": "integer"
@@ -36,6 +146,7 @@
       "properties": {
         "server_url": {
           "default": "http://localhost:8000/",
+          "description": "Keycloak server base URL.",
           "format": "uri",
           "maxLength": 2083,
           "minLength": 1,
@@ -44,11 +155,13 @@
         },
         "client_id": {
           "default": "example_client",
+          "description": "Keycloak OIDC client ID.",
           "title": "Client Id",
           "type": "string"
         },
         "realm_name": {
           "default": "example_realm",
+          "description": "Keycloak realm name.",
           "title": "Realm Name",
           "type": "string"
         }
@@ -60,12 +173,14 @@
       "additionalProperties": false,
       "properties": {
         "stripe_secret_key": {
+          "description": "Stripe API secret key.",
           "format": "password",
           "title": "Stripe Secret Key",
           "type": "string",
           "writeOnly": true
         },
         "stripe_webhook_secret": {
+          "description": "Stripe webhook signing secret.",
           "format": "password",
           "title": "Stripe Webhook Secret",
           "type": "string",
@@ -93,15 +208,16 @@
     },
     "ConversationSettings": {
       "additionalProperties": false,
-      "description": "Settings for file storage configuration.",
       "properties": {
         "cache_ttl": {
           "default": 600,
+          "description": "Conversation cache TTL in seconds.",
           "title": "Cache Ttl",
           "type": "integer"
         },
         "cache_limit": {
           "default": 50,
+          "description": "Maximum number of cached conversations per user.",
           "title": "Cache Limit",
           "type": "integer"
         }
@@ -113,18 +229,21 @@
       "additionalProperties": false,
       "properties": {
         "pgvector_connection_uri": {
+          "description": "PostgreSQL connection URI for the pgvector database.",
           "format": "multi-host-uri",
           "minLength": 1,
           "title": "Pgvector Connection Uri",
           "type": "string"
         },
         "timescale_connection_uri": {
+          "description": "PostgreSQL connection URI for TimescaleDB.",
           "format": "multi-host-uri",
           "minLength": 1,
           "title": "Timescale Connection Uri",
           "type": "string"
         },
         "redis_connection_uri": {
+          "description": "Redis connection URI for caching.",
           "format": "uri",
           "minLength": 1,
           "title": "Redis Connection Uri",
@@ -178,35 +297,41 @@
     },
     "ObjectStorageSettings": {
       "additionalProperties": false,
-      "description": "Settings for file storage configuration.",
       "properties": {
         "s3_bucket_name": {
+          "description": "S3 bucket name for file storage.",
           "title": "S3 Bucket Name",
           "type": "string"
         },
         "s3_region_name": {
+          "description": "AWS region for the S3 bucket.",
           "title": "S3 Region Name",
           "type": "string"
         },
         "s3_access_key_id": {
+          "description": "AWS access key ID for S3.",
           "title": "S3 Access Key Id",
           "type": "string"
         },
         "s3_secret_access_key": {
+          "description": "AWS secret access key for S3.",
           "title": "S3 Secret Access Key",
           "type": "string"
         },
         "s3_endpoint_url": {
+          "description": "S3-compatible endpoint URL.",
           "title": "S3 Endpoint Url",
           "type": "string"
         },
         "s3_presigned_url_expiry_seconds": {
           "default": 3600,
+          "description": "Presigned URL expiry time in seconds.",
           "title": "S3 Presigned Url Expiry Seconds",
           "type": "integer"
         },
         "redis_cache_expiry_seconds": {
           "default": 3600,
+          "description": "Redis cache expiry for file metadata in seconds.",
           "title": "Redis Cache Expiry Seconds",
           "type": "integer"
         }
@@ -226,6 +351,7 @@
       "properties": {
         "exporter_otlp_endpoint": {
           "default": "http://localhost:4317/",
+          "description": "OTLP exporter endpoint URL.",
           "format": "uri",
           "maxLength": 2083,
           "minLength": 1,
@@ -234,22 +360,27 @@
         },
         "exporter_otlp_protocol": {
           "$ref": "#/$defs/ExporterProtocol",
-          "default": "grpc"
+          "default": "grpc",
+          "description": "OTLP exporter protocol (gRPC or HTTP)."
         },
         "traces": {
           "$ref": "#/$defs/TracesType",
-          "default": "disabled"
+          "default": "disabled",
+          "description": "Traces exporter type."
         },
         "metrics": {
           "$ref": "#/$defs/MetricsType",
-          "default": "disabled"
+          "default": "disabled",
+          "description": "Metrics exporter type."
         },
         "logs": {
           "$ref": "#/$defs/LogsType",
-          "default": "disabled"
+          "default": "disabled",
+          "description": "Logs exporter type."
         },
         "prometheus_port": {
           "default": 9000,
+          "description": "Port for the Prometheus metrics endpoint.",
           "title": "Prometheus Port",
           "type": "integer"
         }
@@ -364,6 +495,10 @@
         "embedding_model"
       ],
       "title": "RagSettings",
+    "Routes": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ApiGatewayRoute"
+      },
       "type": "object"
     },
     "TracesType": {
@@ -379,6 +514,7 @@
       "properties": {
         "loki_url": {
           "default": "http://localhost:3100/",
+          "description": "Loki server URL for user activity logs.",
           "format": "uri",
           "maxLength": 2083,
           "minLength": 1,
@@ -411,7 +547,8 @@
   "properties": {
     "stage": {
       "$ref": "#/$defs/AppStage",
-      "default": "DEV"
+      "default": "DEV",
+      "description": "Application deployment stage."
     },
     "allowed_origins": {
       "anyOf": [
@@ -427,56 +564,75 @@
         }
       ],
       "default": "*",
+      "description": "CORS allowed origins. Use '*' to allow all.",
       "title": "Allowed Origins"
     },
     "host": {
       "default": "127.0.0.1",
+      "description": "Host address to bind the server to.",
       "title": "Host",
       "type": "string"
     },
     "port": {
       "default": 8000,
+      "description": "Port for the public-facing main application.",
       "title": "Port",
       "type": "integer"
     },
     "internal_port": {
       "default": 9000,
+      "description": "Port for the internal API and metrics.",
       "title": "Internal Port",
       "type": "integer"
     },
     "log_level": {
       "$ref": "#/$defs/LogLevel",
-      "default": "WARNING"
+      "default": "WARNING",
+      "description": "Minimum log level for the application."
     },
     "db": {
-      "$ref": "#/$defs/DBSettings"
+      "$ref": "#/$defs/DBSettings",
+      "description": "Database connection settings."
     },
     "apikey": {
-      "$ref": "#/$defs/ApiKeysSettings"
+      "$ref": "#/$defs/ApiKeysSettings",
+      "description": "API key generation and validation settings."
     },
     "auth": {
-      "$ref": "#/$defs/AuthSettings"
+      "$ref": "#/$defs/AuthSettings",
+      "description": "Keycloak authentication settings."
     },
     "billing": {
-      "$ref": "#/$defs/BillingSettings"
+      "$ref": "#/$defs/BillingSettings",
+      "description": "Stripe billing and invoice settings."
     },
     "user_log": {
-      "$ref": "#/$defs/UserLogSettings"
+      "$ref": "#/$defs/UserLogSettings",
+      "description": "User activity log settings."
     },
     "conversation": {
-      "$ref": "#/$defs/ConversationSettings"
+      "$ref": "#/$defs/ConversationSettings",
+      "description": "Conversation caching settings."
     },
     "file_storage": {
-      "$ref": "#/$defs/ObjectStorageSettings"
+      "$ref": "#/$defs/ObjectStorageSettings",
+      "description": "S3-compatible object storage settings."
     },
     "organization": {
-      "$ref": "#/$defs/OrgSettings"
+      "$ref": "#/$defs/OrgSettings",
+      "description": "Organization management settings."
     },
     "observability": {
       "$ref": "#/$defs/ObservabilitySettings"
     },
     "rag": {
       "$ref": "#/$defs/RagSettings"
+      "$ref": "#/$defs/ObservabilitySettings",
+      "description": "OpenTelemetry observability settings."
+    },
+    "api_gateway": {
+      "$ref": "#/$defs/ApiGatewaySettings",
+      "description": "API gateway routing and permissions."
     }
   },
   "required": [
@@ -490,6 +646,7 @@
     "organization",
     "observability",
     "rag"
+    "api_gateway"
   ],
   "title": "AppSettings",
   "type": "object"
