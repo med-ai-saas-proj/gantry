@@ -65,6 +65,8 @@ class ManagementRole(str, Enum):
     FILE_STORAGE_MANAGE = "file_storage.manage"
     FILE_STORAGE_VIEW = "file_storage.view"
 
+    RAG_MANAGE = "rag.manage"
+
 
 # Role hierarchies - higher roles include permissions of lower roles
 ROLE_HIERARCHY: Final[dict[ManagementRole, list[ManagementRole]]] = {

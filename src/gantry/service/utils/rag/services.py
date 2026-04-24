@@ -589,79 +589,6 @@ class RagService:
                     ),
                 )
 
-    async def addFile(
-        self,
-        file_uid: uuid.UUID,
-        project_id: int,
-        project_uuid: uuid.UUID,
-        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
-        chunk_size: int = 1000,
-        chunk_overlap: int = 150,
-    ) -> Result[str, FileNotFoundInSystemError]:
-        task_id = str(uuid.uuid4())
-        async with self.session_manager.get_session() as session:
-            file_info = await self.file_repo.getAvailableByUUID(
-                session, file_uid, project_id
-            )
-            if not file_info:
-                return Err(FileNotFoundInSystemError())
-
-            task_dict = {
-                "task_id": task_id,
-                "file_id": file_info.id,
-                "file_uid": str(file_uid),
-                "project_id": project_id,
-                "project_uuid": str(project_uuid),
-                "chunk_splitter": chunk_splitter.value,
-                "chunk_size": chunk_size,
-                "chunk_overlap": chunk_overlap,
-                "status": "pending",
-            }
-
-        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
-        async with self.redis.pipeline() as pipe:
-            await cast(
-                Awaitable[None],
-                pipe.set(result_key, json.dumps(task_dict), ex=self.TASK_TTL),
-            )
-            await cast(
-                Awaitable[None], pipe.rpush(self.REDIS_TASK_QUEUE, task_id)
-            )
-            await pipe.execute()
-
-        return Ok(task_id)
-
-    async def getTaskStatus(
-        self,
-        task_id: str,
-        project_id: int,
-    ) -> Result[EmbeddingTask, TaskNotFoundError]:
-        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
-        task_info = await cast(
-            Awaitable[str | bytes | None], self.redis.get(result_key)
-        )
-        if not task_info:
-            return Err(TaskNotFoundError())
-
-        task_dict = json.loads(task_info)
-        if task_dict.get("project_id") != project_id:
-            return Err(TaskNotFoundError())
-
-        return Ok(
-            EmbeddingTask(
-                task_id=task_dict["task_id"],
-                file_id=task_dict["file_id"],
-                file_uid=uuid.UUID(task_dict["file_uid"]),
-                project_id=task_dict["project_id"],
-                project_uuid=uuid.UUID(task_dict["project_uuid"]),
-                chunk_splitter=ChunkSplitterType(task_dict["chunk_splitter"]),
-                chunk_size=task_dict["chunk_size"],
-                chunk_overlap=task_dict["chunk_overlap"],
-                status=task_dict["status"],
-                failed_reason=task_dict.get("failed_reason"),
-            )
-        )
-
     async def processEmbedding(
         self,
         file_uid: uuid.UUID,
@@ -767,6 +694,108 @@ class RagService:
 
         return Ok(None)
 
+    async def addFile(
+        self,
+        file_uid: uuid.UUID,
+        project_id: int,
+        project_uuid: uuid.UUID,
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+    ) -> Result[str, FileNotFoundInSystemError]:
+        task_id = str(uuid.uuid4())
+        async with self.session_manager.get_session() as session:
+            file_info = await self.file_repo.getAvailableByUUID(
+                session, file_uid, project_id
+            )
+            if not file_info:
+                return Err(FileNotFoundInSystemError())
+
+            task_dict = {
+                "task_id": task_id,
+                "file_id": file_info.id,
+                "file_uid": str(file_uid),
+                "project_id": project_id,
+                "project_uuid": str(project_uuid),
+                "chunk_splitter": chunk_splitter.value,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "status": "pending",
+            }
+
+        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
+        async with self.redis.pipeline() as pipe:
+            await cast(
+                Awaitable[None],
+                pipe.set(result_key, json.dumps(task_dict), ex=self.TASK_TTL),
+            )
+            await cast(
+                Awaitable[None], pipe.rpush(self.REDIS_TASK_QUEUE, task_id)
+            )
+            await pipe.execute()
+
+        return Ok(task_id)
+
+    async def addFileByProjectUid(
+        self,
+        file_uid: uuid.UUID,
+        project_uid: uuid.UUID,
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+    ) -> Result[str, FileNotFoundInSystemError]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.addFile,
+            file_uid=file_uid,
+            project_uuid=project_uid,
+            chunk_splitter=chunk_splitter,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+        )
+
+    async def getTaskStatus(
+        self,
+        task_id: str,
+        project_id: int,
+    ) -> Result[EmbeddingTask, TaskNotFoundError]:
+        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
+        task_info = await cast(
+            Awaitable[str | bytes | None], self.redis.get(result_key)
+        )
+        if not task_info:
+            return Err(TaskNotFoundError())
+
+        task_dict = json.loads(task_info)
+        if task_dict.get("project_id") != project_id:
+            return Err(TaskNotFoundError())
+
+        return Ok(
+            EmbeddingTask(
+                task_id=task_dict["task_id"],
+                file_id=task_dict["file_id"],
+                file_uid=uuid.UUID(task_dict["file_uid"]),
+                project_id=task_dict["project_id"],
+                project_uuid=uuid.UUID(task_dict["project_uuid"]),
+                chunk_splitter=ChunkSplitterType(task_dict["chunk_splitter"]),
+                chunk_size=task_dict["chunk_size"],
+                chunk_overlap=task_dict["chunk_overlap"],
+                status=task_dict["status"],
+                failed_reason=task_dict.get("failed_reason"),
+            )
+        )
+
+    async def getTaskStatusByProjectUid(
+        self,
+        task_id: str,
+        project_uid: uuid.UUID,
+    ) -> Result[EmbeddingTask, TaskNotFoundError]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.getTaskStatus,
+            task_id=task_id,
+        )
+
     async def addEmbedding(
         self,
         text: str,
@@ -835,6 +864,15 @@ class RagService:
                 for file_info in files_info
             ]
 
+    async def getFilesInRagByProjectUid(
+        self,
+        project_uid: uuid.UUID,
+    ) -> Sequence[FileRecord]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.getFilesInRag,
+        )
+
     async def querySimilarByText(
         self,
         project_id: int,
@@ -865,6 +903,24 @@ class RagService:
         return await self.querySimilarByVector(
             project_id=project_id,
             embedding=query_embedding,
+            filters=filters,
+            top_k=top_k,
+        )
+
+    async def querySimilarByTextByProjectUid(
+        self,
+        project_uid: uuid.UUID,
+        query: str,
+        filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
+        top_k: int = 5,
+    ) -> Result[
+        Sequence[RagEmbeddingRecord],
+        FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
+    ]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.querySimilarByText,
+            query=query,
             filters=filters,
             top_k=top_k,
         )
@@ -981,3 +1037,17 @@ class RagService:
                     }
                 )
             return Ok(results)
+
+    async def _wrapProjectUUID(
+        self, project_uid: uuid.UUID, async_func, **kwargs
+    ):
+        async with self.session_manager.get_session() as session:
+            project = await self.project_repo.getByUuid(
+                session, str(project_uid)
+            )
+            if not project:
+                raise InternalServiceError(
+                    message=f"Project with UUID {project_uid} not found."
+                )
+            project_id = project.id
+        return await async_func(project_id=project_id, **kwargs)

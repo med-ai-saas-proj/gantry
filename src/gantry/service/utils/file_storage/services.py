@@ -18,7 +18,6 @@ import asyncio
 from typing import TYPE_CHECKING, BinaryIO
 from datetime import datetime
 
-from regex import P
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
 
@@ -69,12 +68,14 @@ class FileStorageService:
             file_storage_settings: ObjectStorageSettings,
             file_repo: FileRepository,
             redis: Redis,
+            project_repo: ProjectRepository,
         ):
             self.storage_backend = storage_backend
             self.session_manager = session_manager
             self.file_storage_settings = file_storage_settings
             self.file_repo = file_repo
             self.redis = redis
+            self.project_repo = project_repo
 
     def _uploadFileToStorage(
         self,
