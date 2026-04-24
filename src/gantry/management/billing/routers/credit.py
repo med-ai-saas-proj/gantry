@@ -26,7 +26,7 @@ from fastapi import Depends
 )
 async def get_available_credits(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_CREDITS))
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
     ],
     credit_service: Annotated[CreditService, Depends(getCreditService)],
 ) -> ObjectResponse[CreditInfoResponse]:
@@ -44,7 +44,7 @@ async def get_available_credits(
 )
 async def list_credit_transactions(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_CREDITS))
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
     ],
     credit_service: Annotated[CreditService, Depends(getCreditService)],
     offset: int = 0,

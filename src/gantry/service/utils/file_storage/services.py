@@ -1,7 +1,11 @@
 from gantry.db.session import AsyncSessionManager
 from gantry.shared.utils.json_utils import json_serializer
 from gantry.shared.utils.uuid_utils import uuid7
-from gantry.shared.custom_types.error_exception import RecoverableError
+from gantry.management.project.repositories import ProjectRepository
+from gantry.shared.custom_types.error_exception import (
+    RecoverableError,
+    InternalServiceError,
+)
 
 from .types import FileRecord
 from .models import File, FileStatus
@@ -14,6 +18,7 @@ import asyncio
 from typing import TYPE_CHECKING, BinaryIO
 from datetime import datetime
 
+from regex import P
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
 
@@ -47,12 +52,14 @@ class FileStorageService:
             file_storage_settings: ObjectStorageSettings,
             file_repo: FileRepository,
             redis: Redis,
+            project_repo: ProjectRepository,
         ):
             self.storage_backend = storage_backend
             self.session_manager = session_manager
             self.file_storage_settings = file_storage_settings
             self.file_repo = file_repo
             self.redis = redis
+            self.project_repo = project_repo
     else:
 
         def __init__(
@@ -129,6 +136,30 @@ class FileStorageService:
             await session.commit()
         return file_uid
 
+    async def uploadFileByProjectUUID(
+        self,
+        file_name: str,
+        file_data: BinaryIO | bytes,
+        file_size: int,
+        mime_type: str,
+        project_uid: uuid.UUID,
+        ext: str | None = None,
+        file_uid: uuid.UUID | None = None,
+        extra_metadata: dict | None = None,
+    ):
+        """Upload a file with a specified UUID and store its metadata."""
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.uploadFile,
+            file_name=file_name,
+            file_data=file_data,
+            file_size=file_size,
+            mime_type=mime_type,
+            ext=ext,
+            file_uid=file_uid,
+            extra_metadata=extra_metadata,
+        )
+
     def _loadFileContentFromStorage(
         self,
         file_path: str,
@@ -189,6 +220,16 @@ class FileStorageService:
         )
         return Ok(url)
 
+    async def getFileUrlByProjectUUID(
+        self, file_uuid: uuid.UUID, project_uid: uuid.UUID
+    ) -> Result[str, FileNotFoundInSystemError]:
+        """Generate a presigned URL for the file by UUID and project UUID."""
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.getFileUrl,
+            file_uuid=file_uuid,
+        )
+
     async def getFileInfoAndUrl(
         self, file_uuid: uuid.UUID, project_id: int
     ) -> Result[tuple[str, FileRecord], FileNotFoundInSystemError]:
@@ -206,6 +247,16 @@ class FileStorageService:
             ExpiresIn=self.file_storage_settings.s3_presigned_url_expiry_seconds,
         )
         return Ok((url, file_record))
+
+    async def getFileInfoAndUrlByProjectUUID(
+        self, file_uuid: uuid.UUID, project_uid: uuid.UUID
+    ) -> Result[tuple[str, FileRecord], FileNotFoundInSystemError]:
+        """Generate a presigned URL for the file by UUID and project UUID."""
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.getFileInfoAndUrl,
+            file_uuid=file_uuid,
+        )
 
     async def getFileInfo(
         self, file_uuid: uuid.UUID, project_id: int
@@ -257,6 +308,16 @@ class FileStorageService:
         )
         return Ok(res)
 
+    async def getFileInfoByProjectUUID(
+        self, file_uuid: uuid.UUID, project_uuid: uuid.UUID
+    ) -> Result[FileRecord, FileNotFoundInSystemError]:
+        """Retrieve file info by UUID and project UUID."""
+        return await self._wrapProjectUUID(
+            project_uuid,
+            self.getFileInfo,
+            file_uuid=file_uuid,
+        )
+
     async def updateFileMetadata(
         self, file_uuid: uuid.UUID, project_id: int, extra_metadata: dict | None
     ) -> Result[None, FileNotFoundInSystemError]:
@@ -272,6 +333,20 @@ class FileStorageService:
             await session.commit()
         await self.redis.delete(cache_key)  # Invalidate cache
         return Ok(None)
+
+    async def updateFileMetadataByProjectUUID(
+        self,
+        file_uuid: uuid.UUID,
+        project_uuid: uuid.UUID,
+        extra_metadata: dict | None,
+    ) -> Result[None, FileNotFoundInSystemError]:
+        """Update file metadata by UUID and project UUID."""
+        return await self._wrapProjectUUID(
+            project_uuid,
+            self.updateFileMetadata,
+            file_uuid=file_uuid,
+            extra_metadata=extra_metadata,
+        )
 
     def _deleteFileFromStorage(self, file_path: str) -> None:
         self.storage_backend.delete_object(
@@ -303,6 +378,16 @@ class FileStorageService:
             await session.commit()
         return Ok(None)
 
+    async def deleteFileByProjectUUID(
+        self, file_uid: uuid.UUID, project_uid: uuid.UUID
+    ) -> Result[None, FileNotFoundInSystemError]:
+        """Delete a file from storage and remove its metadata by project UUID."""
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.deleteFile,
+            file_uuid=file_uid,
+        )
+
     async def listFilesInProject(self, project_id: int) -> list[FileRecord]:
         """List all available files for a project."""
         async with self.session_manager.get_session() as session:
@@ -322,3 +407,23 @@ class FileStorageService:
                 }
                 for file_record in file_records
             ]
+
+    async def listFilesInProjectByUUID(
+        self, project_uid: uuid.UUID
+    ) -> list[FileRecord]:
+        """List all available files for a project."""
+        return await self._wrapProjectUUID(project_uid, self.listFilesInProject)
+
+    async def _wrapProjectUUID(
+        self, project_uid: uuid.UUID, async_func, **kwargs
+    ):
+        async with self.session_manager.get_session() as session:
+            project = await self.project_repo.getByUuid(
+                session, str(project_uid)
+            )
+            if not project:
+                raise InternalServiceError(
+                    message=f"Project with UUID {project_uid} not found."
+                )
+            project_id = project.id
+        return await async_func(project_id=project_id, **kwargs)

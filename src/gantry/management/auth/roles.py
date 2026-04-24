@@ -58,9 +58,12 @@ class ManagementRole(str, Enum):
     SETTINGS_VIEW = "settings.view"
 
     # Billing management
+    BILLING_VIEW_USAGE_ALL = "billing.view_usage_all"
     BILLING_VIEW_USAGE = "billing.view_usage"
     BILLING_MANAGE = "billing.manage"
-    BILLING_VIEW_CREDITS = "billing.view_credits"
+
+    FILE_STORAGE_MANAGE = "file_storage.manage"
+    FILE_STORAGE_VIEW = "file_storage.view"
 
 
 # Role hierarchies - higher roles include permissions of lower roles

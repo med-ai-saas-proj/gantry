@@ -15,7 +15,7 @@ from uuid import UUID
 from typing import Annotated
 from datetime import datetime
 
-from fastapi import Query, Depends
+from fastapi import Query, Depends, HTTPException
 
 
 @billing_router.get(
@@ -37,6 +37,17 @@ async def listTransactions(
     limit: int = 100,
     offset: int = 0,
 ) -> PaginatedResponse[TransactionInfoResponse]:
+    project_uids_set = set(project_uids or [])
+    allowed_view_set = set(user_info["project_uids"])
+    if project_uids_set:
+        if not project_uids_set.issubset(allowed_view_set):
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have access to view transactions for some of the specified projects.",
+            )
+    else:  # if no project_uids filter provided, default to all projects user has access to
+        project_uids_set = allowed_view_set
+
     res, total = await billing_service.getTransactions(
         org_id=user_info["org_id"],
         project_uids=project_uids,
@@ -68,4 +79,10 @@ async def getTransactionDetails(
             org_id=user_info["org_id"], transaction_uid=transaction_uid
         )
     ).unwrap()
+    if res.project_uid not in user_info["project_uids"]:
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have access to view this transaction.",
+        )
+
     return ObjectResponse[TransactionInfoResponse](data=res)

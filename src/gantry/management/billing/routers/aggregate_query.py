@@ -12,7 +12,7 @@ from uuid import UUID
 from typing import Annotated
 from datetime import datetime
 
-from fastapi import Query, Depends
+from fastapi import Query, Depends, HTTPException
 
 
 @billing_router.get(
@@ -34,6 +34,17 @@ async def get_aggregate_by_projects(
         None
     ),  # filter by project_uid or whole organization
 ) -> ListResponse[BillingAggregateReport]:
+    project_uids_set = set(project_uids or [])
+    allowed_view_set = set(user_info["project_uids"])
+    if project_uids_set:
+        if not project_uids_set.issubset(allowed_view_set):
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have access to view transactions for some of the specified projects.",
+            )
+    else:  # if no project_uids filter provided, default to all projects user has access to
+        project_uids_set = allowed_view_set
+
     res = (
         await billing_service.get_aggregate_by_projects(
             project_uids=project_uids,
@@ -85,7 +96,7 @@ async def get_aggregate_by_projects(
 )
 async def get_aggregate_by_org(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE_ALL))
     ],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
