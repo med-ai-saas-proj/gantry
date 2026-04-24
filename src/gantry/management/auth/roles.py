@@ -57,6 +57,11 @@ class ManagementRole(str, Enum):
     SETTINGS_EDIT = "settings.edit"
     SETTINGS_VIEW = "settings.view"
 
+    # Billing management
+    BILLING_VIEW_USAGE = "billing.view_usage"
+    BILLING_MANAGE = "billing.manage"
+    BILLING_VIEW_CREDITS = "billing.view_credits"
+
 
 # Role hierarchies - higher roles include permissions of lower roles
 ROLE_HIERARCHY: Final[dict[ManagementRole, list[ManagementRole]]] = {

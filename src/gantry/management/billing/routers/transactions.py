@@ -1,5 +1,6 @@
+from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.auth.dependencies import getUserInfo, requireRole
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
@@ -22,7 +23,9 @@ from fastapi import Query, Depends
     description="List transactions with optional filters (e.g. project_id, date range, etc.). Supports pagination.",
 )
 async def listTransactions(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+    ],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
@@ -34,16 +37,14 @@ async def listTransactions(
     limit: int = 100,
     offset: int = 0,
 ) -> PaginatedResponse[TransactionInfoResponse]:
-    res, total = (
-        await billing_service.getTransactions(
-            org_id=user_info["org_id"],
-            project_uids=project_uids,
-            start_date=start_date,
-            end_date=end_date,
-            limit=limit,
-            offset=offset,
-        )
-    ).unwrap()
+    res, total = await billing_service.getTransactions(
+        org_id=user_info["org_id"],
+        project_uids=project_uids,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+    )
     return PaginatedResponse[TransactionInfoResponse](
         data=res, total=total, offset=offset, limit=limit
     )
@@ -55,7 +56,9 @@ async def listTransactions(
 )
 async def getTransactionDetails(
     transaction_uid: UUID,
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+    ],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],

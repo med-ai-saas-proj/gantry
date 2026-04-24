@@ -1,5 +1,6 @@
+from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.auth.dependencies import requireRole
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
 )
@@ -26,7 +27,9 @@ from fastapi import Body, Depends
     description="Create a new billing source for an organization.",
 )
 async def create_billing_source(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+    ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
@@ -42,7 +45,9 @@ async def create_billing_source(
     "/sources", description="Get billing sources info for an organization."
 )
 async def billing_source_info(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+    ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
@@ -58,7 +63,9 @@ async def billing_source_info(
     description="Update a billing source (e.g. change default payment method, update billing address, etc.).",
 )
 async def update_billing_source(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+    ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
@@ -76,7 +83,9 @@ async def update_billing_source(
     description="Create a setup intent for a billing source.",
 )
 async def create_setup_intent(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+    ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
@@ -91,7 +100,9 @@ async def create_setup_intent(
 )
 async def delete_payment_method(
     payment_method_id: str,  # e.g. "pm_12345" for Stripe
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+    ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
@@ -107,7 +118,9 @@ async def delete_payment_method(
     description="List payment methods for a billing source.",
 )
 async def list_payment_methods(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+    ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
@@ -122,7 +135,9 @@ async def list_payment_methods(
 )
 async def get_payment_method_details(
     payment_method_id: str,  # e.g. "pm_12345" for Stripe
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+    ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
@@ -138,7 +153,9 @@ async def get_payment_method_details(
     description="List setup intents that require user action for a billing source (used to verify payment method after linking)",
 )
 async def list_required_action_setup_intents(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+    ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],
@@ -155,7 +172,9 @@ async def list_required_action_setup_intents(
 )
 async def cancel_setup_intent(
     setup_intent_id: str,
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+    ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
     ],

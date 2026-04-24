@@ -163,7 +163,7 @@ class AuthService:
             "email": claims.get("email"),
             "roles": roles,
             "org_id": org_id,
-            "project_ids": self._extractProjectIds(claims, roles) or [],
+            "project_uids": self._extractProjectIds(claims, roles) or [],
         }
 
         return Ok(auth_info)
