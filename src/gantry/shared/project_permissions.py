@@ -13,15 +13,20 @@ def _dedupe_permissions(values: Any) -> list[str]:
         return []
 
     deduped: list[str] = []
-    seen: set[str] = set()
-    for value in values:
-        if not isinstance(value, str) or not value:
-            continue
-        if value in seen:
-            continue
-        seen.add(value)
-        deduped.append(value)
+    _append_unique_permissions(deduped, values)
     return deduped
+
+
+def _append_unique_permissions(target: list[str], values: list[Any]) -> None:
+    """Append distinct non-empty string permissions without changing existing order."""
+    seen = set(target)
+    for permission in values:
+        if not isinstance(permission, str) or not permission:
+            continue
+        if permission in seen:
+            continue
+        seen.add(permission)
+        target.append(permission)
 
 
 def normalize_project_permission_map(raw: Any) -> ProjectPermissionMap:
@@ -42,12 +47,7 @@ def normalize_project_permission_map(raw: Any) -> ProjectPermissionMap:
             parsed = normalize_project_permission_map(value)
             for project_uuid, permissions in parsed.items():
                 merged = normalized.setdefault(project_uuid, [])
-                seen = set(merged)
-                for permission in permissions:
-                    if permission in seen:
-                        continue
-                    seen.add(permission)
-                    merged.append(permission)
+                _append_unique_permissions(merged, permissions)
         return normalized
 
     if not isinstance(raw, dict):
