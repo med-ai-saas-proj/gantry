@@ -7,12 +7,18 @@ from pyrusult import Ok, Err
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.auth.services import MissingOrganizationClaimError
+from gantry.management.auth.services import (
+    InsufficientPermissionsError,
+    MissingOrganizationClaimError,
+)
 from gantry.management.auth.dependencies import (
     MissingOrganizationContextError,
     getUserInfo,
+    _getUserInfo,
     getUserOrgId,
+    getAdminUserInfo,
     requireUserOrgId,
+    _getAdminUserInfo,
 )
 
 
@@ -42,7 +48,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        user_info = await getUserInfo(
+        user_info = await _getUserInfo(
             "token",
             auth_service,
             kc_org_client,
@@ -73,7 +79,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        user_info = await getUserInfo(
+        user_info = await _getUserInfo(
             "token",
             auth_service,
             kc_org_client,
@@ -89,7 +95,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
         kc_org_client = Mock()
 
         with self.assertRaises(MissingOrganizationClaimError):
-            await getUserInfo(
+            await _getUserInfo(
                 "token",
                 auth_service,
                 kc_org_client,
@@ -117,13 +123,51 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
             return_value=Ok([{"id": "org-1", "name": "org-name"}])
         )
 
-        user_info = await getUserInfo(
+        user_info = await _getUserInfo(
             "token",
             auth_service,
             kc_org_client,
         )
 
         self.assertEqual(user_info["project_ids"], ["proj-1", "proj-2"])
+
+    async def test_get_admin_user_info_requires_admin_role(self):
+        auth_service = Mock()
+        auth_service.verifyToken.return_value = Ok(
+            {
+                "id": "admin-1",
+                "username": "admin",
+                "email": "admin@test",
+                "roles": ["ADMIN"],
+                "org_id": "",
+                "project_ids": [],
+            }
+        )
+        auth_service.checkAdminRole.return_value = Ok(None)
+
+        user_info = await _getAdminUserInfo("token", auth_service)
+
+        self.assertEqual(user_info["id"], "admin-1")
+        auth_service.checkAdminRole.assert_called_once_with(user_info)
+
+    async def test_get_admin_user_info_rejects_missing_admin_role(self):
+        auth_service = Mock()
+        auth_service.verifyToken.return_value = Ok(
+            {
+                "id": "u1",
+                "username": "alice",
+                "email": "a@test",
+                "roles": [],
+                "org_id": "",
+                "project_ids": [],
+            }
+        )
+        auth_service.checkAdminRole.side_effect = InsufficientPermissionsError(
+            ["ADMIN"]
+        )
+
+        with self.assertRaises(InsufficientPermissionsError):
+            await _getAdminUserInfo("token", auth_service)
 
     async def test_get_user_org_id_and_require_user_org_id(self):
         self.assertEqual(

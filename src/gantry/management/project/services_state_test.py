@@ -13,7 +13,6 @@ from .services_test_support import (
     BaseProjectServiceTest,
     InsufficientProjectPermissionError,
     _DummyError,
-    encode_project_permission,
 )
 
 
@@ -150,7 +149,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.redis.set.assert_any_await(
             "billing:spending_limit:org-1:proj:10",
             -1,
-            ex=36000,
+            ex=3600,
         )
 
     async def test_update_project_settings_caches_negative_one_for_missing_rate_limit(
@@ -192,7 +191,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.redis.set.assert_any_await(
             "billing:spending_limit:org-1:proj:10",
             -1,
-            ex=36000,
+            ex=3600,
         )
 
     async def test_list_project_users_propagates_org_member_lookup_error(self):
@@ -365,12 +364,12 @@ class TestProjectServiceState(BaseProjectServiceTest):
             == ResultStatus.Err
         )
 
-        # _set_project_permissions string/non-list branches and attr error
+        # _set_project_permissions attr error and invalid-shape branches
         service.kc.getUserAttributes = AsyncMock(
             side_effect=[
                 Err(_DummyError("get attrs failed")),
-                Ok({PROJECT_PERMISSIONS_ATTR: "proj-1:project.owner"}),
-                Ok({PROJECT_PERMISSIONS_ATTR: {"bad": "shape"}}),
+                Ok({PROJECT_PERMISSIONS_ATTR: "not-a-project-map"}),
+                Ok({PROJECT_PERMISSIONS_ATTR: {"bad": None}}),
             ]
         )
         service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
@@ -389,6 +388,11 @@ class TestProjectServiceState(BaseProjectServiceTest):
                 )
             ).status
             == ResultStatus.Ok
+        )
+        service.kc.setUserAttribute.assert_awaited_with(
+            "u1",
+            PROJECT_PERMISSIONS_ATTR,
+            {"proj-1": ["project.settings.read"]},
         )
 
         # _get_member_permissions / _count_project_owners / authorize_project_permission

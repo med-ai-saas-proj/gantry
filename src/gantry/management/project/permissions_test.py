@@ -6,13 +6,16 @@ import unittest
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
+from gantry.shared.project_permissions import (
+    normalize_project_permission_map,
+    serialize_project_permission_map,
+    serialize_project_permission_values,
+)
 from gantry.management.project.permissions import (
     ALL_PERMISSIONS,
     PROJECT_PERMISSIONS_ATTR,
     ProjectPermission,
     has_permission,
-    decode_project_permission,
-    encode_project_permission,
     get_effective_permissions,
 )
 
@@ -48,26 +51,62 @@ class TestProjectPermissions(unittest.TestCase):
             has_permission(perms, ProjectPermission.SETTINGS_WRITE)
         )
 
-    def test_project_permission_encoding_uses_flat_attr_entries(self):
-        """Project permissions should be encoded into one shared attr list."""
+    def test_project_permission_helpers_support_grouped_attr_map(self):
+        """Project permissions should persist as one grouped attr object."""
         # Act
         attr_name = PROJECT_PERMISSIONS_ATTR
-        entry = encode_project_permission("proj-123", "project.owner")
-        decoded = decode_project_permission(entry)
+        encoded = serialize_project_permission_map(
+            {
+                "proj-123": [
+                    "project.owner",
+                    "project.settings.read",
+                    "project.owner",
+                ]
+            }
+        )
 
         # Assert
         self.assertEqual(attr_name, "project_permissions")
-        self.assertEqual(entry, "proj-123:project.owner")
-        self.assertEqual(decoded, ("proj-123", "project.owner"))
+        self.assertEqual(
+            encoded,
+            {
+                "proj-123": [
+                    "project.owner",
+                    "project.settings.read",
+                ]
+            },
+        )
         self.assertIn(ProjectPermission.OWNER.value, ALL_PERMISSIONS)
         self.assertNotIn("organization.projects.create", ALL_PERMISSIONS)
 
-    def test_decode_project_permission_rejects_invalid_entries(self):
-        """Malformed flat entries should be ignored by decoder."""
+    def test_normalize_project_permission_map_ignores_old_flat_entries(self):
+        """Only the grouped map format should be accepted."""
         # Act + Assert
-        self.assertIsNone(decode_project_permission("missing-separator"))
-        self.assertIsNone(decode_project_permission(":project.owner"))
-        self.assertIsNone(decode_project_permission("proj-1:"))
+        self.assertEqual(
+            normalize_project_permission_map(
+                [
+                    "proj-1:project.owner",
+                    "proj-1:project.settings.read",
+                    "proj-2:apikey.read",
+                ]
+            ),
+            {},
+        )
+
+    def test_keycloak_values_store_one_json_object_per_project(self):
+        """Raw Keycloak values should split grouped permissions per project."""
+        self.assertEqual(
+            serialize_project_permission_values(
+                {
+                    "proj-1": ["project.owner", "project.owner"],
+                    "proj-2": ["apikey.read"],
+                }
+            ),
+            [
+                '{"proj-1":["project.owner"]}',
+                '{"proj-2":["apikey.read"]}',
+            ],
+        )
 
     def test_invalid_project_permission_strings_do_not_gain_hierarchy(self):
         """Unknown raw permission strings should not grant extra project access."""

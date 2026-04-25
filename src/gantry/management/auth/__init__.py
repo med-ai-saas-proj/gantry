@@ -8,12 +8,13 @@ from .services import (
     UnauthorizedError,
     InsufficientPermissionsError,
 )
-from .factories import getAuthService
+from .factories import getAuthService, getAdminAuthService
 from .dependencies import (
     getUserInfo,
     requireRole,
     requireAnyRole,
     requireAllRoles,
+    getAdminUserInfo,
 )
 
 
@@ -29,10 +30,12 @@ __all__ = [
     "InsufficientPermissionsError",
     # Dependencies
     "getUserInfo",
+    "getAdminUserInfo",
     "requireRole",
     "requireAnyRole",
     "requireAllRoles",
     # Services
     "AuthService",
     "getAuthService",
+    "getAdminAuthService",
 ]

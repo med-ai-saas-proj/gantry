@@ -15,7 +15,6 @@ from .services_test_support import (
     LastOwnerRemovalNotAllowedError,
     unittest,
     _DummyError,
-    encode_project_permission,
 )
 
 
@@ -69,7 +68,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         service.kc.setUserAttribute.assert_awaited_once_with(
             "u2",
             PROJECT_PERMISSIONS_ATTR,
-            [],
+            {},
         )
         self.session_manager.session.commit.assert_awaited()
 
@@ -185,11 +184,9 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         service.kc.getUserAttributes = AsyncMock(
             return_value=Ok(
                 {
-                    PROJECT_PERMISSIONS_ATTR: [
-                        encode_project_permission(
-                            "other-proj", "project.settings.read"
-                        )
-                    ]
+                    PROJECT_PERMISSIONS_ATTR: {
+                        "other-proj": ["project.settings.read"]
+                    }
                 }
             )
         )
@@ -205,7 +202,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         service.kc.setUserAttribute.assert_awaited_once_with(
             "u2",
             PROJECT_PERMISSIONS_ATTR,
-            [encode_project_permission("other-proj", "project.settings.read")],
+            {"other-proj": ["project.settings.read"]},
         )
         self.session_manager.session.commit.assert_awaited()
 
@@ -337,12 +334,10 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         service.kc.getUserAttributes = AsyncMock(
             return_value=Ok(
                 {
-                    PROJECT_PERMISSIONS_ATTR: [
-                        encode_project_permission(
-                            "proj-1", "project.settings.read"
-                        ),
-                        encode_project_permission("proj-2", "project.owner"),
-                    ]
+                    PROJECT_PERMISSIONS_ATTR: {
+                        "proj-1": ["project.settings.read"],
+                        "proj-2": ["project.owner"],
+                    }
                 }
             )
         )

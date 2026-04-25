@@ -15,7 +15,6 @@ from .services_test_support import (
     InvalidProjectPermissionError,
     LastOwnerRemovalNotAllowedError,
     _DummyError,
-    encode_project_permission,
 )
 
 
@@ -105,11 +104,9 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         service.kc.getUserAttributes = AsyncMock(
             return_value=Ok(
                 {
-                    PROJECT_PERMISSIONS_ATTR: [
-                        encode_project_permission(
-                            "other-proj", "project.settings.read"
-                        )
-                    ]
+                    PROJECT_PERMISSIONS_ATTR: {
+                        "other-proj": ["project.settings.read"]
+                    }
                 }
             )
         )
@@ -130,12 +127,10 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         service.kc.setUserAttribute.assert_awaited_once_with(
             "target",
             PROJECT_PERMISSIONS_ATTR,
-            [
-                encode_project_permission(
-                    "other-proj", "project.settings.read"
-                ),
-                encode_project_permission("proj-1", "project.settings.write"),
-            ],
+            {
+                "other-proj": ["project.settings.read"],
+                "proj-1": ["project.settings.write"],
+            },
         )
 
     async def test_project_owner_can_update_other_user_permissions(self):

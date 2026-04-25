@@ -2,6 +2,10 @@
 
 from gantry.db.factories import AsyncSessionManager
 from gantry.management.billing.utils import int_to_scaled_int
+from gantry.shared.project_permissions import (
+    normalize_project_permission_map,
+    serialize_project_permission_map,
+)
 from gantry.management.billing.cache_settings import (
     BILLING_CACHE_TTL_SECONDS,
     billing_project_spending_limit_key,
@@ -36,8 +40,6 @@ from .permissions import (
     PROJECT_PERMISSIONS_ATTR,
     ProjectPermission,
     has_permission,
-    decode_project_permission,
-    encode_project_permission,
 )
 from .repositories import (
     ProjectRepository,
@@ -268,23 +270,11 @@ class ProjectService:
         attrs: dict[str, Any],
         project_uuid: str,
     ) -> list[str]:
-        """Extract project-scoped permissions from flat Keycloak attr entries."""
-        raw = attrs.get(PROJECT_PERMISSIONS_ATTR, [])
-        if isinstance(raw, str):
-            raw = [raw]
-        if isinstance(raw, list):
-            extracted: list[str] = []
-            for entry in raw:
-                if not isinstance(entry, str):
-                    continue
-                decoded = decode_project_permission(entry)
-                if decoded is None:
-                    continue
-                entry_project_uuid, permission = decoded
-                if entry_project_uuid == project_uuid:
-                    extracted.append(permission)
-            return extracted
-        return []
+        """Extract project-scoped permissions from grouped Keycloak attrs."""
+        grouped = normalize_project_permission_map(
+            attrs.get(PROJECT_PERMISSIONS_ATTR, {})
+        )
+        return list(grouped.get(project_uuid, []))
 
     def _extractOrgPermissions(self, attrs: dict[str, Any]) -> list[str]:
         """Extract organization-scoped permissions from Keycloak attrs."""
@@ -355,38 +345,24 @@ class ProjectService:
         project_uuid: str,
         permissions: list[str],
     ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
-        """Replace one project's permission slice inside the shared attr list."""
+        """Replace one project's permission slice inside the shared attr map."""
         attrs_res = await self.kc.getUserAttributes(user_id)
         if attrs_res.status == ResultStatus.Err:
             return attrs_res.into()
 
         attrs = attrs_res.unwrap()
-        raw = attrs.get(PROJECT_PERMISSIONS_ATTR, [])
-        if isinstance(raw, str):
-            raw = [raw]
-        elif not isinstance(raw, list):
-            raw = []
-
-        filtered_entries = []
-        for entry in raw:
-            if not isinstance(entry, str):
-                continue
-            decoded = decode_project_permission(entry)
-            if decoded is None:
-                continue
-            entry_project_uuid, _ = decoded
-            if entry_project_uuid != project_uuid:
-                filtered_entries.append(entry)
-
-        updated_entries = filtered_entries + [
-            encode_project_permission(project_uuid, permission)
-            for permission in permissions
-        ]
+        grouped = normalize_project_permission_map(
+            attrs.get(PROJECT_PERMISSIONS_ATTR, {})
+        )
+        if permissions:
+            grouped[project_uuid] = list(dict.fromkeys(permissions))
+        else:
+            grouped.pop(project_uuid, None)
 
         return await self.kc.setUserAttribute(
             user_id,
             PROJECT_PERMISSIONS_ATTR,
-            updated_entries,
+            serialize_project_permission_map(grouped),
         )
 
     async def _getMemberPermissions(
