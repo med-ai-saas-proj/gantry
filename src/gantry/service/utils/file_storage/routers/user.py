@@ -1,6 +1,9 @@
 from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import requireRole
+from gantry.management.auth.dependencies import (
+    requireRole,
+    check_access_to_project,
+)
 
 from ..dtos import (
     FileInfoResponse,
@@ -53,11 +56,7 @@ async def upload_file(
     ),
 ):
     """Upload a file to the file storage service."""
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to upload files for this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     if file.size is None or file.size == 0:
         raise HTTPException(status_code=400, detail="File is empty.")
@@ -105,11 +104,8 @@ async def list_files(
     ),
 ):
     """List files in the file storage service."""
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to view files for this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
+
     files_info = await file_storage_service.listFilesInProjectByUUID(
         project_uid
     )
@@ -158,11 +154,7 @@ async def download_file(
     ),
 ):
     """Download a file by file ID."""
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to download files for this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     presigned_url = (
         await file_storage_service.getFileUrlByProjectUUID(file_id, project_uid)
@@ -189,11 +181,7 @@ async def get_file_info_and_presigned_url(
     ),
 ) -> FileInfoWithPresignedURLResponse:
     """Get file URL and info by file ID."""
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to view files for this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     (
         presigned_url,
@@ -233,11 +221,7 @@ async def get_file_info(
     ),
 ):
     """Get file info by file ID."""
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to view files for this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     file_info = (
         await file_storage_service.getFileInfoByProjectUUID(
@@ -273,11 +257,7 @@ async def get_file_presigned_url(
     ),
 ):
     """Get presigned URL for file download."""
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to download files for this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     presigned_url = (
         await file_storage_service.getFileUrlByProjectUUID(file_id, project_uid)
@@ -306,11 +286,7 @@ async def delete_file(
     ),
 ):
     """Delete a file by file ID."""
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to delete files for this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     (
         await file_storage_service.deleteFileByProjectUUID(file_id, project_uid)
@@ -338,11 +314,7 @@ async def update_file_metadata(
     ),
 ):
     """Update file metadata by file ID."""
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="You don't have access to update files for this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     (
         await file_storage_service.updateFileMetadataByProjectUUID(

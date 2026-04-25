@@ -1,12 +1,8 @@
-from gantry.settings import AppStage, getAppSettings
-
 from .entities import ApiKeyInfo
-from .services import InvalidAPIKey
 from .factories import ApiKeyService, getApiKeyService
 from .permissions import registerPermissions
 
 import json
-import uuid
 from typing import Annotated
 
 from fastapi import Depends, Request, Security
@@ -56,6 +52,37 @@ def requiredPermissions(permissions: list[str]):
         api_key_info = user_info.unwrap()
         _inject_api_key_context_headers(request, api_key_info)
         return api_key_info
+
+    # from gantry.settings import AppStage, getAppSettings
+    # from .services import InvalidAPIKey
+    # import uuid
+
+    # app_settings = getAppSettings()
+    # if app_settings.stage == AppStage.DEV:
+    #     async def mock_api_key(
+    #         request: Request,
+    #         api_key: Annotated[str | None, Security(api_key_header)],
+    #     ) -> ApiKeyInfo:
+    #         if api_key == "bypass_key":
+    #             return {
+    #                 "api_key_id": 0,
+    #                 "user_id": "test_user",
+    #                 "hashed_key": "bypass_hashed_key",
+    #                 "project_id": 0,
+    #                 "project_uid": str(uuid.UUID(int=0)),
+    #                 "project_uuid": str(uuid.UUID(int=0)),
+    #                 "api_key_uuid": str(uuid.UUID(int=0)),
+    #                 "org_id": "test_org1",
+    #                 "organization_uuid": "test_org1",
+    #                 "permissions": permissions,
+    #                 "rpm_limit_organization": 1000000,
+    #                 "rpm_limit_project": 1000000,
+    #                 "spending_limit_organization": 1000000,
+    #                 "spending_limit_project": 1000000,
+    #             }
+    #         raise InvalidAPIKey()
+
+    #     return mock_api_key
 
     return get_api_key
 

@@ -1,6 +1,9 @@
 from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import requireRole
+from gantry.management.auth.dependencies import (
+    requireRole,
+    check_access_to_project,
+)
 from gantry.service.utils.file_storage.dtos import FileInfoResponse
 
 from ..dtos import (
@@ -16,7 +19,7 @@ from ..factories import getRagService
 import uuid
 from typing import Sequence, Annotated
 
-from fastapi import Body, Query, Depends, Security, APIRouter, HTTPException
+from fastapi import Body, Query, Depends, Security, APIRouter
 
 
 rag_user_router = APIRouter(tags=["rag-user"])
@@ -36,11 +39,7 @@ async def get_files(
         ..., description="Project UID to filter files for a specific project."
     ),
 ) -> Sequence[FileInfoResponse]:
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: You don't have access to this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     res = await rag_service.getFilesInRagByProjectUid(project_uid)
     return [
@@ -72,11 +71,7 @@ async def add_file(
         ..., description="Project UID to filter files for a specific project."
     ),
 ) -> str:
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: You don't have access to this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     task_id = (
         await rag_service.addFileByProjectUid(
@@ -106,11 +101,7 @@ async def get_task_status(
     ),
 ) -> EmbeddingTaskResponse:
     """Get the status of an asynchronous RAG embedding task."""
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: You don't have access to this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     task_result = (
         await rag_service.getTaskStatusByProjectUid(task_id, project_uid)
@@ -143,11 +134,7 @@ async def query_similar_by_text(
         ..., description="Project UID to filter files for a specific project."
     ),
 ):
-    if project_uid not in user_info["project_uids"]:
-        raise HTTPException(
-            status_code=403,
-            detail="Forbidden: You don't have access to this project.",
-        )
+    check_access_to_project(user_info=user_info, project_uid=project_uid)
 
     results = (
         await rag_service.querySimilarByTextByProjectUid(

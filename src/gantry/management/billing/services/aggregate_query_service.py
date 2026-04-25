@@ -38,7 +38,7 @@ class BillingAggregateQueryService:
         period_scale: int,
     ) -> Result[Sequence[BillingAggregateReport], ProjectNotFoundError]:
         """Fetch the current total_amount for the given project/org/period."""
-        if project_uids is not None and len(project_uids) > 0:
+        if project_uids:
             async with self.session_manager.get_session() as session:
                 projs_info_res = await session.execute(
                     select(Project.id, Project.uuid).where(

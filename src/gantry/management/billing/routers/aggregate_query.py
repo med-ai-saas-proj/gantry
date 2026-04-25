@@ -1,6 +1,9 @@
 from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import requireRole
+from gantry.management.auth.dependencies import (
+    requireRole,
+    check_access_to_projects,
+)
 from gantry.shared.custom_types.responses import ListResponse
 
 from ..type import AggregatePeriod, BillingAggregateReport
@@ -34,16 +37,16 @@ async def get_aggregate_by_projects(
         None
     ),  # filter by project_uid or whole organization
 ) -> ListResponse[BillingAggregateReport]:
-    project_uids_set = set(project_uids or [])
-    allowed_view_set = set(user_info["project_uids"])
+    project_uids_set = (
+        set([str(uid) for uid in project_uids]) if project_uids else set()
+    )
     if project_uids_set:
-        if not project_uids_set.issubset(allowed_view_set):
-            raise HTTPException(
-                status_code=403,
-                detail="You don't have access to view transactions for some of the specified projects.",
-            )
+        check_access_to_projects(
+            user_info=user_info, project_uids=project_uids_set
+        )
+        project_uids = [UUID(uid) for uid in project_uids_set]
     else:  # if no project_uids filter provided, default to all projects user has access to
-        project_uids_set = allowed_view_set
+        project_uids = [UUID(uid) for uid in user_info["project_uids"]]
 
     res = (
         await billing_service.get_aggregate_by_projects(

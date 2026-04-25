@@ -12,9 +12,10 @@ from .entities import UserInfo
 from .settings import getAuthSettings
 from .factories import AuthService, getAuthService
 
+from uuid import UUID
 from typing import Annotated
 
-from fastapi import Depends, Security
+from fastapi import Depends, Security, HTTPException
 from pyrusult import ResultStatus
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
@@ -82,29 +83,29 @@ async def _getUserInfo(
 
 getUserInfo = _getUserInfo
 
-if app_settings.stage == AppStage.DEV:
-    from gantry.management.auth.services import UnauthorizedError
+# if app_settings.stage == AppStage.DEV:
+#     from gantry.management.auth.services import UnauthorizedError
 
-    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+#     from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-    # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
-    security = HTTPBearer()
+#     # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
+#     security = HTTPBearer()
 
-    async def mock_getUserInfo(
-        auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-        auth_service: Annotated[AuthService, Depends(getAuthService)],
-    ) -> UserInfo:
-        if auth.credentials == "bypass_token":
-            return UserInfo(
-                id="test_user",
-                username="test_user",
-                email="test_user@example.com",
-                roles=[],
-                org_id="test_org1",
-            )
-        raise UnauthorizedError()
+#     async def mock_getUserInfo(
+#         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+#     ) -> UserInfo:
+#         if auth.credentials == "bypass_token":
+#             return UserInfo(
+#                 id="test_user",
+#                 username="test_user",
+#                 email="test_user@example.com",
+#                 roles=[],
+#                 org_id="test_org1",
+#                 project_uids=[str(UUID(int=0))],
+#             )
+#         raise UnauthorizedError()
 
-    getUserInfo = mock_getUserInfo
+#     getUserInfo = mock_getUserInfo
 
 
 async def getUserOrgId(
@@ -121,6 +122,26 @@ async def requireUserOrgId(
     if not org_id:
         raise MissingOrganizationContextError()
     return org_id
+
+
+def check_access_to_project(user_info: UserInfo, project_uid: UUID):
+    if (
+        "organization.owner" not in user_info["roles"]
+        and str(project_uid) not in user_info["project_uids"]
+    ):
+        raise HTTPException(
+            status_code=403, detail="User does not have access to this project"
+        )
+
+
+def check_access_to_projects(user_info: UserInfo, project_uids: set[str]):
+    if "organization.owner" not in user_info[
+        "roles"
+    ] and not project_uids.issubset(set(user_info["project_uids"])):
+        raise HTTPException(
+            status_code=403,
+            detail=f"You don't have access to some of the specified projects {project_uids - set(user_info['project_uids'])}",
+        )
 
 
 def requireRole(role: ManagementRole):
@@ -186,6 +207,29 @@ def requireAnyRole(roles: list[ManagementRole]):
         user_info = auth_service.verifyToken(token).unwrap()
         auth_service.checkAnyRole(user_info, roles).unwrap()
         return user_info
+
+    # if app_settings.stage == AppStage.DEV:
+    #     from gantry.management.auth.services import UnauthorizedError
+
+    #     from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+    #     # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
+    #     security = HTTPBearer()
+
+    #     async def mock_dependency(
+    #         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    #     ) -> UserInfo:
+    #         if auth.credentials == "bypass_token":
+    #             return UserInfo(
+    #                 id="test_user",
+    #                 username="test_user",
+    #                 email="test_user@example.com",
+    #                 roles=[],
+    #                 org_id="test_org1",
+    #                 project_uids=[str(UUID(int=0))],
+    #             )
+    #         raise UnauthorizedError()
+    #     return mock_dependency
 
     return dependency
 
