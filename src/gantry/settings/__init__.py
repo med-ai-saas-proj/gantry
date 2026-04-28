@@ -52,7 +52,6 @@ class AppSettings(BaseSettings):
         cli_ignore_unknown_args=True,
     )
 
-    rag: RagSettings
     stage: Annotated[
         AppStage,
         Field(description="Application deployment stage."),
@@ -117,6 +116,10 @@ class AppSettings(BaseSettings):
     api_gateway: Annotated[
         ApiGatewaySettings,
         Field(description="API gateway routing and permissions."),
+    ]
+    rag: Annotated[
+        RagSettings,
+        Field(description="RAG config"),
     ]
 
     @classmethod

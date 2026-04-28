@@ -18,10 +18,11 @@
 
 1. Check out [Getting API key](#getting-api-keys)
 1. Copy [`example.gantry.toml`](./example.gantry.toml) to `gantry.toml` then find all the `#apikey` and put yours in.
-1. Start DBs and other services: `docker compose -f compose.dev.yaml up`
+1. Start the server and other services: `docker compose --profile frontend-dev up`
+<!--1. Start DBs and other services: `docker compose up`
 1. Install dependency: `uv sync --dev --frozen`
 1. Migrate DB: `uv run gantry server -f gantry.toml migrate`
-1. Start server: `uv run gantry server -f gantry.toml`
+1. Start server: `uv run gantry server -f gantry.toml`-->
 
 **NOTES**:
 - test username and password: `gantry-test-user` | `password` 

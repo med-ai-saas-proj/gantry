@@ -34,23 +34,9 @@ def executeScript(script: str):
 
 def upgrade() -> None:
     """Upgrade schema."""
-    path = script_directory / "${up_revision}_upgrade.sql"
-    if path.exists():
-        with open(path) as f:
-            sql = f.read()
-        executeScript(sql)
-    else:
-        open(path, "w")
-        ${upgrades if upgrades else "pass"}
+    ${upgrades if upgrades else "pass"}
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    path = script_directory / "${up_revision}_downgrade.sql"
-    if path.exists():
-        with open(path) as f:
-            sql = f.read()
-        executeScript(sql)
-    else:
-        open(path, "w")
-        ${downgrades if downgrades else "pass"}
+    ${downgrades if downgrades else "pass"}

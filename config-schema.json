@@ -100,9 +100,13 @@
           "type": "array"
         },
         "routes": {
-          "$ref": "#/$defs/Routes",
+          "additionalProperties": {
+            "$ref": "#/$defs/ApiGatewayRoute"
+          },
           "default": {},
-          "description": "Route definitions keyed by route name."
+          "description": "Route definitions keyed by route name.",
+          "title": "Routes",
+          "type": "object"
         }
       },
       "title": "ApiGatewaySettings",
@@ -157,6 +161,12 @@
           "default": "example_client",
           "description": "Keycloak OIDC client ID.",
           "title": "Client Id",
+          "type": "string"
+        },
+        "admin_client_id": {
+          "default": "example_admin_client",
+          "description": "Keycloak OIDC client ID for admin users.",
+          "title": "Admin Client Id",
           "type": "string"
         },
         "realm_name": {
@@ -457,6 +467,18 @@
           "type": "string",
           "writeOnly": true
         },
+        "openai_base_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Openai Base Url"
+        },
         "embedding_model": {
           "title": "Embedding Model",
           "type": "string"
@@ -495,10 +517,6 @@
         "embedding_model"
       ],
       "title": "RagSettings",
-    "Routes": {
-      "additionalProperties": {
-        "$ref": "#/$defs/ApiGatewayRoute"
-      },
       "type": "object"
     },
     "TracesType": {
@@ -623,16 +641,16 @@
       "description": "Organization management settings."
     },
     "observability": {
-      "$ref": "#/$defs/ObservabilitySettings"
-    },
-    "rag": {
-      "$ref": "#/$defs/RagSettings"
       "$ref": "#/$defs/ObservabilitySettings",
       "description": "OpenTelemetry observability settings."
     },
     "api_gateway": {
       "$ref": "#/$defs/ApiGatewaySettings",
       "description": "API gateway routing and permissions."
+    },
+    "rag": {
+      "$ref": "#/$defs/RagSettings",
+      "description": "RAG config"
     }
   },
   "required": [
@@ -645,8 +663,8 @@
     "file_storage",
     "organization",
     "observability",
+    "api_gateway",
     "rag"
-    "api_gateway"
   ],
   "title": "AppSettings",
   "type": "object"

@@ -18,6 +18,8 @@ services:
         reservations:
           cpus: "0.1"
           memory: 20M
+    profiles:
+      - full
 
   prometheus:
     image: prom/prometheus:latest
@@ -224,6 +226,66 @@ services:
           cpus: "0.4"
           memory: 512M
 
+  rustfs:
+    image: rustfs/rustfs:1.0.0-alpha.99
+    container_name: rustfs
+    environment:
+      RUSTFS_ACCESS_KEY: rustfs-access-key
+      RUSTFS_SECRET_KEY: rustfs-secret-key
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - rustfs_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
+
+  rustfs-setup:
+    image: minio/mc
+    environment:
+      MINIO_HOST: rustfs
+      MINIO_PORT: 9000
+      MINIO_USER: rustfsadmin
+      MINIO_PASS: rustfsadmin
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+
+        until mc alias set rustfs http://rustfs:9000 rustfs-access-key rustfs-secret-key; do
+          echo 'RustFS is not ready yet, retrying in 2 seconds...'
+          sleep 2
+        done
+
+        echo '1. Create private bucket if not exists'
+        mc mb rustfs/private-files --ignore-existing
+
+        echo '2. Set Policy PRIVATE for private bucket'
+        mc anonymous set none rustfs/private-files
+
+        echo 'RustFS Configuration Complete!'
+
+  self:
+    image: ghcr.io/astral-sh/uv:0.11.8
+    container_name: gantry
+    network_mode: "host"
+    volumes:
+      - .:/app
+    working_dir: /app
+    restart: unless-stopped
+    command: |
+      uv run gantry server --config-file example.gantry.toml migrate
+      && uv run gantry server --config-file example.gantry.toml
+    profiles:
+      - frontend-dev
+
 volumes:
   timescale_data:
   postgres_data:
@@ -234,3 +296,4 @@ volumes:
   jaeger_data:
   grafana_data:
   mailpit_data:
+  rustfs_data:

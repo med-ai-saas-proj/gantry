@@ -36,11 +36,11 @@ cache_limit = 50
 
 [file_storage]
 # Required: S3 / Object Storage configuration
-s3_bucket_name = "my-app-bucket"             #apikey
+s3_bucket_name = "private-files"             #apikey
 s3_region_name = "us-east-1"                 #apikey
-s3_access_key_id = "AKIA..."                 #apikey
-s3_secret_access_key = "secret-key"          #apikey
-s3_endpoint_url = "https://s3.amazonaws.com" #apikey
+s3_access_key_id = "rustfs-access-key"       #apikey
+s3_secret_access_key = "rustfs-secret-key"   #apikey
+s3_endpoint_url = "http://localhost:9000"    #apikey
 s3_presigned_url_expiry_seconds = 3600
 redis_cache_expiry_seconds = 3600
 

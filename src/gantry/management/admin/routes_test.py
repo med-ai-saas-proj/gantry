@@ -169,9 +169,7 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             "user-1",
             {
                 "org_permissions": ["organization.settings.read"],
-                "project_permissions": {
-                    "project-a": ["project.settings.read"]
-                },
+                "project_permissions": {"project-a": ["project.settings.read"]},
             },
         )
 

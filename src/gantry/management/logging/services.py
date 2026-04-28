@@ -253,35 +253,3 @@ def filter_pipeline(key: LogFilterKey, value: str | FilterQuery):
             raise ValueError(f"Unknown filter mode: {value['mode']}")
     else:
         raise ValueError(f"Invalid filter value type: {type(value)}")
-
-
-# if __name__ == "__main__":
-#     # Example usage
-#     http_client = httpx.Client(base_url="http://localhost:3100")
-#     log_query_service = LogQueryService(http_client)
-
-#     # Query logs
-#     logs = log_query_service.search_logs(
-#         org_id="test_org1",
-#         service_name="Med-AI-SaaS",
-#         start=datetime.datetime.now() - datetime.timedelta(hours=12),
-#         end=datetime.datetime.now(),
-#         limit=10,
-#     )
-#     for log_line in logs.unwrap():
-#         print(log_line)
-
-#     # Get log labels
-#     labels = log_query_service.get_log_labels(
-#         start=datetime.datetime.now() - datetime.timedelta(hours=12),
-#         end=datetime.datetime.now(),
-#     )
-#     print(labels.unwrap())
-
-#     # Get log label values
-#     label_values = log_query_service.get_log_label_values(
-#         label_name="service_name",
-#         start=datetime.datetime.now() - datetime.timedelta(hours=1),
-#         end=datetime.datetime.now(),
-#     )
-#     print(label_values.unwrap())
