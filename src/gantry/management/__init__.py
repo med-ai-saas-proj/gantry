@@ -6,6 +6,7 @@ from .billing import billing_router
 from .logging import logging_router
 from .project import project_router
 from .api_keys import apikey_router
+from .admin import admin_router
 from .organization import org_router
 
 from fastapi import FastAPI, APIRouter
@@ -41,6 +42,7 @@ management_app.add_middleware(
 )
 
 v1_router = APIRouter(prefix="/v1", tags=["v1"], include_in_schema=True)
+v1_router.include_router(admin_router)
 v1_router.include_router(apikey_router)
 v1_router.include_router(org_router)
 v1_router.include_router(billing_router)

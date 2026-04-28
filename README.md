@@ -25,11 +25,13 @@
 
 **NOTES**:
 - test username and password: `gantry-test-user` | `password` 
+- admin username and password: `gantry-admin-user` | `password`
 
 ### Some useful scripts
 
 - Generate `example.env` files for `.env` files: `scripts/gen-example-env.sh`
 - Reset the database state: `scripts/reset-db.sh`. Remember to migrate and recreate the test account.
+- Smoke test admin-only routes: `./scripts/test_admin_api.sh`
 
 ### Getting API keys
 
@@ -39,7 +41,7 @@
 
 ## Keycloak config
 
-Gantry need 2 clients, 1 for the frontend (gantry front-end) and an service client for the backend (gantry-backend). You also need to config emails for sending invitation email. Here's the setup you need to go through.
+Gantry needs 3 clients: 1 for the frontend (`gantry-frontend`), 1 for admin users (`gantry-admin`), and 1 service client for the backend (`gantry-backend`). You also need to config emails for sending invitation email. Here's the setup you need to go through.
 
 1. Create clients:
     1. Go to `Clients > Create client` and uses the following config: 
@@ -49,6 +51,12 @@ Gantry need 2 clients, 1 for the frontend (gantry front-end) and an service clie
         - Authentication flow: Standard flow
         - Put your frontend's URLs in Access Settings
       
+    1. Create another client with the following config:
+        - Client id: `gantry-admin`
+        - PKCE: S256
+        - Client authentication: off
+        - Authentication flow: Standard flow
+        - Assign the realm role `ADMIN` to users who should access admin-only endpoints
     1. Create another client with the following config:
         - Client id: `gantry-backend`
         - Client authentication: On

@@ -16,7 +16,12 @@ secret_length = 32
 [auth]
 server_url = "http://localhost:8080/"
 client_id = "gantry-frontend"
+admin_client_id = "gantry-admin"
 realm_name = "gantry"
+
+[rag]
+openai_api_key = "sk-example"               #apikey
+embedding_model = "text-embedding-3-small"
 
 [billing]
 stripe_secret_key = "sk_test_example_key" #apikey

@@ -62,7 +62,7 @@ class TestApiKeyPermissionsRegistry(unittest.TestCase):
         collector = _RequiredPermissionsCollector()
         for path in [
             Path("src/gantry/service/utils/conversation/routers.py"),
-            Path("src/gantry/service/utils/file_storage/routers.py"),
+            Path("src/gantry/service/utils/file_storage/routers/api.py"),
         ]:
             collector.visit(ast.parse(path.read_text(), filename=str(path)))
 

@@ -87,6 +87,15 @@
         "clientRole": false,
         "containerId": "7e27575a-59d9-465c-a4e3-08864ab1e08a",
         "attributes": {}
+      },
+      {
+        "id": "da713b52-cd62-4a3d-a319-be43e617178f",
+        "name": "ADMIN",
+        "description": "Administrative realm role for Gantry admin endpoints.",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "gantry",
+        "attributes": {}
       }
     ],
     "client": {
@@ -528,6 +537,36 @@
           "uma_protection"
         ]
       },
+      "notBefore": 0,
+      "groups": []
+    },
+    {
+      "id": "0ca67717-b692-4c01-8d29-98c64c243526",
+      "username": "gantry-admin-user",
+      "firstName": "admin",
+      "lastName": "user",
+      "email": "admin-user@gantry.com",
+      "emailVerified": true,
+      "attributes": {},
+      "enabled": true,
+      "createdTimestamp": 1776069926126,
+      "totp": false,
+      "credentials": [
+        {
+          "id": "922616d9-876d-4f0e-b579-2da89450233d",
+          "type": "password",
+          "userLabel": "My password",
+          "createdDate": 1776069960048,
+          "secretData": "{\"value\":\"fS5e+KZOSiqIGjHQkihEQ/GLQkqGA4xfROupljn8g1k=\",\"salt\":\"8TNAXbb/PlJzSxjCbjvSnw==\",\"additionalParameters\":{}}",
+          "credentialData": "{\"hashIterations\":5,\"algorithm\":\"argon2\",\"additionalParameters\":{\"hashLength\":[\"32\"],\"memory\":[\"7168\"],\"type\":[\"id\"],\"version\":[\"1.3\"],\"parallelism\":[\"1\"]}}"
+        }
+      ],
+      "disableableCredentialTypes": [],
+      "requiredActions": [],
+      "realmRoles": [
+        "default-roles-gantry",
+        "ADMIN"
+      ],
       "notBefore": 0,
       "groups": []
     }
@@ -972,6 +1011,64 @@
           }
         }
       ],
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "offline_access",
+        "organization",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "id": "8edaf99e-251c-41d2-9d16-c4dc6db7c426",
+      "clientId": "gantry-admin",
+      "name": "gantry-admin",
+      "description": "Public client for Gantry admin users.",
+      "rootUrl": "http://localhost:3000",
+      "adminUrl": "http://localhost:3000",
+      "baseUrl": "http://localhost:3000",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000/*"
+      ],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "realm_client": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "standard.token.exchange.enabled": "false",
+        "post.logout.redirect.uris": "http://localhost:3000/*",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "pkce.code.challenge.method": "S256",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "dpop.bound.access.tokens": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
       "defaultClientScopes": [
         "web-origins",
         "acr",

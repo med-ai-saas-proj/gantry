@@ -27,10 +27,10 @@ class TestAuthService(unittest.TestCase):
                 "preferred_username": "alice",
                 "email": "alice@test",
                 "organization": "org-1",
-                "project_permissions": [
-                    "proj-1:project.owner",
-                    "proj-2:project.settings.read",
-                ],
+                "project_permissions": {
+                    "proj-1": ["project.owner"],
+                    "proj-2": ["project.settings.read"],
+                },
                 "realm_access": {"roles": ["r1"]},
                 "resource_access": {
                     "med-ai-saas-app": {"roles": ["r2"]},
@@ -73,10 +73,12 @@ class TestAuthService(unittest.TestCase):
                 "preferred_username": "alice",
                 "email": "alice@test",
                 "organization": "org-1",
-                "project_permissions": [
-                    "proj-1:project.owner",
-                    "proj-1:project.settings.write",
-                ],
+                "project_permissions": {
+                    "proj-1": [
+                        "project.owner",
+                        "project.settings.write",
+                    ]
+                },
                 "azp": "med-ai-saas-app",
             }
         )
@@ -157,3 +159,83 @@ class TestAuthService(unittest.TestCase):
 
         self.assertTrue(result.status == ResultStatus.Err)
         self.assertIsInstance(result.err(), MissingOrganizationClaimError)
+
+    def test_map_claims_allows_admin_without_organization_claim(self):
+        admin_service = AuthService(
+            server_url="http://localhost:8080",
+            realm="dev",
+            client_id="gantry-admin",
+            require_organization_claim=False,
+        )
+
+        result = admin_service._mapClaimsToAuthInfo(
+            {
+                "sub": "admin-1",
+                "preferred_username": "admin",
+                "email": "admin@test",
+                "realm_access": {"roles": [AuthService.ADMIN_REALM_ROLE]},
+                "azp": "gantry-admin",
+            }
+        )
+
+        self.assertTrue(result.status == ResultStatus.Ok)
+        self.assertEqual(result.unwrap()["org_id"], "")
+        self.assertEqual(
+            result.unwrap()["roles"],
+            [AuthService.ADMIN_REALM_ROLE],
+        )
+
+    def test_check_admin_role_requires_realm_admin_role(self):
+        missing_role = self.service.checkAdminRole(
+            {
+                "id": "u1",
+                "username": "alice",
+                "email": "a@test",
+                "roles": [],
+                "org_id": "",
+                "project_ids": [],
+            }
+        )
+        has_role = self.service.checkAdminRole(
+            {
+                "id": "u1",
+                "username": "alice",
+                "email": "a@test",
+                "roles": [AuthService.ADMIN_REALM_ROLE],
+                "org_id": "",
+                "project_ids": [],
+            }
+        )
+
+        self.assertTrue(missing_role.status == ResultStatus.Err)
+        self.assertTrue(has_role.status == ResultStatus.Ok)
+
+    def test_get_openid_metadata_uses_well_known_when_available(self):
+        self.service._openid_client.well_known = lambda: {
+            "issuer": "http://issuer.example/realms/dev",
+            "jwks_uri": "http://issuer.example/certs",
+        }
+
+        self.assertEqual(
+            self.service._getIssuer(),
+            "http://issuer.example/realms/dev",
+        )
+        self.assertEqual(
+            self.service._getJwksUrl(),
+            "http://issuer.example/certs",
+        )
+
+    def test_get_openid_metadata_falls_back_when_well_known_fails(self):
+        def raise_error():
+            raise RuntimeError("boom")
+
+        self.service._openid_client.well_known = raise_error
+
+        self.assertEqual(
+            self.service._getIssuer(),
+            "http://localhost:8080/realms/dev",
+        )
+        self.assertEqual(
+            self.service._getJwksUrl(),
+            "http://localhost:8080/realms/dev/protocol/openid-connect/certs",
+        )

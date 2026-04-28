@@ -52,6 +52,10 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         self.redis = _DummyRedis()
         self.api_key_repo = Mock()
         self.project_repo = Mock()
+        self.billing_transaction_service = Mock()
+        self.billing_transaction_service.getSpendingLimits = AsyncMock(
+            return_value=Ok((None, None))
+        )
         self.api_key_repo.getByKey = AsyncMock(return_value=None)
         self.api_key_repo.getContextByHashedKey = AsyncMock(return_value=None)
         self.service = ApiKeyService(
@@ -60,6 +64,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             api_key_repo=self.api_key_repo,
             project_repo=self.project_repo,
             session_manager=self.session_manager,
+            billing_transaction_service=self.billing_transaction_service,
             redis=self.redis,
         )
         self.service.default_org_rate_limit = 120
@@ -404,7 +409,10 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         self.api_key_repo.getContextByHashedKey = AsyncMock(
             return_value=self._context()
         )
-        self.redis.get = AsyncMock(side_effect=[None, None, None, "123", "456"])
+        self.redis.get = AsyncMock(side_effect=[None, None, None])
+        self.billing_transaction_service.getSpendingLimits = AsyncMock(
+            return_value=Ok((123, 456))
+        )
 
         result = await self.service.verifyApiKey(
             "sk_demo.secret", ["chat.read"]
@@ -501,7 +509,10 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         self.api_key_repo.getContextByHashedKey = AsyncMock(
             return_value=self._context(project_id=7, organization_uuid="org-1")
         )
-        self.redis.get = AsyncMock(side_effect=[None, None, None, "111", "222"])
+        self.redis.get = AsyncMock(side_effect=[None, None, None])
+        self.billing_transaction_service.getSpendingLimits = AsyncMock(
+            return_value=Ok((111, 222))
+        )
 
         result = await self.service.parseApiKey("sk_demo.secret")
 
@@ -562,9 +573,10 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
                 '"disabled":false}',
                 "33",
                 "44",
-                "555",
-                "666",
             ]
+        )
+        self.billing_transaction_service.getSpendingLimits = AsyncMock(
+            return_value=Ok((555, 666))
         )
 
         result = await self.service.verifyApiKey("sk_demo.secret", ["chat.run"])
