@@ -1,6 +1,9 @@
 """Authentication and authorization services for management API."""
 
 from gantry.shared.consts import messages_const
+from gantry.shared.project_permissions import (
+    normalize_project_permission_map,
+)
 from gantry.shared.custom_types.error_exception import RecoverableError
 
 from .roles import (
@@ -15,6 +18,7 @@ from typing import Any, Callable
 
 import jwt
 from jwt import PyJWKClient
+from keycloak import KeycloakOpenID
 from pyrusult import Ok, Err, Result
 
 
@@ -56,25 +60,79 @@ class AuthService:
     Handles token verification and role-based access control.
     """
 
-    def __init__(self, server_url: str, realm: str, client_id: str):
+    ADMIN_REALM_ROLE = "ADMIN"
+
+    def __init__(
+        self,
+        server_url: str,
+        realm: str,
+        client_id: str,
+        require_organization_claim: bool = True,
+    ):
         # Strip trailing slash from server URL
         self.server_url = server_url.rstrip("/")
         self.realm = realm
         self.client_id = client_id
+        self.require_organization_claim = require_organization_claim
 
-        self.jwks_url = (
+        self._default_jwks_url = (
             f"{self.server_url}/realms/{self.realm}"
             f"/protocol/openid-connect/certs"
         )
-        self.issuer = f"{self.server_url}/realms/{self.realm}"
+        self._default_issuer = f"{self.server_url}/realms/{self.realm}"
+        self._openid_client = KeycloakOpenID(
+            server_url=self.server_url,
+            realm_name=self.realm,
+            client_id=self.client_id,
+            verify=True,
+        )
+        self._openid_metadata: dict[str, Any] | None = None
+        self._jwk_client: PyJWKClient | None = None
+        self._jwk_client_url: str | None = None
 
-        self.jwk_client = PyJWKClient(self.jwks_url, cache_keys=True)
+    def _getOpenIdMetadata(self) -> dict[str, Any]:
+        """Load and cache OpenID metadata via python-keycloak."""
+        if self._openid_metadata is not None:
+            return self._openid_metadata
+        try:
+            metadata = self._openid_client.well_known()
+            if isinstance(metadata, dict):
+                self._openid_metadata = metadata
+                return metadata
+        except Exception:
+            pass
+        self._openid_metadata = {}
+        return self._openid_metadata
+
+    def _getIssuer(self) -> str:
+        """Resolve the issuer from OpenID metadata with a safe fallback."""
+        metadata = self._getOpenIdMetadata()
+        issuer = metadata.get("issuer")
+        if isinstance(issuer, str) and issuer:
+            return issuer
+        return self._default_issuer
+
+    def _getJwksUrl(self) -> str:
+        """Resolve the JWKS URL from OpenID metadata with a safe fallback."""
+        metadata = self._getOpenIdMetadata()
+        jwks_uri = metadata.get("jwks_uri")
+        if isinstance(jwks_uri, str) and jwks_uri:
+            return jwks_uri
+        return self._default_jwks_url
+
+    def _getJwkClient(self) -> PyJWKClient:
+        """Get a cached PyJWKClient bound to the resolved JWKS URL."""
+        jwks_url = self._getJwksUrl()
+        if self._jwk_client is None or self._jwk_client_url != jwks_url:
+            self._jwk_client = PyJWKClient(jwks_url, cache_keys=True)
+            self._jwk_client_url = jwks_url
+        return self._jwk_client
 
     def verifyToken(self, token: str) -> Result[UserInfo, UnauthorizedError]:
         """Verify Keycloak JWT token."""
         try:
             # Get the signing key from the token header
-            signing_key = self.jwk_client.get_signing_key_from_jwt(token)
+            signing_key = self._getJwkClient().get_signing_key_from_jwt(token)
 
             # Decode and verify the token
             payload = jwt.decode(
@@ -82,7 +140,7 @@ class AuthService:
                 signing_key.key,
                 algorithms=["RS256"],
                 audience="account",
-                issuer=self.issuer,
+                issuer=self._getIssuer(),
                 options={
                     "verify_exp": True,
                     # "verify_iss": True,
@@ -103,12 +161,12 @@ class AuthService:
         """Maps Keycloak JWT claims to the internal AuthInfo entity.
         Keycloak always includes 'sub' as the user UUID.
         """
-        user_id = claims.get("sub")
-        if not isinstance(user_id, str):
+        user_uid = claims.get("sub")
+        if not isinstance(user_uid, str):
             return Err(
                 UnauthorizedError(
                     from_exception=ValueError(
-                        f"User id not found or is not a string, {user_id=}"
+                        f"User uid not found or is not a string, {user_uid=}"
                     )
                 )
             )
@@ -154,7 +212,7 @@ class AuthService:
         username = claims.get("preferred_username")
 
         org_id = self._extractOrganizationId(claims.get("organization"))
-        if not org_id:
+        if self.require_organization_claim and not org_id:
             return Err(MissingOrganizationClaimError())
 
         auth_info: UserInfo = {
@@ -162,7 +220,7 @@ class AuthService:
             "username": username if isinstance(username, str) else None,
             "email": claims.get("email"),
             "roles": roles,
-            "org_id": org_id,
+            "org_id": org_id or "",
             "project_uids": self._extractProjectIds(claims, roles) or [],
         }
 
@@ -198,30 +256,40 @@ class AuthService:
 
     @staticmethod
     def _extractProjectIdsFromEntries(entries: list[str]) -> list[str]:
-        """Extract distinct project ids from flat token entries like `proj:perm`."""
+        """Extract distinct project uids from flat token entries like `proj:perm`."""
         seen: set[str] = set()
+        project_uids: list[str] = []
         for entry in entries:
-            project_id, separator, permission = entry.partition(":")
-            if not separator or not project_id or not permission:
+            project_uid, separator, permission = entry.partition(":")
+            if not separator or not project_uid or not permission:
                 continue
-            seen.add(project_id)
-        return list(seen)
+            if project_uid in seen:
+                continue
+            seen.add(project_uid)
+            project_uids.append(project_uid)
+        return project_uids
 
     def _extractProjectIds(
         self,
         claims: dict[str, Any],
         roles: list[str],
     ) -> list[str]:
-        """Extract project ids directly from token-carried project permission entries."""
-        raw = claims.get("project_permissions", [])
-        if isinstance(raw, str):
-            project_entries = [raw]
-        elif isinstance(raw, list):
-            project_entries = [entry for entry in raw if isinstance(entry, str)]
-        else:
-            project_entries = []
+        """Extract project uids directly from token-carried permission data."""
+        grouped_permissions = normalize_project_permission_map(
+            claims.get("project_permissions", {})
+        )
+        if grouped_permissions:
+            return list(grouped_permissions)
+        return self._extractProjectIdsFromEntries(roles)
 
-        return self._extractProjectIdsFromEntries(project_entries or roles)
+    def checkAdminRole(
+        self,
+        user_info: UserInfo,
+    ) -> Result[None, InsufficientPermissionsError]:
+        """Require the Keycloak realm role `ADMIN` for admin-only flows."""
+        if self.ADMIN_REALM_ROLE not in user_info.get("roles", []):
+            return Err(InsufficientPermissionsError([self.ADMIN_REALM_ROLE]))
+        return Ok(None)
 
     def checkRole(
         self, user_info: UserInfo, role: ManagementRole

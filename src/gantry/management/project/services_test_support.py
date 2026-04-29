@@ -29,7 +29,6 @@ from gantry.management.project.services import (
 from gantry.management.project.permissions import (
     PROJECT_PERMISSIONS_ATTR,
     ProjectPermission,
-    encode_project_permission,
 )
 
 
@@ -54,7 +53,6 @@ __all__ = [
     "_DummyError",
     "_DummyRedis",
     "_DummySessionManager",
-    "encode_project_permission",
     "OwnerRequiredForGrantError",
     "unittest",
 ]

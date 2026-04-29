@@ -10,8 +10,13 @@ from gantry.shared.custom_types.error_exception import RecoverableError
 from .roles import ManagementRole
 from .entities import UserInfo
 from .settings import getAuthSettings
-from .factories import AuthService, getAuthService
+from .factories import (
+    AuthService,
+    getAuthService,
+    getAdminAuthService,
+)
 
+import os
 from uuid import UUID
 from typing import Annotated
 
@@ -36,6 +41,18 @@ oauth_2_scheme = OAuth2AuthorizationCodeBearer(
     ),
 )
 
+admin_oauth_2_scheme = OAuth2AuthorizationCodeBearer(
+    tokenUrl=(
+        f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
+    ),
+    authorizationUrl=(
+        f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/auth"
+    ),
+    refreshUrl=(
+        f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
+    ),
+)
+
 
 class MissingOrganizationContextError(RecoverableError):
     """Raised when the authenticated token has no organization context."""
@@ -47,6 +64,11 @@ class MissingOrganizationContextError(RecoverableError):
 
 
 app_settings = getAppSettings()
+enable_mock_auth = os.getenv("GANTRY_ENABLE_MOCK_AUTH", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 async def _getUserInfo(
@@ -83,13 +105,16 @@ async def _getUserInfo(
 
 getUserInfo = _getUserInfo
 
-# if app_settings.stage == AppStage.DEV:
-#     from gantry.management.auth.services import UnauthorizedError
 
-#     from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+async def _getAdminUserInfo(
+    token: Annotated[str, Security(admin_oauth_2_scheme)],
+    auth_service: Annotated[AuthService, Depends(getAdminAuthService)],
+) -> UserInfo:
+    """Get authenticated admin user info and require Keycloak realm role `ADMIN`."""
+    user_info = auth_service.verifyToken(token).unwrap()
+    auth_service.checkAdminRole(user_info).unwrap()
+    return user_info
 
-#     # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
-#     security = HTTPBearer()
 
 #     async def mock_getUserInfo(
 #         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
@@ -105,7 +130,48 @@ getUserInfo = _getUserInfo
 #             )
 #         raise UnauthorizedError()
 
-#     getUserInfo = mock_getUserInfo
+getAdminUserInfo = _getAdminUserInfo
+
+if app_settings.stage == AppStage.DEV and enable_mock_auth:
+    from gantry.management.auth.services import UnauthorizedError
+
+    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+    # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
+    security = HTTPBearer()
+
+    async def mock_getUserInfo(
+        auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+        auth_service: Annotated[AuthService, Depends(getAuthService)],
+    ) -> UserInfo:
+        if auth.credentials == "bypass_token":
+            return UserInfo(
+                id="test_user",
+                username="test_user",
+                email="test_user@example.com",
+                roles=[],
+                org_id="test_org1",
+                project_ids=[],
+            )
+        raise UnauthorizedError()
+
+    getUserInfo = mock_getUserInfo
+
+    async def mock_getAdminUserInfo(
+        auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+    ) -> UserInfo:
+        if auth.credentials == "bypass_token":
+            return UserInfo(
+                id="test_admin",
+                username="test_admin",
+                email="test_admin@example.com",
+                roles=[AuthService.ADMIN_REALM_ROLE],
+                org_id="",
+                project_ids=[],
+            )
+        raise UnauthorizedError()
+
+    getAdminUserInfo = mock_getAdminUserInfo
 
 
 async def getUserOrgId(

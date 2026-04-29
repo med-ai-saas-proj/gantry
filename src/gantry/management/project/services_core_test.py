@@ -14,38 +14,31 @@ from .services_test_support import (
     InsufficientProjectPermissionError,
     unittest,
     _DummyError,
-    encode_project_permission,
 )
 
 
 class TestProjectServiceCore(BaseProjectServiceTest):
     """Project service tests grouped by category."""
 
-    def test_extract_project_permissions_supports_string_and_list(self):
-        """Project permission extraction should accept string/list values."""
+    def test_extract_project_permissions_supports_grouped_map(self):
+        """Project permission extraction should read grouped attr maps."""
         # Arrange
         service = self._make_service()
 
         # Act
-        from_string = service._extractProjectPermissions(
-            {
-                PROJECT_PERMISSIONS_ATTR: encode_project_permission(
-                    "proj-1", "project.owner"
-                )
-            },
+        from_map = service._extractProjectPermissions(
+            {PROJECT_PERMISSIONS_ATTR: {"proj-1": ["project.owner"]}},
             "proj-1",
         )
         from_list = service._extractProjectPermissions(
             {
-                PROJECT_PERMISSIONS_ATTR: [
-                    encode_project_permission(
-                        "proj-1", "project.settings.read"
-                    ),
-                    123,
-                    encode_project_permission(
-                        "proj-2", "project.settings.write"
-                    ),
-                ]
+                PROJECT_PERMISSIONS_ATTR: {
+                    "proj-1": [
+                        "project.settings.read",
+                        "project.settings.read",
+                    ],
+                    "proj-2": ["project.settings.write"],
+                }
             },
             "proj-1",
         )
@@ -55,12 +48,12 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertEqual(from_string, ["project.owner"])
+        self.assertEqual(from_map, ["project.owner"])
         self.assertEqual(from_list, ["project.settings.read"])
         self.assertEqual(from_invalid, [])
 
-    def test_extract_project_permissions_ignores_malformed_entries(self):
-        """Malformed flat entries should be ignored during extraction."""
+    def test_extract_project_permissions_ignores_old_flat_entries(self):
+        """Old flat entries should not be accepted by the new contract."""
         # Arrange
         service = self._make_service()
 
@@ -71,7 +64,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
         # Assert
-        self.assertEqual(res, ["project.owner"])
+        self.assertEqual(res, [])
 
     async def test_get_project_or_err_success(self):
         """Known project uuid should map repository row into DTO tuple."""
@@ -104,13 +97,10 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         service.kc.getUserAttributes = AsyncMock(
             return_value=Ok(
                 {
-                    PROJECT_PERMISSIONS_ATTR: [
-                        encode_project_permission(
-                            "proj-1", "project.settings.read"
-                        ),
-                        encode_project_permission("proj-2", "project.owner"),
-                        "invalid-entry",
-                    ]
+                    PROJECT_PERMISSIONS_ATTR: {
+                        "proj-1": ["project.settings.read"],
+                        "proj-2": ["project.owner"],
+                    }
                 }
             )
         )
@@ -128,11 +118,13 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         service.kc.setUserAttribute.assert_awaited_once_with(
             "u1",
             PROJECT_PERMISSIONS_ATTR,
-            [
-                encode_project_permission("proj-2", "project.owner"),
-                encode_project_permission("proj-1", "project.users.get_all"),
-                encode_project_permission("proj-1", "project.settings.write"),
-            ],
+            {
+                "proj-2": ["project.owner"],
+                "proj-1": [
+                    "project.users.get_all",
+                    "project.settings.write",
+                ],
+            },
         )
 
     async def test_set_project_permissions_ignores_non_string_entries(self):
@@ -141,7 +133,12 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         service = self._make_service()
         service.kc.getUserAttributes = AsyncMock(
             return_value=Ok(
-                {PROJECT_PERMISSIONS_ATTR: [123, None, "proj-2:project.owner"]}
+                {
+                    PROJECT_PERMISSIONS_ATTR: {
+                        "proj-2": ["project.owner"],
+                        "bad": None,
+                    }
+                }
             )
         )
         service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
@@ -154,7 +151,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         service.kc.setUserAttribute.assert_awaited_once_with(
             "u1",
             PROJECT_PERMISSIONS_ATTR,
-            [encode_project_permission("proj-2", "project.owner")],
+            {"proj-2": ["project.owner"]},
         )
 
     async def test_ensure_user_in_org_success_and_not_found(self):

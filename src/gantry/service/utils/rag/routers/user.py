@@ -144,7 +144,6 @@ async def query_similar_by_text(
             body.top_k,
         )
     ).unwrap()
-
     return [
         RagQueryResponse(
             file_info=FileInfoResponse(

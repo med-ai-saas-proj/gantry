@@ -4,9 +4,12 @@ This module uses `python-keycloak` for authentication/session handling,
 while organization endpoints are called via raw admin REST paths.
 """
 
+from gantry.shared.project_permissions import (
+    normalize_project_permission_map,
+    serialize_project_permission_values,
+)
 from gantry.shared.custom_types.error_exception import RecoverableError
 
-import json
 from typing import Any
 from urllib.parse import urljoin
 
@@ -62,6 +65,28 @@ type KeycloakPossibleError = (
     | KeycloakOrgConfigError
     | KeycloakOrgError
 )
+
+_PROJECT_PERMISSIONS_ATTR = "project_permissions"
+
+
+def _encodeUserAttribute(key: str, values: Any) -> Any:
+    """Encode structured attributes into Keycloak's string attribute shape."""
+    if key != _PROJECT_PERMISSIONS_ATTR:
+        return values
+
+    normalized = normalize_project_permission_map(values)
+    if not normalized:
+        return []
+    return serialize_project_permission_values(normalized)
+
+
+def _decodeUserAttributes(attrs: dict[str, Any]) -> dict[str, Any]:
+    """Decode structured attributes from Keycloak's raw representation."""
+    decoded = dict(attrs)
+    decoded[_PROJECT_PERMISSIONS_ATTR] = normalize_project_permission_map(
+        attrs.get(_PROJECT_PERMISSIONS_ATTR, {})
+    )
+    return decoded
 
 
 class OrgNotFoundError(RecoverableError):
@@ -688,8 +713,65 @@ class KeycloakOrgClient:
             user = await self._admin.a_get_user(user_id)
             attrs = user.get("attributes", {})
             if isinstance(attrs, dict):
-                return Ok(attrs)
+                return Ok(_decodeUserAttributes(attrs))
             return Ok({})
+        except KeycloakError as exc:
+            return Err(
+                self._mapKeycloakError(
+                    exc,
+                    not_found_error=MemberNotFoundError(),
+                    include_conflict=False,
+                )
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
+
+    async def getUserProfile(
+        self, user_id: str
+    ) -> Result[dict[str, Any], MemberNotFoundError | KeycloakOrgError]:
+        """Return the raw Keycloak user representation for one user."""
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
+
+        try:
+            user = await self._admin.a_get_user(user_id)
+            if isinstance(user, dict):
+                return Ok(user)
+            return Err(KeycloakOrgError())
+        except KeycloakError as exc:
+            return Err(
+                self._mapKeycloakError(
+                    exc,
+                    not_found_error=MemberNotFoundError(),
+                    include_conflict=False,
+                )
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
+
+    async def setUserAttributes(
+        self,
+        user_id: str,
+        updates: dict[str, Any],
+    ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
+        """Update multiple user attributes in one Keycloak admin call."""
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
+
+        try:
+            user = await self._admin.a_get_user(user_id)
+            attrs = user.get("attributes", {})
+            if not isinstance(attrs, dict):
+                attrs = {}
+            for key, values in updates.items():
+                attrs[key] = _encodeUserAttribute(key, values)
+            user["attributes"] = attrs
+            await self._admin.a_update_user(user_id, user)
+            return Ok(True)
         except KeycloakError as exc:
             return Err(
                 self._mapKeycloakError(
@@ -705,7 +787,7 @@ class KeycloakOrgClient:
         self,
         user_id: str,
         key: str,
-        values: list[str],
+        values: Any,
     ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
         if self._init_error is not None:
             return Err(self._init_error)
@@ -717,7 +799,7 @@ class KeycloakOrgClient:
             attrs = user.get("attributes", {})
             if not isinstance(attrs, dict):
                 attrs = {}
-            attrs[key] = values
+            attrs[key] = _encodeUserAttribute(key, values)
             user["attributes"] = attrs
             await self._admin.a_update_user(user_id, user)
             return Ok(True)
