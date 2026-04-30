@@ -4,11 +4,10 @@ COPY --from=ghcr.io/astral-sh/uv:0.10.4 /uv /uvx /bin/
 
 WORKDIR /app
 
-COPY pyproject.toml uv.lock /app
+COPY . .
 RUN uv sync --frozen
 
-COPY . .
+EXPOSE 8000
 
 ENTRYPOINT [ "uv", "run", "gantry" ]
-
 CMD [ "server", "--config-file", "example.gantry.toml" ]

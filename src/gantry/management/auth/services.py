@@ -159,6 +159,7 @@ class AuthService:
         self, claims: dict[str, Any]
     ) -> Result[UserInfo, UnauthorizedError]:
         """Maps Keycloak JWT claims to the internal AuthInfo entity.
+
         Keycloak always includes 'sub' as the user UUID.
         """
         user_uid = claims.get("sub")

@@ -1,4 +1,4 @@
-from gantry.management.api_keys.entities import ApiKeyInfo
+from gantry.management.api_keys import ApiKeyInfo
 from gantry.service.utils.file_storage.dtos import FileInfoResponse
 from gantry.management.api_keys.dependencies import requiredPermissions
 

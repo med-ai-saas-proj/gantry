@@ -8,3 +8,9 @@ class UserInfo(TypedDict):
     roles: list[str]
     org_id: str
     project_ids: list[str]
+
+
+class AdminInfo(TypedDict):
+    id: str
+    username: str | None
+    email: str | None

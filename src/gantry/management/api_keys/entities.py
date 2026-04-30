@@ -8,10 +8,10 @@ class ApiKeyInfo(TypedDict):
     api_key_uuid: str
     user_id: str
     project_id: int
+    project_uid: str
     project_uuid: str
     org_id: str
     organization_uuid: str
-    project_uid: str
     hashed_key: str
     permissions: list[str]
     rpm_limit_organization: int

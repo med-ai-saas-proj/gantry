@@ -25,8 +25,16 @@
 1. Start server: `uv run gantry server -f gantry.toml`-->
 
 **NOTES**:
-- test username and password: `gantry-test-user` | `password` 
-- admin username and password: `gantry-admin-user` | `password`
+- logins:
+  - keycloak admin: `admin` | `admin`
+  - app's test user: `gantry-test-user` | `password` 
+  - app's admin user: `gantry-admin-user` | `password`
+  - rustfs: `rustfs-access-key` | `rustfs-secret-key`
+- dasboards:
+  - Grafana: <localhost:3001>
+  - Mailpit (Check sent mail): <localhost:8025>
+  - Keycloak (Auth server): <localhost:8080>
+  - Rustfs (S3 storage): <localhost:9001>
 
 ### Some useful scripts
 

@@ -12,9 +12,9 @@ from .factories import getAuthService, getAdminAuthService
 from .dependencies import (
     getUserInfo,
     requireRole,
+    getAdminInfo,
     requireAnyRole,
     requireAllRoles,
-    getAdminUserInfo,
 )
 
 
