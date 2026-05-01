@@ -1,11 +1,11 @@
 """API key repository."""
 
 from gantry.db.repository import Repository
-from gantry.management.project.models import Project, ProjectSettings
-from gantry.management.api_keys.entities import ApiKeyInfo, ApiKeyContextRecord
-from gantry.management.organization.models import OrgSettings
+from gantry.management.project import Project, ProjectSettings
+from gantry.management.organization import OrgSettings
 
 from .models import ApiKey
+from .entities import ApiKeyInfo, ApiKeyContextRecord
 
 from typing import Sequence
 

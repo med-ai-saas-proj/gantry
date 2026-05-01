@@ -1,9 +1,10 @@
 """FastAPI dependencies for authentication and authorization."""
 
+from gantry.keycloak import getKeycloakSettings
 from gantry.settings import AppStage, getAppSettings
 from gantry.management.organization.factories import (
-    KeycloakOrgClient,
-    getKeycloakOrgClient,
+    KeycloakServiceClient,
+    getKeycloakServiceClient,
 )
 from gantry.shared.custom_types.error_exception import RecoverableError
 
@@ -24,9 +25,9 @@ from pyrusult import ResultStatus
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
-auth_settings = getAuthSettings()
-server_url_str = auth_settings.server_url.encoded_string()
-realm_name = auth_settings.realm_name
+keycloak_settings = getKeycloakSettings()
+server_url_str = keycloak_settings.server_url.encoded_string()
+realm_name = keycloak_settings.realm_name
 
 oauth_2_scheme = OAuth2AuthorizationCodeBearer(
     tokenUrl=(
@@ -73,7 +74,9 @@ enable_mock_auth = os.getenv("GANTRY_ENABLE_MOCK_AUTH", "").lower() in {
 async def _getUserInfo(
     token: Annotated[str, Security(oauth_2_scheme)],
     auth_service: Annotated[AuthService, Depends(getAuthService)],
-    kc_org_client: Annotated[KeycloakOrgClient, Depends(getKeycloakOrgClient)],
+    kc_org_client: Annotated[
+        KeycloakServiceClient, Depends(getKeycloakServiceClient)
+    ],
 ) -> UserInfo:
     """Get authenticated user info from JWT token.
 

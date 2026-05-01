@@ -34,16 +34,14 @@ async def listTransactions(
     limit: int = 100,
     offset: int = 0,
 ) -> PaginatedResponse[TransactionInfoResponse]:
-    res, total = (
-        await billing_service.getTransactions(
-            org_id=user_info["org_id"],
-            project_uids=project_uids,
-            start_date=start_date,
-            end_date=end_date,
-            limit=limit,
-            offset=offset,
-        )
-    ).unwrap()
+    res, total = await billing_service.getTransactions(
+        org_id=user_info["org_id"],
+        project_uids=project_uids,
+        start_date=start_date,
+        end_date=end_date,
+        limit=limit,
+        offset=offset,
+    )  # .unwrap()
     return PaginatedResponse[TransactionInfoResponse](
         data=res, total=total, offset=offset, limit=limit
     )

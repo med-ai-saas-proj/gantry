@@ -4,7 +4,7 @@ This module uses `python-keycloak` for authentication/session handling,
 while organization endpoints are called via raw admin REST paths.
 """
 
-from gantry.shared.project_permissions import (
+from gantry.shared.utils.permission_utils import (
     normalize_project_permission_map,
     serialize_project_permission_values,
 )
@@ -129,7 +129,7 @@ class UserNotInOrganizationError(RecoverableError):
     detail = "The user is not a member of this organization."
 
 
-class KeycloakOrgClient:
+class KeycloakServiceClient:
     """Async adapter over python-keycloak admin connection."""
 
     def __init__(

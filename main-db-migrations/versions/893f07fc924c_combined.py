@@ -8,12 +8,11 @@ Reason:
 
 """
 
-from alembic import op
-
 from typing import Union, Sequence
 from pathlib import Path
 
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 
@@ -667,24 +666,24 @@ def upgrade() -> None:
         schema="Billing",
         postgresql_where=sa.text("project_id IS NULL"),
     )
-    op.create_table(
-        "daily_billing_summary",
-        sa.Column("bucket", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("organization_id", sa.String(), nullable=False),
-        sa.Column("project_id", sa.BigInteger(), nullable=False),
-        sa.Column("apikey_id", sa.BigInteger(), nullable=False),
-        sa.Column("total_amount", sa.Numeric(), nullable=False),
-        sa.Column("transaction_count", sa.BigInteger(), nullable=False),
-        sa.PrimaryKeyConstraint(
-            "bucket",
-            "organization_id",
-            "project_id",
-            "apikey_id",
-            name=op.f("daily_billing_summary_pkey"),
-        ),
-        schema="Billing",
-        skip_autogenerate=True,
-    )
+    # op.create_table(
+    #     "daily_billing_summary",
+    #     sa.Column("bucket", sa.DateTime(timezone=True), nullable=False),
+    #     sa.Column("organization_id", sa.String(), nullable=False),
+    #     sa.Column("project_id", sa.BigInteger(), nullable=False),
+    #     sa.Column("apikey_id", sa.BigInteger(), nullable=False),
+    #     sa.Column("total_amount", sa.Numeric(), nullable=False),
+    #     sa.Column("transaction_count", sa.BigInteger(), nullable=False),
+    #     sa.PrimaryKeyConstraint(
+    #         "bucket",
+    #         "organization_id",
+    #         "project_id",
+    #         "apikey_id",
+    #         name=op.f("daily_billing_summary_pkey"),
+    #     ),
+    #     schema="Billing",
+    #     skip_autogenerate=True,
+    # )
     op.create_table(
         "BillingInvoiceLineItems",
         sa.Column("id", sa.BigInteger(), autoincrement=True, nullable=False),

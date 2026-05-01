@@ -3,12 +3,16 @@
 Orchestrates the Keycloak admin client and Postgres repositories.
 """
 
-from gantry.db.factories import AsyncSessionManager
-from gantry.management.billing.utils import int_to_scaled_int
-from gantry.management.billing.cache_settings import (
-    BILLING_CACHE_TTL_SECONDS,
-    billing_org_spending_limit_key,
+from gantry.db import AsyncSessionManager
+from gantry.keycloak import (
+    KeycloakOrgError,
+    OrgNotFoundError,
+    MemberNotFoundError,
+    KeycloakServiceClient,
+    InvitationNotFoundError,
+    UserNotInOrganizationError,
 )
+from gantry.shared.utils.scaled_amount import int_to_scaled_int
 from gantry.shared.custom_types.error_exception import RecoverableError
 
 from .dtos import (
@@ -23,21 +27,15 @@ from .dtos import (
 )
 from .settings import getOrgSettings
 from .cache_keys import (
+    BILLING_CACHE_TTL_SECONDS,
     ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
     organization_rpm_limit_key,
+    billing_org_spending_limit_key,
 )
 from .permissions import OrgPermission, has_permission
 from .repositories import (
     OrgSettingsRepository,
     OrgDeletionRequestRepository,
-)
-from .keycloak_client import (
-    KeycloakOrgError,
-    OrgNotFoundError,
-    KeycloakOrgClient,
-    MemberNotFoundError,
-    InvitationNotFoundError,
-    UserNotInOrganizationError,
 )
 
 from typing import Any
@@ -165,7 +163,7 @@ class OrgService:
 
     def __init__(
         self,
-        kc_client: KeycloakOrgClient,
+        kc_client: KeycloakServiceClient,
         settings_repo: OrgSettingsRepository,
         deletion_repo: OrgDeletionRequestRepository,
         session_manager: AsyncSessionManager,
@@ -702,7 +700,7 @@ class OrgService:
         invite_res = await self.kc.inviteUser(
             org_id,
             email,
-            client_id=settings.invite_client_id,
+            client_id=settings.keycloak_service_client_id,
             redirect_uri=settings.invite_redirect_uri,
         )
         if invite_res.status == ResultStatus.Err:

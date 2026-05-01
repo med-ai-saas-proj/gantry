@@ -1,6 +1,6 @@
 """Helpers for reading and writing admin-visible permission summaries."""
 
-from gantry.shared.project_permissions import (
+from gantry.shared.utils.permission_utils import (
     normalize_project_permission_map,
     serialize_project_permission_map,
 )

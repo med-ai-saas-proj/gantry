@@ -2,9 +2,9 @@ from gantry.settings import AppStage, getAppSettings
 from gantry.shared.consts.common_const import APP_NAME
 from gantry.shared.custom_types.error_exception import ProblemDetails
 
-from .utils.rag import rag_router
-from .utils.conversation import conversation_router
-from .utils.file_storage import file_storage_router
+from .rag import rag_router
+from .conversation import conversation_router
+from .file_storage import file_storage_router
 
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference

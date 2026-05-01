@@ -148,15 +148,6 @@
     "AuthSettings": {
       "additionalProperties": false,
       "properties": {
-        "server_url": {
-          "default": "http://localhost:8000/",
-          "description": "Keycloak server base URL.",
-          "format": "uri",
-          "maxLength": 2083,
-          "minLength": 1,
-          "title": "Server Url",
-          "type": "string"
-        },
         "client_id": {
           "default": "example_client",
           "description": "Keycloak OIDC client ID.",
@@ -167,12 +158,6 @@
           "default": "example_admin_client",
           "description": "Keycloak OIDC client ID for admin users.",
           "title": "Admin Client Id",
-          "type": "string"
-        },
-        "realm_name": {
-          "default": "example_realm",
-          "description": "Keycloak realm name.",
-          "title": "Realm Name",
           "type": "string"
         }
       },
@@ -275,6 +260,28 @@
       ],
       "title": "ExporterProtocol",
       "type": "string"
+    },
+    "KeycloakSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "server_url": {
+          "default": "http://localhost:8000/",
+          "description": "Keycloak server base URL.",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Server Url",
+          "type": "string"
+        },
+        "realm_name": {
+          "default": "example_realm",
+          "description": "Keycloak realm name.",
+          "title": "Realm Name",
+          "type": "string"
+        }
+      },
+      "title": "KeycloakSettings",
+      "type": "object"
     },
     "LogLevel": {
       "enum": [
@@ -412,11 +419,6 @@
           "title": "Keycloak Service Client Secret",
           "type": "string"
         },
-        "invite_client_id": {
-          "description": "OIDC client id used for invitation registration links.",
-          "title": "Invite Client Id",
-          "type": "string"
-        },
         "invite_redirect_uri": {
           "default": "http://localhost:3000",
           "description": "Redirect URI used for invitation registration links.",
@@ -452,8 +454,7 @@
         }
       },
       "required": [
-        "keycloak_service_client_secret",
-        "invite_client_id"
+        "keycloak_service_client_secret"
       ],
       "title": "OrgSettings",
       "type": "object"
@@ -616,6 +617,10 @@
       "$ref": "#/$defs/ApiKeysSettings",
       "description": "API key generation and validation settings."
     },
+    "keycloak": {
+      "$ref": "#/$defs/KeycloakSettings",
+      "description": "Keycloak server and realm."
+    },
     "auth": {
       "$ref": "#/$defs/AuthSettings",
       "description": "Keycloak authentication settings."
@@ -656,6 +661,7 @@
   "required": [
     "db",
     "apikey",
+    "keycloak",
     "auth",
     "billing",
     "user_log",

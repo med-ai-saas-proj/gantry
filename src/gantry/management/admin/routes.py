@@ -5,8 +5,8 @@ from gantry.management.project.permissions import (
     ALL_PERMISSIONS as ALL_PROJECT_PERMISSIONS,
 )
 from gantry.management.organization.factories import (
-    KeycloakOrgClient,
-    getKeycloakOrgClient,
+    KeycloakServiceClient,
+    getKeycloakServiceClient,
 )
 from gantry.management.organization.permissions import (
     ALL_PERMISSIONS as ALL_ORG_PERMISSIONS,
@@ -80,7 +80,7 @@ def _validate_permission_update_payload(
 
 async def _build_user_profile_response(
     user_id: str,
-    kc_org_client: KeycloakOrgClient,
+    kc_org_client: KeycloakServiceClient,
 ) -> AdminUserProfileResponse:
     """Load one user's Keycloak profile and map it into the admin response."""
     profile_res = await kc_org_client.getUserProfile(user_id)
@@ -139,7 +139,9 @@ async def get_admin_me(
 async def get_user_organizations(
     user_info: Annotated[UserInfo, Depends(getAdminInfo)],
     user_id: Annotated[str, Path()],
-    kc_org_client: Annotated[KeycloakOrgClient, Depends(getKeycloakOrgClient)],
+    kc_org_client: Annotated[
+        KeycloakServiceClient, Depends(getKeycloakServiceClient)
+    ],
 ) -> list[AdminUserOrganizationInfoResponse]:
     """Return organization memberships for any user after admin auth."""
     del user_info
@@ -164,7 +166,9 @@ async def get_user_organizations(
 async def get_user_profile(
     user_info: Annotated[UserInfo, Depends(getAdminInfo)],
     user_id: Annotated[str, Path()],
-    kc_org_client: Annotated[KeycloakOrgClient, Depends(getKeycloakOrgClient)],
+    kc_org_client: Annotated[
+        KeycloakServiceClient, Depends(getKeycloakServiceClient)
+    ],
 ) -> AdminUserProfileResponse:
     """Return one user's Keycloak profile plus normalized permission data."""
     del user_info
@@ -180,7 +184,9 @@ async def set_user_permissions(
     user_info: Annotated[UserInfo, Depends(getAdminInfo)],
     user_id: Annotated[str, Path()],
     payload: Annotated[AdminUserPermissionUpdateRequest, Body()],
-    kc_org_client: Annotated[KeycloakOrgClient, Depends(getKeycloakOrgClient)],
+    kc_org_client: Annotated[
+        KeycloakServiceClient, Depends(getKeycloakServiceClient)
+    ],
 ) -> AdminUserProfileResponse:
     """Replace one user's permission attributes through Keycloak admin API."""
     del user_info
@@ -206,7 +212,9 @@ async def set_user_permissions(
 async def reset_user_permissions(
     user_info: Annotated[UserInfo, Depends(getAdminInfo)],
     user_id: Annotated[str, Path()],
-    kc_org_client: Annotated[KeycloakOrgClient, Depends(getKeycloakOrgClient)],
+    kc_org_client: Annotated[
+        KeycloakServiceClient, Depends(getKeycloakServiceClient)
+    ],
 ) -> AdminUserProfileResponse:
     """Clear one user's org/project permission attributes in Keycloak."""
     del user_info

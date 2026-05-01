@@ -1,5 +1,4 @@
-from gantry.management.api_keys.entities import ApiKeyInfo
-from gantry.management.api_keys.dependencies import requiredPermissions
+from gantry.management.auth import UserInfo, getUserInfo
 
 from ..dtos import (
     FileInfoResponse,
@@ -28,10 +27,10 @@ from fastapi import (
 from starlette.responses import RedirectResponse
 
 
-file_storage_service_router = APIRouter(tags=["file-storage-service"])
+file_storage_user_router = APIRouter(tags=["file-storage-user"])
 
 
-@file_storage_service_router.post(
+@file_storage_user_router.post(
     "/",
     summary="Upload a file to the file storage service.",
     description="Endpoint to upload a file to the file storage service.",
@@ -43,9 +42,7 @@ async def upload_file(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["file.write"]))
-    ],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
 ):
     """Upload a file to the file storage service."""
     if file.size is None or file.size == 0:
@@ -76,7 +73,7 @@ async def upload_file(
     )
 
 
-@file_storage_service_router.get(
+@file_storage_user_router.get(
     "/",
     summary="List files in the file storage service.",
     description="Endpoint to list files in the file storage service.",
@@ -86,9 +83,7 @@ async def list_files(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["file.read"]))
-    ],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
 ):
     """List files in the file storage service."""
     files_info = await file_storage_service.listFilesInProject(
@@ -107,7 +102,7 @@ async def list_files(
     ]
 
 
-@file_storage_service_router.get(
+@file_storage_user_router.get(
     "/{file_id}/download",
     summary="Download a file by file ID.",
     description="Endpoint to download a file by its file ID.",
@@ -128,9 +123,7 @@ async def list_files(
 )
 async def download_file(
     file_id: uuid.UUID,
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["file.read"]))
-    ],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
@@ -144,7 +137,7 @@ async def download_file(
     return RedirectResponse(url=presigned_url)
 
 
-@file_storage_service_router.get(
+@file_storage_user_router.get(
     "/{file_id}",
     summary="Get file info and presigned URL by file ID.",
     description="Endpoint to retrieve file info and a presigned URL for downloading the file by file ID.",
@@ -155,9 +148,7 @@ async def get_file_info_and_presigned_url(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["file.read"]))
-    ],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
 ) -> FileInfoWithPresignedURLResponse:
     """Get file URL and info by file ID."""
     (
@@ -179,7 +170,7 @@ async def get_file_info_and_presigned_url(
     )
 
 
-@file_storage_service_router.get(
+@file_storage_user_router.get(
     "/{file_id}/info",
     summary="Get file info by file ID.",
     description="Endpoint to retrieve file info by file ID.",
@@ -190,9 +181,7 @@ async def get_file_info(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["file.read"]))
-    ],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
 ):
     """Get file info by file ID."""
     file_info = (
@@ -210,7 +199,7 @@ async def get_file_info(
     )
 
 
-@file_storage_service_router.get(
+@file_storage_user_router.get(
     "/{file_id}/presigned-url",
     summary="Get presigned URL for file download.",
     description="Endpoint to generate a presigned URL for downloading the file.",
@@ -218,9 +207,7 @@ async def get_file_info(
 )
 async def get_file_presigned_url(
     file_id: uuid.UUID,
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["file.read"]))
-    ],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
@@ -236,7 +223,7 @@ async def get_file_presigned_url(
     )
 
 
-@file_storage_service_router.delete(
+@file_storage_user_router.delete(
     "/{file_id}",
     summary="Delete a file by file ID.",
     description="Endpoint to delete a file from storage by its file ID.",
@@ -244,9 +231,7 @@ async def get_file_presigned_url(
 )
 async def delete_file(
     file_id: uuid.UUID,
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["file.delete"]))
-    ],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
@@ -260,7 +245,7 @@ async def delete_file(
     return None
 
 
-@file_storage_service_router.put(
+@file_storage_user_router.put(
     "/{file_id}/metadata",
     summary="Update file metadata by file ID.",
     description="Endpoint to update file metadata by file ID.",
@@ -269,9 +254,7 @@ async def delete_file(
 async def update_file_metadata(
     file_id: uuid.UUID,
     body: Annotated[UpdateFileMetadataRequest, Body()],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["file.write"]))
-    ],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
@@ -285,6 +268,4 @@ async def update_file_metadata(
     return None
 
 
-file_storage_router.include_router(
-    file_storage_service_router, prefix="/service"
-)
+file_storage_router.include_router(file_storage_user_router, prefix="/user")

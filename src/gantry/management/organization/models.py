@@ -4,8 +4,7 @@ Only settings and deletion requests live in Postgres.
 Organisation metadata, members, and invitations are stored in Keycloak.
 """
 
-from gantry.db.base import BaseSQLModel
-from gantry.db.utils import WithID, WithCreateUpdateTimestamp
+from gantry.db import WithID, BaseSQLModel, WithCreateUpdateTimestamp
 
 from datetime import datetime
 

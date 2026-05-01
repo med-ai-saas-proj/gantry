@@ -1,4 +1,4 @@
-from gantry.service.utils.file_storage.dtos import FileInfoResponse
+from gantry.service.file_storage.dtos import FileInfoResponse
 
 from .type import ChunkSplitterType
 

@@ -10,7 +10,6 @@ from gantry.settings.observability import MetricsType
 from gantry.shared.dtos.error_output import (
     ProblemDetails,
 )
-from gantry.management.api_keys.permissions import doneRegisterPermission
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
@@ -32,7 +31,6 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 
 configure_mappers()
-doneRegisterPermission()
 
 setupOtel(
     service_name=common_const.APP_NAME,

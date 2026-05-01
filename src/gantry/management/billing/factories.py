@@ -4,13 +4,13 @@ from gantry.db.factories import (
     getRedis,
     getSessionManager,
 )
-from gantry.management.project.repositories import ProjectSettingsRepository
-from gantry.management.organization.repositories import OrgSettingsRepository
+from gantry.management.api_key import getApiKeyService
+from gantry.management.project import ProjectSettingsRepository
+from gantry.shared.logging.logger import getLogger
+from gantry.management.organization import OrgSettingsRepository
 
 from .settings import getBillingSetting
-from ..api_keys.factories import getApiKeyService
 from .services.credit_service import CreditService
-from ...shared.logging.logger import getLogger
 from .repositories.credit_repo import CreditRepo
 from .services.invoice_service import InvoiceService
 from .repositories.invoice_repo import InvoiceRepo

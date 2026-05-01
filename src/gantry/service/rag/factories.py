@@ -1,8 +1,8 @@
-from gantry.db.factories import getRedis, getSessionManager
+from gantry.db import getRedis, getSessionManager
 from gantry.shared.logging.logger import getLogger
+from gantry.service.file_storage.factories import getFileStorageService
 from gantry.management.project.repositories import ProjectRepository
-from gantry.service.utils.file_storage.factories import getFileStorageService
-from gantry.service.utils.file_storage.repositories import FileRepository
+from gantry.service.file_storage.repositories import FileRepository
 
 from .services import RagService
 from .settings import getRagSettings

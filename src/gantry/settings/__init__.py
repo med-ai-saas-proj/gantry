@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from gantry.settings.rag import RagSettings
+from gantry.settings.keycloak import KeycloakSettings
 
 from .db import DBSettings
 from .auth import AuthSettings
@@ -85,6 +86,9 @@ class AppSettings(BaseSettings):
         ApiKeysSettings,
         Field(description="API key generation and validation settings."),
     ]
+    keycloak: Annotated[
+        KeycloakSettings, Field(description="Keycloak server and realm.")
+    ]
     auth: Annotated[
         AuthSettings,
         Field(description="Keycloak authentication settings."),
@@ -142,5 +146,5 @@ class AppSettings(BaseSettings):
         cls.__instance = val
 
 
-def getAppSettings():
+def getAppSettings() -> AppSettings:
     return AppSettings.get()

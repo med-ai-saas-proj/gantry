@@ -1,16 +1,16 @@
-from gantry.db.session import AsyncSessionManager
+from gantry.db import AsyncSessionManager
 from gantry.settings.rag import VectorOpsType
-from gantry.management.project.repositories import ProjectRepository
-from gantry.service.utils.file_storage.types import FileRecord
-from gantry.service.utils.file_storage.services import (
+from gantry.service.file_storage.types import FileRecord
+from gantry.service.file_storage.services import (
     FileStorageService,
     FileNotFoundInSystemError,
 )
+from gantry.management.project.repositories import ProjectRepository
+from gantry.service.file_storage.repositories import FileRepository
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
     InternalServiceError,
 )
-from gantry.service.utils.file_storage.repositories import FileRepository
 
 from .dtos import (
     QueryFilterByFileUid,

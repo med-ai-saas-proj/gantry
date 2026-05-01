@@ -1,6 +1,6 @@
 from gantry.db.factories import getRedis, getSessionManager
 from gantry.shared.logging.logger import getLogger
-from gantry.service.utils.file_storage.factories import getFileStorageService
+from gantry.service.file_storage.factories import getFileStorageService
 
 from .services import ConversationService
 from .settings import getConversationSettings

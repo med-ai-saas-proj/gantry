@@ -1,7 +1,7 @@
+from gantry.management.api_key import ApiKeyInfo
 from gantry.shared.utils.uuid_utils import uuid7
-from gantry.management.api_keys.entities import ApiKeyInfo
-from gantry.service.utils.file_storage.utils import detect_file_type
-from gantry.service.utils.file_storage.services import FileStorageService
+from gantry.service.file_storage.utils import detect_file_type
+from gantry.service.file_storage.services import FileStorageService
 from gantry.shared.utils.redis_auto_extend_lock import RedisAutoExtendAsyncLock
 
 from .types import FileUploadInfo

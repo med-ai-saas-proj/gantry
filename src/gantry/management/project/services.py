@@ -1,16 +1,20 @@
 """Business logic for project management."""
 
+from gantry.keycloak import (
+    KeycloakOrgError,
+    OrgNotFoundError,
+    MemberNotFoundError,
+    KeycloakServiceClient,
+    UserNotInOrganizationError,
+)
 from gantry.db.factories import AsyncSessionManager
-from gantry.management.billing.utils import int_to_scaled_int
-from gantry.shared.project_permissions import (
+from gantry.shared.utils.scaled_amount import int_to_scaled_int
+from gantry.shared.utils.permission_utils import (
     normalize_project_permission_map,
     serialize_project_permission_map,
 )
-from gantry.management.billing.cache_settings import (
-    BILLING_CACHE_TTL_SECONDS,
-    billing_project_spending_limit_key,
-)
 from gantry.management.organization.cache_keys import (
+    BILLING_CACHE_TTL_SECONDS,
     ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
     project_rpm_limit_key,
 )
@@ -19,13 +23,6 @@ from gantry.management.organization.permissions import (
     has_permission as has_org_permission,
 )
 from gantry.shared.custom_types.error_exception import RecoverableError
-from gantry.management.organization.keycloak_client import (
-    KeycloakOrgError,
-    OrgNotFoundError,
-    KeycloakOrgClient,
-    MemberNotFoundError,
-    UserNotInOrganizationError,
-)
 
 from .dtos import (
     ProjectInfoResponse,
@@ -52,6 +49,17 @@ from typing import Any
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
+
+
+BILLING_PROJECT_SPENDING_LIMIT_KEY = (
+    "billing:spending_limit:{org_id}:proj:{project_id}"
+)
+
+
+def billing_project_spending_limit_key(org_id: str, project_id: int) -> str:
+    return BILLING_PROJECT_SPENDING_LIMIT_KEY.format(
+        org_id=org_id, project_id=project_id
+    )
 
 
 class InvalidProjectPermissionError(RecoverableError):
@@ -131,7 +139,7 @@ class ProjectService:
         project_repo: ProjectRepository,
         membership_repo: ProjectMemberRepository,
         settings_repo: ProjectSettingsRepository,
-        kc_client: KeycloakOrgClient,
+        kc_client: KeycloakServiceClient,
         redis: Redis | None = None,
     ):
         self.session_manager = session_manager
@@ -401,7 +409,7 @@ class ProjectService:
                 member_user_id, project_uuid
             )
             if perms_res.status == ResultStatus.Err:
-                return perms_res
+                return perms_res.into()
             if ProjectPermission.OWNER.value in perms_res.unwrap():
                 owner_count += 1
         return Ok(owner_count)
@@ -424,7 +432,7 @@ class ProjectService:
         """Authorize one project permission for the given user and project."""
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
-            return project_res
+            return project_res.into()
         project_id, org_id, project_info = project_res.unwrap()
         if not allow_archived:
             active_res = self._ensureProjectActive(project_info)
@@ -432,14 +440,14 @@ class ProjectService:
                 return active_res
         org_owner_res = await self._isOrgOwner(org_id, user_id)
         if org_owner_res.status == ResultStatus.Err:
-            return org_owner_res
+            return org_owner_res.into()
         if org_owner_res.unwrap():
             return Ok(None)
         perms_res = await self._getMemberPermissions(
             project_id, project_uuid, user_id
         )
         if perms_res.status == ResultStatus.Err:
-            return perms_res
+            return perms_res.into()
         if not has_permission(perms_res.unwrap(), required):
             return Err(InsufficientProjectPermissionError())
         return Ok(None)
@@ -604,7 +612,7 @@ class ProjectService:
             organization_id, actor_user_id
         )
         if org_perms_res.status == ResultStatus.Err:
-            return org_perms_res
+            return org_perms_res.into()
         if not has_org_permission(
             org_perms_res.unwrap(),
             OrgPermission.PROJECTS_CREATE,
@@ -717,7 +725,7 @@ class ProjectService:
         """Fetch settings for one project, creating an empty row when missing."""
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
-            return project_res
+            return project_res.into()
         project_id, org_id, _ = project_res.unwrap()
 
         async with self.session_manager.get_session() as session:
@@ -749,12 +757,12 @@ class ProjectService:
         """Persist project settings and refresh the RPM cache."""
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
-            return project_res
+            return project_res.into()
         project_id, org_id, project_info = project_res.unwrap()
 
         active_res = self._ensureProjectActive(project_info)
         if active_res.status == ResultStatus.Err:
-            return active_res
+            return active_res.into()
 
         flattened_extra = self._flattenSettings(extra)
 
@@ -849,15 +857,15 @@ class ProjectService:
         """Add an organization member to the project with empty project perms."""
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
-            return project_res
+            return project_res.into()
         project_id, org_id, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
         if active_res.status == ResultStatus.Err:
-            return active_res
+            return active_res.into()
 
         in_org_res = await self._ensureUserInOrg(target_user_id, org_id)
         if in_org_res.status == ResultStatus.Err:
-            return in_org_res
+            return in_org_res.into()
 
         async with self.session_manager.get_session() as session:
             existing = await self.membership_repo.getMembership(
@@ -896,11 +904,11 @@ class ProjectService:
         """Remove a project member while preserving the last-owner invariant."""
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
-            return project_res
+            return project_res.into()
         project_id, _, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
         if active_res.status == ResultStatus.Err:
-            return active_res
+            return active_res.into()
 
         async with self.session_manager.get_session() as session:
             membership = await self.membership_repo.getMembership(
@@ -913,13 +921,13 @@ class ProjectService:
                 target_user_id, project_uuid
             )
             if perms_res.status == ResultStatus.Err:
-                return perms_res
+                return perms_res.into()
             if ProjectPermission.OWNER.value in perms_res.unwrap():
                 owner_count_res = await self._countProjectOwners(
                     project_id, project_uuid
                 )
                 if owner_count_res.status == ResultStatus.Err:
-                    return owner_count_res
+                    return owner_count_res.into()
                 if owner_count_res.unwrap() <= 1:
                     return Err(LastOwnerRemovalNotAllowedError())
 
@@ -951,17 +959,17 @@ class ProjectService:
         """Return project-scoped permissions for one project member."""
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
-            return project_res
+            return project_res.into()
         project_id, _, project_info = project_res.unwrap()
         active_res = self._ensureProjectActive(project_info)
         if active_res.status == ResultStatus.Err:
-            return active_res
+            return active_res.into()
 
         perms_res = await self._getMemberPermissions(
             project_id, project_uuid, target_user_id
         )
         if perms_res.status == ResultStatus.Err:
-            return perms_res
+            return perms_res.into()
 
         return Ok(
             ProjectUserPermissionsResponse(permissions=perms_res.unwrap())

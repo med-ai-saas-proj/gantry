@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 class TestOrganizationFactories(unittest.TestCase):
     def tearDown(self):
-        factories.getKeycloakOrgClient.cache_clear()
+        factories.getKeycloakServiceClient.cache_clear()
         factories.getOrgService.cache_clear()
 
     def test_get_keycloak_org_client_builds_singleton(self):
@@ -34,8 +34,8 @@ class TestOrganizationFactories(unittest.TestCase):
         ):
             mock_cls.return_value = "kc-client"
 
-            first = factories.getKeycloakOrgClient()
-            second = factories.getKeycloakOrgClient()
+            first = factories.getKeycloakServiceClient()
+            second = factories.getKeycloakServiceClient()
 
         self.assertEqual(first, "kc-client")
         self.assertEqual(second, "kc-client")

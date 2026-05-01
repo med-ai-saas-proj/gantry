@@ -4,7 +4,7 @@ from gantry.db.utils import (
     WithCreateTimestamp,
 )
 from gantry.management.project.models import Project
-from gantry.service.utils.file_storage.models import File
+from gantry.service.file_storage.models import File
 
 from typing import Sequence
 

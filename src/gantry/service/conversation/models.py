@@ -6,7 +6,7 @@ from gantry.db.utils import (
     WithCreateUpdateTimestamp,
 )
 from gantry.management.project.models import Project
-from gantry.service.utils.conversation.types import MessagePart
+from gantry.service.conversation.types import MessagePart
 
 from datetime import datetime
 

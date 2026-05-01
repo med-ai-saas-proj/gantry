@@ -1,7 +1,7 @@
-from gantry.db.session import AsyncSessionManager
+from gantry.db import AsyncSessionManager
+from gantry.shared.utils.scaled_amount import scaled_amount_to_decimal
 
 from ..dtos import ScaledAmount, CreditTransactionInfoResponse
-from ..utils import scaled_amount_to_decimal
 from ..repositories.credit_repo import CreditRepo
 
 from decimal import Decimal

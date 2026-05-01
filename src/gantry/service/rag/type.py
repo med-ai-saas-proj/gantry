@@ -1,4 +1,4 @@
-from gantry.service.utils.file_storage.types import FileRecord
+from gantry.service.file_storage.types import FileRecord
 
 import enum
 import uuid

@@ -1,6 +1,6 @@
 from gantry.shared.utils.uuid_utils import uuid7
 from gantry.shared.custom_types.error_exception import RecoverableError
-from gantry.service.utils.agent.dtos.generation_output import ResponseStatus
+from gantry.service.agent.dtos.generation_output import ResponseStatus
 
 from .types import FileType, FileUploadInfo
 from ..agent.dtos.model import (
