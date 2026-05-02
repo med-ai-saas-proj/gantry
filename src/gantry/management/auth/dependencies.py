@@ -1,14 +1,15 @@
 """FastAPI dependencies for authentication and authorization."""
 
+from gantry.keycloak import getKeycloakSettings
 from gantry.settings import AppStage, getAppSettings
 from gantry.management.organization.factories import (
-    KeycloakOrgClient,
-    getKeycloakOrgClient,
+    KeycloakServiceClient,
+    getKeycloakServiceClient,
 )
 from gantry.shared.custom_types.error_exception import RecoverableError
 
 from .roles import ManagementRole
-from .entities import UserInfo
+from .entities import UserInfo, AdminInfo
 from .settings import getAuthSettings
 from .factories import (
     AuthService,
@@ -25,9 +26,9 @@ from pyrusult import ResultStatus
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
-auth_settings = getAuthSettings()
-server_url_str = auth_settings.server_url.encoded_string()
-realm_name = auth_settings.realm_name
+keycloak_settings = getKeycloakSettings()
+server_url_str = keycloak_settings.server_url.encoded_string()
+realm_name = keycloak_settings.realm_name
 
 oauth_2_scheme = OAuth2AuthorizationCodeBearer(
     tokenUrl=(
@@ -74,10 +75,11 @@ enable_mock_auth = os.getenv("GANTRY_ENABLE_MOCK_AUTH", "").lower() in {
 async def _getUserInfo(
     token: Annotated[str, Security(oauth_2_scheme)],
     auth_service: Annotated[AuthService, Depends(getAuthService)],
-    kc_org_client: Annotated[KeycloakOrgClient, Depends(getKeycloakOrgClient)],
+    kc_org_client: Annotated[
+        KeycloakServiceClient, Depends(getKeycloakServiceClient)
+    ],
 ) -> UserInfo:
-    """
-    Get authenticated user info from JWT token.
+    """Get authenticated user info from JWT token.
 
     This is the base dependency for authentication.
     Returns UserInfo if token is valid, raises UnauthorizedError otherwise.
@@ -106,10 +108,10 @@ async def _getUserInfo(
 getUserInfo = _getUserInfo
 
 
-async def _getAdminUserInfo(
+async def _getAdminInfo(
     token: Annotated[str, Security(admin_oauth_2_scheme)],
     auth_service: Annotated[AuthService, Depends(getAdminAuthService)],
-) -> UserInfo:
+) -> AdminInfo:
     """Get authenticated admin user info and require Keycloak realm role `ADMIN`."""
     user_info = auth_service.verifyToken(token).unwrap()
     auth_service.checkAdminRole(user_info).unwrap()
@@ -130,7 +132,7 @@ async def _getAdminUserInfo(
 #             )
 #         raise UnauthorizedError()
 
-getAdminUserInfo = _getAdminUserInfo
+getAdminInfo = _getAdminInfo
 
 if app_settings.stage == AppStage.DEV and enable_mock_auth:
     from gantry.management.auth.services import UnauthorizedError
@@ -171,7 +173,7 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
             )
         raise UnauthorizedError()
 
-    getAdminUserInfo = mock_getAdminUserInfo
+    getAdminInfo = mock_getAdminUserInfo
 
 
 async def getUserOrgId(
@@ -211,24 +213,24 @@ def check_access_to_projects(user_info: UserInfo, project_uids: set[str]):
 
 
 def requireRole(role: ManagementRole):
-    """
-    Create a dependency that requires a specific role.
+    """Create a dependency that requires a specific role.
 
-    Usage::
-
-        @router.post(
-            "/members"
-        )
-        async def create_member(
-            user_info: Annotated[
-                UserInfo,
-                Depends(
-                    requireRole(
-                        ManagementRole.MEMBER_ADD
-                    )
-                ),
-            ],
-        ): ...
+    Usage:
+    ```python
+    @router.post(
+        "/members"
+    )
+    async def create_member(
+        user_info: Annotated[
+            UserInfo,
+            Depends(
+                requireRole(
+                    ManagementRole.MEMBER_ADD
+                )
+            ),
+        ],
+    ): ...
+    ```
     """
 
     async def dependency(
@@ -243,27 +245,27 @@ def requireRole(role: ManagementRole):
 
 
 def requireAnyRole(roles: list[ManagementRole]):
-    """
-    Create a dependency that requires any of the specified roles.
+    """Create a dependency that requires any of the specified roles.
 
-    Usage::
-
-        @router.get(
-            "/members"
-        )
-        async def list_members(
-            user_info: Annotated[
-                UserInfo,
-                Depends(
-                    requireAnyRole(
-                        [
-                            ManagementRole.MEMBER_VIEW,
-                            ManagementRole.MEMBER_ADMIN,
-                        ]
-                    )
-                ),
-            ],
-        ): ...
+    Usage:
+    ```python
+    @router.get(
+        "/members"
+    )
+    async def list_members(
+        user_info: Annotated[
+            UserInfo,
+            Depends(
+                requireAnyRole(
+                    [
+                        ManagementRole.MEMBER_VIEW,
+                        ManagementRole.MEMBER_ADMIN,
+                    ]
+                )
+            ),
+        ],
+    ): ...
+    ```
     """
 
     async def dependency(
@@ -301,27 +303,27 @@ def requireAnyRole(roles: list[ManagementRole]):
 
 
 def requireAllRoles(roles: list[ManagementRole]):
-    """
-    Create a dependency that requires all of the specified roles.
+    """Create a dependency that requires all of the specified roles.
 
-    Usage::
-
-        @router.post(
-            "/admin/critical"
-        )
-        async def critical_operation(
-            user_info: Annotated[
-                UserInfo,
-                Depends(
-                    requireAllRoles(
-                        [
-                            ManagementRole.SUPER_ADMIN,
-                            ManagementRole.AUDIT_VIEW,
-                        ]
-                    )
-                ),
-            ],
-        ): ...
+    Usage:
+    ```python
+    @router.post(
+        "/admin/critical"
+    )
+    async def critical_operation(
+        user_info: Annotated[
+            UserInfo,
+            Depends(
+                requireAllRoles(
+                    [
+                        ManagementRole.SUPER_ADMIN,
+                        ManagementRole.AUDIT_VIEW,
+                    ]
+                )
+            ),
+        ],
+    ): ...
+    ```
     """
 
     async def dependency(

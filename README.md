@@ -18,14 +18,23 @@
 
 1. Check out [Getting API key](#getting-api-keys)
 1. Copy [`example.gantry.toml`](./example.gantry.toml) to `gantry.toml` then find all the `#apikey` and put yours in.
-1. Start DBs and other services: `docker compose -f compose.dev.yaml up`
+1. Start the server and other services: `docker compose --profile frontend-dev up`
+<!--1. Start DBs and other services: `docker compose up`
 1. Install dependency: `uv sync --dev --frozen`
 1. Migrate DB: `uv run gantry server -f gantry.toml migrate`
-1. Start server: `uv run gantry server -f gantry.toml`
+1. Start server: `uv run gantry server -f gantry.toml`-->
 
 **NOTES**:
-- test username and password: `gantry-test-user` | `password` 
-- admin username and password: `gantry-admin-user` | `password`
+- logins:
+  - keycloak admin: `admin` | `admin`
+  - app's test user: `gantry-test-user` | `password` 
+  - app's admin user: `gantry-admin-user` | `password`
+  - rustfs: `rustfs-access-key` | `rustfs-secret-key`
+- dasboards:
+  - Grafana: <localhost:3001>
+  - Mailpit (Check sent mail): <localhost:8025>
+  - Keycloak (Auth server): <localhost:8080>
+  - Rustfs (S3 storage): <localhost:9001>
 
 ### Some useful scripts
 

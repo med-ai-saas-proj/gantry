@@ -1,6 +1,4 @@
-"""
-API routes for the Organization module.
-"""
+"""API routes for the Organization module."""
 
 from gantry.management.auth.entities import UserInfo
 

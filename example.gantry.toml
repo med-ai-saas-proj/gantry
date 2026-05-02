@@ -13,11 +13,13 @@ redis_connection_uri = "redis://localhost:6379/0"
 secret = "your-minimum-16-char-secret-key"
 secret_length = 32
 
-[auth]
+[keycloak]
 server_url = "http://localhost:8080/"
+realm_name = "gantry"
+
+[auth]
 client_id = "gantry-frontend"
 admin_client_id = "gantry-admin"
-realm_name = "gantry"
 
 [rag]
 openai_api_key = "sk-example"               #apikey
@@ -36,18 +38,17 @@ cache_limit = 50
 
 [file_storage]
 # Required: S3 / Object Storage configuration
-s3_bucket_name = "my-app-bucket"             #apikey
+s3_bucket_name = "private-files"             #apikey
 s3_region_name = "us-east-1"                 #apikey
-s3_access_key_id = "AKIA..."                 #apikey
-s3_secret_access_key = "secret-key"          #apikey
-s3_endpoint_url = "https://s3.amazonaws.com" #apikey
+s3_access_key_id = "rustfs-access-key"       #apikey
+s3_secret_access_key = "rustfs-secret-key"   #apikey
+s3_endpoint_url = "http://localhost:9000"    #apikey
 s3_presigned_url_expiry_seconds = 3600
 redis_cache_expiry_seconds = 3600
 
 [organization]
 keycloak_service_client_id = "gantry-backend"
 keycloak_service_client_secret = "sW4f7NOGqpcNmpstgfYbeBoUigJoA5EX"
-invite_client_id = "gantry-backend"
 invite_redirect_uri = "http://localhost:3000"
 deletion_cancel_window_days = 30
 deletion_worker_interval_seconds = 60

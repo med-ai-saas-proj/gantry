@@ -15,7 +15,7 @@ class Migrate(BaseSettings):
         from gantry.db.factories import getSessionManager
 
         PACKAGE_DIR = Path(__file__).parents[4]
-        alembic_cfg = Config(PACKAGE_DIR / "alembic.ini")
+        alembic_cfg = Config(PACKAGE_DIR / "main-db-alembic.ini")
 
         def runMigrate(conn):
             alembic_cfg.attributes["connection"] = conn

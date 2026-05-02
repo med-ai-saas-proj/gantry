@@ -3,10 +3,10 @@ from gantry.shared.consts.common_const import APP_NAME
 from gantry.shared.custom_types.error_exception import ProblemDetails
 
 from .admin import admin_router
+from .api_key import apikey_router
 from .billing import billing_router
 from .logging import logging_router
 from .project import project_router
-from .api_keys import apikey_router
 from .organization import org_router
 
 from fastapi import FastAPI, APIRouter

@@ -1,7 +1,7 @@
 """Authentication and authorization services for management API."""
 
 from gantry.shared.consts import messages_const
-from gantry.shared.project_permissions import (
+from gantry.shared.utils.permission_utils import (
     normalize_project_permission_map,
 )
 from gantry.shared.custom_types.error_exception import RecoverableError
@@ -159,6 +159,7 @@ class AuthService:
         self, claims: dict[str, Any]
     ) -> Result[UserInfo, UnauthorizedError]:
         """Maps Keycloak JWT claims to the internal AuthInfo entity.
+
         Keycloak always includes 'sub' as the user UUID.
         """
         user_uid = claims.get("sub")

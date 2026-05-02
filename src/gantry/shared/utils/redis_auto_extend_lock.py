@@ -27,4 +27,4 @@ class RedisAutoExtendAsyncLock:
     async def __aexit__(self, exc_type, exc_value, traceback):
         if self.task:
             self.task.cancel()
-        return self.lock.__aexit__(exc_type, exc_value, traceback)
+        return await self.lock.__aexit__(exc_type, exc_value, traceback)

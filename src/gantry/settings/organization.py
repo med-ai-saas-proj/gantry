@@ -21,13 +21,6 @@ class OrgSettings(BaseSettings):
         ),
     ]
 
-    invite_client_id: Annotated[
-        str,
-        Field(
-            description="OIDC client id used for invitation registration links.",
-        ),
-    ]
-
     invite_redirect_uri: Annotated[
         str,
         Field(

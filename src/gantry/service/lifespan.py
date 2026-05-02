@@ -1,4 +1,4 @@
-from gantry.service.utils.rag.factories import getRagService
+from gantry.service.rag.factories import getRagService
 
 
 async def rag_embedding_proccess_loop():

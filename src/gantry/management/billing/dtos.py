@@ -1,30 +1,18 @@
 """DTOs for the billing module."""
 
+from gantry.shared.utils.scaled_amount import ScaledAmount
+
 from .models import (
     TransactionStatus,
     BillingSourceProvider,
 )
 
 from uuid import UUID
-from typing import Sequence, TypedDict
+from typing import Literal, Sequence, TypedDict
 from decimal import Decimal
 from datetime import date, datetime
 
 from pydantic import BaseModel
-from typing_extensions import Literal
-
-
-class ScaledAmount(TypedDict):
-    """Fixed-point monetary amount — avoids float/Decimal in API inputs.
-
-    actual_value = value / 10^scale
-    Example: 3.14159 USD → {"value": 314159, "scale": 5}
-
-    Reference: https://stackoverflow.com/a/77703260/31748896
-    """
-
-    value: int
-    scale: int
 
 
 class PostRequest(BaseModel):

@@ -30,9 +30,14 @@ class Server(AppSettings):
             CliApp.run_subcommand(self)
             return
 
-        import asyncio
+        try:
+            import uvloop
 
-        asyncio.run(self._serve())
+            uvloop.run(self._serve())
+        except ImportError:
+            import asyncio
+
+            asyncio.run(self._serve())
 
     async def _serve(self):
         from gantry.main.app import main_app, internal_app

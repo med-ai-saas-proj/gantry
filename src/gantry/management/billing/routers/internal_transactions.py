@@ -1,5 +1,4 @@
-from gantry.management.api_keys.entities import ApiKeyInfo
-from gantry.management.api_keys.dependencies import getApiKeyInfo
+from gantry.management.api_key import ApiKeyInfo, getApiKeyInfo
 
 from ..dtos import PostRequest, CaptureRequest
 from ..factories import getBillingTransactionService

@@ -1,8 +1,12 @@
 """FastAPI dependencies for the Organization module."""
 
-from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.settings import getAuthSettings
-from gantry.management.auth.factories import AuthService, getAuthService
+from gantry.keycloak import getKeycloakSettings
+from gantry.management.auth import (
+    UserInfo,
+    AuthService,
+    getAuthService,
+    getAuthSettings,
+)
 from gantry.shared.custom_types.error_exception import RecoverableError
 
 from .services import InvalidPermissionError
@@ -17,8 +21,9 @@ from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
 auth_settings = getAuthSettings()
-server_url_str = auth_settings.server_url.encoded_string()
-realm_name = auth_settings.realm_name
+keycloak_settings = getKeycloakSettings()
+server_url_str = keycloak_settings.server_url.encoded_string()
+realm_name = keycloak_settings.realm_name
 org_settings = getOrgSettings()
 
 oauth_2_scheme = OAuth2AuthorizationCodeBearer(

@@ -15,10 +15,10 @@ from gantry.management.auth.dependencies import (
     MissingOrganizationContextError,
     getUserInfo,
     _getUserInfo,
+    getAdminInfo,
     getUserOrgId,
-    getAdminUserInfo,
+    _getAdminInfo,
     requireUserOrgId,
-    _getAdminUserInfo,
 )
 
 
@@ -145,7 +145,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
         )
         auth_service.checkAdminRole.return_value = Ok(None)
 
-        user_info = await _getAdminUserInfo("token", auth_service)
+        user_info = await _getAdminInfo("token", auth_service)
 
         self.assertEqual(user_info["id"], "admin-1")
         auth_service.checkAdminRole.assert_called_once_with(user_info)
@@ -167,7 +167,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
         )
 
         with self.assertRaises(InsufficientPermissionsError):
-            await _getAdminUserInfo("token", auth_service)
+            await _getAdminInfo("token", auth_service)
 
     async def test_get_user_org_id_and_require_user_org_id(self):
         self.assertEqual(

@@ -18,6 +18,8 @@ services:
         reservations:
           cpus: "0.1"
           memory: 20M
+    profiles:
+      - full
 
   prometheus:
     image: prom/prometheus:latest
@@ -200,13 +202,6 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
-      KC_FEATURES: organization,opentelemetry-metrics,opentelemetry-logs
-      KC_TELEMETRY_ENDPOINT: http://otelcol:4317
-      KC_TELEMETRY_RESOURCE_ATTRIBUTES: service.name=keycloak,deployment.environment=dev
-      KC_TRACING_ENABLED: "true"
-      KC_TELEMETRY_LOGS_ENABLED: "true"
-      KC_METRICS_ENABLED: "true"
-      KC_TELEMETRY_METRICS_ENABLED: "true"
     ports:
       - "8080:8080"
     command: start-dev --import-realm --http-access-log-enabled=true
@@ -223,6 +218,24 @@ services:
         reservations:
           cpus: "0.4"
           memory: 512M
+
+  gantry:
+    build: .
+    container_name: gantry
+    network_mode: "host"
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        sleep 10 &&
+        echo 'Migrating' &&
+        uv run gantry server --config-file example.gantry.toml migrate &&
+        echo 'Running server' &&
+        uv run gantry server --config-file example.gantry.toml
+    profiles:
+      - frontend-dev
 
 volumes:
   timescale_data:

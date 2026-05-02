@@ -1,6 +1,11 @@
 from gantry.db.factories import AsyncSessionManager
 from gantry.shared.utils.redis import redis_get_or_load
 from gantry.shared.utils.uuid_utils import uuid7
+from gantry.shared.utils.scaled_amount import (
+    decimal_to_scaled_int,
+    scaled_int_to_decimal,
+    scaled_amount_to_decimal,
+)
 from gantry.management.project.repositories import ProjectSettingsRepository
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
@@ -17,10 +22,7 @@ from ..dtos import (
 from ..type import AggregatePeriod
 from ..utils import (
     get_billing_period,
-    decimal_to_scaled_int,
-    scaled_int_to_decimal,
     get_next_billing_period,
-    scaled_amount_to_decimal,
 )
 from ..cache_settings import (
     BILLING_CACHE_TTL_SECONDS,

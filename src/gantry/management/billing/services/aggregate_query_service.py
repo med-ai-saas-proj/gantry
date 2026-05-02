@@ -1,7 +1,6 @@
 from gantry.db.session import AsyncSessionManager
-from gantry.management.projects.models import Project
-from gantry.management.project.services import ProjectNotFoundError
-from gantry.management.api_keys.services import ApiKeyService, InvalidAPIKey
+from gantry.management.api_key import ApiKeyService, InvalidAPIKey
+from gantry.management.project import Project, ProjectNotFoundError
 
 from ..type import AggregatePeriod, BillingAggregateReport
 from ..repositories.transaction_repo import TransactionRepository
