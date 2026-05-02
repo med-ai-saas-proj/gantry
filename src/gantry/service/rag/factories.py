@@ -24,7 +24,7 @@ def getRagService():
         getFileStorageService(),
         AsyncOpenAI(
             api_key=getRagSettings().openai_api_key.get_secret_value(),
-            base_url=getRagSettings().openai_base_url,
+            base_url=str(getRagSettings().openai_base_url),
         )
         if getRagSettings().openai_base_url
         else AsyncOpenAI(

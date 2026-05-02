@@ -15,7 +15,7 @@ from uuid import UUID
 from typing import Annotated
 from datetime import datetime
 
-from fastapi import Query, Depends, HTTPException
+from fastapi import Query, Depends
 
 
 @billing_router.get(

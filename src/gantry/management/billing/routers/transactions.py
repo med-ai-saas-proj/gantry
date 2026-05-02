@@ -1,7 +1,6 @@
 from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
 from gantry.management.auth.dependencies import (
-    getUserInfo,
     requireRole,
     check_access_to_project,
     check_access_to_projects,

@@ -662,7 +662,6 @@ class RagService:
                 .on_conflict_do_update(
                     index_elements=[
                         RagMetadata.file_id,
-                        RagMetadata.project_id,
                     ],
                     set_={
                         "created_at": func.now(),
@@ -683,7 +682,7 @@ class RagService:
                     DynamicBucket(
                         embedding=embedding,
                         file_id=file_info["id"],
-                        text=chunk,
+                        text=chunk.replace("\x00", "").strip(),
                         project_id=project_id,
                     )
                     for chunk, embedding in zip(chunks, embeddings)
@@ -947,16 +946,22 @@ class RagService:
 
         async with self.session_manager.get_session() as session:
             DynamicBucket = get_orm_class(table_name, target_dimension)
+
             if ops_type == VectorOpsType.cosine:
-                distance_func = "embedding <=> :embedding"
+                distance_expr = DynamicBucket.embedding.cosine_distance(
+                    embedding
+                )
             elif ops_type == VectorOpsType.l2:
-                distance_func = "embedding <-> :embedding"
+                distance_expr = DynamicBucket.embedding.l2_distance(embedding)
             elif ops_type == VectorOpsType.ip:
-                distance_func = "embedding <#> :embedding"
+                distance_expr = DynamicBucket.embedding.max_inner_product(
+                    embedding
+                )
             else:
                 raise ValueError(f"Unsupported ops type: {ops_type}")
+
             stmt = select(DynamicBucket)
-            resolved_file_ids: Sequence[int] = []
+            resolved_file_ids: Sequence[int] | None = None
             if isinstance(filters, QueryFilterByFileUid):
                 resolved_files = await self.file_repo.getAvailableIdsByUUIDs(
                     session, filters.file_uids, project_id
@@ -981,15 +986,12 @@ class RagService:
                     file_info.id for file_info in resolved_files
                 ]
 
-            if resolved_file_ids:
+            if resolved_file_ids is not None:
                 stmt = stmt.where(DynamicBucket.file_id.in_(resolved_file_ids))
-            stmt = stmt.order_by(text(distance_func)).limit(top_k)
+            stmt = stmt.order_by(distance_expr).limit(top_k)
             result = await session.execute(stmt.params(embedding=embedding))
             records: list = []
             for row in result.scalars().all():
-                file_model = await self.file_repo.getByKey(session, row.file_id)
-                if not file_model:
-                    continue
                 records.append(
                     {
                         "file_id": row.file_id,

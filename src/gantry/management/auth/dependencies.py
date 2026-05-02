@@ -18,6 +18,8 @@ from .factories import (
 )
 
 import os
+from re import A
+from math import e
 from uuid import UUID
 from typing import Annotated
 
@@ -118,20 +120,6 @@ async def _getAdminInfo(
     return user_info
 
 
-#     async def mock_getUserInfo(
-#         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-#     ) -> UserInfo:
-#         if auth.credentials == "bypass_token":
-#             return UserInfo(
-#                 id="test_user",
-#                 username="test_user",
-#                 email="test_user@example.com",
-#                 roles=[],
-#                 org_id="test_org1",
-#                 project_uids=[str(UUID(int=0))],
-#             )
-#         raise UnauthorizedError()
-
 getAdminInfo = _getAdminInfo
 
 if app_settings.stage == AppStage.DEV and enable_mock_auth:
@@ -153,7 +141,7 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
                 email="test_user@example.com",
                 roles=[],
                 org_id="test_org1",
-                project_ids=[],
+                project_uids=[],
             )
         raise UnauthorizedError()
 
@@ -161,15 +149,12 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
 
     async def mock_getAdminUserInfo(
         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-    ) -> UserInfo:
+    ) -> AdminInfo:
         if auth.credentials == "bypass_token":
-            return UserInfo(
+            return AdminInfo(
                 id="test_admin",
                 username="test_admin",
                 email="test_admin@example.com",
-                roles=[AuthService.ADMIN_REALM_ROLE],
-                org_id="",
-                project_ids=[],
             )
         raise UnauthorizedError()
 
@@ -241,6 +226,30 @@ def requireRole(role: ManagementRole):
         auth_service.checkRole(user_info, role).unwrap()
         return user_info
 
+    if enable_mock_auth and app_settings.stage == AppStage.DEV:
+        from gantry.management.auth.services import UnauthorizedError
+
+        from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+        # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
+        security = HTTPBearer()
+
+        async def mock_dependency(
+            auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+        ) -> UserInfo:
+            if auth.credentials == "bypass_token":
+                return UserInfo(
+                    id="test_user",
+                    username="test_user",
+                    email="test_user@example.com",
+                    roles=[],
+                    org_id="test_org1",
+                    project_uids=[str(UUID(int=0))],
+                )
+            raise UnauthorizedError()
+
+        return mock_dependency
+
     return dependency
 
 
@@ -276,28 +285,29 @@ def requireAnyRole(roles: list[ManagementRole]):
         auth_service.checkAnyRole(user_info, roles).unwrap()
         return user_info
 
-    # if app_settings.stage == AppStage.DEV:
-    #     from gantry.management.auth.services import UnauthorizedError
+    if enable_mock_auth and app_settings.stage == AppStage.DEV:
+        from gantry.management.auth.services import UnauthorizedError
 
-    #     from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+        from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-    #     # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
-    #     security = HTTPBearer()
+        # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
+        security = HTTPBearer()
 
-    #     async def mock_dependency(
-    #         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-    #     ) -> UserInfo:
-    #         if auth.credentials == "bypass_token":
-    #             return UserInfo(
-    #                 id="test_user",
-    #                 username="test_user",
-    #                 email="test_user@example.com",
-    #                 roles=[],
-    #                 org_id="test_org1",
-    #                 project_uids=[str(UUID(int=0))],
-    #             )
-    #         raise UnauthorizedError()
-    #     return mock_dependency
+        async def mock_dependency(
+            auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
+        ) -> UserInfo:
+            if auth.credentials == "bypass_token":
+                return UserInfo(
+                    id="test_user",
+                    username="test_user",
+                    email="test_user@example.com",
+                    roles=[],
+                    org_id="test_org1",
+                    project_uids=[str(UUID(int=0))],
+                )
+            raise UnauthorizedError()
+
+        return mock_dependency
 
     return dependency
 

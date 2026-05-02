@@ -12,6 +12,9 @@ from gantry.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
 )
+from gantry.management.billing.services.transaction_services import (
+    TransactionService,
+)
 
 # from gantry.management.billing.services.transaction_services import (
 #     TransactionService,
@@ -123,7 +126,7 @@ class ApiKeyService:
         api_key_repo: ApiKeyRepository,
         project_repo: ProjectRepository,
         session_manager: AsyncSessionManager,
-        # billing_transaction_service: TransactionService,
+        billing_transaction_service: TransactionService,
         redis: Redis | None = None,
     ):
         self.logger = logger
