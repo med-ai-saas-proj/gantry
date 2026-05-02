@@ -134,6 +134,10 @@ async def query_similar_by_text(
     project_uid: uuid.UUID = Query(
         ..., description="Project UID to filter files for a specific project."
     ),
+    include_embedding: bool = Query(
+        default=False,
+        description="Whether to include embeddings in the response. Embeddings can be large, so they are excluded by default.",
+    ),
 ):
     check_access_to_project(user_info=user_info, project_uid=project_uid)
 
@@ -143,6 +147,7 @@ async def query_similar_by_text(
             body.query_text,
             body.filters,
             body.top_k,
+            include_embedding,
         )
     ).unwrap()
     return [

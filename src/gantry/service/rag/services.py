@@ -878,6 +878,7 @@ class RagService:
         query: str,
         filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
         top_k: int = 5,
+        include_embedding: bool = False,
     ) -> Result[
         Sequence[RagEmbeddingRecord],
         FileNotFoundInSystemError
@@ -904,6 +905,7 @@ class RagService:
             embedding=query_embedding,
             filters=filters,
             top_k=top_k,
+            include_embedding=include_embedding,
         )
 
     async def querySimilarByTextByProjectUid(
@@ -912,6 +914,7 @@ class RagService:
         query: str,
         filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
         top_k: int = 5,
+        include_embedding: bool = False,
     ) -> Result[
         Sequence[RagEmbeddingRecord],
         FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
@@ -922,6 +925,7 @@ class RagService:
             query=query,
             filters=filters,
             top_k=top_k,
+            include_embedding=include_embedding,
         )
 
     async def querySimilarByVector(
@@ -930,6 +934,7 @@ class RagService:
         embedding: Sequence[float],
         filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
         top_k: int = 5,
+        include_embedding: bool = False,
     ) -> Result[
         Sequence[RagEmbeddingRecord],
         FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
@@ -988,6 +993,11 @@ class RagService:
 
             if resolved_file_ids is not None:
                 stmt = stmt.where(DynamicBucket.file_id.in_(resolved_file_ids))
+
+            # If filters were applied but no files matched, return empty result early to avoid unnecessary distance calculations
+            if len(resolved_file_ids or []) == 0:
+                return Ok([])
+
             stmt = stmt.order_by(distance_expr).limit(top_k)
             result = await session.execute(stmt.params(embedding=embedding))
             records: list = []
@@ -1009,35 +1019,34 @@ class RagService:
             }
             results: list[RagEmbeddingRecord] = []
             for record in records:
-                results.append(
-                    {
-                        "text": record["text"],
-                        "embedding": record["embedding"],
-                        "created_at": record["created_at"],
-                        "file_info": {
-                            "id": file_info_map[record["file_id"]].id,
-                            "uid": file_info_map[record["file_id"]].uuid,
-                            "filename": file_info_map[
-                                record["file_id"]
-                            ].original_filename,
-                            "mime_type": file_info_map[
-                                record["file_id"]
-                            ].mime_type,
-                            "size": file_info_map[
-                                record["file_id"]
-                            ].size_in_bytes,
-                            "created_at": file_info_map[
-                                record["file_id"]
-                            ].created_at,
-                            "extra_metadata": file_info_map[
-                                record["file_id"]
-                            ].extra_metadata,
-                            "storage_path": file_info_map[
-                                record["file_id"]
-                            ].filepath,
-                        },
-                    }
-                )
+                data: RagEmbeddingRecord = {
+                    "text": record["text"],
+                    "created_at": record["created_at"],
+                    "embedding": record["embedding"]
+                    if include_embedding
+                    else [],
+                    "file_info": {
+                        "id": file_info_map[record["file_id"]].id,
+                        "uid": file_info_map[record["file_id"]].uuid,
+                        "filename": file_info_map[
+                            record["file_id"]
+                        ].original_filename,
+                        "mime_type": file_info_map[record["file_id"]].mime_type,
+                        "size": file_info_map[record["file_id"]].size_in_bytes,
+                        "created_at": file_info_map[
+                            record["file_id"]
+                        ].created_at,
+                        "extra_metadata": file_info_map[
+                            record["file_id"]
+                        ].extra_metadata,
+                        "storage_path": file_info_map[
+                            record["file_id"]
+                        ].filepath,
+                    },
+                }
+                if include_embedding:
+                    data["embedding"] = record["embedding"]
+                results.append(data)
             return Ok(results)
 
     async def _wrapProjectUUID(

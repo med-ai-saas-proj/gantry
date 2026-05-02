@@ -17,7 +17,7 @@ import uuid
 from typing import Annotated
 from collections.abc import Sequence
 
-from fastapi import Body, Depends, Security, APIRouter
+from fastapi import Body, Query, Depends, Security, APIRouter
 
 
 rag_service_router = APIRouter(tags=["rag-service"])
@@ -137,6 +137,10 @@ async def query_similar_by_vector(
         ApiKeyInfo, Security(requiredPermissions(["rag.read"]))
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
+    include_embedding: bool = Query(
+        default=False,
+        description="Whether to include embeddings in the response. Embeddings can be large, so they are excluded by default.",
+    ),
 ):
     results = (
         await rag_service.querySimilarByVector(
@@ -144,6 +148,7 @@ async def query_similar_by_vector(
             body.embedding,
             body.filters,
             body.top_k,
+            include_embedding,
         )
     ).unwrap()
     return [
@@ -176,6 +181,10 @@ async def query_similar_by_text(
         ApiKeyInfo, Security(requiredPermissions(["rag.read"]))
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
+    include_embedding: bool = Query(
+        default=False,
+        description="Whether to include embeddings in the response. Embeddings can be large, so they are excluded by default.",
+    ),
 ):
     results = (
         await rag_service.querySimilarByText(
@@ -183,6 +192,7 @@ async def query_similar_by_text(
             body.query_text,
             body.filters,
             body.top_k,
+            include_embedding,
         )
     ).unwrap()
     return [
