@@ -5,6 +5,23 @@ from gantry.shared.dtos.base import BaseDTO
 from pydantic import Field
 
 
+class AdminPaginationQuery(BaseDTO):
+    """Shared pagination query for admin dashboard lists."""
+
+    limit: int = Field(20, ge=1, le=100)
+    offset: int = Field(0, ge=0)
+    q: str | None = Field(None, description="Optional search text")
+
+
+class AdminDashboardSummaryResponse(BaseDTO):
+    """Top-level counters for the admin dashboard home screen."""
+
+    organizations: int
+    projects: int
+    api_keys: int
+    users: int
+
+
 class AdminUserInfoResponse(BaseDTO):
     """Authenticated admin user information."""
 
@@ -20,6 +37,25 @@ class AdminUserOrganizationInfoResponse(BaseDTO):
     id: str
     name: str | None = None
     alias: str | None = None
+
+
+class AdminUserListItemResponse(BaseDTO):
+    """One Keycloak user in admin dashboard lists."""
+
+    id: str
+    username: str | None = None
+    email: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    enabled: bool
+    email_verified: bool
+
+
+class AdminUserListResponse(BaseDTO):
+    """Paginated Keycloak user list for admin dashboard."""
+
+    total: int
+    results: list[AdminUserListItemResponse]
 
 
 class AdminUserProjectPermissionResponse(BaseDTO):

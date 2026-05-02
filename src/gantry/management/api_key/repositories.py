@@ -149,6 +149,12 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         res = await session.execute(stmt)
         return int(res.scalar_one() or 0)
 
+    async def countAll(self, session: AsyncSession) -> int:
+        """Return the total number of API keys."""
+        stmt = select(func.count()).select_from(ApiKey)
+        res = await session.execute(stmt)
+        return int(res.scalar_one() or 0)
+
     async def create(
         self,
         session: AsyncSession,

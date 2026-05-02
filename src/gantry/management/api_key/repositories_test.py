@@ -5,7 +5,7 @@ from unittest.mock import Mock, AsyncMock, patch
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.api_keys.repositories import ApiKeyRepository
+from gantry.management.api_key.repositories import ApiKeyRepository
 
 
 class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):

@@ -10,8 +10,7 @@ from pyrusult import Ok, ResultStatus
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.project.services import ProjectNotFoundError
-from gantry.management.api_keys.services import (
+from gantry.management.api_key.services import (
     ApiKeyService,
     InvalidAPIKey,
     UserNotFoundError,
@@ -20,7 +19,8 @@ from gantry.management.api_keys.services import (
     InsufficientPermission,
     InvalidPermissionError,
 )
-from gantry.management.api_keys.permissions import (
+from gantry.management.project.services import ProjectNotFoundError
+from gantry.management.api_key.permissions import (
     clearPermissions,
     registerPermissions,
 )

@@ -1,9 +1,7 @@
 """Factory functions for the Keycloak module singletons."""
 
-from gantry.keycloak import KeycloakServiceClient, getKeycloakSettings
-from gantry.db.factories import getRedis, getSessionManager
-from gantry.shared.logging.logger import getLogger
-from gantry.management.auth.settings import getAuthSettings
+from .services import KeycloakServiceClient
+from .settings import getKeycloakSettings
 
 from functools import lru_cache
 

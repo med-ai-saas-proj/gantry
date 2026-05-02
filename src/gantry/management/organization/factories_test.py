@@ -11,45 +11,35 @@ class TestOrganizationFactories(unittest.TestCase):
         factories.getOrgService.cache_clear()
 
     def test_get_keycloak_org_client_builds_singleton(self):
-        auth = SimpleNamespace(
-            server_url=SimpleNamespace(encoded_string=lambda: "http://kc"),
-            realm_name="dev",
-        )
         org_settings = SimpleNamespace(
             keycloak_service_client_id="svc-id",
             keycloak_service_client_secret="svc-secret",
         )
         with (
             patch(
-                "gantry.management.organization.factories.getAuthSettings",
-                return_value=auth,
-            ),
-            patch(
                 "gantry.management.organization.factories.getOrgSettings",
                 return_value=org_settings,
             ),
             patch(
-                "gantry.management.organization.factories.KeycloakOrgClient"
-            ) as mock_cls,
+                "gantry.management.organization.factories.getBaseKeycloakServiceClient"
+            ) as mock_factory,
         ):
-            mock_cls.return_value = "kc-client"
+            mock_factory.return_value = "kc-client"
 
             first = factories.getKeycloakServiceClient()
             second = factories.getKeycloakServiceClient()
 
         self.assertEqual(first, "kc-client")
         self.assertEqual(second, "kc-client")
-        mock_cls.assert_called_once_with(
-            server_url="http://kc",
-            realm="dev",
-            service_client_id="svc-id",
-            service_client_secret="svc-secret",
+        mock_factory.assert_called_once_with(
+            "svc-id",
+            "svc-secret",
         )
 
     def test_get_org_service_builds_singleton(self):
         with (
             patch(
-                "gantry.management.organization.factories.getKeycloakOrgClient",
+                "gantry.management.organization.factories.getKeycloakServiceClient",
                 return_value="kc-client",
             ),
             patch(

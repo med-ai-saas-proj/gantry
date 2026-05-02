@@ -1,6 +1,6 @@
 """Shared Redis cache-key helpers for organization settings."""
 
-ORG_RPM_LIMIT_CACHE_TTL_SECONDS = 3600
+ORG_RPM_LIMIT_CACHE_TTL_SECONDS = 36000
 BILLING_CACHE_TTL_SECONDS = 3600  # 1 hour
 ORG_RPM_LIMIT_KEY = "organization:rpm_limit:{org_id}"
 BILLING_ORG_SPENDING_LIMIT_KEY = "billing:spending_limit:{org_id}"

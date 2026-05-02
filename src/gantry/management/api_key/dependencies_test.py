@@ -9,11 +9,11 @@ from starlette.requests import Request
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.api_keys.permissions import (
+from gantry.management.api_key.permissions import (
     listPermissions,
     clearPermissions,
 )
-from gantry.management.api_keys.dependencies import (
+from gantry.management.api_key.dependencies import (
     getApiKeyInfo,
     requiredPermissions,
 )

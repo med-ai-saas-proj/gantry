@@ -2,7 +2,9 @@
 
 from gantry.db.factories import getRedis, getSessionManager
 from gantry.shared.logging.logger import getLogger
-from gantry.management.organization.factories import getKeycloakServiceClient
+from gantry.management.organization.factories import (
+    getKeycloakServiceClient as getKeycloakOrgClient,
+)
 
 from .services import ProjectService
 from .repositories import (
@@ -23,6 +25,6 @@ def getProjectService() -> ProjectService:
         project_repo=ProjectRepository(),
         membership_repo=ProjectMemberRepository(),
         settings_repo=ProjectSettingsRepository(),
-        kc_client=getKeycloakServiceClient(),
+        kc_client=getKeycloakOrgClient(),
         redis=getRedis(),
     )

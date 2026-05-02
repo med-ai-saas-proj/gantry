@@ -12,8 +12,11 @@ from functools import lru_cache
 @lru_cache(1)
 def getApiKeyService():
     """Get singleton ApiKeyService instance."""
+    from gantry.management.billing.factories import (
+        getBillingTransactionService,
+    )
+
     apikeys_settings = getApiKeysSettings()
-    from gantry.management.billing.factories import getBillingTransactionService
 
     return ApiKeyService(
         config={
@@ -24,6 +27,6 @@ def getApiKeyService():
         api_key_repo=ApiKeyRepository(),
         project_repo=ProjectRepository(),
         session_manager=getSessionManager(),
-        redis=getRedis(),
         billing_transaction_service=getBillingTransactionService(),
+        redis=getRedis(),
     )

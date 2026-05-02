@@ -1,11 +1,13 @@
 import os
+import sys
+import types
 import unittest
 from unittest.mock import patch
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.api_keys import factories
+from gantry.management.api_key import factories
 
 
 class TestApiKeyFactories(unittest.TestCase):
@@ -23,33 +25,43 @@ class TestApiKeyFactories(unittest.TestCase):
                 "secret_length": 24,
             },
         )()
+        fake_billing_factories = types.ModuleType(
+            "gantry.management.billing.factories"
+        )
+        fake_billing_factories.getBillingTransactionService = lambda: (
+            "billing-transaction-service"
+        )
         with (
             patch(
-                "gantry.management.api_keys.factories.getApiKeysSettings",
+                "gantry.management.api_key.factories.getApiKeysSettings",
                 return_value=settings,
             ),
             patch(
-                "gantry.management.api_keys.factories.getLogger",
+                "gantry.management.api_key.factories.getLogger",
                 return_value="logger",
             ),
             patch(
-                "gantry.management.api_keys.factories.getSessionManager",
+                "gantry.management.api_key.factories.getSessionManager",
                 return_value="session-manager",
             ),
             patch(
-                "gantry.management.api_keys.factories.getRedis",
+                "gantry.management.api_key.factories.getRedis",
                 return_value="redis-client",
             ),
             patch(
-                "gantry.management.api_keys.factories.ApiKeyRepository",
+                "gantry.management.api_key.factories.ApiKeyRepository",
                 return_value="api-key-repo",
             ),
             patch(
-                "gantry.management.api_keys.factories.ProjectRepository",
+                "gantry.management.api_key.factories.ProjectRepository",
                 return_value="project-repo",
             ),
+            patch.dict(
+                sys.modules,
+                {"gantry.management.billing.factories": fake_billing_factories},
+            ),
             patch(
-                "gantry.management.api_keys.factories.ApiKeyService"
+                "gantry.management.api_key.factories.ApiKeyService"
             ) as service_cls,
         ):
             service_cls.return_value = "api-key-service"
@@ -65,5 +77,6 @@ class TestApiKeyFactories(unittest.TestCase):
             api_key_repo="api-key-repo",
             project_repo="project-repo",
             session_manager="session-manager",
+            billing_transaction_service="billing-transaction-service",
             redis="redis-client",
         )

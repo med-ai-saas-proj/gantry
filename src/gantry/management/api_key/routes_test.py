@@ -7,8 +7,8 @@ from pyrusult import Ok
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.api_keys import routes
-from gantry.management.api_keys.dtos import ApiKeyWriteRequest
+from gantry.management.api_key import routes
+from gantry.management.api_key.dtos import ApiKeyWriteRequest
 from gantry.management.project.permissions import ProjectPermission
 
 

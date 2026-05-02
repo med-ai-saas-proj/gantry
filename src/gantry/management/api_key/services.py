@@ -7,6 +7,7 @@ from gantry.management.organization.cache_keys import (
     ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
     project_rpm_limit_key,
     organization_rpm_limit_key,
+    billing_org_spending_limit_key,
 )
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
@@ -35,7 +36,7 @@ import hmac
 import json
 import uuid
 import secrets
-from typing import Callable, Sequence, TypedDict, NotRequired
+from typing import Any, Callable, Protocol, Sequence, TypedDict, NotRequired
 
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
@@ -83,6 +84,18 @@ class UserNotFoundError(UnrecoverableError):
     detail = "Check the user table, there is null in there"
 
 
+BILLING_PROJECT_SPENDING_LIMIT_KEY = (
+    "billing:spending_limit:{org_id}:proj:{project_id}"
+)
+
+
+def billing_project_spending_limit_key(org_id: str, project_id: int) -> str:
+    return BILLING_PROJECT_SPENDING_LIMIT_KEY.format(
+        org_id=org_id,
+        project_id=project_id,
+    )
+
+
 class ApiKeyNotFoundError(RecoverableError):
     """Raised when an API key cannot be found."""
 
@@ -113,6 +126,16 @@ class ApiKeyServiceConfig(TypedDict):
     api_key_info_cache_ttl_seconds: NotRequired[int]
 
 
+class BillingSpendingLimitReader(Protocol):
+    """Minimal contract needed from the billing integration."""
+
+    async def getSpendingLimits(
+        self,
+        org_id: str,
+        project_id: int,
+    ) -> Any: ...
+
+
 class ApiKeyService:
     """Coordinate project-scoped API key CRUD and verification."""
 
@@ -123,7 +146,7 @@ class ApiKeyService:
         api_key_repo: ApiKeyRepository,
         project_repo: ProjectRepository,
         session_manager: AsyncSessionManager,
-        # billing_transaction_service: TransactionService,
+        billing_transaction_service: BillingSpendingLimitReader | None = None,
         redis: Redis | None = None,
     ):
         self.logger = logger
@@ -143,7 +166,7 @@ class ApiKeyService:
         self.session_manager = session_manager
         self.redis = redis
         self.default_org_rate_limit = getOrgSettings().default_rate_limit
-        # self.billing_transaction_service = billing_transaction_service
+        self.billing_transaction_service = billing_transaction_service
 
     def _createApiKeySecret(self) -> str:
         return secrets.token_urlsafe(self.api_key_secret_length)
@@ -330,6 +353,60 @@ class ApiKeyService:
             return -1
         return self._normalizeScaledSpendingLimit(raw)
 
+    async def _readSpendingLimits(
+        self,
+        organization_uuid: str,
+        project_id: int,
+    ) -> tuple[int, int]:
+        """Read billing limits from Redis, falling back to legacy billing service."""
+        project_limit = await self._readCachedSpendingLimit(
+            billing_project_spending_limit_key(organization_uuid, project_id)
+        )
+        organization_limit = await self._readCachedSpendingLimit(
+            billing_org_spending_limit_key(organization_uuid)
+        )
+        if project_limit != -1 or organization_limit != -1:
+            return project_limit, organization_limit
+
+        service_limits = await self._readSpendingLimitsFromBillingService(
+            organization_uuid=organization_uuid,
+            project_id=project_id,
+        )
+        if service_limits is None:
+            return project_limit, organization_limit
+
+        return service_limits
+
+    async def _readSpendingLimitsFromBillingService(
+        self,
+        organization_uuid: str,
+        project_id: int,
+    ) -> tuple[int, int] | None:
+        """Fallback to billing service when billing Redis keys are cold."""
+        if self.billing_transaction_service is None:
+            return None
+
+        try:
+            limits_res = (
+                await self.billing_transaction_service.getSpendingLimits(
+                    organization_uuid,
+                    project_id,
+                )
+            )
+            limits = limits_res.unwrap()
+            return (
+                int(limits[0] if limits[0] is not None else -1),
+                int(limits[1] if limits[1] is not None else -1),
+            )
+        except Exception as exc:
+            self.logger.warning(
+                "billing_spending_limit_service_read_failed",
+                organization_uuid=organization_uuid,
+                project_id=project_id,
+                error=str(exc),
+            )
+            return None
+
     async def _enrichContextLimits(
         self,
         context: ApiKeyContextRecord,
@@ -356,17 +433,15 @@ class ApiKeyService:
             await self._writeCachedRpmLimit(project_rpm_key, project_rpm_limit)
         context["rpm_limit_project"] = project_rpm_limit
 
-        # spending_limit = (
-        #     await self.billing_transaction_service.getSpendingLimits(
-        #         context["organization_uuid"], context["project_id"]
-        #     )
-        # ).unwrap()
-        context["spending_limit_project"] = int(
-            spending_limit[0] if spending_limit[0] is not None else -1
+        (
+            spending_limit_project,
+            spending_limit_organization,
+        ) = await self._readSpendingLimits(
+            context["organization_uuid"],
+            context["project_id"],
         )
-        context["spending_limit_organization"] = int(
-            spending_limit[1] if spending_limit[1] is not None else -1
-        )
+        context["spending_limit_project"] = spending_limit_project
+        context["spending_limit_organization"] = spending_limit_organization
         return context
 
     async def _loadContextFromStorage(

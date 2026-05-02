@@ -6,7 +6,7 @@ from pathlib import Path
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.api_keys.permissions import (
+from gantry.management.api_key.permissions import (
     listPermissions,
     clearPermissions,
     registerPermissions,
@@ -61,8 +61,8 @@ class TestApiKeyPermissionsRegistry(unittest.TestCase):
     def test_service_routes_declare_expected_dynamic_permissions(self):
         collector = _RequiredPermissionsCollector()
         for path in [
-            Path("src/gantry/service/utils/conversation/routers.py"),
-            Path("src/gantry/service/utils/file_storage/routers/api.py"),
+            Path("src/gantry/service/conversation/routers.py"),
+            Path("src/gantry/service/file_storage/routers/api.py"),
         ]:
             collector.visit(ast.parse(path.read_text(), filename=str(path)))
 

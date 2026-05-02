@@ -109,6 +109,12 @@ class ProjectRepository(Repository[Project, int]):
         res = await session.execute(stmt)
         return list(res.scalars().all())
 
+    async def countAll(self, session: AsyncSession) -> int:
+        """Return the total number of projects."""
+        stmt = select(func.count()).select_from(Project)
+        res = await session.execute(stmt)
+        return int(res.scalar_one() or 0)
+
 
 class ProjectMemberRepository(Repository[ProjectMember, int]):
     """Repository for project memberships."""

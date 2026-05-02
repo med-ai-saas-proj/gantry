@@ -6,7 +6,7 @@ import unittest
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.shared.project_permissions import (
+from gantry.shared.utils.permission_utils import (
     normalize_project_permission_map,
     serialize_project_permission_map,
     serialize_project_permission_values,

@@ -1,5 +1,10 @@
 """Category tests for organization service unit rules."""
 
+from gantry.shared.utils.scaled_amount import int_to_scaled_int
+from gantry.management.organization.cache_keys import (
+    BILLING_CACHE_TTL_SECONDS,
+)
+
 from .services_test_support import (
     UTC,
     Ok,
@@ -213,8 +218,8 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         self.redis.set.assert_awaited()
         self.redis.set.assert_any_await(
             "billing:spending_limit:org-1",
-            5000,
-            ex=36000,
+            int_to_scaled_int(5000, 8),
+            ex=BILLING_CACHE_TTL_SECONDS,
         )
 
     async def test_process_due_deletions_deletes_org_and_cleans_records(self):
@@ -349,8 +354,8 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         self.redis.set.assert_awaited()
         self.redis.set.assert_any_await(
             "billing:spending_limit:org-1",
-            7000,
-            ex=36000,
+            int_to_scaled_int(7000, 8),
+            ex=BILLING_CACHE_TTL_SECONDS,
         )
 
     async def test_misc_org_error_propagation_paths(self):
