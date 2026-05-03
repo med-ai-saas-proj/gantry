@@ -209,7 +209,6 @@ services:
     volumes:
       - keycloak_data:/opt/keycloak/data
       - ./asset/gantry-realm.json:/opt/keycloak/data/import/gantry-realm.json:ro
-      - ./asset/keycloak-themes:/opt/keycloak/themes
     deploy:
       resources:
         limits:

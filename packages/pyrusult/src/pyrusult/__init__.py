@@ -69,6 +69,11 @@ class _Result(Generic[T, E]):
             return fn(self.value)
         return self
 
+    def flatten(self) -> Result[U, V]:
+        tmp: _Result = self
+        while isinstance(tmp.value, _Result):
+            tmp = tmp.value
+
 
 @dataclass
 class Ok(_Result[T, E]):

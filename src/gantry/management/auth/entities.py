@@ -5,9 +5,11 @@ class UserInfo(TypedDict):
     id: str
     username: str | None
     email: str | None
-    roles: list[str]
-    org_id: str
-    project_ids: list[str]
+    org_uuid: str
+    org_permissions: list[str]
+    project_permissions: dict[
+        str, list[str]
+    ]  # mapping of project_uuid and permissions
 
 
 class AdminInfo(TypedDict):

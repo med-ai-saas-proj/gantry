@@ -3,9 +3,7 @@
 from gantry.keycloak import getKeycloakSettings
 from gantry.management.auth import (
     UserInfo,
-    AuthService,
-    getAuthService,
-    getAuthSettings,
+    getUserInfo,
 )
 from gantry.shared.custom_types.error_exception import RecoverableError
 
@@ -20,7 +18,6 @@ from fastapi import Path, Depends, Security
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
-auth_settings = getAuthSettings()
 keycloak_settings = getKeycloakSettings()
 server_url_str = keycloak_settings.server_url.encoded_string()
 realm_name = keycloak_settings.realm_name
@@ -37,14 +34,6 @@ oauth_2_scheme = OAuth2AuthorizationCodeBearer(
         f"{server_url_str}/realms/{realm_name}/protocol/openid-connect/token"
     ),
 )
-
-
-async def _get_user_info(
-    token: Annotated[str, Security(oauth_2_scheme)],
-    auth_service: Annotated[AuthService, Depends(getAuthService)],
-) -> UserInfo:
-    """Verify the JWT and return ``UserInfo``."""
-    return auth_service.verifyToken(token).unwrap()
 
 
 async def getLimit(
@@ -91,19 +80,6 @@ def _raise_permission_fetch_error(err: Exception):
     return err
 
 
-async def _get_permissions_or_raise(
-    org_service: OrgService,
-    org_id: str,
-    user_id: str,
-) -> list[str]:
-    perms_res = await org_service.getUserPermissions(org_id, user_id)
-    return (
-        perms_res.map(lambda r: r.permissions)
-        .map_err(_raise_permission_fetch_error)
-        .unwrap()
-    )
-
-
 def requiredOrgPermission(permission: OrgPermission):
     """Return a dependency that enforces *permission* for the org.
 
@@ -129,14 +105,9 @@ def requiredOrgPermission(permission: OrgPermission):
     """
 
     async def _dependency(
-        org_id: Annotated[str, Path()],
-        user_info: Annotated[UserInfo, Depends(_get_user_info)],
-        org_service: Annotated[OrgService, Depends(getOrgService)],
+        user_info: Annotated[UserInfo, Depends(getUserInfo)],
     ) -> UserInfo:
-        user_perms = await _get_permissions_or_raise(
-            org_service, org_id, user_info["id"]
-        )
-        if not has_permission(user_perms, permission):
+        if not has_permission(user_info["org_permissions"], permission):
             raise _InsufficientOrgPermission()
         return user_info
 

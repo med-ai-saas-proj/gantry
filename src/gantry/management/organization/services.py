@@ -26,12 +26,6 @@ from .dtos import (
     UserPermissionsResponse,
 )
 from .settings import getOrgSettings
-from .cache_keys import (
-    BILLING_CACHE_TTL_SECONDS,
-    ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
-    organization_rpm_limit_key,
-    billing_org_spending_limit_key,
-)
 from .permissions import OrgPermission, has_permission
 from .repositories import (
     OrgSettingsRepository,
@@ -168,59 +162,17 @@ class OrgService:
         deletion_repo: OrgDeletionRequestRepository,
         session_manager: AsyncSessionManager,
         logger: BoundLogger,
-        redis: Redis | None = None,
     ):
         self.kc = kc_client
         self.settings_repo = settings_repo
         self.deletion_repo = deletion_repo
         self.session_manager = session_manager
         self.logger = logger
-        self.redis = redis
 
     def _computeCancelBefore(self, requested_at: datetime) -> datetime:
         """Compute the deletion cancellation deadline from settings."""
         days = getOrgSettings().deletion_cancel_window_days
         return requested_at + timedelta(days=days)
-
-    async def _cacheOrgRateLimit(
-        self, org_id: str, rate_limit: int | None
-    ) -> None:
-        """Persist the org RPM limit to Redis for fast downstream reads."""
-        if self.redis is None:
-            return
-        try:
-            await self.redis.set(
-                organization_rpm_limit_key(org_id),
-                -1 if rate_limit is None else int(rate_limit),
-                ex=ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
-            )
-        except Exception as exc:
-            self.logger.warning(
-                "organization_rpm_limit_cache_write_failed",
-                org_id=org_id,
-                error=str(exc),
-            )
-
-    async def _cacheOrgSpendingLimit(
-        self, org_id: str, spending_limit: int | None
-    ) -> None:
-        """Persist the org spending limit to the billing Redis key."""
-        if self.redis is None:
-            return
-        try:
-            await self.redis.set(
-                billing_org_spending_limit_key(org_id),
-                -1
-                if spending_limit is None
-                else int_to_scaled_int(spending_limit, 8),
-                ex=BILLING_CACHE_TTL_SECONDS,
-            )
-        except Exception as exc:
-            self.logger.warning(
-                "organization_spending_limit_cache_write_failed",
-                org_id=org_id,
-                error=str(exc),
-            )
 
     async def _ensureOrgExists(
         self, org_id: str
@@ -541,7 +493,6 @@ class OrgService:
                 extra=settings.extra or {},
             )
             await session.commit()
-            await self._cacheOrgRateLimit(org_id, settings.rate_limit)
             return Ok(output)
 
     async def updateSettings(
@@ -572,8 +523,6 @@ class OrgService:
                 extra=settings.extra or {},
             )
             await session.commit()
-            await self._cacheOrgRateLimit(org_id, settings.rate_limit)
-            await self._cacheOrgSpendingLimit(org_id, settings.spending_limit)
             return Ok(output)
 
     # users
@@ -700,7 +649,7 @@ class OrgService:
         invite_res = await self.kc.inviteUser(
             org_id,
             email,
-            client_id=settings.keycloak_service_client_id,
+            # client_id=settings.keycloak_service_client_id,
             redirect_uri=settings.invite_redirect_uri,
         )
         if invite_res.status == ResultStatus.Err:

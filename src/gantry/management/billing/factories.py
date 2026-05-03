@@ -1,5 +1,6 @@
 """Singleton factory for BillingService."""
 
+from gantry.db import getRedisCacheRepo
 from gantry.db.factories import (
     getRedis,
     getSessionManager,
@@ -35,7 +36,7 @@ def getBillingTransactionService() -> TransactionService:
         logger=getLogger(),
         session_manager=getSessionManager(),
         redis=getRedis(),
-        org_settings_repo=OrgSettingsRepository(),
+        org_settings_repo=OrgSettingsRepository(getRedisCacheRepo()),
         project_settings_repo=ProjectSettingsRepository(),
         transaction_repo=TransactionRepository(),
     )

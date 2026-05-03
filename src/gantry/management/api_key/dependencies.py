@@ -6,7 +6,6 @@ from .factories import ApiKeyService, getApiKeyService
 from .permissions import registerPermissions
 
 import json
-import uuid
 from typing import Annotated
 
 from fastapi import Depends, Request, Security
@@ -64,7 +63,7 @@ async def getApiKeyInfo(
     request: Request,
     api_key: Annotated[str, Security(api_key_header)],
     api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
-):
+) -> ApiKeyInfo:
     """Dependency to get API key info without permission checks."""
     user_info = await api_key_service.parseApiKey(api_key)
     api_key_info = user_info.unwrap()
