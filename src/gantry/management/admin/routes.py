@@ -39,7 +39,6 @@ from .dtos import (
     AdminDashboardSummaryResponse,
     AdminUserPermissionUpdateRequest,
     AdminUserOrganizationInfoResponse,
-    AdminUserPermissionSummaryResponse,
 )
 from .factories import AdminService, getAdminService
 

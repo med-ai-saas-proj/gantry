@@ -199,7 +199,6 @@ class AdminService:
             id=user_info["id"],
             username=user_info["username"],
             email=user_info["email"],
-            roles=user_info["roles"],
         )
 
     async def getDashboardSummary(self) -> AdminDashboardSummaryResponse:

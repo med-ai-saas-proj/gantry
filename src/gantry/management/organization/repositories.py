@@ -1,6 +1,6 @@
 """Repositories for Organization Postgres models."""
 
-from gantry.db import Repository
+from gantry.db import Repository, CacheRepository
 
 from .models import (
     OrgSettings,
@@ -17,20 +17,32 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 class OrgSettingsRepository(Repository[OrgSettings, str]):
     """Repository for OrgSettings (keyed by org_id)."""
 
-    def __init__(self):
+    CACHE_KEY = "org:settings:{org_id}"
+
+    def __init__(self, cache_repo: CacheRepository):
+        self.cache_repo = cache_repo
         super().__init__(OrgSettings, OrgSettings.org_id)
+
+    @classmethod
+    def getCacheKey(cls, org_id: str) -> str:
+        return cls.CACHE_KEY.format(org_id=org_id)
 
     async def getOrCreate(
         self, session: AsyncSession, org_id: str
     ) -> OrgSettings:
         """Return existing settings or insert a default row atomically."""
+        key = self.getCacheKey(org_id)
+        if (cached := await self.cache_repo.getCache(key)) is not None:
+            return cached
         insert_stmt = pg_insert(OrgSettings).values(org_id=org_id, extra={})
         stmt = insert_stmt.on_conflict_do_update(
             index_elements=[OrgSettings.org_id],
             set_={"org_id": insert_stmt.excluded.org_id},
         ).returning(OrgSettings)
         res = await session.execute(stmt)
-        return res.scalar_one()
+        res = res.scalar_one()
+        await self.cache_repo.setCache(key, res)
+        return res
 
     async def upsert(
         self,
@@ -61,7 +73,9 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
             .returning(OrgSettings)
         )
         result = await session.execute(stmt)
-        return result.scalar_one()
+        result = result.scalar_one()
+        await self.cache_repo.setCache(self.getCacheKey(org_id), result)
+        return result
 
     async def deleteByOrgId(self, session: AsyncSession, org_id: str) -> bool:
         stmt = (
@@ -70,6 +84,7 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
             .returning(OrgSettings.org_id)
         )
         res = await session.execute(stmt)
+        await self.cache_repo.invalidateCache(self.getCacheKey(org_id))
         return res.scalar_one_or_none() is not None
 
 

@@ -1,6 +1,7 @@
-from gantry.db.factories import getRedis, getSessionManager
+from gantry.db import getRedisCacheRepo
+from gantry.db.factories import getSessionManager
+from gantry.management.project import getProjectRepository
 from gantry.shared.logging.logger import getLogger
-from gantry.management.project.repositories import ProjectRepository
 
 from .services import ApiKeyService
 from .settings import getApiKeysSettings
@@ -10,12 +11,13 @@ from functools import lru_cache
 
 
 @lru_cache(1)
+def getApiKeyRepository():
+    return ApiKeyRepository(getRedisCacheRepo())
+
+
+@lru_cache(1)
 def getApiKeyService():
     """Get singleton ApiKeyService instance."""
-    from gantry.management.billing.factories import (
-        getBillingTransactionService,
-    )
-
     apikeys_settings = getApiKeysSettings()
 
     return ApiKeyService(
@@ -24,9 +26,7 @@ def getApiKeyService():
             "api_key_secret_length": apikeys_settings.secret_length,
         },
         logger=getLogger(),
-        api_key_repo=ApiKeyRepository(),
-        project_repo=ProjectRepository(),
+        api_key_repo=getApiKeyRepository(),
+        project_repo=getProjectRepository(),
         session_manager=getSessionManager(),
-        billing_transaction_service=getBillingTransactionService(),
-        redis=getRedis(),
     )

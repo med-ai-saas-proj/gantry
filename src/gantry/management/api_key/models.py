@@ -1,5 +1,4 @@
-from gantry.db.base import BaseSQLModel
-from gantry.db.utils import WithID, WithCreateUpdateTimestamp
+from gantry.db import WithID, WithUUID, BaseSQLModel, WithCreateUpdateTimestamp
 from gantry.management.project.models import Project
 
 from sqlalchemy import String, Boolean, BigInteger, ForeignKey
@@ -14,12 +13,14 @@ class ApiKeyBaseSQLModel(BaseSQLModel):
     __table_args__ = {"schema": "ApiKey"}
 
 
-class ApiKey(WithCreateUpdateTimestamp, WithID, ApiKeyBaseSQLModel):
+class ApiKey(WithCreateUpdateTimestamp, WithID, WithUUID, ApiKeyBaseSQLModel):
     """Project-scoped API key with dynamic text permissions."""
 
     __tablename__ = "ApiKeys"
 
-    user_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    user_id: Mapped[str] = mapped_column(
+        String(128), nullable=False
+    )  # Created by
     hint: Mapped[str] = mapped_column(String(128), nullable=False)
     hashed_key: Mapped[str] = mapped_column(
         String(128), index=True, unique=True, nullable=False

@@ -9,5 +9,10 @@ from .utils import (
 )
 from .session import AsyncSession, AsyncSessionManager
 from .settings import getDBSettings
-from .factories import getRedis, getAsyncEngine, getSessionManager
-from .repository import Repository
+from .factories import (
+    getRedis,
+    getAsyncEngine,
+    getRedisCacheRepo,
+    getSessionManager,
+)
+from .repositories import Repository, CacheRepository, RedisCacheRepository

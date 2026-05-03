@@ -1,4 +1,4 @@
-from gantry.db import getRedis, getSessionManager
+from gantry.db import getRedis, getRedisCacheRepo, getSessionManager
 from gantry.shared.logging.logger import getLogger
 from gantry.service.file_storage.factories import getFileStorageService
 from gantry.management.project.repositories import ProjectRepository
@@ -18,7 +18,7 @@ def getRagService():
 
     return RagService(
         getSessionManager(),
-        ProjectRepository(),
+        ProjectRepository(getRedisCacheRepo()),
         FileRepository(),
         getRagSettings(),
         getFileStorageService(),

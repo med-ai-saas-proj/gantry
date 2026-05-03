@@ -647,15 +647,13 @@ class KeycloakServiceClient:
         self,
         org_id: str,
         email: str,
-        client_id: str | None = None,
         redirect_uri: str | None = None,
         first_name: str | None = None,
         last_name: str | None = None,
     ) -> Result[bool, KeycloakPossibleError | OrgNotFoundError]:
         path = f"{self._adminBase()}/organizations/{org_id}/members/invite-user"
         form: dict[str, str] = {"email": email}
-        if client_id:
-            form["clientId"] = client_id
+        form["clientId"] = self.service_client_id
         if redirect_uri:
             form["redirectUri"] = redirect_uri
         if first_name:

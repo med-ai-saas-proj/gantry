@@ -28,7 +28,7 @@ class AdminUserInfoResponse(BaseDTO):
     id: str
     username: str | None
     email: str | None
-    roles: list[str]
+    # roles: list[str]
 
 
 class AdminUserOrganizationInfoResponse(BaseDTO):

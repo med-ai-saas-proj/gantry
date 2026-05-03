@@ -1,8 +1,9 @@
 #:schema config-schema.json
 stage = "DEV"
-allowed_origins = "*"
+allowed_origins = ["http://localhost:3000"]
 port = 8000
 internal_port = 9000
+log_level = "DEBUG"
 
 [db]
 timescale_connection_uri = "postgresql+asyncpg://gantry:123456@localhost:5432/gantry"
@@ -16,6 +17,8 @@ secret_length = 32
 [keycloak]
 server_url = "http://localhost:8080/"
 realm_name = "gantry"
+service_client_id = "gantry-backend"
+service_client_secret = "sW4f7NOGqpcNmpstgfYbeBoUigJoA5EX"
 
 [auth]
 client_id = "gantry-frontend"
@@ -47,8 +50,6 @@ s3_presigned_url_expiry_seconds = 3600
 redis_cache_expiry_seconds = 3600
 
 [organization]
-keycloak_service_client_id = "gantry-backend"
-keycloak_service_client_secret = "sW4f7NOGqpcNmpstgfYbeBoUigJoA5EX"
 invite_redirect_uri = "http://localhost:3000"
 deletion_cancel_window_days = 30
 deletion_worker_interval_seconds = 60

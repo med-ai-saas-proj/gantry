@@ -1,7 +1,7 @@
 """API routes for project management."""
 
-from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.auth import UserInfo, getUserInfo
+from gantry.management.organization import OrgPermission, requiredOrgPermission
 
 from .dtos import (
     PaginationQuery,
@@ -19,6 +19,7 @@ from .dtos import (
     ProjectUserPermissionsResponse,
     ProjectPermissionCatalogResponse,
 )
+from .services import ProjectNotFoundError
 from .factories import ProjectService, getProjectService
 from .permissions import ALL_PERMISSIONS, ProjectPermission
 from .dependencies import requiredProjectPermission
@@ -48,6 +49,7 @@ async def get_projects(
 ) -> ProjectListResponse:
     """List joined projects or all org projects depending on the query."""
     if query.organization:
+        await requiredOrgPermission(OrgPermission.PROJECTS_GET_ALL)(user_info)
         result = await project_service.listOrgProjects(
             actor_user_id=user_info["id"],
             organization_id=query.organization,
@@ -97,14 +99,15 @@ async def update_project(
         UserInfo,
         Depends(requiredProjectPermission(ProjectPermission.SETTINGS_WRITE)),
     ],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     input_data: Annotated[UpdateProjectRequest, Body()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectInfoResponse:
     """Update mutable metadata for one project."""
-    _ = user_info
+    if project_uuid not in user_info["project_permissions"]:
+        raise ProjectNotFoundError()
     result = await project_service.updateProject(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         name=input_data.name,
         description=input_data.description,
     )

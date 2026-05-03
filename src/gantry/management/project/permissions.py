@@ -9,7 +9,7 @@ class ProjectPermission(str, Enum):
 
     OWNER = "project.owner"
 
-    PROJECTS_GET_ALL = "projects.get_all"
+    MEMBER = "project.member"
 
     USERS_ADD = "project.users.add"
     USERS_GET_ALL = "project.users.get_all"

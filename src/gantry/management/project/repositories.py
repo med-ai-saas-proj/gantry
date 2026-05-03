@@ -1,12 +1,14 @@
 """Repositories for Project module models."""
 
-from gantry.db.repository import Repository
+from gantry.db import Repository
+from gantry.db.repositories import CacheRepository
 from gantry.shared.utils.uuid_utils import uuid7
 
 from .models import Project, ProjectMember, ProjectSettings
 
 from uuid import UUID
 
+from numpy import isin
 from sqlalchemy import func, delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -15,8 +17,19 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 class ProjectRepository(Repository[Project, int]):
     """Repository for Project table."""
 
-    def __init__(self):
+    CACHE_KEY = "project:{project_id}"
+
+    def __init__(self, cache_repo: CacheRepository):
+        self.cache_repo = cache_repo
         super().__init__(Project, Project.id)
+
+    @classmethod
+    def getCacheKey(cls, project_uuid: UUID | str):
+        return cls.CACHE_KEY.format(
+            project_id=project_uuid
+            if isinstance(project_uuid, str)
+            else project_uuid.hex
+        )
 
     async def create(
         self,
@@ -36,7 +49,9 @@ class ProjectRepository(Repository[Project, int]):
             .returning(Project)
         )
         res = await session.execute(stmt)
-        return res.scalar_one()
+        res = res.scalar_one()
+        await self.cache_repo.setCache(self.getCacheKey(res.uuid), res)
+        return res
 
     async def getByUuid(
         self, session: AsyncSession, project_uuid: str
@@ -51,28 +66,43 @@ class ProjectRepository(Repository[Project, int]):
             .where(Project.uuid == parsed)
             .limit(1)
         )
-        res = await session.execute(stmt)
-        return res.scalar_one_or_none()
+        # res = await session.execute(stmt)
+        # return res.scalar_one_or_none()
+        return (
+            await self.cache_repo.getCacheOrCall(
+                self.getCacheKey(parsed),
+                session.execute,
+                stmt,
+            )
+        ).scalar_one_or_none()
 
-    async def updateById(
+    async def updateByUuid(
         self,
         session: AsyncSession,
-        project_id: int,
+        project_uuid: str,
         *,
         name: str,
         description: str | None,
     ) -> Project | None:
         stmt = (
             update(Project)
-            .where(Project.id == project_id)
+            .where(Project.uuid == project_uuid, Project.is_archived == False)
             .values(
                 name=name,
                 description=description,
             )
             .returning(Project)
         )
-        res = await session.execute(stmt)
-        return res.scalar_one_or_none()
+        # res = await session.execute(stmt)
+        # return res.scalar_one_or_none()
+
+        return (
+            await self.cache_repo.getCacheOrCall(
+                self.getCacheKey(project_uuid),
+                session.execute,
+                stmt,
+            )
+        ).scalar_one_or_none()
 
     async def listByOrg(
         self,
@@ -85,14 +115,25 @@ class ProjectRepository(Repository[Project, int]):
             .where(Project.organization_id == organization_id)
             .order_by(Project.created_at.desc())
         )
-        res = await session.execute(stmt)
-        return list(res.scalars().all())
+        # res = await session.execute(stmt)
+        # return list(res.scalars().all())
+        return list(
+            (
+                await self.cache_repo.getCacheOrCall(
+                    self.getCacheKey(organization_id),
+                    session.execute,
+                    stmt,
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     async def listByMember(
         self,
         session: AsyncSession,
         user_id: str,
-        organization_id: str | None = None,
+        organization_id: str | None,
     ) -> list[Project]:
         stmt = (
             select(Project)
@@ -104,10 +145,21 @@ class ProjectRepository(Repository[Project, int]):
             .where(ProjectMember.user_id == user_id)
             .order_by(Project.created_at.desc())
         )
-        if organization_id:
-            stmt = stmt.where(Project.organization_id == organization_id)
-        res = await session.execute(stmt)
-        return list(res.scalars().all())
+        if organization_id is not None:
+            stmt.where(Project.organization_id == organization_id)
+        # res = await session.execute(stmt)
+        # return list(res.scalars().all())
+        return list(
+            (
+                await self.cache_repo.getCacheOrCall(
+                    self.getCacheKey(user_id),
+                    session.execute,
+                    stmt,
+                )
+            )
+            .scalars()
+            .all()
+        )
 
     async def countAll(self, session: AsyncSession) -> int:
         """Return the total number of projects."""
@@ -119,8 +171,19 @@ class ProjectRepository(Repository[Project, int]):
 class ProjectMemberRepository(Repository[ProjectMember, int]):
     """Repository for project memberships."""
 
-    def __init__(self):
+    CACHE_KEY = "project:memberships:{project_uuid}"
+
+    def __init__(self, cache_repo: CacheRepository):
+        self.cache_repo = cache_repo
         super().__init__(ProjectMember, ProjectMember.project_id)
+
+    @classmethod
+    def getCacheKey(cls, project_uuid: UUID | str):
+        return cls.CACHE_KEY.format(
+            project_id=project_uuid
+            if isinstance(project_uuid, str)
+            else project_uuid.hex
+        )
 
     async def getMembership(
         self,
@@ -137,6 +200,13 @@ class ProjectMemberRepository(Repository[ProjectMember, int]):
         )
         res = await session.execute(stmt)
         return res.scalar_one_or_none()
+        # return (
+        #     await self.cache_repo.getCacheOrCall(
+        #         self.getCacheKey(project_uuid),
+        #         session.execute,
+        #         stmt,
+        #     )
+        # ).scalar_one_or_none()
 
     async def upsertMembership(
         self,
@@ -222,8 +292,17 @@ class ProjectMemberRepository(Repository[ProjectMember, int]):
 class ProjectSettingsRepository(Repository[ProjectSettings, int]):
     """Repository for project settings."""
 
-    def __init__(self):
+    CACHE_KEY = "project:settings:{project_uuid}"
+
+    def __init__(self, cache_repo: CacheRepository):
+        self.cache_repo = cache_repo
         super().__init__(ProjectSettings, ProjectSettings.project_id)
+
+    @classmethod
+    def getCacheKey(cls, project_uuid: UUID | str) -> str:
+        return cls.CACHE_KEY.format(
+            project_uuid if isinstance(project_uuid, str) else project_uuid.hex
+        )
 
     async def getOrCreate(
         self,
@@ -238,6 +317,38 @@ class ProjectSettingsRepository(Repository[ProjectSettings, int]):
         ).returning(ProjectSettings)
         res = await session.execute(stmt)
         return res.scalar_one()
+
+    async def getOrCreateByUuid(
+        self,
+        session: AsyncSession,
+        project_uuid: str,
+    ) -> ProjectSettings:
+        """Return existing settings or insert a default row atomically."""
+
+        _project_uuid = UUID(project_uuid)
+        cache_key = self.getCacheKey(project_uuid)
+        stmt = (
+            select(ProjectSettings)
+            .join(Project, Project.id == ProjectSettings.project_id)
+            .where(Project.uuid == _project_uuid)
+        )
+        res = (
+            await self.cache_repo.getCacheOrCall(
+                cache_key, session.execute, stmt
+            )
+        ).scalar_one_or_none()
+        if res is None:
+            stmt = (
+                insert(ProjectSettings)
+                .from_select(
+                    [ProjectSettings.project_id],
+                    select(Project).where(Project.uuid == _project_uuid),
+                )
+                .returning(ProjectSettings)
+            )
+            res = (await session.execute(stmt)).scalar_one()
+            await self.cache_repo.setCache(self.getCacheKey(project_uuid), res)
+        return res
 
     async def upsert(
         self,
