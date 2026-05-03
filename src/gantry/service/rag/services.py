@@ -992,11 +992,10 @@ class RagService:
                 ]
 
             if resolved_file_ids is not None:
+                # If filters were applied but no files matched, return empty result early to avoid unnecessary distance calculations
+                if len(resolved_file_ids) == 0:
+                    return Ok([])
                 stmt = stmt.where(DynamicBucket.file_id.in_(resolved_file_ids))
-
-            # If filters were applied but no files matched, return empty result early to avoid unnecessary distance calculations
-            if len(resolved_file_ids or []) == 0:
-                return Ok([])
 
             stmt = stmt.order_by(distance_expr).limit(top_k)
             result = await session.execute(stmt.params(embedding=embedding))
