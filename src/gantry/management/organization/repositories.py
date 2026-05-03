@@ -9,6 +9,7 @@ from .models import (
 
 from datetime import datetime
 
+from pyrusult import ResultStatus
 from sqlalchemy import func, delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -32,8 +33,10 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
     ) -> OrgSettings:
         """Return existing settings or insert a default row atomically."""
         key = self.getCacheKey(org_id)
-        if (cached := await self.cache_repo.getCache(key)) is not None:
-            return cached
+        if (
+            cached := await self.cache_repo.getCached(key)
+        ) and cached.status == ResultStatus.Ok:
+            return cached.value
         insert_stmt = pg_insert(OrgSettings).values(org_id=org_id, extra={})
         stmt = insert_stmt.on_conflict_do_update(
             index_elements=[OrgSettings.org_id],
@@ -84,7 +87,7 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
             .returning(OrgSettings.org_id)
         )
         res = await session.execute(stmt)
-        await self.cache_repo.invalidateCache(self.getCacheKey(org_id))
+        await self.cache_repo.invalidateCached(self.getCacheKey(org_id))
         return res.scalar_one_or_none() is not None
 
 

@@ -102,7 +102,7 @@ class ApiKeyRepository(Repository[ApiKey, int]):
                 ),
             )
 
-        return await self.cache_repo.getCacheOrCall(
+        return await self.cache_repo.getCachedOrCall(
             f"api_keys:context_record:{hashed_key}", _inner
         )
 

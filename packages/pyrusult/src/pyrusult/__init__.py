@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Generic, Literal, TypeVar, Callable, TypeAlias
+from typing import TypeIs, Generic, Literal, TypeVar, Callable, TypeAlias
 from dataclasses import dataclass
 
 

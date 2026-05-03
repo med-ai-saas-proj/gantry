@@ -33,7 +33,6 @@ import secrets
 from typing import Callable, Sequence, TypedDict, NotRequired
 
 from pyrusult import Ok, Err, Result, ResultStatus
-from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 
 
