@@ -2,8 +2,8 @@ from gantry.management.billing.dtos import (
     InvoiceInfoResponse,
     InvoiceDetailInfoResponse,
 )
-from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.auth.entities import UserInfo, AdminInfo
+from gantry.management.auth.dependencies import getAdminInfo
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
@@ -27,8 +27,7 @@ from fastapi import Depends
 )
 async def mark_invoice_as_paid(
     invoice_uid: UUID,
-    # TODO: use admin dependency here
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ):
     (
@@ -43,8 +42,7 @@ async def mark_invoice_as_paid(
 )
 async def mark_invoice_as_refunded(
     invoice_uid: UUID,
-    # TODO: use admin dependency here
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ):
     (
@@ -59,8 +57,7 @@ async def mark_invoice_as_refunded(
     description="List invoices, with filters for project_id, billing_period, payment_status, etc.",
 )
 async def list_invoices(
-    # TODO: use admin dependency here
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
     org_ids: list[str] | None = None,
     from_date: datetime | None = None,  # ISO date string
@@ -93,8 +90,7 @@ async def list_invoices(
 )
 async def get_invoice_details(
     invoice_uid: UUID,
-    # TODO: use admin dependency here
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[InvoiceDetailInfoResponse]:
     res = (

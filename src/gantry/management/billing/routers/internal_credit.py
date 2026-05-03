@@ -1,5 +1,5 @@
-from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.auth.entities import UserInfo, AdminInfo
+from gantry.management.auth.dependencies import getAdminInfo
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
@@ -25,8 +25,7 @@ from fastapi import Body, Depends
     description="Add credits to an organization or project (e.g. from a promotion, refund, etc.).",
 )
 async def add_credits(
-    # TODO: use admin dependency here
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     credit_service: Annotated[CreditService, Depends(getCreditService)],
     body: Annotated[AddCreditRequest, Body()],
 ) -> ObjectResponse[CreditInfoResponse]:
@@ -45,8 +44,7 @@ async def add_credits(
     description="Get available credits for the organization",
 )
 async def get_available_credits(
-    # TODO: use admin dependency here
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     org_id: str,
     credit_service: Annotated[CreditService, Depends(getCreditService)],
 ) -> ObjectResponse[CreditInfoResponse]:
@@ -61,8 +59,7 @@ async def get_available_credits(
     description="List credit transactions (e.g. when credits were added from promotions, refunds, or used to offset an invoice).",
 )
 async def list_credit_transactions(
-    # TODO: use admin dependency here
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     credit_service: Annotated[CreditService, Depends(getCreditService)],
     org_id: str,
     offset: int = 0,
