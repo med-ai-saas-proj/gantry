@@ -27,13 +27,13 @@ async def get_aggregate_by_projects(
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
-    project_uids: list[UUID] | None = Query(
+    project_uuids: list[UUID] | None = Query(
         None
-    ),  # filter by project_uid or whole organization
+    ),  # filter by project_uuid or whole organization
 ) -> ListResponse[BillingAggregateReport]:
     res = (
         await billing_service.get_aggregate_by_projects(
-            project_uids=project_uids,
+            project_uuids=project_uuids,
             org_id=user_info["org_id"],
             start_time=period_start,
             end_time=period_end,

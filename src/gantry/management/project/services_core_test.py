@@ -394,11 +394,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Update project should persist new name and description."""
         # Arrange
         service = self._make_service()
-        active_info = SimpleNamespace(archived=False)
-        service._getProjectOrErr = AsyncMock(
-            return_value=Ok((10, "org-1", active_info))
-        )
-        service.project_repo.updateById = AsyncMock(
+        service.project_repo.updateByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 id=10,
                 uuid="proj-1",
@@ -418,20 +414,17 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         self.session_manager.session.commit.assert_awaited_once()
 
     async def test_update_project_rejects_archived_project(self):
-        """Archived projects should not allow metadata updates."""
+        """Archived project updates surface as not found from the repository."""
         # Arrange
         service = self._make_service()
-        archived_info = SimpleNamespace(archived=True)
-        service._getProjectOrErr = AsyncMock(
-            return_value=Ok((10, "org-1", archived_info))
-        )
+        service.project_repo.updateByUuid = AsyncMock(return_value=None)
 
         # Act
         res = await service.updateProject("proj-1", "New", "new")
 
         # Assert
         self.assertTrue(res.status == ResultStatus.Err)
-        self.assertIsInstance(res.err(), ProjectArchivedError)
+        self.assertIsInstance(res.err(), ProjectNotFoundError)
 
     async def test_list_user_projects_org_membership_error(self):
         """List by organization should fail if actor not in org."""
@@ -539,7 +532,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
 
         # Act
         true_res = await service._hasOrgWideProjectPermission(
-            "u1", "org-1", ProjectPermission.PROJECTS_GET_ALL
+            "u1", "org-1", ProjectPermission.SETTINGS_READ
         )
 
         # Assert
@@ -556,7 +549,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
 
         # Act
         false_res = await service._hasOrgWideProjectPermission(
-            "u1", "org-1", ProjectPermission.PROJECTS_GET_ALL
+            "u1", "org-1", ProjectPermission.SETTINGS_WRITE
         )
 
         # Assert
@@ -576,14 +569,17 @@ class TestProjectServiceCore(BaseProjectServiceTest):
             ]
         )
         service._getPermissionsFromAttrs = AsyncMock(
-            side_effect=[Ok([]), Ok(["projects.get_all"])]
+            side_effect=[
+                Ok([]),
+                Ok([ProjectPermission.SETTINGS_READ.value]),
+            ]
         )
 
         # Act
         res = await service._hasOrgWideProjectPermission(
             "actor",
             "org-1",
-            ProjectPermission.PROJECTS_GET_ALL,
+            ProjectPermission.SETTINGS_READ,
         )
 
         # Assert
@@ -598,11 +594,9 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
     async def test_list_org_projects_success(self):
-        """Org project list should return DTO when actor has permission."""
+        """Org project list should return DTO rows from the repository."""
         # Arrange
         service = self._make_service()
-        service._isOrgOwner = AsyncMock(return_value=Ok(False))
-        service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(True))
         service.project_repo.listByOrg = AsyncMock(
             return_value=[
                 SimpleNamespace(
@@ -621,52 +615,12 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         # Assert
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().total, 1)
-
-    async def test_list_org_projects_org_owner_can_view_all(self):
-        """Organization owner should list every project in the organization."""
-        # Arrange
-        service = self._make_service()
-        service._isOrgOwner = AsyncMock(return_value=Ok(True))
-        service._hasOrgWideProjectPermission = AsyncMock()
-        service.project_repo.listByOrg = AsyncMock(
-            return_value=[
-                SimpleNamespace(
-                    uuid="p1",
-                    name="P1",
-                    description=None,
-                    organization_id="org-1",
-                    is_archived=False,
-                )
-            ]
-        )
-
-        # Act
-        res = await service.listOrgProjects("u-org-owner", "org-1")
-
-        # Assert
-        self.assertTrue(res.status == ResultStatus.Ok)
-        self.assertEqual(res.unwrap().total, 1)
-        service._hasOrgWideProjectPermission.assert_not_awaited()
-
-    async def test_list_org_projects_denied_without_org_wide_permission(self):
-        """Org project listing should fail without projects.get_all."""
-        # Arrange
-        service = self._make_service()
-        service._isOrgOwner = AsyncMock(return_value=Ok(False))
-        service._hasOrgWideProjectPermission = AsyncMock(return_value=Ok(False))
-
-        # Act
-        res = await service.listOrgProjects("u1", "org-1")
-
-        # Assert
-        self.assertTrue(res.status == ResultStatus.Err)
-        self.assertIsInstance(res.err(), InsufficientProjectPermissionError)
 
     async def test_get_project_returns_project_for_org_owner(self):
         """Organization owner should read any project in the same org."""
         service = self._make_service()
         project_info = SimpleNamespace(
-            id="proj-1",
+            project_uuid="proj-1",
             name="P1",
             description=None,
             organization_id="org-1",
@@ -680,13 +634,13 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.getProject("proj-1", "u-owner")
 
         self.assertTrue(res.status == ResultStatus.Ok)
-        self.assertEqual(res.unwrap().id, "proj-1")
+        self.assertEqual(res.unwrap().project_uuid, "proj-1")
 
     async def test_get_project_returns_project_for_member(self):
         """Project member should read the project metadata."""
         service = self._make_service()
         project_info = SimpleNamespace(
-            id="proj-1",
+            project_uuid="proj-1",
             name="P1",
             description=None,
             organization_id="org-1",
@@ -703,13 +657,13 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         res = await service.getProject("proj-1", "u1")
 
         self.assertTrue(res.status == ResultStatus.Ok)
-        self.assertEqual(res.unwrap().id, "proj-1")
+        self.assertEqual(res.unwrap().project_uuid, "proj-1")
 
     async def test_get_project_denies_non_member_non_owner(self):
         """Users outside the project should not read project metadata."""
         service = self._make_service()
         project_info = SimpleNamespace(
-            id="proj-1",
+            project_uuid="proj-1",
             name="P1",
             description=None,
             organization_id="org-1",

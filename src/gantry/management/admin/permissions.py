@@ -36,19 +36,19 @@ def normalize_string_list(raw: Any) -> list[str]:
 def build_project_permission_summary(
     attrs: dict[str, Any],
 ) -> list[AdminUserProjectPermissionResponse]:
-    """Group project permissions by project uid."""
+    """Group project permissions by project uuid."""
     grouped = normalize_project_permission_map(
         attrs.get(PROJECT_PERMISSIONS_ATTR)
     )
     return [
         AdminUserProjectPermissionResponse(
-            project_id=project_uid,
+            id=project_uuid,
             permissions=sorted(permissions),
             effective_permissions=sorted(
                 get_effective_project_permissions(sorted(permissions))
             ),
         )
-        for project_uid, permissions in sorted(grouped.items())
+        for project_uuid, permissions in sorted(grouped.items())
     ]
 
 

@@ -7,182 +7,77 @@ from pyrusult import Ok, Err
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.auth.services import (
-    InsufficientPermissionsError,
-    MissingOrganizationClaimError,
-)
+from gantry.management.auth.services import MissingOrganizationClaimError
 from gantry.management.auth.dependencies import (
     MissingOrganizationContextError,
-    getUserInfo,
     _getUserInfo,
-    getAdminInfo,
     getUserOrgId,
     _getAdminInfo,
+    getUserOrgUuid,
     requireUserOrgId,
+    requireUserOrgUuid,
 )
 
 
 class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
-    async def test_get_user_info_resolves_claim_org_id_from_memberships(self):
+    async def test_get_user_info_unwraps_verified_token(self):
         auth_service = Mock()
-        auth_service.verifyToken.return_value = Ok(
-            {
-                "id": "u1",
-                "username": "alice",
-                "email": "a@test",
-                "roles": ["proj-1:project.owner"],
-                "org_id": "11111111-1111-1111-1111-111111111111",
-                "project_ids": ["proj-1"],
-            }
-        )
-        kc_org_client = Mock()
-        kc_org_client.getMemberOrganizations = AsyncMock(
+        auth_service.verifyToken = AsyncMock(
             return_value=Ok(
-                [
-                    {
-                        "id": "11111111-1111-1111-1111-111111111111",
-                        "name": "org-name",
-                        "alias": "org-alias",
-                    }
-                ]
+                {
+                    "id": "u1",
+                    "username": "alice",
+                    "email": "a@test",
+                    "org_uuid": "org-1",
+                    "org_permissions": ["organization.settings.read"],
+                    "project_permissions": {"proj-1": ["project.owner"]},
+                }
             )
         )
 
-        user_info = await _getUserInfo(
-            "token",
-            auth_service,
-            kc_org_client,
-        )
+        user_info = await _getUserInfo("token", auth_service)
 
+        self.assertEqual(user_info["org_uuid"], "org-1")
         self.assertEqual(
-            user_info["org_id"], "11111111-1111-1111-1111-111111111111"
+            user_info["project_permissions"],
+            {"proj-1": ["project.owner"]},
         )
-        self.assertEqual(user_info["project_ids"], ["proj-1"])
-        kc_org_client.getMemberOrganizations.assert_awaited_once_with("u1")
 
-    async def test_get_user_info_resolves_org_name_claim_to_org_id(self):
+    async def test_get_user_info_propagates_missing_organization_claim(self):
         auth_service = Mock()
-        auth_service.verifyToken.return_value = Ok(
-            {
-                "id": "u1",
-                "username": "alice",
-                "email": "a@test",
-                "roles": [],
-                "org_id": "org-name",
-                "project_ids": [],
-            }
+        auth_service.verifyToken = AsyncMock(
+            return_value=Err(MissingOrganizationClaimError())
         )
-        kc_org_client = Mock()
-        kc_org_client.getMemberOrganizations = AsyncMock(
-            return_value=Ok(
-                [{"id": "org-1", "name": "org-name", "alias": "org-alias"}]
-            )
-        )
-
-        user_info = await _getUserInfo(
-            "token",
-            auth_service,
-            kc_org_client,
-        )
-
-        self.assertEqual(user_info["org_id"], "org-1")
-
-    async def test_get_user_info_rejects_regular_user_without_org(self):
-        auth_service = Mock()
-        auth_service.verifyToken.return_value = Err(
-            MissingOrganizationClaimError()
-        )
-        kc_org_client = Mock()
 
         with self.assertRaises(MissingOrganizationClaimError):
-            await _getUserInfo(
-                "token",
-                auth_service,
-                kc_org_client,
-            )
+            await _getUserInfo("token", auth_service)
 
-    async def test_get_user_info_keeps_project_ids_from_verify_token(
-        self,
-    ):
+    async def test_get_admin_info_unwraps_admin_token(self):
         auth_service = Mock()
-        auth_service.verifyToken.return_value = Ok(
-            {
-                "id": "u1",
-                "username": "alice",
-                "email": "a@test",
-                "roles": [
-                    "proj-1:project.settings.read",
-                    "proj-2:project.owner",
-                ],
-                "org_id": "org-1",
-                "project_ids": ["proj-1", "proj-2"],
-            }
-        )
-        kc_org_client = Mock()
-        kc_org_client.getMemberOrganizations = AsyncMock(
-            return_value=Ok([{"id": "org-1", "name": "org-name"}])
-        )
-
-        user_info = await _getUserInfo(
-            "token",
-            auth_service,
-            kc_org_client,
-        )
-
-        self.assertEqual(user_info["project_ids"], ["proj-1", "proj-2"])
-
-    async def test_get_admin_user_info_requires_admin_role(self):
-        auth_service = Mock()
-        auth_service.verifyToken.return_value = Ok(
+        auth_service.verifyTokenAdmin.return_value = Ok(
             {
                 "id": "admin-1",
                 "username": "admin",
                 "email": "admin@test",
-                "roles": ["ADMIN"],
-                "org_id": "",
-                "project_ids": [],
             }
         )
-        auth_service.checkAdminRole.return_value = Ok(None)
 
         user_info = await _getAdminInfo("token", auth_service)
 
         self.assertEqual(user_info["id"], "admin-1")
-        auth_service.checkAdminRole.assert_called_once_with(user_info)
 
-    async def test_get_admin_user_info_rejects_missing_admin_role(self):
-        auth_service = Mock()
-        auth_service.verifyToken.return_value = Ok(
-            {
-                "id": "u1",
-                "username": "alice",
-                "email": "a@test",
-                "roles": [],
-                "org_id": "",
-                "project_ids": [],
-            }
-        )
-        auth_service.checkAdminRole.side_effect = InsufficientPermissionsError(
-            ["ADMIN"]
-        )
-
-        with self.assertRaises(InsufficientPermissionsError):
-            await _getAdminInfo("token", auth_service)
-
-    async def test_get_user_org_id_and_require_user_org_id(self):
-        self.assertEqual(
-            (
-                await getUserOrgId(
-                    {
-                        "id": "u1",
-                        "roles": [],
-                        "org_id": "org-1",
-                        "project_ids": [],
-                    }
-                )
-            ),
-            "org-1",
-        )
+    async def test_get_user_org_uuid_and_aliases(self):
+        user_info = {
+            "id": "u1",
+            "username": "alice",
+            "email": "a@test",
+            "org_uuid": "org-1",
+            "org_permissions": [],
+            "project_permissions": {},
+        }
+        self.assertEqual(await getUserOrgUuid(user_info), "org-1")
+        self.assertEqual(await getUserOrgId(user_info), "org-1")
+        self.assertEqual(await requireUserOrgUuid("org-1"), "org-1")
         self.assertEqual(await requireUserOrgId("org-1"), "org-1")
         with self.assertRaises(MissingOrganizationContextError):
-            await requireUserOrgId("")
+            await requireUserOrgUuid("")

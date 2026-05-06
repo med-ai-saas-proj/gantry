@@ -29,7 +29,7 @@ class BillingAggregateQueryService:
 
     async def get_aggregate_by_projects(
         self,
-        project_uids: list[UUID] | None,
+        project_uuids: list[UUID] | None,
         org_id: str,
         start_time: datetime,
         end_time: datetime | None,
@@ -37,22 +37,24 @@ class BillingAggregateQueryService:
         period_scale: int,
     ) -> Result[Sequence[BillingAggregateReport], ProjectNotFoundError]:
         """Fetch the current total_amount for the given project/org/period."""
-        if project_uids is not None and len(project_uids) > 0:
+        if project_uuids is not None and len(project_uuids) > 0:
             async with self.session_manager.get_session() as session:
                 projs_info_res = await session.execute(
                     select(Project.id, Project.uuid).where(
-                        Project.uuid.in_(project_uids),
+                        Project.uuid.in_(project_uuids),
                         Project.organization_id == org_id,
                     )
                 )
                 projs_info = {row.uuid: row.id for row in projs_info_res.all()}
                 project_ids = list(projs_info.values())
-                existed_project_uids = set(projs_info.keys())
-                missing_project_uids = set(project_uids) - existed_project_uids
-                if missing_project_uids:
+                existed_project_uuids = set(projs_info.keys())
+                missing_project_uuids = (
+                    set(project_uuids) - existed_project_uuids
+                )
+                if missing_project_uuids:
                     return Err(
                         ProjectNotFoundError(
-                            message=f"Project UUIDs not found: {', '.join(str(uid) for uid in missing_project_uids)}"
+                            message=f"Project UUIDs not found: {', '.join(str(project_uuid) for project_uuid in missing_project_uuids)}"
                         )
                     )
         else:

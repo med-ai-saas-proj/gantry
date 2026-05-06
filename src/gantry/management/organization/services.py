@@ -37,7 +37,6 @@ from typing import Any
 from datetime import UTC, datetime, timedelta
 
 from pyrusult import Ok, Err, Result, ResultStatus
-from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 
 
@@ -320,7 +319,7 @@ class OrgService:
             if isinstance(owner_id_res.err(), OwnerNotFoundError):
                 return Ok(
                     OrgInfoResponse(
-                        id=str(org.get("id") or org_id),
+                        org_id=str(org.get("id") or org_id),
                         name=name,
                         owner_id=None,
                     )
@@ -328,7 +327,7 @@ class OrgService:
             return owner_id_res.into()
         return Ok(
             OrgInfoResponse(
-                id=str(org.get("id") or org_id),
+                org_id=str(org.get("id") or org_id),
                 name=name,
                 owner_id=owner_id_res.unwrap(),
             )
@@ -361,7 +360,7 @@ class OrgService:
 
             return Ok(
                 DeleteRequestResponse(
-                    org_id=org_id,
+                    id=org_id,
                     requested_at=requested_at_dt.isoformat(),
                     cancel_before=cancel_before_dt.isoformat(),
                 )
@@ -457,7 +456,7 @@ class OrgService:
                 total=len(orgs),
                 results=[
                     OrgInfoResponse(
-                        id=str(org.get("id") or ""),
+                        org_id=str(org.get("id") or ""),
                         name=str(org.get("name") or org.get("alias") or ""),
                         owner_id=None,
                     )
@@ -498,7 +497,13 @@ class OrgService:
             if attr_res.status == ResultStatus.Err:
                 return attr_res.into()
 
-        return Ok(OrgInfoResponse(id=org_id, name=name, owner_id=owner_id))
+        return Ok(
+            OrgInfoResponse(
+                org_id=org_id,
+                name=name,
+                owner_id=owner_id,
+            )
+        )
 
     async def updateOrgInfo(
         self,
@@ -535,7 +540,7 @@ class OrgService:
 
         return Ok(
             OrgInfoResponse(
-                id=org_id,
+                org_id=org_id,
                 name=name,
                 owner_id=owner_id,
             )
@@ -558,8 +563,6 @@ class OrgService:
                 extra=settings.extra or {},
             )
             await session.commit()
-            await self._cacheOrgRateLimit(org_id, settings.rate_limit)
-            await self._cacheOrgSpendingLimit(org_id, settings.spending_limit)
             return Ok(output)
 
     async def updateSettings(

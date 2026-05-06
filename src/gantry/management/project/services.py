@@ -166,7 +166,7 @@ class ProjectService:
                     project.id,
                     project.organization_id,
                     ProjectInfoResponse(
-                        id=str(project.uuid),
+                        project_uuid=str(project.uuid),
                         name=project.name,
                         description=project.description,
                         organization_id=project.organization_id,
@@ -403,7 +403,7 @@ class ProjectService:
                     total=len(projects),
                     results=[
                         ProjectInfoResponse(
-                            id=str(p.uuid),
+                            project_uuid=str(p.uuid),
                             name=p.name,
                             description=p.description,
                             organization_id=p.organization_id,
@@ -439,7 +439,7 @@ class ProjectService:
                         total=len(projects),
                         results=[
                             ProjectInfoResponse(
-                                id=str(p.uuid),
+                                project_uuid=str(p.uuid),
                                 name=p.name,
                                 description=p.description,
                                 organization_id=p.organization_id,
@@ -495,7 +495,7 @@ class ProjectService:
                     total=len(projects),
                     results=[
                         ProjectInfoResponse(
-                            id=str(p.uuid),
+                            project_uuid=str(p.uuid),
                             name=p.name,
                             description=p.description,
                             organization_id=p.organization_id,
@@ -551,7 +551,7 @@ class ProjectService:
             if set_res.status == ResultStatus.Err:
                 return set_res.into()
             output = ProjectInfoResponse(
-                id=str(project.uuid),
+                project_uuid=str(project.uuid),
                 name=project.name,
                 description=project.description,
                 organization_id=project.organization_id,
@@ -610,7 +610,7 @@ class ProjectService:
             await session.commit()
             return Ok(
                 ProjectInfoResponse(
-                    id=str(updated.uuid),
+                    project_uuid=str(updated.uuid),
                     name=updated.name,
                     description=updated.description,
                     organization_id=updated.organization_id,
@@ -966,7 +966,7 @@ class ProjectService:
             project.is_archived = archived
             await session.flush()
             output = ProjectArchiveResponse(
-                project_id=str(project.uuid),
+                id=str(project.uuid),
                 archived=project.is_archived,
             )
             await session.commit()

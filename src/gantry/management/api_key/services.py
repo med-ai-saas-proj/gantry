@@ -29,10 +29,9 @@ from .repositories import ApiKeyRepository
 import hmac
 import uuid
 import secrets
-from typing import Any, Callable, Protocol, Sequence, TypedDict, NotRequired
+from typing import Callable, Sequence, TypedDict, NotRequired
 
 from pyrusult import Ok, Err, Result, ResultStatus
-from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 
 
@@ -119,16 +118,6 @@ class ApiKeyServiceConfig(TypedDict):
     api_key_info_cache_ttl_seconds: NotRequired[int]
 
 
-class BillingSpendingLimitReader(Protocol):
-    """Minimal contract needed from the billing integration."""
-
-    async def getSpendingLimits(
-        self,
-        org_id: str,
-        project_id: int,
-    ) -> Any: ...
-
-
 class ApiKeyService:
     """Coordinate project-scoped API key CRUD and verification."""
 
@@ -156,7 +145,6 @@ class ApiKeyService:
         self.project_repo = project_repo
         self.session_manager = session_manager
         self.default_org_rate_limit = getOrgSettings().default_rate_limit
-        self.billing_transaction_service = billing_transaction_service
 
     def _createApiKeySecret(self) -> str:
         return secrets.token_urlsafe(self.api_key_secret_length)
@@ -236,15 +224,18 @@ class ApiKeyService:
 
     @staticmethod
     def _toApiKeyInfo(
-        api_key_uuid: str,
         context: ApiKeyContextRecord,
     ) -> ApiKeyInfo:
         return ApiKeyInfo(
             {
-                "api_key_uuid": api_key_uuid,
+                "api_key_id": context["api_key_id"],
+                "api_key_uuid": context["api_key_uuid"],
+                "project_id": context["project_id"],
                 "user_uuid": context["user_uuid"],
+                "org_id": context["org_id"],
                 "project_uuid": context["project_uuid"],
                 "organization_uuid": context["organization_uuid"],
+                "hashed_key": context["hashed_key"],
                 "permissions": list(context["permissions"]),
                 "rpm_limit_organization": context["rpm_limit_organization"],
                 "rpm_limit_project": context["rpm_limit_project"],
@@ -258,7 +249,8 @@ class ApiKeyService:
     def _snapshotApiKey(self, api_key: ApiKey) -> dict[str, object]:
         """Detach the fields needed outside the ORM session boundary."""
         return {
-            "id": api_key.id,
+            "api_key_id": api_key.id,
+            "api_key_uuid": str(api_key.uuid),
             "project_id": api_key.project_id,
             "name": api_key.name,
             "description": api_key.description,
@@ -295,11 +287,16 @@ class ApiKeyService:
             return Ok(str(project.uuid))
 
     def _toResponse(
-        self, api_key: dict[str, object], project_uuid: str
+        self,
+        api_key: dict[str, object],
+        project_id: int,
+        project_uuid: str,
     ) -> ApiKeyResponse:
         return ApiKeyResponse(
-            id=int(api_key["api_key_id"]),
-            project_id=project_uuid,
+            api_key_id=int(api_key["api_key_id"]),
+            api_key_uuid=str(api_key["api_key_uuid"]),
+            project_id=project_id,
+            project_uuid=project_uuid,
             name=str(api_key["name"]),
             description=str(api_key["description"]),
             hint=str(api_key["hint"]),
@@ -356,13 +353,15 @@ class ApiKeyService:
         project_id, _, normalized_project_uuid = project_res.unwrap()
 
         api_key_secret = self._createApiKeySecret()
-        formatted_key = self.api_key_format(str(uuid.uuid4()), api_key_secret)
+        api_key_uuid = uuid.uuid4()
+        formatted_key = self.api_key_format(str(api_key_uuid), api_key_secret)
         hashed_key = self._hashApiKey(formatted_key)
         hint = self.generateHint(formatted_key)
 
         async with self.session_manager.get_session() as session:
             created = await self.api_key_repo.create(
                 session,
+                uuid=api_key_uuid,
                 user_id=actor_user_id,
                 project_id=project_id,
                 hashed_key=hashed_key,
@@ -375,8 +374,10 @@ class ApiKeyService:
 
         return Ok(
             ApiKeyCreateResponse(
-                id=created.id,
-                project_id=normalized_project_uuid,
+                api_key_id=created.id,
+                api_key_uuid=str(created.uuid),
+                project_id=project_id,
+                project_uuid=normalized_project_uuid,
                 name=created.name,
                 description=created.description,
                 hint=created.hint,
@@ -409,7 +410,11 @@ class ApiKeyService:
             ApiKeyListResponse(
                 total=total,
                 results=[
-                    self._toResponse(api_key, normalized_project_uuid)
+                    self._toResponse(
+                        api_key,
+                        project_id,
+                        normalized_project_uuid,
+                    )
                     for api_key in snapshots
                 ],
             )
@@ -430,7 +435,13 @@ class ApiKeyService:
             )
             if project is None:
                 return Err(ProjectNotFoundError())
-            return Ok(self._toResponse(api_key, str(project.uuid)))
+            return Ok(
+                self._toResponse(
+                    api_key,
+                    int(project.id),
+                    str(project.uuid),
+                )
+            )
 
     async def updateApiKey(
         self,
@@ -474,6 +485,7 @@ class ApiKeyService:
             return Ok(
                 self._toResponse(
                     self._snapshotApiKey(updated),
+                    int(project.id),
                     str(project.uuid),
                 )
             )
@@ -537,6 +549,7 @@ class ApiKeyService:
             return Ok(
                 self._toResponse(
                     self._snapshotApiKey(updated),
+                    int(project.id),
                     str(project.uuid),
                 )
             )
@@ -559,7 +572,7 @@ class ApiKeyService:
 
     async def _resolveApiKeyContext(
         self, api_key: str
-    ) -> Result[tuple[str, ApiKeyContextRecord], InvalidAPIKey]:
+    ) -> Result[ApiKeyContextRecord, InvalidAPIKey]:
         parts_res = self.get_api_key_parts(api_key)
         if parts_res.status == ResultStatus.Err:
             return parts_res.into()
@@ -570,8 +583,10 @@ class ApiKeyService:
         context = await self._loadContextFromStorage(hashed_key)
         if context is None:
             return Err(InvalidAPIKey())
+        if context["api_key_uuid"] != api_key_uuid:
+            return Err(InvalidAPIKey())
 
-        return Ok((api_key_uuid, context))
+        return Ok(context)
 
     async def parseApiKey(
         self, api_key: str
@@ -588,13 +603,13 @@ class ApiKeyService:
         if context_res.status == ResultStatus.Err:
             return context_res.into()
 
-        api_key_uuid, context = context_res.unwrap()
+        context = context_res.unwrap()
         if context["disabled"]:
             return Err(ApiKeyDisabledError())
         if not context["user_uuid"]:
             return Err(UserNotFoundError())
 
-        return Ok(self._toApiKeyInfo(api_key_uuid, context))
+        return Ok(self._toApiKeyInfo(context))
 
     async def verifyApiKey(
         self, api_key: str, required_permissions: list[str]
@@ -611,7 +626,7 @@ class ApiKeyService:
         if context_res.status == ResultStatus.Err:
             return context_res.into()
 
-        api_key_uuid, context = context_res.unwrap()
+        context = context_res.unwrap()
         if context["disabled"]:
             return Err(ApiKeyDisabledError())
         if not context["user_uuid"]:
@@ -622,4 +637,4 @@ class ApiKeyService:
         if missing_permissions:
             return Err(InsufficientPermission())
 
-        return Ok(self._toApiKeyInfo(api_key_uuid, context))
+        return Ok(self._toApiKeyInfo(context))

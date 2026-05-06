@@ -24,7 +24,7 @@ from gantry.management.project.dtos import (
     UpdateProjectSettingsRequest,
     ProjectPermissionCatalogResponse,
 )
-from gantry.management.auth.entities import UserInfo
+from gantry.management.auth.entities import AdminInfo
 from gantry.management.api_key.services import ApiKeyService
 from gantry.management.project.services import (
     ProjectService,
@@ -140,7 +140,7 @@ class AdminService:
     def _toProjectInfoResponse(project: Any) -> ProjectInfoResponse:
         """Map a project row to the public admin DTO."""
         return ProjectInfoResponse(
-            id=str(project.uuid),
+            project_uuid=str(project.uuid),
             name=project.name,
             description=project.description,
             organization_id=project.organization_id,
@@ -193,12 +193,12 @@ class AdminService:
             permissions=build_permission_summary(attrs),
         )
 
-    def getAdminInfo(self, user_info: UserInfo) -> AdminUserInfoResponse:
+    def getAdminInfo(self, admin_info: AdminInfo) -> AdminUserInfoResponse:
         """Return the authenticated admin identity DTO."""
         return AdminUserInfoResponse(
-            id=user_info["id"],
-            username=user_info["username"],
-            email=user_info["email"],
+            id=admin_info["id"],
+            username=admin_info["username"],
+            email=admin_info["email"],
         )
 
     async def getDashboardSummary(self) -> AdminDashboardSummaryResponse:
@@ -303,7 +303,7 @@ class AdminService:
         update_res.unwrap()
 
         return OrgInfoResponse(
-            id=org_id,
+            org_id=org_id,
             name=input_data.name,
             owner_id=None,
         )
@@ -430,13 +430,13 @@ class AdminService:
 
     async def createApiKey(
         self,
-        user_info: UserInfo,
+        admin_info: AdminInfo,
         project_id: str,
         input_data: ApiKeyWriteRequest,
     ) -> ApiKeyCreateResponse:
         """Create an API key in one project without project permission checks."""
         result = await self.apikey_service.createApiKey(
-            actor_user_id=user_info["id"],
+            actor_user_id=admin_info["id"],
             project_uuid=project_id,
             name=input_data.name,
             description=input_data.description,

@@ -147,3 +147,7 @@ async def requireUserOrgUuid(
     if not org_id:
         raise MissingOrganizationContextError()
     return org_id
+
+
+getUserOrgId = getUserOrgUuid
+requireUserOrgId = requireUserOrgUuid

@@ -52,9 +52,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertEqual(len(res.unwrap().results), 1)
         self.assertEqual(res.unwrap().results[0].id, "u2")
 
-    async def test_get_project_settings_creates_missing_row_and_writes_cache(
-        self,
-    ):
+    async def test_get_project_settings_creates_missing_row(self):
         service = self._make_service()
         service._getProjectOrErr = AsyncMock(
             return_value=Ok(
@@ -79,11 +77,9 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertEqual(res.unwrap().rate_limit, 120)
         self.assertEqual(res.unwrap().spending_limit, 6000)
         self.assertEqual(res.unwrap().extra, {"burst": True})
-        self.redis.set.assert_awaited()
+        self.redis.set.assert_not_awaited()
 
-    async def test_update_project_settings_flattens_extra_and_updates_cache(
-        self,
-    ):
+    async def test_update_project_settings_flattens_extra(self):
         service = self._make_service()
         service._getProjectOrErr = AsyncMock(
             return_value=Ok(
@@ -113,11 +109,9 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertEqual(res.unwrap().spending_limit, 7000)
         self.assertEqual(res.unwrap().extra, {"ui.theme": "dark"})
         service.settings_repo.upsert.assert_awaited_once()
-        self.redis.set.assert_awaited()
+        self.redis.set.assert_not_awaited()
 
-    async def test_get_project_settings_caches_negative_one_for_missing_rate_limit(
-        self,
-    ):
+    async def test_get_project_settings_returns_none_for_missing_limits(self):
         service = self._make_service()
         service._getProjectOrErr = AsyncMock(
             return_value=Ok(
@@ -141,18 +135,9 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertIsNone(res.unwrap().rate_limit)
         self.assertIsNone(res.unwrap().spending_limit)
-        self.redis.set.assert_any_await(
-            "organization:rpm_limit:org-1:proj:10",
-            -1,
-            ex=36000,
-        )
-        self.redis.set.assert_any_await(
-            "billing:spending_limit:org-1:proj:10",
-            -1,
-            ex=3600,
-        )
+        self.redis.set.assert_not_awaited()
 
-    async def test_update_project_settings_caches_negative_one_for_missing_rate_limit(
+    async def test_update_project_settings_returns_none_for_missing_limits(
         self,
     ):
         service = self._make_service()
@@ -183,16 +168,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertIsNone(res.unwrap().rate_limit)
         self.assertIsNone(res.unwrap().spending_limit)
-        self.redis.set.assert_any_await(
-            "organization:rpm_limit:org-1:proj:10",
-            -1,
-            ex=36000,
-        )
-        self.redis.set.assert_any_await(
-            "billing:spending_limit:org-1:proj:10",
-            -1,
-            ex=3600,
-        )
+        self.redis.set.assert_not_awaited()
 
     async def test_list_project_users_propagates_org_member_lookup_error(self):
         """Project user listing should return upstream org-member lookup errors."""
@@ -451,18 +427,16 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertTrue(
             (
                 await service._hasOrgWideProjectPermission(
-                    "u1", "org-1", ProjectPermission.PROJECTS_GET_ALL
+                    "u1", "org-1", ProjectPermission.SETTINGS_READ
                 )
             ).status
             == ResultStatus.Err
         )
 
-        service._hasOrgWideProjectPermission = AsyncMock(
-            return_value=Err(_DummyError("authz failed"))
-        )
+        service.project_repo.listByOrg = AsyncMock(return_value=[])
         self.assertTrue(
             (await service.listOrgProjects("u1", "org-1")).status
-            == ResultStatus.Err
+            == ResultStatus.Ok
         )
 
         # create/list/add/remove/get/update not-found or downstream write errors

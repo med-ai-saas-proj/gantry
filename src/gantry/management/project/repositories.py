@@ -8,7 +8,6 @@ from .models import Project, ProjectMember, ProjectSettings
 
 from uuid import UUID
 
-from numpy import isin
 from sqlalchemy import func, delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -19,7 +18,7 @@ class ProjectRepository(Repository[Project, int]):
 
     CACHE_KEY = "project:{project_id}"
 
-    def __init__(self, cache_repo: CacheRepository):
+    def __init__(self, cache_repo: CacheRepository | None = None):
         self.cache_repo = cache_repo
         super().__init__(Project, Project.id)
 
@@ -50,7 +49,8 @@ class ProjectRepository(Repository[Project, int]):
         )
         res = await session.execute(stmt)
         res = res.scalar_one()
-        await self.cache_repo.setCache(self.getCacheKey(res.uuid), res)
+        if self.cache_repo is not None:
+            await self.cache_repo.setCache(self.getCacheKey(res.uuid), res)
         return res
 
     async def getByUuid(
@@ -66,15 +66,8 @@ class ProjectRepository(Repository[Project, int]):
             .where(Project.uuid == parsed)
             .limit(1)
         )
-        # res = await session.execute(stmt)
-        # return res.scalar_one_or_none()
-        return (
-            await self.cache_repo.getCacheOrCall(
-                self.getCacheKey(parsed),
-                session.execute,
-                stmt,
-            )
-        ).scalar_one_or_none()
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
 
     async def updateByUuid(
         self,
@@ -84,25 +77,26 @@ class ProjectRepository(Repository[Project, int]):
         name: str,
         description: str | None,
     ) -> Project | None:
+        try:
+            parsed = UUID(project_uuid)
+        except ValueError:
+            return None
         stmt = (
             update(Project)
-            .where(Project.uuid == project_uuid, Project.is_archived == False)
+            .where(Project.uuid == parsed, Project.is_archived.is_(False))
             .values(
                 name=name,
                 description=description,
             )
             .returning(Project)
         )
-        # res = await session.execute(stmt)
-        # return res.scalar_one_or_none()
-
-        return (
-            await self.cache_repo.getCacheOrCall(
-                self.getCacheKey(project_uuid),
-                session.execute,
-                stmt,
+        res = await session.execute(stmt)
+        updated = res.scalar_one_or_none()
+        if updated is not None and self.cache_repo is not None:
+            await self.cache_repo.setCache(
+                self.getCacheKey(project_uuid), updated
             )
-        ).scalar_one_or_none()
+        return updated
 
     async def listByOrg(
         self,
@@ -115,19 +109,8 @@ class ProjectRepository(Repository[Project, int]):
             .where(Project.organization_id == organization_id)
             .order_by(Project.created_at.desc())
         )
-        # res = await session.execute(stmt)
-        # return list(res.scalars().all())
-        return list(
-            (
-                await self.cache_repo.getCacheOrCall(
-                    self.getCacheKey(organization_id),
-                    session.execute,
-                    stmt,
-                )
-            )
-            .scalars()
-            .all()
-        )
+        res = await session.execute(stmt)
+        return list(res.scalars().all())
 
     async def listByMember(
         self,
@@ -146,20 +129,9 @@ class ProjectRepository(Repository[Project, int]):
             .order_by(Project.created_at.desc())
         )
         if organization_id is not None:
-            stmt.where(Project.organization_id == organization_id)
-        # res = await session.execute(stmt)
-        # return list(res.scalars().all())
-        return list(
-            (
-                await self.cache_repo.getCacheOrCall(
-                    self.getCacheKey(user_id),
-                    session.execute,
-                    stmt,
-                )
-            )
-            .scalars()
-            .all()
-        )
+            stmt = stmt.where(Project.organization_id == organization_id)
+        res = await session.execute(stmt)
+        return list(res.scalars().all())
 
     async def countAll(self, session: AsyncSession) -> int:
         """Return the total number of projects."""
@@ -173,7 +145,7 @@ class ProjectMemberRepository(Repository[ProjectMember, int]):
 
     CACHE_KEY = "project:memberships:{project_uuid}"
 
-    def __init__(self, cache_repo: CacheRepository):
+    def __init__(self, cache_repo: CacheRepository | None = None):
         self.cache_repo = cache_repo
         super().__init__(ProjectMember, ProjectMember.project_id)
 
@@ -294,14 +266,18 @@ class ProjectSettingsRepository(Repository[ProjectSettings, int]):
 
     CACHE_KEY = "project:settings:{project_uuid}"
 
-    def __init__(self, cache_repo: CacheRepository):
+    def __init__(self, cache_repo: CacheRepository | None = None):
         self.cache_repo = cache_repo
         super().__init__(ProjectSettings, ProjectSettings.project_id)
 
     @classmethod
     def getCacheKey(cls, project_uuid: UUID | str) -> str:
         return cls.CACHE_KEY.format(
-            project_uuid if isinstance(project_uuid, str) else project_uuid.hex
+            project_uuid=(
+                project_uuid
+                if isinstance(project_uuid, str)
+                else str(project_uuid)
+            )
         )
 
     async def getOrCreate(
@@ -332,11 +308,14 @@ class ProjectSettingsRepository(Repository[ProjectSettings, int]):
             .join(Project, Project.id == ProjectSettings.project_id)
             .where(Project.uuid == _project_uuid)
         )
-        res = (
-            await self.cache_repo.getCacheOrCall(
-                cache_key, session.execute, stmt
-            )
-        ).scalar_one_or_none()
+        if self.cache_repo is not None:
+            res = (
+                await self.cache_repo.getCacheOrCall(
+                    cache_key, session.execute, stmt
+                )
+            ).scalar_one_or_none()
+        else:
+            res = (await session.execute(stmt)).scalar_one_or_none()
         if res is None:
             stmt = (
                 insert(ProjectSettings)
@@ -347,7 +326,10 @@ class ProjectSettingsRepository(Repository[ProjectSettings, int]):
                 .returning(ProjectSettings)
             )
             res = (await session.execute(stmt)).scalar_one()
-            await self.cache_repo.setCache(self.getCacheKey(project_uuid), res)
+            if self.cache_repo is not None:
+                await self.cache_repo.setCache(
+                    self.getCacheKey(project_uuid), res
+                )
         return res
 
     async def upsert(

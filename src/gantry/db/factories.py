@@ -33,5 +33,15 @@ def getRedis() -> Redis:
 
 
 @lru_cache(1)
+def getRedisBinary() -> Redis:
+    return Redis.from_url(
+        getDBSettings().redis_connection_uri.encoded_string(),
+        decode_responses=False,
+    )
+
+
+@lru_cache(1)
 def getRedisCacheRepo() -> RedisCacheRepository:
-    return RedisCacheRepository(getRedis(), ttl=getDBSettings().cache_ttl)
+    return RedisCacheRepository(
+        getRedisBinary(), ttl=getDBSettings().cache_ttl
+    )

@@ -1,6 +1,4 @@
 import os
-import sys
-import types
 import unittest
 from unittest.mock import patch
 
@@ -13,6 +11,7 @@ from gantry.management.api_key import factories
 class TestApiKeyFactories(unittest.TestCase):
     def tearDown(self):
         factories.getApiKeyService.cache_clear()
+        factories.getApiKeyRepository.cache_clear()
 
     def test_get_api_key_service_builds_singleton(self):
         settings = type(
@@ -25,12 +24,6 @@ class TestApiKeyFactories(unittest.TestCase):
                 "secret_length": 24,
             },
         )()
-        fake_billing_factories = types.ModuleType(
-            "gantry.management.billing.factories"
-        )
-        fake_billing_factories.getBillingTransactionService = lambda: (
-            "billing-transaction-service"
-        )
         with (
             patch(
                 "gantry.management.api_key.factories.getApiKeysSettings",
@@ -45,20 +38,12 @@ class TestApiKeyFactories(unittest.TestCase):
                 return_value="session-manager",
             ),
             patch(
-                "gantry.management.api_key.factories.getRedis",
-                return_value="redis-client",
-            ),
-            patch(
-                "gantry.management.api_key.factories.ApiKeyRepository",
+                "gantry.management.api_key.factories.getApiKeyRepository",
                 return_value="api-key-repo",
             ),
             patch(
-                "gantry.management.api_key.factories.ProjectRepository",
+                "gantry.management.api_key.factories.getProjectRepository",
                 return_value="project-repo",
-            ),
-            patch.dict(
-                sys.modules,
-                {"gantry.management.billing.factories": fake_billing_factories},
             ),
             patch(
                 "gantry.management.api_key.factories.ApiKeyService"
@@ -77,6 +62,4 @@ class TestApiKeyFactories(unittest.TestCase):
             api_key_repo="api-key-repo",
             project_repo="project-repo",
             session_manager="session-manager",
-            billing_transaction_service="billing-transaction-service",
-            redis="redis-client",
         )

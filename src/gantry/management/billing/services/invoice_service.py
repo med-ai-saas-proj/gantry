@@ -204,7 +204,7 @@ class InvoiceService:
                         InvoiceItemInfoResponse(
                             description=line["description"],
                             amount=line["amount"],
-                            project_uid=line["project_uid"],
+                            project_uuid=line["project_uuid"],
                             project_name=line["project_name"],
                         )
                         for line in lines
@@ -575,8 +575,8 @@ class InvoiceService:
                             "invoice_uid": str(invoice_uid),
                             "invoice_line_uuid": str(line["invoice_line_uuid"]),
                             "org_id": org_id,
-                            "project_uid": str(line["project_uid"])
-                            if line["project_uid"]
+                            "project_uuid": str(line["project_uuid"])
+                            if line["project_uuid"]
                             else "",
                         },
                     },

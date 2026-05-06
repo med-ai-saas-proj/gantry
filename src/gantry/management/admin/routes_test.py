@@ -11,9 +11,6 @@ ADMIN_INFO = {
     "id": "admin-1",
     "username": "admin",
     "email": "admin@test",
-    "roles": ["ADMIN"],
-    "org_id": "",
-    "project_ids": [],
 }
 
 
@@ -52,7 +49,6 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             id="admin-1",
             username="admin",
             email="admin@test",
-            roles=["ADMIN"],
         )
         admin_service.getAdminInfo.return_value = expected
 
@@ -86,7 +82,7 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             total=1,
             results=[
                 routes.OrgInfoResponse(
-                    id="org-1",
+                    org_id="org-1",
                     name="Org 1",
                     owner_id=None,
                 )
@@ -110,7 +106,7 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             description="desc",
         )
         expected = routes.ProjectInfoResponse(
-            id="project-1",
+            project_uuid="project-1",
             name="Project 1",
             description="desc",
             organization_id="org-1",
@@ -218,8 +214,10 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             permissions=["objects:read"],
         )
         expected = routes.ApiKeyCreateResponse(
-            id=1,
-            project_id="project-1",
+            api_key_id=1,
+            api_key_uuid="api-key-1",
+            project_id=7,
+            project_uuid="project-1",
             name="Key",
             description="",
             hint="sk_x...abcd",

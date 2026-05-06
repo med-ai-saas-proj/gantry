@@ -1,5 +1,6 @@
 """API routes for the Organization module."""
 
+from gantry.management.auth import getUserInfo
 from gantry.management.auth.entities import UserInfo
 
 from .dtos import (
@@ -20,7 +21,7 @@ from .dtos import (
 )
 from .factories import OrgService, getOrgService
 from .permissions import ALL_PERMISSIONS, OrgPermission
-from .dependencies import _get_user_info, requiredOrgPermission
+from .dependencies import requiredOrgPermission
 
 from typing import Annotated
 
@@ -119,7 +120,7 @@ async def cancel_delete_org(
     """Cancel a previously requested organization deletion."""
     result = await org_service.cancelDeleteOrg(org_id)
     result.unwrap()
-    return DeleteCancelResponse(org_id=org_id, cancelled=True)
+    return DeleteCancelResponse(id=org_id, cancelled=True)
 
 
 @org_router.get(
@@ -312,7 +313,7 @@ async def resend_invitation(
 async def get_user_permissions(
     user_info: Annotated[
         UserInfo,
-        Depends(_get_user_info),
+        Depends(getUserInfo),
     ],
     org_id: Annotated[str, Path()],
     user_id: Annotated[str, Path()],

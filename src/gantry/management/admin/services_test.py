@@ -79,9 +79,6 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             "id": "admin-1",
             "username": "admin",
             "email": "admin@test",
-            "roles": ["ADMIN"],
-            "org_id": "",
-            "project_ids": [],
         }
 
     def test_get_admin_info_maps_identity(self):
@@ -89,7 +86,6 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.id, "admin-1")
         self.assertEqual(result.username, "admin")
-        self.assertEqual(result.roles, ["ADMIN"])
 
     def test_list_organization_permissions_returns_catalog(self):
         result = self.service.listOrganizationPermissions()
@@ -101,7 +97,9 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         pagination = AdminPaginationQuery(limit=10, offset=5, q="org")
         expected = OrgListResponse(
             total=1,
-            results=[OrgInfoResponse(id="org-1", name="Org 1", owner_id=None)],
+            results=[
+                OrgInfoResponse(org_id="org-1", name="Org 1", owner_id=None)
+            ],
         )
         self.org_service.listOrgs = AsyncMock(return_value=Ok(expected))
 
@@ -121,7 +119,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             owner_id="user-1",
         )
         expected = OrgInfoResponse(
-            id="org-1",
+            org_id="org-1",
             name="Org 1",
             owner_id="user-1",
         )
@@ -138,7 +136,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_organization_delegates_to_org_service(self):
         expected = OrgInfoResponse(
-            id="org-1",
+            org_id="org-1",
             name="Org 1",
             owner_id=None,
         )
@@ -196,7 +194,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             ],
         )
         deletion = DeleteRequestResponse(
-            org_id="org-1",
+            id="org-1",
             requested_at="2026-05-02T00:00:00+00:00",
             cancel_before="2026-06-01T00:00:00+00:00",
         )
@@ -262,7 +260,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             UpdateOrgMetadataRequest(name="New Org"),
         )
 
-        self.assertEqual(result.id, "org-1")
+        self.assertEqual(result.org_id, "org-1")
         self.assertEqual(result.name, "New Org")
         self.kc.updateOrg.assert_awaited_once_with(
             "org-1",
@@ -286,7 +284,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         result = await self.service.listProjects("org-1")
 
         self.assertEqual(result.total, 1)
-        self.assertEqual(result.results[0].id, "project-1")
+        self.assertEqual(result.results[0].project_uuid, "project-1")
         self.project_repo.listByOrg.assert_awaited_once_with(
             self.session_manager.session,
             "org-1",
@@ -309,7 +307,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             CreateProjectRequest(name="Project 1", description="desc"),
         )
 
-        self.assertEqual(result.id, "project-1")
+        self.assertEqual(result.project_uuid, "project-1")
         self.session_manager.session.commit.assert_awaited_once()
         self.project_repo.create.assert_awaited_once_with(
             session=self.session_manager.session,
@@ -364,7 +362,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(result.permissions.project_permissions), 2)
         self.assertEqual(
-            result.permissions.project_permissions[0].project_id,
+            result.permissions.project_permissions[0].id,
             "project-a",
         )
 
@@ -435,14 +433,14 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
 
     async def test_update_and_delete_project_delegate(self):
         updated = ProjectInfoResponse(
-            id="project-1",
+            project_uuid="project-1",
             name="Renamed Project",
             description=None,
             organization_id="org-1",
             archived=False,
         )
         archived = ProjectArchiveResponse(
-            project_id="project-1",
+            id="project-1",
             archived=True,
         )
         self.project_service.updateProject = AsyncMock(return_value=Ok(updated))
@@ -486,8 +484,10 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
     async def test_list_get_update_delete_api_keys_delegate(self):
         now = datetime.now(UTC)
         key = ApiKeyResponse(
-            id=1,
-            project_id="project-1",
+            api_key_id=1,
+            api_key_uuid="api-key-1",
+            project_id=7,
+            project_uuid="project-1",
             name="Key",
             description="desc",
             hint="sk_x...abcd",
@@ -497,8 +497,10 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         )
         keys = ApiKeyListResponse(total=1, results=[key])
         updated = ApiKeyResponse(
-            id=1,
-            project_id="project-1",
+            api_key_id=1,
+            api_key_uuid="api-key-1",
+            project_id=7,
+            project_uuid="project-1",
             name="Renamed Key",
             description="",
             hint="sk_x...abcd",
@@ -542,8 +544,10 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
     async def test_create_api_key_passes_actor_identity(self):
         now = datetime.now(UTC)
         expected = ApiKeyCreateResponse(
-            id=1,
-            project_id="project-1",
+            api_key_id=1,
+            api_key_uuid="api-key-1",
+            project_id=7,
+            project_uuid="project-1",
             name="Key",
             description="",
             hint="sk_x...abcd",

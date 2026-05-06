@@ -128,7 +128,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
         self,
         session: AsyncSession,
         org_id: str,
-        project_uids: list[UUID] | None = None,
+        project_uuids: list[UUID] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         offset: int = 0,
@@ -144,15 +144,15 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
                 BillingTransaction.captured_at,
                 BillingTransaction.organization_id,
                 BillingTransaction.status,
-                Project.uuid.label("project_uid"),
+                Project.uuid.label("project_uuid"),
                 func.count().over().label("total"),
             )
             .select_from(BillingTransaction)
             .join(Project, BillingTransaction.project_id == Project.id)
             .where(BillingTransaction.organization_id == org_id)
         )
-        if project_uids and len(project_uids) > 0:
-            stmt = stmt.where(Project.uuid.in_(project_uids))
+        if project_uuids and len(project_uuids) > 0:
+            stmt = stmt.where(Project.uuid.in_(project_uuids))
         if start_date:
             stmt = stmt.where(BillingTransaction.created_at >= start_date)
         if end_date:
@@ -167,7 +167,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
                 "transaction_uid": row.uuid,
                 "amount": row.amount,
                 "date": row.created_at,
-                "project_uid": row.project_uid,
+                "project_uuid": row.project_uuid,
                 "details": row.details,
                 "captured_at": row.captured_at,
                 "status": row.status,
@@ -191,7 +191,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
                 BillingTransaction.captured_at,
                 BillingTransaction.organization_id,
                 BillingTransaction.status,
-                Project.uuid.label("project_uid"),
+                Project.uuid.label("project_uuid"),
             )
             .select_from(BillingTransaction)
             .join(Project, BillingTransaction.project_id == Project.id)
@@ -211,7 +211,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             "transaction_uid": row.uuid,
             "amount": row.amount,
             "date": row.created_at,
-            "project_uid": row.project_uid,
+            "project_uuid": row.project_uuid,
             "details": row.details,
             "captured_at": row.captured_at,
             "status": row.status,

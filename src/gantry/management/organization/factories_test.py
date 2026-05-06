@@ -1,40 +1,32 @@
 from gantry.management.organization import factories
 
 import unittest
-from types import SimpleNamespace
 from unittest.mock import patch
 
 
 class TestOrganizationFactories(unittest.TestCase):
     def tearDown(self):
-        factories.getKeycloakServiceClient.cache_clear()
+        factories.getOrgSettingsRepository.cache_clear()
         factories.getOrgService.cache_clear()
 
-    def test_get_keycloak_org_client_builds_singleton(self):
-        org_settings = SimpleNamespace(
-            keycloak_service_client_id="svc-id",
-            keycloak_service_client_secret="svc-secret",
-        )
+    def test_get_org_settings_repository_builds_singleton(self):
         with (
             patch(
-                "gantry.management.organization.factories.getOrgSettings",
-                return_value=org_settings,
+                "gantry.management.organization.factories.getRedisCacheRepo",
+                return_value="cache-repo",
             ),
             patch(
-                "gantry.management.organization.factories.getBaseKeycloakServiceClient"
-            ) as mock_factory,
+                "gantry.management.organization.factories.OrgSettingsRepository"
+            ) as repo_cls,
         ):
-            mock_factory.return_value = "kc-client"
+            repo_cls.return_value = "settings-repo"
 
-            first = factories.getKeycloakServiceClient()
-            second = factories.getKeycloakServiceClient()
+            first = factories.getOrgSettingsRepository()
+            second = factories.getOrgSettingsRepository()
 
-        self.assertEqual(first, "kc-client")
-        self.assertEqual(second, "kc-client")
-        mock_factory.assert_called_once_with(
-            "svc-id",
-            "svc-secret",
-        )
+        self.assertEqual(first, "settings-repo")
+        self.assertEqual(second, "settings-repo")
+        repo_cls.assert_called_once_with("cache-repo")
 
     def test_get_org_service_builds_singleton(self):
         with (
@@ -43,20 +35,16 @@ class TestOrganizationFactories(unittest.TestCase):
                 return_value="kc-client",
             ),
             patch(
-                "gantry.management.organization.factories.OrgSettingsRepository",
+                "gantry.management.organization.factories.getOrgSettingsRepository",
                 return_value="settings-repo",
             ),
             patch(
-                "gantry.management.organization.factories.OrgDeletionRequestRepository",
+                "gantry.management.organization.factories.getOrgDeletionRequestRepository",
                 return_value="deletion-repo",
             ),
             patch(
                 "gantry.management.organization.factories.getSessionManager",
                 return_value="session-manager",
-            ),
-            patch(
-                "gantry.management.organization.factories.getRedis",
-                return_value="redis-client",
             ),
             patch(
                 "gantry.management.organization.factories.getLogger",
@@ -79,5 +67,4 @@ class TestOrganizationFactories(unittest.TestCase):
             deletion_repo="deletion-repo",
             session_manager="session-manager",
             logger="logger",
-            redis="redis-client",
         )

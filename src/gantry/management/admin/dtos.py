@@ -28,7 +28,6 @@ class AdminUserInfoResponse(BaseDTO):
     id: str
     username: str | None
     email: str | None
-    # roles: list[str]
 
 
 class AdminUserOrganizationInfoResponse(BaseDTO):
@@ -61,7 +60,7 @@ class AdminUserListResponse(BaseDTO):
 class AdminUserProjectPermissionResponse(BaseDTO):
     """Project-scoped permissions grouped by project id."""
 
-    project_id: str
+    id: str
     permissions: list[str]
     effective_permissions: list[str]
 

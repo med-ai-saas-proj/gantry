@@ -19,7 +19,7 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
 
     CACHE_KEY = "org:settings:{org_id}"
 
-    def __init__(self, cache_repo: CacheRepository):
+    def __init__(self, cache_repo: CacheRepository | None = None):
         self.cache_repo = cache_repo
         super().__init__(OrgSettings, OrgSettings.org_id)
 
@@ -32,7 +32,10 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
     ) -> OrgSettings:
         """Return existing settings or insert a default row atomically."""
         key = self.getCacheKey(org_id)
-        if (cached := await self.cache_repo.getCache(key)) is not None:
+        if (
+            self.cache_repo is not None
+            and (cached := await self.cache_repo.getCache(key)) is not None
+        ):
             return cached
         insert_stmt = pg_insert(OrgSettings).values(org_id=org_id, extra={})
         stmt = insert_stmt.on_conflict_do_update(
@@ -41,7 +44,8 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
         ).returning(OrgSettings)
         res = await session.execute(stmt)
         res = res.scalar_one()
-        await self.cache_repo.setCache(key, res)
+        if self.cache_repo is not None:
+            await self.cache_repo.setCache(key, res)
         return res
 
     async def upsert(
@@ -74,7 +78,8 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
         )
         result = await session.execute(stmt)
         result = result.scalar_one()
-        await self.cache_repo.setCache(self.getCacheKey(org_id), result)
+        if self.cache_repo is not None:
+            await self.cache_repo.setCache(self.getCacheKey(org_id), result)
         return result
 
     async def deleteByOrgId(self, session: AsyncSession, org_id: str) -> bool:
@@ -84,7 +89,8 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
             .returning(OrgSettings.org_id)
         )
         res = await session.execute(stmt)
-        await self.cache_repo.invalidateCache(self.getCacheKey(org_id))
+        if self.cache_repo is not None:
+            await self.cache_repo.invalidateCache(self.getCacheKey(org_id))
         return res.scalar_one_or_none() is not None
 
 

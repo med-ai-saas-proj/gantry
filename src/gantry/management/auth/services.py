@@ -157,12 +157,12 @@ class AuthService:
 
         Keycloak always includes 'sub' as the user UUID.
         """
-        user_uid = claims.get("sub")
-        if not isinstance(user_uid, str):
+        user_uuid = claims.get("sub")
+        if not isinstance(user_uuid, str):
             return Err(
                 UnauthorizedError(
                     from_exception=ValueError(
-                        f"User uid not found or is not a string, {user_uid=}"
+                        f"User uuid not found or is not a string, {user_uuid=}"
                     )
                 )
             )
@@ -173,7 +173,7 @@ class AuthService:
             await self.keycloak_client.getUserAttributes(claims["sub"])
         ).unwrap()
         org_id = self._extractOrganizationId(claims.get("organization"))
-        if self.require_organization_claim and org_id is not None:
+        if self.require_organization_claim and org_id is None:
             return Err(MissingOrganizationClaimError())
 
         auth_info: UserInfo = {
@@ -192,12 +192,12 @@ class AuthService:
     def _groupProjectPerms(self, perms: list[str]):
         res: dict[str, list[str]] = {}
         for entry in perms:
-            project_uid, separator, permission = entry.partition(":")
-            if not separator or not project_uid or not permission:
+            project_uuid, separator, permission = entry.partition(":")
+            if not separator or not project_uuid or not permission:
                 continue
-            if project_uid not in res:
-                res[project_uid] = []
-            res[project_uid].append(permission)
+            if project_uuid not in res:
+                res[project_uuid] = []
+            res[project_uuid].append(permission)
         return res
 
     def _extractOrganizationId(self, organization_claim: Any) -> str | None:
@@ -230,7 +230,7 @@ class AuthService:
 
     def verifyTokenAdmin(
         self, token: str
-    ) -> Result[AdminInfo, UnauthorizedError]:
+    ) -> Result[AdminInfo, UnauthorizedError | ForbiddenError]:
         try:
             signing_key = self._getJwkClient().get_signing_key_from_jwt(token)
 
@@ -250,8 +250,8 @@ class AuthService:
                 },
             )
 
-            if self.ADMIN_REALM_ROLE in payload["realm_access"]["roles"]:
-                return Err(UnauthorizedError())
+            if self.ADMIN_REALM_ROLE not in payload["realm_access"]["roles"]:
+                return Err(ForbiddenError())
 
             return Ok(
                 AdminInfo(
