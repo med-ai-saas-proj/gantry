@@ -1,6 +1,7 @@
 """Service for managing project-scoped API keys."""
 
-from gantry.db import CacheRepository, AsyncSessionManager
+from gantry.db import AsyncSessionManager
+from gantry.settings import ApiKeyPermission
 from gantry.management.project import ProjectRepository, ProjectNotFoundError
 from gantry.management.organization import getOrgSettings
 from gantry.shared.custom_types.error_exception import (
@@ -8,26 +9,18 @@ from gantry.shared.custom_types.error_exception import (
     UnrecoverableError,
 )
 
-# from gantry.management.billing.services.transaction_services import (
-#     TransactionService,
-# )
 from .dtos import (
     ApiKeyResponse,
     ApiKeyListResponse,
     ApiKeyCreateResponse,
-    ApiKeyPermissionAuditResponse,
+    ApiKeyPermissionResponse,
     ApiKeyPermissionCatalogResponse,
 )
 from .models import ApiKey
 from .entities import ApiKeyInfo, ApiKeyContextRecord
-from .permissions import (
-    listPermissions,
-    hasOnlyRegisteredPermissions,
-)
 from .repositories import ApiKeyRepository
 
 import hmac
-import json
 import uuid
 import secrets
 from typing import Callable, Sequence, TypedDict, NotRequired
@@ -116,6 +109,7 @@ class ApiKeyService:
         logger: BoundLogger,
         api_key_repo: ApiKeyRepository,
         project_repo: ProjectRepository,
+        permissions: list[ApiKeyPermission],
         session_manager: AsyncSessionManager,
     ):
         self.logger = logger
@@ -134,6 +128,8 @@ class ApiKeyService:
         self.project_repo = project_repo
         self.session_manager = session_manager
         self.default_org_rate_limit = getOrgSettings().default_rate_limit
+        self.permissions = permissions
+        self.permissions_ids_set = set(p.id for p in self.permissions)
         # self.billing_transaction_service = billing_transaction_service
 
     def _createApiKeySecret(self) -> str:
@@ -186,7 +182,8 @@ class ApiKeyService:
     def _validatePermissions(
         self, permissions: list[str]
     ) -> Result[None, InvalidPermissionError]:
-        if not hasOnlyRegisteredPermissions(permissions):
+
+        if not self.permissions_ids_set.issuperset(permissions):
             return Err(InvalidPermissionError())
         return Ok(None)
 
@@ -288,27 +285,16 @@ class ApiKeyService:
 
     def getPermissionCatalog(self) -> ApiKeyPermissionCatalogResponse:
         """Return the runtime catalog of API key permissions."""
-        permissions = listPermissions()
         return ApiKeyPermissionCatalogResponse(
-            total=len(permissions),
-            results=permissions,
-        )
-
-    async def auditPermissions(self) -> ApiKeyPermissionAuditResponse:
-        """Compare stored API key permissions with the runtime permission catalog."""
-        registered_permissions = listPermissions()
-        async with self.session_manager.get_session() as session:
-            stored_permissions = (
-                await self.api_key_repo.listDistinctPermissions(session)
-            )
-
-        registered_set = set(registered_permissions)
-        stored_set = set(stored_permissions)
-        return ApiKeyPermissionAuditResponse(
-            registered_permissions=registered_permissions,
-            stored_permissions=stored_permissions,
-            stale_permissions=sorted(stored_set - registered_set),
-            unused_permissions=sorted(registered_set - stored_set),
+            total=len(self.permissions),
+            results=[
+                ApiKeyPermissionResponse(
+                    id=perm.id,
+                    name=perm.name,
+                    description=perm.description,
+                )
+                for perm in self.permissions
+            ],
         )
 
     async def createApiKey(

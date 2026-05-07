@@ -7,7 +7,7 @@ from .db import DBSettings
 from .auth import AuthSettings
 from .utils import TomlPathConfigSettingsSource, DotEnvPathConfigSettingsSource
 from .billing import BillingSettings
-from .api_keys import ApiKeysSettings
+from .api_keys import ApiKeysSettings, ApiKeyPermission
 from .user_log import UserLogSettings
 from .api_gateway import ApiGatewaySettings
 from .conversation import ConversationSettings
