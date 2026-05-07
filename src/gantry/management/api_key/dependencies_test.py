@@ -41,14 +41,10 @@ class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
         service.verifyApiKey = AsyncMock(
             return_value=Ok(
                 {
-                    "api_key_id": 1,
                     "api_key_uuid": "api-key-uuid",
-                    "user_id": "u1",
-                    "project_id": 2,
+                    "user_uuid": "u1",
                     "project_uuid": "proj-uuid",
-                    "org_id": "org-uuid",
                     "organization_uuid": "org-uuid",
-                    "hashed_key": "hashed",
                     "permissions": ["chat.read"],
                     "rpm_limit_organization": 100,
                     "rpm_limit_project": -1,
@@ -61,7 +57,7 @@ class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
 
         result = await dependency(request, "raw-key", service)
 
-        self.assertEqual(result["api_key_id"], 1)
+        self.assertEqual(result["api_key_uuid"], "api-key-uuid")
         self.assertEqual(listPermissions(), ["chat.read"])
         service.verifyApiKey.assert_awaited_once_with("raw-key", ["chat.read"])
         self.assertEqual(request.headers["X-Organization-UUID"], "org-uuid")
@@ -83,14 +79,10 @@ class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
         service.parseApiKey = AsyncMock(
             return_value=Ok(
                 {
-                    "api_key_id": 1,
                     "api_key_uuid": "api-key-uuid",
-                    "user_id": "u1",
-                    "project_id": 2,
+                    "user_uuid": "u1",
                     "project_uuid": "proj-uuid",
-                    "org_id": "org-uuid",
                     "organization_uuid": "org-uuid",
-                    "hashed_key": "hashed",
                     "permissions": ["chat.run"],
                     "rpm_limit_organization": 50,
                     "rpm_limit_project": -1,

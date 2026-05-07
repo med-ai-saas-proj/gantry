@@ -484,9 +484,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
     async def test_list_get_update_delete_api_keys_delegate(self):
         now = datetime.now(UTC)
         key = ApiKeyResponse(
-            api_key_id=1,
             api_key_uuid="api-key-1",
-            project_id=7,
             project_uuid="project-1",
             name="Key",
             description="desc",
@@ -497,9 +495,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         )
         keys = ApiKeyListResponse(total=1, results=[key])
         updated = ApiKeyResponse(
-            api_key_id=1,
             api_key_uuid="api-key-1",
-            project_id=7,
             project_uuid="project-1",
             name="Renamed Key",
             description="",
@@ -514,16 +510,16 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         self.apikey_service.deleteApiKey = AsyncMock(return_value=Ok(True))
 
         list_result = await self.service.listApiKeys("project-1")
-        get_result = await self.service.getApiKey(1)
+        get_result = await self.service.getApiKey("api-key-1")
         update_result = await self.service.updateApiKey(
-            1,
+            "api-key-1",
             ApiKeyWriteRequest(
                 name="Renamed Key",
                 description="",
                 permissions=["objects:write"],
             ),
         )
-        delete_result = await self.service.deleteApiKey(1)
+        delete_result = await self.service.deleteApiKey("api-key-1")
 
         self.assertEqual(list_result, keys)
         self.assertEqual(get_result, key)
@@ -532,21 +528,19 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         self.apikey_service.getApiKeys.assert_awaited_once_with(
             project_uuid="project-1"
         )
-        self.apikey_service.getApiKey.assert_awaited_once_with(1)
+        self.apikey_service.getApiKey.assert_awaited_once_with("api-key-1")
         self.apikey_service.updateApiKey.assert_awaited_once_with(
-            api_key_id=1,
+            api_key_uuid="api-key-1",
             name="Renamed Key",
             description="",
             permissions=["objects:write"],
         )
-        self.apikey_service.deleteApiKey.assert_awaited_once_with(1)
+        self.apikey_service.deleteApiKey.assert_awaited_once_with("api-key-1")
 
     async def test_create_api_key_passes_actor_identity(self):
         now = datetime.now(UTC)
         expected = ApiKeyCreateResponse(
-            api_key_id=1,
             api_key_uuid="api-key-1",
-            project_id=7,
             project_uuid="project-1",
             name="Key",
             description="",

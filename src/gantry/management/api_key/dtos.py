@@ -16,9 +16,7 @@ class ApiKeyWriteRequest(BaseDTO):
 class ApiKeyResponse(BaseDTO):
     """Output DTO for one API key resource."""
 
-    api_key_id: int
     api_key_uuid: str
-    project_id: int
     project_uuid: str
     name: str
     description: str

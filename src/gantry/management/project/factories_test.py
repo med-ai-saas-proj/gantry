@@ -19,7 +19,7 @@ class TestProjectFactories(unittest.TestCase):
                 return_value="logger",
             ),
             patch(
-                "gantry.management.project.factories.getKeycloakOrgClient",
+                "gantry.management.project.factories.getKeycloakServiceClient",
                 return_value="kc-client",
             ),
             patch(

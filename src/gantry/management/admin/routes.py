@@ -469,48 +469,48 @@ async def create_admin_api_key(
 
 
 @admin_router.get(
-    "/api-keys/{apikey_id}",
+    "/api-keys/{api_key_uuid}",
     response_model=ApiKeyResponse,
     summary="Get API key as admin",
 )
 async def get_admin_api_key(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
-    apikey_id: Annotated[int, Path()],
+    api_key_uuid: Annotated[str, Path(min_length=1)],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
 ) -> ApiKeyResponse:
     """Return one API key without project permission checks."""
     del user_info
-    return await admin_service.getApiKey(apikey_id)
+    return await admin_service.getApiKey(api_key_uuid)
 
 
 @admin_router.put(
-    "/api-keys/{apikey_id}",
+    "/api-keys/{api_key_uuid}",
     response_model=ApiKeyResponse,
     summary="Update API key as admin",
 )
 async def update_admin_api_key(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
-    apikey_id: Annotated[int, Path()],
+    api_key_uuid: Annotated[str, Path(min_length=1)],
     input_data: Annotated[ApiKeyWriteRequest, Body()],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
 ) -> ApiKeyResponse:
     """Update one API key without project permission checks."""
     del user_info
-    return await admin_service.updateApiKey(apikey_id, input_data)
+    return await admin_service.updateApiKey(api_key_uuid, input_data)
 
 
 @admin_router.delete(
-    "/api-keys/{apikey_id}",
+    "/api-keys/{api_key_uuid}",
     summary="Delete API key as admin",
 )
 async def delete_admin_api_key(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
-    apikey_id: Annotated[int, Path()],
+    api_key_uuid: Annotated[str, Path(min_length=1)],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
 ) -> Response:
     """Delete one API key without project permission checks."""
     del user_info
-    await admin_service.deleteApiKey(apikey_id)
+    await admin_service.deleteApiKey(api_key_uuid)
     return Response(status_code=200)
 
 

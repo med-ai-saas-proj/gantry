@@ -228,14 +228,10 @@ class ApiKeyService:
     ) -> ApiKeyInfo:
         return ApiKeyInfo(
             {
-                "api_key_id": context["api_key_id"],
                 "api_key_uuid": context["api_key_uuid"],
-                "project_id": context["project_id"],
                 "user_uuid": context["user_uuid"],
-                "org_id": context["org_id"],
                 "project_uuid": context["project_uuid"],
                 "organization_uuid": context["organization_uuid"],
-                "hashed_key": context["hashed_key"],
                 "permissions": list(context["permissions"]),
                 "rpm_limit_organization": context["rpm_limit_organization"],
                 "rpm_limit_project": context["rpm_limit_project"],
@@ -270,11 +266,20 @@ class ApiKeyService:
                 return Err(ApiKeyNotFoundError())
             return Ok(self._snapshotApiKey(api_key))
 
-    async def getApiKeyProjectId(
-        self, api_key_id: int
+    async def _getApiKeyByUuid(
+        self, api_key_uuid: str
+    ) -> Result[dict[str, object], ApiKeyNotFoundError]:
+        async with self.session_manager.get_session() as session:
+            api_key = await self.api_key_repo.getByUuid(session, api_key_uuid)
+            if api_key is None:
+                return Err(ApiKeyNotFoundError())
+            return Ok(self._snapshotApiKey(api_key))
+
+    async def getApiKeyProjectUuid(
+        self, api_key_uuid: str
     ) -> Result[str, ApiKeyNotFoundError | ProjectNotFoundError]:
         """Resolve the project uuid that owns one API key."""
-        api_key_res = await self._getApiKeyById(api_key_id)
+        api_key_res = await self._getApiKeyByUuid(api_key_uuid)
         if api_key_res.status == ResultStatus.Err:
             return api_key_res.into()
 
@@ -286,16 +291,24 @@ class ApiKeyService:
                 return Err(ProjectNotFoundError())
             return Ok(str(project.uuid))
 
+    async def getApiKeyInternalIds(
+        self, api_key_uuid: str
+    ) -> Result[tuple[int, int], ApiKeyNotFoundError]:
+        """Resolve internal numeric ids for one API key uuid."""
+        api_key_res = await self._getApiKeyByUuid(api_key_uuid)
+        if api_key_res.status == ResultStatus.Err:
+            return api_key_res.into()
+
+        api_key = api_key_res.unwrap()
+        return Ok((int(api_key["api_key_id"]), int(api_key["project_id"])))
+
     def _toResponse(
         self,
         api_key: dict[str, object],
-        project_id: int,
         project_uuid: str,
     ) -> ApiKeyResponse:
         return ApiKeyResponse(
-            api_key_id=int(api_key["api_key_id"]),
             api_key_uuid=str(api_key["api_key_uuid"]),
-            project_id=project_id,
             project_uuid=project_uuid,
             name=str(api_key["name"]),
             description=str(api_key["description"]),
@@ -374,9 +387,7 @@ class ApiKeyService:
 
         return Ok(
             ApiKeyCreateResponse(
-                api_key_id=created.id,
                 api_key_uuid=str(created.uuid),
-                project_id=project_id,
                 project_uuid=normalized_project_uuid,
                 name=created.name,
                 description=created.description,
@@ -412,7 +423,6 @@ class ApiKeyService:
                 results=[
                     self._toResponse(
                         api_key,
-                        project_id,
                         normalized_project_uuid,
                     )
                     for api_key in snapshots
@@ -421,10 +431,10 @@ class ApiKeyService:
         )
 
     async def getApiKey(
-        self, api_key_id: int
+        self, api_key_uuid: str
     ) -> Result[ApiKeyResponse, ApiKeyNotFoundError | ProjectNotFoundError]:
-        """Get one API key by id."""
-        api_key_res = await self._getApiKeyById(api_key_id)
+        """Get one API key by uuid."""
+        api_key_res = await self._getApiKeyByUuid(api_key_uuid)
         if api_key_res.status == ResultStatus.Err:
             return api_key_res.into()
         api_key = api_key_res.unwrap()
@@ -438,7 +448,6 @@ class ApiKeyService:
             return Ok(
                 self._toResponse(
                     api_key,
-                    int(project.id),
                     str(project.uuid),
                 )
             )
@@ -446,7 +455,7 @@ class ApiKeyService:
     async def updateApiKey(
         self,
         *,
-        api_key_id: int,
+        api_key_uuid: str,
         name: str,
         description: str,
         permissions: list[str],
@@ -459,15 +468,15 @@ class ApiKeyService:
         if valid_res.status == ResultStatus.Err:
             return valid_res.into()
 
-        api_key_res = await self._getApiKeyById(api_key_id)
+        api_key_res = await self._getApiKeyByUuid(api_key_uuid)
         if api_key_res.status == ResultStatus.Err:
             return api_key_res.into()
         api_key = api_key_res.unwrap()
 
         async with self.session_manager.get_session() as session:
-            updated = await self.api_key_repo.updateById(
+            updated = await self.api_key_repo.updateByUuid(
                 session,
-                api_key_id,
+                api_key_uuid,
                 name=name,
                 description=description,
                 permissions=permissions,
@@ -485,7 +494,6 @@ class ApiKeyService:
             return Ok(
                 self._toResponse(
                     self._snapshotApiKey(updated),
-                    int(project.id),
                     str(project.uuid),
                 )
             )
@@ -518,22 +526,22 @@ class ApiKeyService:
     async def setApiKeyDisabled(
         self,
         *,
-        api_key_id: int,
+        api_key_uuid: str,
         disabled: bool,
     ) -> Result[
         ApiKeyResponse,
         ApiKeyNotFoundError | ProjectNotFoundError,
     ]:
         """Enable or disable one API key."""
-        api_key_res = await self._getApiKeyById(api_key_id)
+        api_key_res = await self._getApiKeyByUuid(api_key_uuid)
         if api_key_res.status == ResultStatus.Err:
             return api_key_res.into()
         api_key = api_key_res.unwrap()
 
         async with self.session_manager.get_session() as session:
-            updated = await self.api_key_repo.updateDisabledById(
+            updated = await self.api_key_repo.updateDisabledByUuid(
                 session,
-                api_key_id,
+                api_key_uuid,
                 disabled=disabled,
             )
             if updated is None:
@@ -549,22 +557,23 @@ class ApiKeyService:
             return Ok(
                 self._toResponse(
                     self._snapshotApiKey(updated),
-                    int(project.id),
                     str(project.uuid),
                 )
             )
 
     async def deleteApiKey(
-        self, api_key_id: int
+        self, api_key_uuid: str
     ) -> Result[bool, ApiKeyNotFoundError]:
-        """Delete one API key by id."""
-        api_key_res = await self._getApiKeyById(api_key_id)
+        """Delete one API key by uuid."""
+        api_key_res = await self._getApiKeyByUuid(api_key_uuid)
         if api_key_res.status == ResultStatus.Err:
             return api_key_res.into()
-        api_key = api_key_res.unwrap()
+        _ = api_key_res.unwrap()
 
         async with self.session_manager.get_session() as session:
-            deleted = await self.api_key_repo.deleteById(session, api_key_id)
+            deleted = await self.api_key_repo.deleteByUuid(
+                session, api_key_uuid
+            )
             if not deleted:
                 return Err(ApiKeyNotFoundError())
             await session.commit()

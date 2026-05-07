@@ -44,7 +44,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         self.session_manager = _DummySessionManager()
         self.api_key_repo = Mock()
         self.project_repo = Mock()
-        self.api_key_repo.getByKey = AsyncMock(return_value=None)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=None)
         self.api_key_repo.getContextByHashedKey = AsyncMock(return_value=None)
         self.service = ApiKeyService(
             config={"key_secret": "secret", "api_key_secret_length": 8},
@@ -99,9 +99,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result.status, ResultStatus.Ok)
-        self.assertEqual(result.unwrap().api_key_id, 11)
         self.assertEqual(result.unwrap().api_key_uuid, "api-key-11")
-        self.assertEqual(result.unwrap().project_id, 7)
         self.assertEqual(result.unwrap().project_uuid, "proj-1")
         self.assertEqual(result.unwrap().permissions, ["chat.run"])
         self.assertTrue(result.unwrap().key.startswith("sk_"))
@@ -154,7 +152,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, ResultStatus.Ok)
         self.assertEqual(result.unwrap().total, 1)
-        self.assertEqual(result.unwrap().results[0].project_id, 7)
+        self.assertEqual(result.unwrap().results[0].api_key_uuid, "api-key-11")
         self.assertEqual(result.unwrap().results[0].project_uuid, "proj-1")
 
     async def test_get_api_keys_returns_project_not_found(self):
@@ -178,20 +176,19 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             disabled=False,
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
-        self.api_key_repo.getByKey = AsyncMock(return_value=api_key)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=api_key)
         self.project_repo.getByKey = AsyncMock(return_value=project)
 
-        result = await self.service.getApiKey(11)
+        result = await self.service.getApiKey("api-key-11")
 
         self.assertEqual(result.status, ResultStatus.Ok)
         self.assertEqual(result.unwrap().api_key_uuid, "api-key-11")
-        self.assertEqual(result.unwrap().project_id, 7)
         self.assertEqual(result.unwrap().project_uuid, "proj-1")
 
     async def test_get_api_key_returns_not_found_from_lookup(self):
-        self.api_key_repo.getByKey = AsyncMock(return_value=None)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=None)
 
-        result = await self.service.getApiKey(11)
+        result = await self.service.getApiKey("api-key-11")
 
         self.assertEqual(result.status, ResultStatus.Err)
         self.assertIsInstance(result.err(), ApiKeyNotFoundError)
@@ -210,19 +207,19 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             permissions=["chat.run"],
             disabled=False,
         )
-        self.api_key_repo.getByKey = AsyncMock(return_value=api_key)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=api_key)
         self.project_repo.getByKey = AsyncMock(return_value=None)
 
-        result = await self.service.getApiKey(11)
+        result = await self.service.getApiKey("api-key-11")
 
         self.assertEqual(result.status, ResultStatus.Err)
         self.assertIsInstance(result.err(), ProjectNotFoundError)
 
     async def test_update_api_key_rejects_missing_key(self):
-        self.api_key_repo.getByKey = AsyncMock(return_value=None)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=None)
 
         result = await self.service.updateApiKey(
-            api_key_id=11,
+            api_key_uuid="api-key-11",
             name="updated",
             description="desc",
             permissions=["chat.run"],
@@ -233,7 +230,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
 
     async def test_update_api_key_rejects_unknown_permissions(self):
         result = await self.service.updateApiKey(
-            api_key_id=11,
+            api_key_uuid="api-key-11",
             name="updated",
             description="desc",
             permissions=["unknown.permission"],
@@ -266,12 +263,12 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             disabled=False,
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
-        self.api_key_repo.getByKey = AsyncMock(return_value=current)
-        self.api_key_repo.updateById = AsyncMock(return_value=updated)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=current)
+        self.api_key_repo.updateByUuid = AsyncMock(return_value=updated)
         self.project_repo.getByKey = AsyncMock(return_value=project)
 
         result = await self.service.updateApiKey(
-            api_key_id=11,
+            api_key_uuid="api-key-11",
             name="updated",
             description="desc",
             permissions=["chat.read"],
@@ -293,11 +290,11 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             permissions=["chat.run"],
             disabled=False,
         )
-        self.api_key_repo.getByKey = AsyncMock(return_value=current)
-        self.api_key_repo.updateById = AsyncMock(return_value=None)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=current)
+        self.api_key_repo.updateByUuid = AsyncMock(return_value=None)
 
         result = await self.service.updateApiKey(
-            api_key_id=11,
+            api_key_uuid="api-key-11",
             name="updated",
             description="desc",
             permissions=["chat.read"],
@@ -331,12 +328,12 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             permissions=["chat.read"],
             disabled=False,
         )
-        self.api_key_repo.getByKey = AsyncMock(return_value=current)
-        self.api_key_repo.updateById = AsyncMock(return_value=updated)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=current)
+        self.api_key_repo.updateByUuid = AsyncMock(return_value=updated)
         self.project_repo.getByKey = AsyncMock(return_value=None)
 
         result = await self.service.updateApiKey(
-            api_key_id=11,
+            api_key_uuid="api-key-11",
             name="updated",
             description="desc",
             permissions=["chat.read"],
@@ -346,9 +343,10 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(result.err(), ProjectNotFoundError)
 
     async def test_delete_api_key_returns_not_found_for_missing_key(self):
-        self.api_key_repo.deleteById = AsyncMock(return_value=False)
+        self.api_key_repo.deleteByUuid = AsyncMock(return_value=False)
 
-        result = await self.service.deleteApiKey(11)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=None)
+        result = await self.service.deleteApiKey("api-key-11")
 
         self.assertEqual(result.status, ResultStatus.Err)
         self.assertIsInstance(result.err(), ApiKeyNotFoundError)
@@ -366,10 +364,10 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             disabled=False,
             hashed_key="hashed",
         )
-        self.api_key_repo.getByKey = AsyncMock(return_value=current)
-        self.api_key_repo.deleteById = AsyncMock(return_value=True)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=current)
+        self.api_key_repo.deleteByUuid = AsyncMock(return_value=True)
 
-        result = await self.service.deleteApiKey(11)
+        result = await self.service.deleteApiKey("api-key-11")
 
         self.assertEqual(result.status, ResultStatus.Ok)
         self.assertTrue(result.unwrap())
@@ -399,12 +397,12 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             disabled=True,
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
-        self.api_key_repo.getByKey = AsyncMock(return_value=current)
-        self.api_key_repo.updateDisabledById = AsyncMock(return_value=updated)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=current)
+        self.api_key_repo.updateDisabledByUuid = AsyncMock(return_value=updated)
         self.project_repo.getByKey = AsyncMock(return_value=project)
 
         result = await self.service.setApiKeyDisabled(
-            api_key_id=11, disabled=True
+            api_key_uuid="api-key-11", disabled=True
         )
 
         self.assertEqual(result.status, ResultStatus.Ok)
@@ -422,10 +420,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, ResultStatus.Ok)
         self.assertEqual(result.unwrap()["api_key_uuid"], "demo")
-        self.assertEqual(result.unwrap()["api_key_id"], 11)
-        self.assertEqual(result.unwrap()["project_id"], 7)
         self.assertEqual(result.unwrap()["project_uuid"], "proj-1")
-        self.assertEqual(result.unwrap()["org_id"], "org-1")
         self.assertEqual(result.unwrap()["organization_uuid"], "org-1")
         self.assertEqual(result.unwrap()["user_uuid"], "u1")
         self.assertEqual(
@@ -501,8 +496,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, ResultStatus.Ok)
         self.assertEqual(result.unwrap()["api_key_uuid"], "demo")
-        self.assertEqual(result.unwrap()["api_key_id"], 11)
-        self.assertEqual(result.unwrap()["project_id"], 7)
+        self.assertEqual(result.unwrap()["project_uuid"], "proj-1")
         self.assertEqual(result.unwrap()["rpm_limit_organization"], 90)
         self.assertEqual(result.unwrap()["spending_limit_project"], -1)
         self.assertEqual(result.unwrap()["user_uuid"], "u1")
@@ -533,12 +527,12 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hashed_key="hashed",
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
-        self.api_key_repo.getByKey = AsyncMock(return_value=current)
-        self.api_key_repo.updateById = AsyncMock(return_value=updated)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=current)
+        self.api_key_repo.updateByUuid = AsyncMock(return_value=updated)
         self.project_repo.getByKey = AsyncMock(return_value=project)
 
         result = await self.service.updateApiKey(
-            api_key_id=11,
+            api_key_uuid="api-key-11",
             name="updated",
             description="desc",
             permissions=["chat.read"],
@@ -546,7 +540,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, ResultStatus.Ok)
 
-    async def test_get_api_key_project_id_returns_project_uuid(self):
+    async def test_get_api_key_project_uuid_returns_project_uuid(self):
         api_key = SimpleNamespace(
             id=11,
             uuid="api-key-11",
@@ -559,23 +553,23 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             disabled=False,
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
-        self.api_key_repo.getByKey = AsyncMock(return_value=api_key)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=api_key)
         self.project_repo.getByKey = AsyncMock(return_value=project)
 
-        result = await self.service.getApiKeyProjectId(11)
+        result = await self.service.getApiKeyProjectUuid("api-key-11")
 
         self.assertEqual(result.status, ResultStatus.Ok)
         self.assertEqual(result.unwrap(), "proj-1")
 
-    async def test_get_api_key_project_id_returns_not_found_from_lookup(self):
-        self.api_key_repo.getByKey = AsyncMock(return_value=None)
+    async def test_get_api_key_project_uuid_returns_not_found_from_lookup(self):
+        self.api_key_repo.getByUuid = AsyncMock(return_value=None)
 
-        result = await self.service.getApiKeyProjectId(11)
+        result = await self.service.getApiKeyProjectUuid("api-key-11")
 
         self.assertEqual(result.status, ResultStatus.Err)
         self.assertIsInstance(result.err(), ApiKeyNotFoundError)
 
-    async def test_get_api_key_project_id_returns_project_not_found(self):
+    async def test_get_api_key_project_uuid_returns_project_not_found(self):
         api_key = SimpleNamespace(
             id=11,
             uuid="api-key-11",
@@ -587,10 +581,10 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             permissions=["chat.run"],
             disabled=False,
         )
-        self.api_key_repo.getByKey = AsyncMock(return_value=api_key)
+        self.api_key_repo.getByUuid = AsyncMock(return_value=api_key)
         self.project_repo.getByKey = AsyncMock(return_value=None)
 
-        result = await self.service.getApiKeyProjectId(11)
+        result = await self.service.getApiKeyProjectUuid("api-key-11")
 
         self.assertEqual(result.status, ResultStatus.Err)
         self.assertIsInstance(result.err(), ProjectNotFoundError)

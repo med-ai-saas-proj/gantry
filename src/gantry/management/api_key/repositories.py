@@ -32,6 +32,17 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         )
         return await self.selectOne(session, stmt)
 
+    async def getByUuid(
+        self, session: AsyncSession, api_key_uuid: str
+    ) -> ApiKey | None:
+        stmt = (
+            select(ApiKey)
+            .select_from(ApiKey)
+            .where(ApiKey.uuid == api_key_uuid)
+            .limit(1)
+        )
+        return await self.selectOne(session, stmt)
+
     async def getContextByHashedKey(
         self,
         session: AsyncSession,
@@ -238,6 +249,28 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         res = await session.execute(stmt)
         return res.scalar_one_or_none()
 
+    async def updateByUuid(
+        self,
+        session: AsyncSession,
+        api_key_uuid: str,
+        *,
+        name: str,
+        description: str,
+        permissions: list[str],
+    ) -> ApiKey | None:
+        stmt = (
+            update(ApiKey)
+            .where(ApiKey.uuid == api_key_uuid)
+            .values(
+                name=name,
+                description=description,
+                permissions=permissions,
+            )
+            .returning(ApiKey)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
     async def updateDisabledById(
         self,
         session: AsyncSession,
@@ -248,6 +281,22 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         stmt = (
             update(ApiKey)
             .where(ApiKey.id == api_key_id)
+            .values(disabled=disabled)
+            .returning(ApiKey)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
+    async def updateDisabledByUuid(
+        self,
+        session: AsyncSession,
+        api_key_uuid: str,
+        *,
+        disabled: bool,
+    ) -> ApiKey | None:
+        stmt = (
+            update(ApiKey)
+            .where(ApiKey.uuid == api_key_uuid)
             .values(disabled=disabled)
             .returning(ApiKey)
         )
@@ -270,6 +319,17 @@ class ApiKeyRepository(Repository[ApiKey, int]):
     async def deleteById(self, session: AsyncSession, api_key_id: int) -> bool:
         stmt = (
             delete(ApiKey).where(ApiKey.id == api_key_id).returning(ApiKey.id)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none() is not None
+
+    async def deleteByUuid(
+        self, session: AsyncSession, api_key_uuid: str
+    ) -> bool:
+        stmt = (
+            delete(ApiKey)
+            .where(ApiKey.uuid == api_key_uuid)
+            .returning(ApiKey.id)
         )
         res = await session.execute(stmt)
         return res.scalar_one_or_none() is not None

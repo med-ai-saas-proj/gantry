@@ -73,9 +73,11 @@ class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
             required=ProjectPermission.APIKEY_WRITE,
         )
 
-    async def test_id_routes_authorize_via_resolved_project(self):
+    async def test_uuid_routes_authorize_via_resolved_project(self):
         apikey_service = Mock()
-        apikey_service.getApiKeyProjectId = AsyncMock(return_value=Ok("proj-1"))
+        apikey_service.getApiKeyProjectUuid = AsyncMock(
+            return_value=Ok("proj-1")
+        )
         apikey_service.getApiKey = AsyncMock(return_value=Ok("detail"))
         apikey_service.updateApiKey = AsyncMock(return_value=Ok("updated"))
         apikey_service.setApiKeyDisabled = AsyncMock(
@@ -90,14 +92,14 @@ class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             await routes.getApiKey(
-                user_info, 11, apikey_service, project_service
+                user_info, "api-key-11", apikey_service, project_service
             ),
             "detail",
         )
         self.assertEqual(
             await routes.updateApiKey(
                 user_info,
-                11,
+                "api-key-11",
                 ApiKeyWriteRequest(
                     name="Key 1",
                     description="desc",
@@ -109,18 +111,18 @@ class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
             "updated",
         )
         delete_res = await routes.deleteApiKey(
-            user_info, 11, apikey_service, project_service
+            user_info, "api-key-11", apikey_service, project_service
         )
         self.assertEqual(delete_res.status_code, 200)
         self.assertEqual(
             await routes.disableApiKey(
-                user_info, 11, apikey_service, project_service
+                user_info, "api-key-11", apikey_service, project_service
             ),
             "disabled",
         )
         self.assertEqual(
             await routes.enableApiKey(
-                user_info, 11, apikey_service, project_service
+                user_info, "api-key-11", apikey_service, project_service
             ),
             "enabled",
         )

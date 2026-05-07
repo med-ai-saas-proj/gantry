@@ -11,10 +11,8 @@ from gantry.management.auth.services import MissingOrganizationClaimError
 from gantry.management.auth.dependencies import (
     MissingOrganizationContextError,
     _getUserInfo,
-    getUserOrgId,
     _getAdminInfo,
     getUserOrgUuid,
-    requireUserOrgId,
     requireUserOrgUuid,
 )
 
@@ -66,7 +64,7 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(user_info["id"], "admin-1")
 
-    async def test_get_user_org_uuid_and_aliases(self):
+    async def test_get_user_org_uuid(self):
         user_info = {
             "id": "u1",
             "username": "alice",
@@ -76,8 +74,6 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
             "project_permissions": {},
         }
         self.assertEqual(await getUserOrgUuid(user_info), "org-1")
-        self.assertEqual(await getUserOrgId(user_info), "org-1")
         self.assertEqual(await requireUserOrgUuid("org-1"), "org-1")
-        self.assertEqual(await requireUserOrgId("org-1"), "org-1")
         with self.assertRaises(MissingOrganizationContextError):
             await requireUserOrgUuid("")

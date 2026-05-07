@@ -444,28 +444,28 @@ class AdminService:
         )
         return result.unwrap()
 
-    async def getApiKey(self, apikey_id: int) -> ApiKeyResponse:
+    async def getApiKey(self, api_key_uuid: str) -> ApiKeyResponse:
         """Return one API key without project permission checks."""
-        result = await self.apikey_service.getApiKey(apikey_id)
+        result = await self.apikey_service.getApiKey(api_key_uuid)
         return result.unwrap()
 
     async def updateApiKey(
         self,
-        apikey_id: int,
+        api_key_uuid: str,
         input_data: ApiKeyWriteRequest,
     ) -> ApiKeyResponse:
         """Update one API key without project permission checks."""
         result = await self.apikey_service.updateApiKey(
-            api_key_id=apikey_id,
+            api_key_uuid=api_key_uuid,
             name=input_data.name,
             description=input_data.description,
             permissions=input_data.permissions,
         )
         return result.unwrap()
 
-    async def deleteApiKey(self, apikey_id: int) -> bool:
+    async def deleteApiKey(self, api_key_uuid: str) -> bool:
         """Delete one API key without project permission checks."""
-        result = await self.apikey_service.deleteApiKey(apikey_id)
+        result = await self.apikey_service.deleteApiKey(api_key_uuid)
         result.unwrap()
         return True
 

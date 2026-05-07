@@ -16,12 +16,6 @@ from functools import lru_cache
 
 
 @lru_cache(1)
-def getKeycloakOrgClient():
-    """Backward-compatible alias for project tests and wiring."""
-    return getKeycloakServiceClient()
-
-
-@lru_cache(1)
 def getProjectRepository():
     return ProjectRepository(getRedisCacheRepo())
 
@@ -42,7 +36,7 @@ def getProjectService() -> ProjectService:
     return ProjectService(
         session_manager=getSessionManager(),
         logger=getLogger(),
-        kc_client=getKeycloakOrgClient(),
+        kc_client=getKeycloakServiceClient(),
         project_repo=getProjectRepository(),
         membership_repo=getProjectMemeberRepository(),
         settings_repo=getProjectSettingsRepository(),
