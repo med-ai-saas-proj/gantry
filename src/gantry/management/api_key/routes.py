@@ -42,19 +42,6 @@ async def getApiKeyPermissions(
     return apikey_service.getPermissionCatalog()
 
 
-@apikey_router.get(
-    "/permissions/audit", response_model=ApiKeyPermissionAuditResponse
-)
-async def auditApiKeyPermissions(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
-) -> ApiKeyPermissionAuditResponse:
-    """Audit mismatches between runtime and stored API key permissions."""
-    _ = user_info
-    result = await apikey_service.auditPermissions()
-    return result
-
-
 @apikey_router.get("", response_model=ApiKeyListResponse)
 async def getApiKeys(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],

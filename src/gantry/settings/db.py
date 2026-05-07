@@ -23,5 +23,6 @@ class DBSettings(BaseSettings):
         Field(description="Redis connection URI for caching."),
     ]
     cache_ttl: Annotated[
-        timedelta, Field(description="Cache time-to-live", gt=0)
+        timedelta | None,
+        Field(description="Cache time-to-live, None mean never expire"),
     ] = timedelta(hours=1)

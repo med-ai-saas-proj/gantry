@@ -43,5 +43,6 @@ def getRedisBinary() -> Redis:
 @lru_cache(1)
 def getRedisCacheRepo() -> RedisCacheRepository:
     return RedisCacheRepository(
-        getRedisBinary(), ttl=getDBSettings().cache_ttl
+        getRedisBinary(),
+        ttl=getDBSettings().cache_ttl,
     )

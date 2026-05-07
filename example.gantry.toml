@@ -7,7 +7,7 @@ log_level = "DEBUG"
 
 [db]
 timescale_connection_uri = "postgresql+asyncpg://gantry:123456@localhost:5432/gantry"
-pgvector_connection_uri = "postgresql+asyncpg://gantry:123456@localhost:5433/gantry"
+pgvector_connection_uri = "postgresql+asyncpg://gantry:123456@localhost:5432/gantry"
 redis_connection_uri = "redis://localhost:6379/0"
 
 [apikey]

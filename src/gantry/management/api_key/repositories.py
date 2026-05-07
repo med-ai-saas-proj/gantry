@@ -7,7 +7,6 @@ from gantry.management.organization import OrgSettings
 from .models import ApiKey
 from .entities import ApiKeyInfo, ApiKeyContextRecord
 
-from uuid import UUID
 from typing import Sequence
 
 from sqlalchemy import func, delete, insert, select, update
@@ -17,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 class ApiKeyRepository(Repository[ApiKey, int]):
     """Repository for project-scoped API keys."""
 
-    def __init__(self, cache_repo: CacheRepository | None = None):
+    def __init__(self, cache_repo: CacheRepository):
         self.cache_repo = cache_repo
         super().__init__(ApiKey, ApiKey.id)
 
@@ -28,17 +27,6 @@ class ApiKeyRepository(Repository[ApiKey, int]):
             select(ApiKey)
             .select_from(ApiKey)
             .where(ApiKey.hashed_key == hashed_key)
-            .limit(1)
-        )
-        return await self.selectOne(session, stmt)
-
-    async def getByUuid(
-        self, session: AsyncSession, api_key_uuid: str
-    ) -> ApiKey | None:
-        stmt = (
-            select(ApiKey)
-            .select_from(ApiKey)
-            .where(ApiKey.uuid == api_key_uuid)
             .limit(1)
         )
         return await self.selectOne(session, stmt)
@@ -82,20 +70,11 @@ class ApiKeyRepository(Repository[ApiKey, int]):
             row = (await session.execute(stmt)).mappings().first()
             if row is None:
                 return None
-            org_spending_limit = row.get(
-                "organization_spending_limit",
-                row.get("spending_limit_organization"),
-            )
-            project_spending_limit = row.get(
-                "project_spending_limit",
-                row.get("spending_limit_project"),
-            )
             return ApiKeyContextRecord(
                 api_key_id=int(row["api_key_id"]),
-                api_key_uuid=str(row["api_key_uuid"]),
+                api_key_uuid=row["api_key_uuid"],
                 user_uuid=str(row["user_id"]),
                 project_id=int(row["project_id"]),
-                org_id=str(row["organization_uuid"]),
                 organization_uuid=str(row["organization_uuid"]),
                 project_uuid=str(row["project_uuid"]),
                 hashed_key=str(row["hashed_key"]),
@@ -112,20 +91,18 @@ class ApiKeyRepository(Repository[ApiKey, int]):
                     else -1
                 ),
                 spending_limit_organization=(
-                    int(org_spending_limit)
-                    if org_spending_limit is not None
+                    int(row["organization_spending_limit"])
+                    if row["organization_spending_limit"] is not None
                     else -1
                 ),
                 spending_limit_project=(
-                    int(project_spending_limit)
-                    if project_spending_limit is not None
+                    int(row["project_spending_limit"])
+                    if row["project_spending_limit"] is not None
                     else -1
                 ),
             )
 
-        if self.cache_repo is None:
-            return await _inner()
-        return await self.cache_repo.getCacheOrCall(
+        return await self.cache_repo.getCachedOrCall(
             f"api_keys:context_record:{hashed_key}", _inner
         )
 
@@ -134,14 +111,14 @@ class ApiKeyRepository(Repository[ApiKey, int]):
     ) -> Sequence[ApiKeyInfo]:
         stmt = (
             select(
-                ApiKey.id.label("api_key_id"),
-                ApiKey.uuid.label("api_key_uuid"),
+                ApiKey.uuid,
                 ApiKey.hashed_key,
                 ApiKey.user_id,
                 ApiKey.project_id,
+                ApiKey.id,
                 ApiKey.permissions,
-                Project.uuid.label("project_uuid"),
-                Project.organization_id.label("organization_uuid"),
+                Project.uuid.label("project_uid"),
+                Project.organization_id,
             )
             .select_from(ApiKey)
             .join(Project, ApiKey.project_id == Project.id)
@@ -151,19 +128,16 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         return [
             ApiKeyInfo(
                 {
-                    "api_key_id": int(key["api_key_id"]),
-                    "api_key_uuid": str(key["api_key_uuid"]),
+                    "api_key_uuid": str(key["uuid"]),
                     "user_uuid": str(key["user_id"]),
-                    "project_id": int(key["project_id"]),
-                    "project_uuid": str(key["project_uuid"]),
-                    "org_id": str(key["organization_uuid"]),
-                    "organization_uuid": str(key["organization_uuid"]),
-                    "hashed_key": str(key["hashed_key"]),
+                    "project_uuid": str(key["project_uid"]),
+                    "organization_uuid": str(key["organization_id"]),
                     "permissions": list(key["permissions"] or []),
                     "rpm_limit_organization": -1,
                     "rpm_limit_project": -1,
                     "spending_limit_organization": -1,
                     "spending_limit_project": -1,
+                    # "hashed_key": key["hashed_key"],
                 }
             )
             for key in result.mappings().all()
@@ -191,17 +165,10 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         res = await session.execute(stmt)
         return int(res.scalar_one() or 0)
 
-    async def countAll(self, session: AsyncSession) -> int:
-        """Return the total number of API keys."""
-        stmt = select(func.count()).select_from(ApiKey)
-        res = await session.execute(stmt)
-        return int(res.scalar_one() or 0)
-
     async def create(
         self,
         session: AsyncSession,
         *,
-        uuid: UUID,
         user_id: str,
         project_id: int,
         hashed_key: str,
@@ -213,7 +180,6 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         stmt = (
             insert(ApiKey)
             .values(
-                uuid=uuid,
                 user_id=user_id,
                 project_id=project_id,
                 hashed_key=hashed_key,
@@ -249,28 +215,6 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         res = await session.execute(stmt)
         return res.scalar_one_or_none()
 
-    async def updateByUuid(
-        self,
-        session: AsyncSession,
-        api_key_uuid: str,
-        *,
-        name: str,
-        description: str,
-        permissions: list[str],
-    ) -> ApiKey | None:
-        stmt = (
-            update(ApiKey)
-            .where(ApiKey.uuid == api_key_uuid)
-            .values(
-                name=name,
-                description=description,
-                permissions=permissions,
-            )
-            .returning(ApiKey)
-        )
-        res = await session.execute(stmt)
-        return res.scalar_one_or_none()
-
     async def updateDisabledById(
         self,
         session: AsyncSession,
@@ -281,22 +225,6 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         stmt = (
             update(ApiKey)
             .where(ApiKey.id == api_key_id)
-            .values(disabled=disabled)
-            .returning(ApiKey)
-        )
-        res = await session.execute(stmt)
-        return res.scalar_one_or_none()
-
-    async def updateDisabledByUuid(
-        self,
-        session: AsyncSession,
-        api_key_uuid: str,
-        *,
-        disabled: bool,
-    ) -> ApiKey | None:
-        stmt = (
-            update(ApiKey)
-            .where(ApiKey.uuid == api_key_uuid)
             .values(disabled=disabled)
             .returning(ApiKey)
         )
@@ -319,17 +247,6 @@ class ApiKeyRepository(Repository[ApiKey, int]):
     async def deleteById(self, session: AsyncSession, api_key_id: int) -> bool:
         stmt = (
             delete(ApiKey).where(ApiKey.id == api_key_id).returning(ApiKey.id)
-        )
-        res = await session.execute(stmt)
-        return res.scalar_one_or_none() is not None
-
-    async def deleteByUuid(
-        self, session: AsyncSession, api_key_uuid: str
-    ) -> bool:
-        stmt = (
-            delete(ApiKey)
-            .where(ApiKey.uuid == api_key_uuid)
-            .returning(ApiKey.id)
         )
         res = await session.execute(stmt)
         return res.scalar_one_or_none() is not None

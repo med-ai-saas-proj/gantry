@@ -1,25 +1,8 @@
 from __future__ import annotations
 
-from typing import Self, Annotated
+from typing import Annotated
 
-from pydantic import Field, BaseModel, model_validator
-
-
-class ApiGatewayPermission(BaseModel):
-    id: Annotated[
-        str,
-        Field(description="Unique permission identifier."),
-    ]
-    name: Annotated[
-        str,
-        Field(description="Human-readable permission name."),
-    ]
-    description: Annotated[
-        str,
-        Field(
-            description="Explanation of what this permission grants.",
-        ),
-    ]
+from pydantic import Field, BaseModel
 
 
 class ApiGatewayRoute(BaseModel):
@@ -56,25 +39,21 @@ class ApiGatewayRoute(BaseModel):
 
 
 class ApiGatewaySettings(BaseModel):
-    permissions: Annotated[
-        list[ApiGatewayPermission],
-        Field(description="Available API gateway permissions."),
-    ] = []
     routes: Annotated[
         dict[str, ApiGatewayRoute],
         Field(description="Route definitions keyed by route name."),
     ] = {}
 
-    @model_validator(mode="after")
-    def validate_required_perms(self) -> Self:
-        permission_ids = {p.id for p in self.permissions}
-        for route_name, route in self.routes.items():
-            if route.required_perms is None:
-                continue
-            invalid = set(route.required_perms) - permission_ids
-            if invalid:
-                raise ValueError(
-                    f"Route '{route_name}' has unknown "
-                    f"permission(s): {sorted(invalid)}"
-                )
-        return self
+    # @model_validator(mode="after")
+    # def validate_required_perms(self) -> Self:
+    #     permission_ids = {p.id for p in self.permissions}
+    #     for route_name, route in self.routes.items():
+    #         if route.required_perms is None:
+    #             continue
+    #         invalid = set(route.required_perms) - permission_ids
+    #         if invalid:
+    #             raise ValueError(
+    #                 f"Route '{route_name}' has unknown "
+    #                 f"permission(s): {sorted(invalid)}"
+    #             )
+    #     return self

@@ -39,11 +39,17 @@ class ApiKeyListResponse(BaseDTO):
     results: list[ApiKeyResponse]
 
 
+class ApiKeyPermissionResponse(BaseDTO):
+    id: str
+    name: str
+    description: str
+
+
 class ApiKeyPermissionCatalogResponse(BaseDTO):
     """List all permissions currently available to API keys."""
 
     total: int
-    results: list[str]
+    results: list[ApiKeyPermissionResponse]
 
 
 class ApiKeyPermissionAuditResponse(BaseDTO):

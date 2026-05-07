@@ -6,8 +6,8 @@ from gantry.settings.keycloak import KeycloakSettings
 from .db import DBSettings
 from .auth import AuthSettings
 from .utils import TomlPathConfigSettingsSource, DotEnvPathConfigSettingsSource
-from .api_key import ApiKeysSettings
 from .billing import BillingSettings
+from .api_key import ApiKeysSettings, ApiKeyPermission
 from .user_log import UserLogSettings
 from .api_gateway import ApiGatewaySettings
 from .conversation import ConversationSettings
