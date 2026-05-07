@@ -2,15 +2,9 @@
 
 from gantry.keycloak import getKeycloakSettings
 from gantry.settings import AppStage, getAppSettings
-from gantry.management.organization.factories import (
-    KeycloakServiceClient,
-    getKeycloakServiceClient,
-)
 from gantry.shared.custom_types.error_exception import RecoverableError
 
-from .roles import ManagementRole
 from .entities import UserInfo, AdminInfo
-from .settings import getAuthSettings
 from .factories import (
     AuthService,
     getAuthService,
@@ -24,7 +18,6 @@ from uuid import UUID
 from typing import Annotated
 
 from fastapi import Depends, Security, HTTPException
-from pyrusult import ResultStatus
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
@@ -77,33 +70,13 @@ enable_mock_auth = os.getenv("GANTRY_ENABLE_MOCK_AUTH", "").lower() in {
 async def _getUserInfo(
     token: Annotated[str, Security(oauth_2_scheme)],
     auth_service: Annotated[AuthService, Depends(getAuthService)],
-    kc_org_client: Annotated[
-        KeycloakServiceClient, Depends(getKeycloakServiceClient)
-    ],
 ) -> UserInfo:
     """Get authenticated user info from JWT token.
 
     This is the base dependency for authentication.
     Returns UserInfo if token is valid, raises UnauthorizedError otherwise.
     """
-    user_info = auth_service.verifyToken(token).unwrap()
-
-    org_claim = user_info["org_id"]
-    if not org_claim:
-        return user_info
-
-    orgs_res = await kc_org_client.getMemberOrganizations(user_info["id"])
-    if orgs_res.status == ResultStatus.Err:
-        return user_info
-
-    for org in orgs_res.unwrap():
-        org_id = org.get("id")
-        if not isinstance(org_id, str) or not org_id:
-            continue
-        if org_claim in {org_id, org.get("name"), org.get("alias")}:
-            user_info["org_id"] = org_id
-            break
-
+    user_info = (await auth_service.verifyToken(token)).unwrap()
     return user_info
 
 
@@ -112,11 +85,10 @@ getUserInfo = _getUserInfo
 
 async def _getAdminInfo(
     token: Annotated[str, Security(admin_oauth_2_scheme)],
-    auth_service: Annotated[AuthService, Depends(getAdminAuthService)],
+    admin_auth_service: Annotated[AuthService, Depends(getAdminAuthService)],
 ) -> AdminInfo:
     """Get authenticated admin user info and require Keycloak realm role `ADMIN`."""
-    user_info = auth_service.verifyToken(token).unwrap()
-    auth_service.checkAdminRole(user_info).unwrap()
+    user_info = admin_auth_service.verifyTokenAdmin(token).unwrap()
     return user_info
 
 
@@ -161,15 +133,15 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
     getAdminInfo = mock_getAdminUserInfo
 
 
-async def getUserOrgId(
+async def getUserOrgUuid(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
 ) -> str:
     """Return the authenticated user's organization id from token context."""
-    return user_info["org_id"]
+    return user_info["org_uuid"]
 
 
-async def requireUserOrgId(
-    org_id: Annotated[str, Depends(getUserOrgId)],
+async def requireUserOrgUuid(
+    org_id: Annotated[str, Depends(getUserOrgUuid)],
 ) -> str:
     """Return token org id, failing if the token has no organization context."""
     if not org_id:

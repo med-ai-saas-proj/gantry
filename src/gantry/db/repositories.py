@@ -1,15 +1,19 @@
 """Repository base class."""
 
-from abc import ABC
-from typing import Sequence
+import pickle
+import inspect
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Sequence, Coroutine, override
+from datetime import timedelta
 
+from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import (
     Select,
     ColumnElement,
     UnaryExpression,
-    func,
     select,
 )
+from redis.asyncio import Redis
 from sqlalchemy.orm import (
     DeclarativeBase,
     InstrumentedAttribute,
@@ -210,3 +214,99 @@ class Repository[TEntity: DeclarativeBase, TKey](ABC):
         """Execute select statement and return multiple entities."""
         res = await session.execute(stmt)
         return res.unique().scalars().all()
+
+
+class CacheRepository(ABC):
+    def __init__(self, ttl: timedelta | None = None):
+        self.ttl = ttl
+
+    @abstractmethod
+    async def getCached(self, key: str) -> Result[Any, None]: ...
+
+    @abstractmethod
+    async def setCache[T](self, key: str, value: T): ...
+
+    @abstractmethod
+    async def invalidateCached(self, key: str) -> None: ...
+
+    @abstractmethod
+    async def getCachedOrCall[**P, R](
+        self,
+        key: str,
+        fn: Callable[P, R | Coroutine[Any, Any, R]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R: ...
+
+    def cache[**P](
+        self,
+        key_fn: Callable[P, str],
+    ):
+        """Cache the result of the function to redis."""
+
+        def _cache[R](
+            fn: Callable[P, R | Coroutine[Any, Any, R]],
+        ) -> Callable[
+            P,
+            Coroutine[None, None, R],
+        ]:
+            # assert P == PP
+
+            async def _wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+                key = key_fn(*args, **kwargs)
+
+                res = await self.getCachedOrCall(
+                    key, lambda: fn(*args, **kwargs)
+                )
+                return res
+
+            return _wrapper
+
+        return _cache
+
+
+class RedisCacheRepository(CacheRepository):
+    def __init__(self, redis: Redis, ttl: timedelta | None = None):
+        self.redis = redis
+        super().__init__(ttl)
+
+    @override
+    async def getCached(self, key: str) -> Result[Any, None]:
+        if (cached := await self.redis.get(key)) is not None:
+            return Ok(pickle.loads(cached))
+        return Err(None)
+
+    @override
+    async def setCache[T](self, key: str, value: T):
+        await self.redis.set(key, pickle.dumps(value), ex=self.ttl)
+
+    @override
+    async def invalidateCached(self, key: str):
+        await self.redis.delete(key)
+
+    @override
+    async def getCachedOrCall[**P, R](
+        self,
+        key: str,
+        fn: Callable[P, R | Coroutine[Any, Any, R]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
+        if (
+            cached := await self.getCached(key)
+        ) and cached.status != ResultStatus.Err:
+            return cached.value
+
+        async with self.redis.lock(f"lock:{key}", timeout=0.5):
+            # Check again if not creator
+            if (
+                cached := await self.getCached(key)
+            ) and cached.status != ResultStatus.Err:
+                return cached.value
+
+            # Create
+            res = fn(*args, **kwargs)
+            if inspect.iscoroutine(res):
+                res = await res
+            await self.setCache(key, res)
+            return res

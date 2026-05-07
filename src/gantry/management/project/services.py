@@ -8,15 +8,9 @@ from gantry.keycloak import (
     UserNotInOrganizationError,
 )
 from gantry.db.factories import AsyncSessionManager
-from gantry.shared.utils.scaled_amount import int_to_scaled_int
 from gantry.shared.utils.permission_utils import (
     normalize_project_permission_map,
     serialize_project_permission_map,
-)
-from gantry.management.organization.cache_keys import (
-    BILLING_CACHE_TTL_SECONDS,
-    ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
-    project_rpm_limit_key,
 )
 from gantry.management.organization.permissions import (
     OrgPermission,
@@ -51,17 +45,6 @@ from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 
 
-BILLING_PROJECT_SPENDING_LIMIT_KEY = (
-    "billing:spending_limit:{org_id}:proj:{project_id}"
-)
-
-
-def billing_project_spending_limit_key(org_id: str, project_id: int) -> str:
-    return BILLING_PROJECT_SPENDING_LIMIT_KEY.format(
-        org_id=org_id, project_id=project_id
-    )
-
-
 class InvalidProjectPermissionError(RecoverableError):
     status = 400
     code = "invalid_project_permission"
@@ -74,15 +57,6 @@ class ProjectNotFoundError(RecoverableError):
     code = "project_not_found"
     title = "Project Not Found"
     detail = "The specified project does not exist."
-
-    def __init__(
-        self,
-        from_exception: Exception | None = None,
-        message: str | None = None,
-    ):
-        super().__init__(from_exception)
-        if message is not None:
-            self.message = message
 
 
 class UserNotInProjectError(RecoverableError):
@@ -224,54 +198,6 @@ class ProjectService:
             else:
                 flattened[full_key] = value
         return flattened
-
-    async def _cacheProjectRateLimit(
-        self,
-        org_id: str,
-        project_id: int,
-        rate_limit: int | None,
-    ) -> None:
-        """Persist project RPM to Redis for fast API-key lookups."""
-        if self.redis is None:
-            return
-        try:
-            await self.redis.set(
-                project_rpm_limit_key(org_id, project_id),
-                -1 if rate_limit is None else int(rate_limit),
-                ex=ORG_RPM_LIMIT_CACHE_TTL_SECONDS,
-            )
-        except Exception as exc:
-            self.logger.warning(
-                "project_rpm_limit_cache_write_failed",
-                org_id=org_id,
-                project_id=project_id,
-                error=str(exc),
-            )
-
-    async def _cacheProjectSpendingLimit(
-        self,
-        org_id: str,
-        project_id: int,
-        spending_limit: int | None,
-    ) -> None:
-        """Persist the project spending limit to the billing Redis key."""
-        if self.redis is None:
-            return
-        try:
-            await self.redis.set(
-                billing_project_spending_limit_key(org_id, project_id),
-                -1
-                if spending_limit is None
-                else int_to_scaled_int(spending_limit, 8),
-                ex=BILLING_CACHE_TTL_SECONDS,
-            )
-        except Exception as exc:
-            self.logger.warning(
-                "project_spending_limit_cache_write_failed",
-                org_id=org_id,
-                project_id=project_id,
-                error=str(exc),
-            )
 
     def _extractProjectPermissions(
         self,
@@ -560,20 +486,6 @@ class ProjectService:
         | InsufficientProjectPermissionError,
     ]:
         """List every project in an org when actor has org-wide project access."""
-        org_owner_res = await self._isOrgOwner(organization_id, actor_user_id)
-        if org_owner_res.status == ResultStatus.Err:
-            return org_owner_res.into()
-        if not org_owner_res.unwrap():
-            authz_res = await self._hasOrgWideProjectPermission(
-                actor_user_id,
-                organization_id,
-                ProjectPermission.PROJECTS_GET_ALL,
-            )
-            if authz_res.status == ResultStatus.Err:
-                return authz_res.into()
-            if not authz_res.unwrap():
-                return Err(InsufficientProjectPermissionError())
-
         async with self.session_manager.get_session() as session:
             projects = await self.project_repo.listByOrg(
                 session, organization_id
@@ -686,19 +598,10 @@ class ProjectService:
         ProjectNotFoundError | ProjectArchivedError,
     ]:
         """Update mutable project metadata for one active project."""
-        project_res = await self._getProjectOrErr(project_uuid)
-        if project_res.status == ResultStatus.Err:
-            return project_res.into()
-        project_id, _, project_info = project_res.unwrap()
-
-        active_res = self._ensureProjectActive(project_info)
-        if active_res.status == ResultStatus.Err:
-            return active_res.into()
-
         async with self.session_manager.get_session() as session:
-            updated = await self.project_repo.updateById(
+            updated = await self.project_repo.updateByUuid(
                 session,
-                project_id,
+                project_uuid,
                 name=name,
                 description=description,
             )
@@ -736,12 +639,6 @@ class ProjectService:
                 extra=settings.extra or {},
             )
             await session.commit()
-            await self._cacheProjectRateLimit(
-                org_id, project_id, settings.rate_limit
-            )
-            await self._cacheProjectSpendingLimit(
-                org_id, project_id, settings.spending_limit
-            )
             return Ok(output)
 
     async def updateProjectSettings(
@@ -780,12 +677,6 @@ class ProjectService:
                 extra=settings.extra or {},
             )
             await session.commit()
-            await self._cacheProjectRateLimit(
-                org_id, project_id, settings.rate_limit
-            )
-            await self._cacheProjectSpendingLimit(
-                org_id, project_id, settings.spending_limit
-            )
             return Ok(output)
 
     async def listProjectUsers(
@@ -881,7 +772,7 @@ class ProjectService:
             set_res = await self._setProjectPermissions(
                 target_user_id,
                 project_uuid,
-                [],
+                [ProjectPermission.MEMBER],
             )
             if set_res.status == ResultStatus.Err:
                 return set_res

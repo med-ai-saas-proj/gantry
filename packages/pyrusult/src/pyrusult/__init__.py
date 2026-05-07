@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Generic, Literal, TypeVar, Callable, TypeAlias
+from typing import TypeIs, Generic, Literal, TypeVar, Callable, TypeAlias
 from dataclasses import dataclass
 
 
@@ -68,6 +68,11 @@ class _Result(Generic[T, E]):
         if self.status == ResultStatus.Ok:
             return fn(self.value)
         return self
+
+    def flatten(self) -> Result[U, V]:
+        tmp: _Result = self
+        while isinstance(tmp.value, _Result):
+            tmp = tmp.value
 
 
 @dataclass

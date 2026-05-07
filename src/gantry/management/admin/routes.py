@@ -1,12 +1,12 @@
 """Admin-only management routes."""
 
+from gantry.keycloak import (
+    KeycloakServiceClient,
+    getKeycloakServiceClient,
+)
 from gantry.management.auth import UserInfo, getAdminInfo
 from gantry.management.project.permissions import (
     ALL_PERMISSIONS as ALL_PROJECT_PERMISSIONS,
-)
-from gantry.management.organization.factories import (
-    KeycloakServiceClient,
-    getKeycloakServiceClient,
 )
 from gantry.management.organization.permissions import (
     ALL_PERMISSIONS as ALL_ORG_PERMISSIONS,
@@ -127,7 +127,7 @@ async def get_admin_me(
         id=user_info["id"],
         username=user_info["username"],
         email=user_info["email"],
-        roles=user_info["roles"],
+        # roles=user_info["roles"],
     )
 
 

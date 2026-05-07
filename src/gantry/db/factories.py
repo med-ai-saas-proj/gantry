@@ -1,8 +1,8 @@
 """Initialize database connections and session manager."""
 
-from gantry.db.session import AsyncSessionManager
-
+from .session import AsyncSessionManager
 from .settings import getDBSettings
+from .repositories import RedisCacheRepository
 
 from functools import lru_cache
 
@@ -29,4 +29,15 @@ def getRedis() -> Redis:
     return Redis.from_url(
         getDBSettings().redis_connection_uri.encoded_string(),
         decode_responses=True,
+    )
+
+
+@lru_cache(1)
+def getRedisCacheRepo() -> RedisCacheRepository:
+    return RedisCacheRepository(
+        Redis.from_url(
+            getDBSettings().redis_connection_uri.encoded_string(),
+            decode_responses=False,
+        ),
+        ttl=getDBSettings().cache_ttl,
     )

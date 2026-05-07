@@ -2,7 +2,7 @@ from gantry.management.billing.dtos import (
     InvoiceInfoResponse,
     InvoiceDetailInfoResponse,
 )
-from gantry.management.auth.entities import UserInfo, AdminInfo
+from gantry.management.auth.entities import AdminInfo
 from gantry.management.auth.dependencies import getAdminInfo
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,

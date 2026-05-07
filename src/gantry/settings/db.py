@@ -1,4 +1,5 @@
 from typing import Annotated
+from datetime import timedelta
 
 from pydantic import Field, RedisDsn, PostgresDsn
 from pydantic_settings import BaseSettings
@@ -21,3 +22,7 @@ class DBSettings(BaseSettings):
         RedisDsn,
         Field(description="Redis connection URI for caching."),
     ]
+    cache_ttl: Annotated[
+        timedelta | None,
+        Field(description="Cache time-to-live, None mean never expire"),
+    ] = timedelta(hours=1)

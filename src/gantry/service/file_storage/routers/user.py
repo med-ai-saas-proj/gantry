@@ -1,5 +1,4 @@
 from gantry.management.auth import UserInfo
-from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
 from gantry.management.auth.dependencies import (
     requireRole,
@@ -32,6 +31,7 @@ from fastapi import (
     HTTPException,
 )
 from starlette.responses import RedirectResponse
+from gantry.management.auth.roles import ManagementRole
 
 
 file_storage_user_router = APIRouter(tags=["file-storage-user"])

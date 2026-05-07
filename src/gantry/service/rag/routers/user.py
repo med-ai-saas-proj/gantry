@@ -1,5 +1,4 @@
 from gantry.management.auth import UserInfo
-from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
 from gantry.management.auth.dependencies import (
     requireRole,
@@ -21,6 +20,7 @@ import uuid
 from typing import Sequence, Annotated
 
 from fastapi import Body, Query, Depends, Security, APIRouter
+from gantry.management.auth.roles import ManagementRole
 
 
 rag_user_router = APIRouter(tags=["rag-user"])

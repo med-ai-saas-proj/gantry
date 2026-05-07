@@ -30,6 +30,7 @@ class OrgPermission(str, Enum):
 
     # Project creation at org scope
     PROJECTS_CREATE = "organization.projects.create"
+    PROJECTS_GET_ALL = "organization.projects.get_all"
 
 
 # Owner inherits every other permission automatically.

@@ -1,4 +1,4 @@
-from gantry.db.repository import Repository
+from gantry.db import Repository
 from gantry.management.project.models import Project
 
 from ..type import (

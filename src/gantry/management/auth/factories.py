@@ -1,6 +1,6 @@
 """Factory functions for creating service instances."""
 
-from gantry.keycloak.settings import getKeycloakSettings
+from gantry.keycloak import getKeycloakSettings, getKeycloakServiceClient
 
 from .services import AuthService
 from .settings import getAuthSettings
@@ -17,6 +17,7 @@ def getAuthService() -> AuthService:
         server_url=keycloak_settings.server_url.encoded_string(),
         realm=keycloak_settings.realm_name,
         client_id=auth_settings.client_id,
+        keycloak_client=getKeycloakServiceClient(),
     )
 
 
@@ -29,5 +30,6 @@ def getAdminAuthService() -> AuthService:
         server_url=keycloak_settings.server_url.encoded_string(),
         realm=keycloak_settings.realm_name,
         client_id=auth_settings.admin_client_id,
+        keycloak_client=getKeycloakServiceClient(),
         require_organization_claim=False,
     )

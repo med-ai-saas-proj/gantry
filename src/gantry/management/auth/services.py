@@ -1,18 +1,10 @@
 """Authentication and authorization services for management API."""
 
+from gantry.keycloak import KeycloakServiceClient
 from gantry.shared.consts import messages_const
-from gantry.shared.utils.permission_utils import (
-    normalize_project_permission_map,
-)
 from gantry.shared.custom_types.error_exception import RecoverableError
 
-from .roles import (
-    ManagementRole,
-    has_role as _has_role,
-    has_any_role as _has_any_role,
-    has_all_roles as _has_all_roles,
-)
-from .entities import UserInfo
+from .entities import UserInfo, AdminInfo
 
 from typing import Any, Callable
 
@@ -54,8 +46,7 @@ class InsufficientPermissionsError(ForbiddenError):
 
 
 class AuthService:
-    """
-    Authentication and authorization service.
+    """Authentication and authorization service.
 
     Handles token verification and role-based access control.
     """
@@ -67,6 +58,7 @@ class AuthService:
         server_url: str,
         realm: str,
         client_id: str,
+        keycloak_client: KeycloakServiceClient,
         require_organization_claim: bool = True,
     ):
         # Strip trailing slash from server URL
@@ -74,6 +66,7 @@ class AuthService:
         self.realm = realm
         self.client_id = client_id
         self.require_organization_claim = require_organization_claim
+        self.keycloak_client = keycloak_client
 
         self._default_jwks_url = (
             f"{self.server_url}/realms/{self.realm}"
@@ -128,7 +121,9 @@ class AuthService:
             self._jwk_client_url = jwks_url
         return self._jwk_client
 
-    def verifyToken(self, token: str) -> Result[UserInfo, UnauthorizedError]:
+    async def verifyToken(
+        self, token: str
+    ) -> Result[UserInfo, UnauthorizedError]:
         """Verify Keycloak JWT token."""
         try:
             # Get the signing key from the token header
@@ -150,12 +145,12 @@ class AuthService:
                 },
             )
 
-            return self._mapClaimsToAuthInfo(payload)
+            return await self._mapClaimsToAuthInfo(payload)
 
         except Exception as e:
             return Err(UnauthorizedError(from_exception=e))
 
-    def _mapClaimsToAuthInfo(
+    async def _mapClaimsToAuthInfo(
         self, claims: dict[str, Any]
     ) -> Result[UserInfo, UnauthorizedError]:
         """Maps Keycloak JWT claims to the internal AuthInfo entity.
@@ -172,60 +167,38 @@ class AuthService:
                 )
             )
 
-        def tryNone[T](fn: Callable[[], T]) -> T | None:
-            try:
-                return fn()
-            except Exception:
-                return None
+        username = claims.get("name")
 
-        roles: list[str] = []
-
-        # Realm roles (from realm_access.roles)
-        realm_roles = tryNone(
-            lambda: claims.get("realm_access", {}).get("roles", [])
-        )
-        if realm_roles:
-            roles.extend(realm_roles)
-
-        # Client roles (from resource_access.{client_id}.roles)
-        # Get roles from the management client
-        client_roles = tryNone(
-            lambda: (
-                claims.get("resource_access", {})
-                .get(self.client_id, {})
-                .get("roles", [])
-            )
-        )
-        if client_roles:
-            roles.extend(client_roles)
-
-        # Also check account client roles for backwards compatibility
-        account_roles = tryNone(
-            lambda: (
-                claims.get("resource_access", {})
-                .get("account", {})
-                .get("roles", [])
-            )
-        )
-        if account_roles:
-            roles.extend(account_roles)
-
-        username = claims.get("preferred_username")
-
+        other_attributes = (
+            await self.keycloak_client.getUserAttributes(claims["sub"])
+        ).unwrap()
         org_id = self._extractOrganizationId(claims.get("organization"))
-        if self.require_organization_claim and not org_id:
+        if self.require_organization_claim and org_id is not None:
             return Err(MissingOrganizationClaimError())
 
         auth_info: UserInfo = {
             "id": claims["sub"],
             "username": username if isinstance(username, str) else None,
             "email": claims.get("email"),
-            "roles": roles,
-            "org_id": org_id or "",
-            "project_uids": self._extractProjectIds(claims, roles) or [],
+            "org_uuid": org_id or "",
+            "org_permissions": other_attributes.get("org_permissions", []),
+            "project_permissions": self._groupProjectPerms(
+                other_attributes.get("project_permissions", [])
+            ),
         }
 
         return Ok(auth_info)
+
+    def _groupProjectPerms(self, perms: list[str]):
+        res: dict[str, list[str]] = {}
+        for entry in perms:
+            project_uid, separator, permission = entry.partition(":")
+            if not separator or not project_uid or not permission:
+                continue
+            if project_uid not in res:
+                res[project_uid] = []
+            res[project_uid].append(permission)
+        return res
 
     def _extractOrganizationId(self, organization_claim: Any) -> str | None:
         """Extract an organization id from supported Keycloak claim shapes."""
@@ -255,92 +228,37 @@ class AuthService:
 
         return None
 
-    @staticmethod
-    def _extractProjectIdsFromEntries(entries: list[str]) -> list[str]:
-        """Extract distinct project uids from flat token entries like `proj:perm`."""
-        seen: set[str] = set()
-        project_uids: list[str] = []
-        for entry in entries:
-            project_uid, separator, permission = entry.partition(":")
-            if not separator or not project_uid or not permission:
-                continue
-            if project_uid in seen:
-                continue
-            seen.add(project_uid)
-            project_uids.append(project_uid)
-        return project_uids
+    def verifyTokenAdmin(
+        self, token: str
+    ) -> Result[AdminInfo, UnauthorizedError]:
+        try:
+            signing_key = self._getJwkClient().get_signing_key_from_jwt(token)
 
-    def _extractProjectIds(
-        self,
-        claims: dict[str, Any],
-        roles: list[str],
-    ) -> list[str]:
-        """Extract project uids directly from token-carried permission data."""
-        grouped_permissions = normalize_project_permission_map(
-            claims.get("project_permissions", {})
-        )
-        if grouped_permissions:
-            return list(grouped_permissions)
-        return self._extractProjectIdsFromEntries(roles)
+            # Decode and verify the token
+            payload = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=["RS256"],
+                audience="account",
+                issuer=self._getIssuer(),
+                options={
+                    "verify_exp": True,
+                    # "verify_iss": True,
+                    # "verify_aud": True,
+                    "verify_iss": False,
+                    "verify_aud": False,
+                },
+            )
 
-    def checkAdminRole(
-        self,
-        user_info: UserInfo,
-    ) -> Result[None, InsufficientPermissionsError]:
-        """Require the Keycloak realm role `ADMIN` for admin-only flows."""
-        if self.ADMIN_REALM_ROLE not in user_info.get("roles", []):
-            return Err(InsufficientPermissionsError([self.ADMIN_REALM_ROLE]))
-        return Ok(None)
+            if self.ADMIN_REALM_ROLE in payload["realm_access"]["roles"]:
+                return Err(UnauthorizedError())
 
-    def checkRole(
-        self, user_info: UserInfo, role: ManagementRole
-    ) -> Result[None, InsufficientPermissionsError]:
-        """
-        Check if user has a specific role.
-
-        Args:
-            user_info: The authenticated user info
-            role: The required role
-
-        Returns:
-            Ok(None) if user has the role, Err otherwise
-        """
-        if not _has_role(user_info.get("roles"), role):
-            return Err(InsufficientPermissionsError([role.value]))
-        return Ok(None)
-
-    def checkAnyRole(
-        self, user_info: UserInfo, roles: list[ManagementRole]
-    ) -> Result[None, InsufficientPermissionsError]:
-        """
-        Check if user has any of the specified roles.
-
-        Args:
-            user_info: The authenticated user info
-            roles: List of roles (user needs at least one)
-
-        Returns:
-            Ok(None) if user has any role, Err otherwise
-        """
-        if not _has_any_role(user_info.get("roles"), roles):
-            role_values = [r.value for r in roles]
-            return Err(InsufficientPermissionsError(role_values))
-        return Ok(None)
-
-    def checkAllRoles(
-        self, user_info: UserInfo, roles: list[ManagementRole]
-    ) -> Result[None, InsufficientPermissionsError]:
-        """
-        Check if user has all of the specified roles.
-
-        Args:
-            user_info: The authenticated user info
-            roles: List of roles (user needs all)
-
-        Returns:
-            Ok(None) if user has all roles, Err otherwise
-        """
-        if not _has_all_roles(user_info.get("roles"), roles):
-            role_values = [r.value for r in roles]
-            return Err(InsufficientPermissionsError(role_values))
-        return Ok(None)
+            return Ok(
+                AdminInfo(
+                    id=payload.get("sub", ""),
+                    username=payload.get("name", ""),
+                    email=payload.get("email", ""),
+                )
+            )
+        except Exception as e:
+            return Err(UnauthorizedError(from_exception=e))

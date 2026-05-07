@@ -140,27 +140,6 @@ services:
           cpus: "0.1"
           memory: 100M
 
-  vector-db:
-    image: pgvector/pgvector:pg18
-    container_name: postgres-pgvector
-    environment:
-      POSTGRES_DB: gantry
-      POSTGRES_USER: gantry
-      POSTGRES_PASSWORD: 123456
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: "0.5"
-          memory: 200M
-        reservations:
-          cpus: "0.1"
-          memory: 100M
-
   redis:
     image: redis:8-alpine
     container_name: redis
@@ -209,7 +188,6 @@ services:
     volumes:
       - keycloak_data:/opt/keycloak/data
       - ./asset/gantry-realm.json:/opt/keycloak/data/import/gantry-realm.json:ro
-      - ./asset/keycloak-themes:/opt/keycloak/themes
     deploy:
       resources:
         limits:

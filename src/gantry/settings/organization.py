@@ -7,20 +7,6 @@ from pydantic_settings import BaseSettings
 
 
 class OrgSettings(BaseSettings):
-    keycloak_service_client_id: Annotated[
-        str,
-        Field(
-            description="Service account client id for Keycloak Admin API calls.",
-        ),
-    ] = "med-ai-saas-backend"
-
-    keycloak_service_client_secret: Annotated[
-        str,
-        Field(
-            description="Service account client secret for Keycloak Admin API calls.",
-        ),
-    ]
-
     invite_redirect_uri: Annotated[
         str,
         Field(
