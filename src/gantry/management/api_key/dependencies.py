@@ -1,6 +1,5 @@
 from .entities import ApiKeyInfo
 from .factories import ApiKeyService, getApiKeyService
-from .permissions import registerPermissions
 
 import os
 import json
