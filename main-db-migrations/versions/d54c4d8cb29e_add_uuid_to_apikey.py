@@ -1,8 +1,8 @@
-"""add api key uuid
+"""Add UUID to ApiKey
 
-Revision ID: c5a9f1391d7e
+Revision ID: d54c4d8cb29e
 Revises: 778951e24058
-Create Date: 2026-05-03 16:30:00.000000
+Create Date: 2026-05-03 16:47:32.333318
 Feature:
 Reason:
 
@@ -16,7 +16,7 @@ from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision: str = "c5a9f1391d7e"
+revision: str = "d54c4d8cb29e"
 down_revision: Union[str, Sequence[str], None] = "778951e24058"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
