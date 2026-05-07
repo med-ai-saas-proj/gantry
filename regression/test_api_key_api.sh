@@ -439,33 +439,33 @@ run_test "POST create api key with registered permission" "201" \
   -H "Content-Type: application/json" \
   -d '{"name":"project-key","description":"created by shell test","permissions":["file.read"]}'
 
-APIKEY_ID=$(echo "$RESPONSE_BODY" | jq -r '.api_key_id // empty')
+APIKEY_UUID=$(echo "$RESPONSE_BODY" | jq -r '.api_key_uuid // empty')
 RAW_API_KEY=$(echo "$RESPONSE_BODY" | jq -r '.key // empty')
 
 run_test "GET api keys in project after create" "200" \
   -X GET "$BASE_URL?project_id=$PROJECT_ID" \
   -H "Authorization: Bearer $AUTH_TOKEN"
 
-run_test "GET api key by id" "200" \
-  -X GET "$BASE_URL/$APIKEY_ID" \
+run_test "GET api key by uuid" "200" \
+  -X GET "$BASE_URL/$APIKEY_UUID" \
   -H "Authorization: Bearer $AUTH_TOKEN"
 
 run_test "PUT update api key permissions and metadata" "200" \
-  -X PUT "$BASE_URL/$APIKEY_ID" \
+  -X PUT "$BASE_URL/$APIKEY_UUID" \
   -H "Authorization: Bearer $AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"project-key-updated","description":"updated by shell test","permissions":["file.read"]}'
 
-run_test "GET api key by id after update" "200" \
-  -X GET "$BASE_URL/$APIKEY_ID" \
+run_test "GET api key by uuid after update" "200" \
+  -X GET "$BASE_URL/$APIKEY_UUID" \
   -H "Authorization: Bearer $AUTH_TOKEN"
 
 run_test "POST disable api key" "200" \
-  -X POST "$BASE_URL/$APIKEY_ID/disable" \
+  -X POST "$BASE_URL/$APIKEY_UUID/disable" \
   -H "Authorization: Bearer $AUTH_TOKEN"
 
-run_test "GET api key by id after disable" "200" \
-  -X GET "$BASE_URL/$APIKEY_ID" \
+run_test "GET api key by uuid after disable" "200" \
+  -X GET "$BASE_URL/$APIKEY_UUID" \
   -H "Authorization: Bearer $AUTH_TOKEN"
 TEST_NUM=$((TEST_NUM + 1))
 echo -e "${CYAN}[TEST $TEST_NUM] Disabled flag should be true after disable${NC}"
@@ -479,11 +479,11 @@ fi
 echo ""
 
 run_test "POST enable api key" "200" \
-  -X POST "$BASE_URL/$APIKEY_ID/enable" \
+  -X POST "$BASE_URL/$APIKEY_UUID/enable" \
   -H "Authorization: Bearer $AUTH_TOKEN"
 
-run_test "GET api key by id after enable" "200" \
-  -X GET "$BASE_URL/$APIKEY_ID" \
+run_test "GET api key by uuid after enable" "200" \
+  -X GET "$BASE_URL/$APIKEY_UUID" \
   -H "Authorization: Bearer $AUTH_TOKEN"
 TEST_NUM=$((TEST_NUM + 1))
 echo -e "${CYAN}[TEST $TEST_NUM] Disabled flag should be false after enable${NC}"
@@ -507,21 +507,21 @@ run_test "READONLY actor cannot create api key" "403" \
   -d '{"name":"should-fail","description":"readonly actor","permissions":["file.read"]}'
 
 run_test "READONLY actor cannot update api key" "403" \
-  -X PUT "$BASE_URL/$APIKEY_ID" \
+  -X PUT "$BASE_URL/$APIKEY_UUID" \
   -H "Authorization: Bearer $READONLY_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"should-fail","description":"readonly actor","permissions":["file.read"]}'
 
 run_test "DELETE api key" "200" \
-  -X DELETE "$BASE_URL/$APIKEY_ID" \
+  -X DELETE "$BASE_URL/$APIKEY_UUID" \
   -H "Authorization: Bearer $AUTH_TOKEN"
 
 run_test "GET deleted api key should return 404" "404" \
-  -X GET "$BASE_URL/$APIKEY_ID" \
+  -X GET "$BASE_URL/$APIKEY_UUID" \
   -H "Authorization: Bearer $AUTH_TOKEN"
 
 run_test "GET api key without auth (should fail 401/403)" "401 403" \
-  -X GET "$BASE_URL/$APIKEY_ID"
+  -X GET "$BASE_URL/$APIKEY_UUID"
 
 echo "=========================================="
 echo -e "Results: ${GREEN}${PASS} passed${NC}, ${RED}${FAIL} failed${NC} (out of ${TEST_NUM})"

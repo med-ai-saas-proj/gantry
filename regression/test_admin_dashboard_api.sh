@@ -26,7 +26,7 @@ RESPONSE_BODY=""
 ADMIN_AUTH_TOKEN=""
 ORG_ID=""
 PROJECT_ID=""
-API_KEY_ID=""
+API_KEY_UUID=""
 
 run_test() {
   local description="$1"
@@ -193,11 +193,11 @@ extract_id_or_fail() {
   echo "$id"
 }
 
-extract_api_key_id_or_fail() {
+extract_api_key_uuid_or_fail() {
   local id
-  id=$(echo "$RESPONSE_BODY" | jq -r '.api_key_id // empty')
+  id=$(echo "$RESPONSE_BODY" | jq -r '.api_key_uuid // empty')
   if [ -z "$id" ] || [ "$id" = "null" ]; then
-    echo -e "${RED}✗ Could not extract API key id from previous response${NC}"
+    echo -e "${RED}✗ Could not extract API key uuid from previous response${NC}"
     exit 1
   fi
   echo "$id"
@@ -311,18 +311,18 @@ run_test "POST admin API key" 201 \
   -H "Authorization: Bearer $ADMIN_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"dashboard-key","description":"admin dashboard e2e","permissions":[]}'
-API_KEY_ID=$(extract_api_key_id_or_fail)
+API_KEY_UUID=$(extract_api_key_uuid_or_fail)
 
 run_test "GET admin API key list" 200 \
   "$BASE_URL/api-keys?project_id=$PROJECT_ID" \
   -H "Authorization: Bearer $ADMIN_AUTH_TOKEN"
 
-run_test "GET admin API key by id" 200 \
-  "$BASE_URL/api-keys/$API_KEY_ID" \
+run_test "GET admin API key by uuid" 200 \
+  "$BASE_URL/api-keys/$API_KEY_UUID" \
   -H "Authorization: Bearer $ADMIN_AUTH_TOKEN"
 
 run_test "PUT admin API key" 200 \
-  -X PUT "$BASE_URL/api-keys/$API_KEY_ID" \
+  -X PUT "$BASE_URL/api-keys/$API_KEY_UUID" \
   -H "Authorization: Bearer $ADMIN_AUTH_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name":"dashboard-key-renamed","description":"updated","permissions":[]}'
@@ -332,7 +332,7 @@ run_test "GET admin user list" 200 \
   -H "Authorization: Bearer $ADMIN_AUTH_TOKEN"
 
 run_test "DELETE admin API key" 200 \
-  -X DELETE "$BASE_URL/api-keys/$API_KEY_ID" \
+  -X DELETE "$BASE_URL/api-keys/$API_KEY_UUID" \
   -H "Authorization: Bearer $ADMIN_AUTH_TOKEN"
 
 run_test "DELETE admin project archives it" 200 \
