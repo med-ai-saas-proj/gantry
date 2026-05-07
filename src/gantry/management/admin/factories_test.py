@@ -31,11 +31,11 @@ class TestAdminFactories(unittest.TestCase):
                 return_value="api-key-service",
             ),
             patch(
-                "gantry.management.admin.factories.ProjectRepository",
+                "gantry.management.admin.factories.getProjectRepository",
                 return_value="project-repo",
             ),
             patch(
-                "gantry.management.admin.factories.ApiKeyRepository",
+                "gantry.management.admin.factories.getApiKeyRepository",
                 return_value="api-key-repo",
             ),
             patch("gantry.management.admin.factories.AdminService") as mock_cls,

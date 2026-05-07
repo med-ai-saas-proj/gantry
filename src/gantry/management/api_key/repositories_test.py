@@ -1,7 +1,10 @@
 import os
+import inspect
 import unittest
 from uuid import uuid4
 from unittest.mock import Mock, AsyncMock, patch
+
+from pyrusult import Ok, Err
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
@@ -18,22 +21,33 @@ class _CacheSpy(CacheRepository):
         self.set_items: list[tuple[str, object]] = []
         self.invalidated_keys: list[str] = []
 
-    async def getCache(self, key: str):
+    async def getCached(self, key: str):
         self.get_keys.append(key)
-        return self.cached
+        return Ok(self.cached) if self.cached is not None else Err(None)
 
     async def setCache(self, key: str, value):
         self.set_items.append((key, value))
         self.cached = value
 
-    async def invalidateCache(self, key: str):
+    async def invalidateCached(self, key: str):
         self.invalidated_keys.append(key)
         self.cached = None
+
+    async def getCachedOrCall(self, key: str, fn, *args, **kwargs):
+        self.get_keys.append(key)
+        if self.cached is not None:
+            return self.cached
+        res = fn(*args, **kwargs)
+        if inspect.iscoroutine(res):
+            res = await res
+        self.set_items.append((key, res))
+        self.cached = res
+        return res
 
 
 class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.repo = ApiKeyRepository()
+        self.repo = ApiKeyRepository(_CacheSpy())
         self.session = Mock()
 
     async def test_get_by_hashed_key_builds_lookup_statement(self):
@@ -72,6 +86,8 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
             "organization_uuid": "org-1",
             "organization_rate_limit": 10,
             "project_rate_limit": 55,
+            "organization_spending_limit": None,
+            "project_spending_limit": None,
         }
         self.session.execute = AsyncMock(return_value=execute_res)
 
@@ -178,7 +194,6 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
 
         result = await self.repo.create(
             self.session,
-            uuid=uuid4(),
             user_id="u1",
             project_id=7,
             hashed_key="hashed",
@@ -258,18 +273,3 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
         execute_res.scalar_one_or_none.return_value = None
         not_deleted = await self.repo.deleteById(self.session, 11)
         self.assertFalse(not_deleted)
-
-    async def test_list_distinct_permissions_returns_sorted_non_empty_entries(
-        self,
-    ):
-        execute_res = Mock()
-        scalars_res = Mock()
-        scalars_res.all.return_value = ["file.read", "", None, "chat.run"]
-        execute_res.scalars.return_value = scalars_res
-        self.session.execute = AsyncMock(return_value=execute_res)
-
-        result = await self.repo.listDistinctPermissions(self.session)
-
-        self.assertEqual(result, ["file.read", "chat.run"])
-        stmt = self.session.execute.await_args.args[0]
-        self.assertIn("unnest", str(stmt).lower())

@@ -1,10 +1,14 @@
 """Factory functions for Admin module singletons."""
 
 from gantry.db import getSessionManager
-from gantry.management.api_key.factories import getApiKeyService
-from gantry.management.project.factories import getProjectService
-from gantry.management.api_key.repositories import ApiKeyRepository
-from gantry.management.project.repositories import ProjectRepository
+from gantry.management.api_key.factories import (
+    getApiKeyService,
+    getApiKeyRepository,
+)
+from gantry.management.project.factories import (
+    getProjectService,
+    getProjectRepository,
+)
 from gantry.management.organization.factories import (
     getOrgService,
     getKeycloakServiceClient,
@@ -24,6 +28,6 @@ def getAdminService() -> AdminService:
         org_service=getOrgService(),
         project_service=getProjectService(),
         apikey_service=getApiKeyService(),
-        project_repo=ProjectRepository(),
-        api_key_repo=ApiKeyRepository(),
+        project_repo=getProjectRepository(),
+        api_key_repo=getApiKeyRepository(),
     )

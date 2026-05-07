@@ -50,12 +50,3 @@ class ApiKeyPermissionCatalogResponse(BaseDTO):
 
     total: int
     results: list[ApiKeyPermissionResponse]
-
-
-class ApiKeyPermissionAuditResponse(BaseDTO):
-    """Describe mismatches between runtime and stored API key permissions."""
-
-    registered_permissions: list[str]
-    stored_permissions: list[str]
-    stale_permissions: list[str]
-    unused_permissions: list[str]

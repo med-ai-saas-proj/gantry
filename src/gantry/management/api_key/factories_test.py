@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
+from gantry.settings.api_key import ApiKeyPermission
 from gantry.management.api_key import factories
 
 
@@ -22,6 +23,13 @@ class TestApiKeyFactories(unittest.TestCase):
                     "Secret", (), {"get_secret_value": lambda self: "secret"}
                 )(),
                 "secret_length": 24,
+                "permissions": [
+                    ApiKeyPermission(
+                        id="chat.read",
+                        name="chat.read",
+                        description="",
+                    )
+                ],
             },
         )()
         with (
@@ -61,5 +69,6 @@ class TestApiKeyFactories(unittest.TestCase):
             logger="logger",
             api_key_repo="api-key-repo",
             project_repo="project-repo",
+            permissions=list(settings.permissions),
             session_manager="session-manager",
         )

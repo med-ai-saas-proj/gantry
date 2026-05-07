@@ -22,15 +22,15 @@ async def post(
     apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     idempotency_key: str | None = Header(None),
 ) -> UUID:
-    api_key_id, project_id = (
+    internal_ids = (
         await apikey_service.getApiKeyInternalIds(apikey_info["api_key_uuid"])
     ).unwrap()
     return (
         await billing_service.post(
             idempotency_key=idempotency_key,
             org_id=apikey_info["organization_uuid"],
-            project_id=project_id,
-            api_key_id=api_key_id,
+            project_id=internal_ids["project_id"],
+            api_key_id=internal_ids["api_key_id"],
             req=body,
         )
     ).unwrap()
@@ -46,14 +46,14 @@ async def capture(
     ],
     apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
 ) -> bool:
-    api_key_id, project_id = (
+    internal_ids = (
         await apikey_service.getApiKeyInternalIds(apikey_info["api_key_uuid"])
     ).unwrap()
     return (
         await billing_service.capture(
             org_id=apikey_info["organization_uuid"],
-            project_id=project_id,
-            api_key_id=api_key_id,
+            project_id=internal_ids["project_id"],
+            api_key_id=internal_ids["api_key_id"],
             transaction_uid=transaction_uid,
             real_amount=body.real_amount,
         )

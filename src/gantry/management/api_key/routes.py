@@ -13,7 +13,6 @@ from .dtos import (
     ApiKeyListResponse,
     ApiKeyWriteRequest,
     ApiKeyCreateResponse,
-    ApiKeyPermissionAuditResponse,
     ApiKeyPermissionCatalogResponse,
 )
 from .factories import ApiKeyService, getApiKeyService

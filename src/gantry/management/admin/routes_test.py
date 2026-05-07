@@ -214,7 +214,9 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             permissions=["objects:read"],
         )
         expected = routes.ApiKeyCreateResponse(
+            api_key_id=11,
             api_key_uuid="api-key-1",
+            project_id=7,
             project_uuid="project-1",
             name="Key",
             description="",

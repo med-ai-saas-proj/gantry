@@ -1,6 +1,9 @@
 import os
+import inspect
 import unittest
 from unittest.mock import Mock, AsyncMock
+
+from pyrusult import Ok, Err
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
@@ -17,22 +20,33 @@ class _CacheSpy(CacheRepository):
         self.set_items: list[tuple[str, object]] = []
         self.invalidated_keys: list[str] = []
 
-    async def getCache(self, key: str):
+    async def getCached(self, key: str):
         self.get_keys.append(key)
-        return self.cached
+        return Ok(self.cached) if self.cached is not None else Err(None)
 
     async def setCache(self, key: str, value):
         self.set_items.append((key, value))
         self.cached = value
 
-    async def invalidateCache(self, key: str):
+    async def invalidateCached(self, key: str):
         self.invalidated_keys.append(key)
         self.cached = None
+
+    async def getCachedOrCall(self, key: str, fn, *args, **kwargs):
+        self.get_keys.append(key)
+        if self.cached is not None:
+            return self.cached
+        res = fn(*args, **kwargs)
+        if inspect.iscoroutine(res):
+            res = await res
+        self.set_items.append((key, res))
+        self.cached = res
+        return res
 
 
 class TestOrgSettingsRepository(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.repo = OrgSettingsRepository()
+        self.repo = OrgSettingsRepository(_CacheSpy())
         self.session = Mock()
 
     async def test_get_or_create_uses_on_conflict_returning(self):

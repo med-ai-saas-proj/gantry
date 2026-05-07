@@ -332,6 +332,7 @@ import os
 
 from sqlalchemy import select
 
+from gantry.db import getRedisCacheRepo
 from gantry.db.factories import getSessionManager
 from gantry.management.project.models import Project
 from gantry.management.project.repositories import ProjectMemberRepository
@@ -343,7 +344,7 @@ async def main():
     actor_user_id = os.environ["ACTOR_USER_ID"]
     project_name = os.environ["BOOTSTRAP_PROJECT_NAME"]
     session_manager = getSessionManager()
-    membership_repo = ProjectMemberRepository()
+    membership_repo = ProjectMemberRepository(getRedisCacheRepo())
 
     async with session_manager.get_session() as session:
         existing_stmt = (

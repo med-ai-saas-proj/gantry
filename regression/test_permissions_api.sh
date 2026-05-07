@@ -171,7 +171,6 @@ setup_auth_token
 run_test "GET organization permission catalog" 200 "$ORG_BASE_URL"
 run_test "GET project permission catalog" 200 "$PROJECT_BASE_URL"
 run_test "GET API key permission catalog" 200 "$APIKEY_BASE_URL" -H "Authorization: Bearer $AUTH_TOKEN"
-run_test "GET API key permission audit" 200 "${APIKEY_BASE_URL}/audit" -H "Authorization: Bearer $AUTH_TOKEN"
 run_test "GET organization permission catalog with wrong method" "405" -X POST "$ORG_BASE_URL"
 run_test "GET project permission catalog with wrong method" "405" -X POST "$PROJECT_BASE_URL"
 run_test "GET API key permission catalog with wrong method" "405" -X POST "$APIKEY_BASE_URL"

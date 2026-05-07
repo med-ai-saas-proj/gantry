@@ -3,7 +3,6 @@ from gantry.settings import AppStage, getAppSettings
 from .entities import ApiKeyInfo
 from .services import InvalidAPIKey
 from .factories import ApiKeyService, getApiKeyService
-from .permissions import registerPermissions
 
 import json
 from typing import Annotated
@@ -44,7 +43,6 @@ def _inject_api_key_context_headers(
 
 def requiredPermissions(permissions: list[str]):
     """Dependency to verify the API key and create required permissions."""
-    registerPermissions(permissions)
 
     async def get_api_key(
         request: Request,

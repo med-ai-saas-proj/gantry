@@ -141,6 +141,11 @@ class ProjectRepository(Repository[Project, int]):
             self.getCacheKey(user_id), _lambda
         )
 
+    async def countAll(self, session: AsyncSession) -> int:
+        stmt = select(func.count()).select_from(Project)
+        res = await session.execute(stmt)
+        return int(res.scalar_one() or 0)
+
 
 class ProjectMemberRepository(Repository[ProjectMember, int]):
     """Repository for project memberships."""

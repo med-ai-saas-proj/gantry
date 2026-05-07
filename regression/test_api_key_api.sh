@@ -268,6 +268,7 @@ bootstrap_project() {
 import asyncio
 import os
 
+from gantry.db import getRedisCacheRepo
 from gantry.db.factories import getSessionManager
 from gantry.management.project.models import Project
 from gantry.management.project.repositories import ProjectMemberRepository
@@ -279,7 +280,7 @@ async def main():
     actor_user_id = os.environ["ACTOR_USER_ID"]
     project_name = os.environ["BOOTSTRAP_PROJECT_NAME"]
     session_manager = getSessionManager()
-    member_repo = ProjectMemberRepository()
+    member_repo = ProjectMemberRepository(getRedisCacheRepo())
 
     async with session_manager.get_session() as session:
         project = Project(
@@ -356,6 +357,7 @@ create_readonly_member() {
     uv run python - <<'PY' >/dev/null
 import asyncio
 import os
+from gantry.db import getRedisCacheRepo
 from gantry.db.factories import getSessionManager
 from gantry.management.project.repositories import ProjectMemberRepository
 from gantry.management.project.models import Project
@@ -366,7 +368,7 @@ async def main():
     project_uuid = os.environ["PROJECT_ID"]
     user_id = os.environ["READONLY_USER_ID"]
     session_manager = getSessionManager()
-    member_repo = ProjectMemberRepository()
+    member_repo = ProjectMemberRepository(getRedisCacheRepo())
     async with session_manager.get_session() as session:
         project = await member_repo.selectOne(
             session,
@@ -413,10 +415,6 @@ echo ""
 
 run_test "GET api key permission catalog" "200" \
   -X GET "$BASE_URL/permissions" \
-  -H "Authorization: Bearer $AUTH_TOKEN"
-
-run_test "GET api key permission audit" "200" \
-  -X GET "$BASE_URL/permissions/audit" \
   -H "Authorization: Bearer $AUTH_TOKEN"
 
 run_test "GET api keys missing project query (should fail 400/422)" "400 422" \

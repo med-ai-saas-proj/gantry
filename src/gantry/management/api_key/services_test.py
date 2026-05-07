@@ -10,6 +10,7 @@ from pyrusult import Ok, ResultStatus
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
+from gantry.settings.api_key import ApiKeyPermission
 from gantry.management.api_key.services import (
     ApiKeyService,
     InvalidAPIKey,
@@ -20,10 +21,6 @@ from gantry.management.api_key.services import (
     InvalidPermissionError,
 )
 from gantry.management.project.services import ProjectNotFoundError
-from gantry.management.api_key.permissions import (
-    clearPermissions,
-    registerPermissions,
-)
 
 
 class _DummySessionManager:
@@ -38,19 +35,29 @@ class _DummySessionManager:
 
 class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        clearPermissions()
-        registerPermissions(["chat.run", "chat.read"])
         self.created_at = datetime(2026, 3, 28, 13, 0, 0)
         self.session_manager = _DummySessionManager()
         self.api_key_repo = Mock()
         self.project_repo = Mock()
         self.api_key_repo.getByUuid = AsyncMock(return_value=None)
         self.api_key_repo.getContextByHashedKey = AsyncMock(return_value=None)
+        self.api_key_repo.updateById = AsyncMock(return_value=None)
+        self.api_key_repo.updateDisabledByUuid = AsyncMock(return_value=None)
+        self.api_key_repo.deleteByUuid = AsyncMock(return_value=False)
+        self.api_key_repo.listDistinctPermissions = AsyncMock(return_value=[])
         self.service = ApiKeyService(
             config={"key_secret": "secret", "api_key_secret_length": 8},
             logger=Mock(),
             api_key_repo=self.api_key_repo,
             project_repo=self.project_repo,
+            permissions=[
+                ApiKeyPermission(
+                    id="chat.run", name="chat.run", description=""
+                ),
+                ApiKeyPermission(
+                    id="chat.read", name="chat.read", description=""
+                ),
+            ],
             session_manager=self.session_manager,
         )
         self.service.default_org_rate_limit = 120
@@ -264,7 +271,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
         self.api_key_repo.getByUuid = AsyncMock(return_value=current)
-        self.api_key_repo.updateByUuid = AsyncMock(return_value=updated)
+        self.api_key_repo.updateById = AsyncMock(return_value=updated)
         self.project_repo.getByKey = AsyncMock(return_value=project)
 
         result = await self.service.updateApiKey(
@@ -291,7 +298,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             disabled=False,
         )
         self.api_key_repo.getByUuid = AsyncMock(return_value=current)
-        self.api_key_repo.updateByUuid = AsyncMock(return_value=None)
+        self.api_key_repo.updateById = AsyncMock(return_value=None)
 
         result = await self.service.updateApiKey(
             api_key_uuid="api-key-11",
@@ -329,7 +336,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             disabled=False,
         )
         self.api_key_repo.getByUuid = AsyncMock(return_value=current)
-        self.api_key_repo.updateByUuid = AsyncMock(return_value=updated)
+        self.api_key_repo.updateById = AsyncMock(return_value=updated)
         self.project_repo.getByKey = AsyncMock(return_value=None)
 
         result = await self.service.updateApiKey(
@@ -528,7 +535,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
         self.api_key_repo.getByUuid = AsyncMock(return_value=current)
-        self.api_key_repo.updateByUuid = AsyncMock(return_value=updated)
+        self.api_key_repo.updateById = AsyncMock(return_value=updated)
         self.project_repo.getByKey = AsyncMock(return_value=project)
 
         result = await self.service.updateApiKey(
@@ -611,20 +618,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         result = self.service.getPermissionCatalog()
 
         self.assertEqual(result.total, 2)
-        self.assertEqual(result.results, ["chat.read", "chat.run"])
-
-    async def test_audit_permissions_returns_stale_and_unused_permissions(self):
-        self.api_key_repo.listDistinctPermissions = AsyncMock(
-            return_value=["chat.run", "orphan.permission"]
-        )
-
-        result = await self.service.auditPermissions()
-
         self.assertEqual(
-            result.registered_permissions, ["chat.read", "chat.run"]
+            [permission.id for permission in result.results],
+            ["chat.run", "chat.read"],
         )
-        self.assertEqual(
-            result.stored_permissions, ["chat.run", "orphan.permission"]
-        )
-        self.assertEqual(result.stale_permissions, ["orphan.permission"])
-        self.assertEqual(result.unused_permissions, ["chat.read"])

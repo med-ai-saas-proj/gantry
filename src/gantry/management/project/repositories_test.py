@@ -1,7 +1,10 @@
 import os
+import inspect
 import unittest
 from uuid import uuid4
 from unittest.mock import Mock, AsyncMock
+
+from pyrusult import Ok, Err
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
@@ -18,22 +21,33 @@ class _CacheSpy(CacheRepository):
         self.set_items: list[tuple[str, object]] = []
         self.invalidated_keys: list[str] = []
 
-    async def getCache(self, key: str):
+    async def getCached(self, key: str):
         self.get_keys.append(key)
-        return self.cached
+        return Ok(self.cached) if self.cached is not None else Err(None)
 
     async def setCache(self, key: str, value):
         self.set_items.append((key, value))
         self.cached = value
 
-    async def invalidateCache(self, key: str):
+    async def invalidateCached(self, key: str):
         self.invalidated_keys.append(key)
         self.cached = None
+
+    async def getCachedOrCall(self, key: str, fn, *args, **kwargs):
+        self.get_keys.append(key)
+        if self.cached is not None:
+            return self.cached
+        res = fn(*args, **kwargs)
+        if inspect.iscoroutine(res):
+            res = await res
+        self.set_items.append((key, res))
+        self.cached = res
+        return res
 
 
 class TestProjectSettingsRepository(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        self.repo = ProjectSettingsRepository()
+        self.repo = ProjectSettingsRepository(_CacheSpy())
         self.session = Mock()
 
     async def test_get_or_create_uses_on_conflict_returning(self):
@@ -51,9 +65,7 @@ class TestProjectSettingsRepository(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_or_create_by_uuid_cache_hit_skips_db(self):
         project_uuid = str(uuid4())
-        execute_res = Mock()
-        execute_res.scalar_one_or_none.return_value = "cached-settings"
-        cache_repo = _CacheSpy(cached=execute_res)
+        cache_repo = _CacheSpy(cached="cached-settings")
         repo = ProjectSettingsRepository(cache_repo)
         session = Mock()
         session.execute = AsyncMock()
@@ -91,7 +103,7 @@ class TestProjectSettingsRepository(unittest.IsolatedAsyncioTestCase):
             cache_repo.set_items[0][0],
             ProjectSettingsRepository.getCacheKey(project_uuid),
         )
-        self.assertIs(cache_repo.set_items[0][1], select_res)
+        self.assertEqual(cache_repo.set_items[0][1], "db-settings")
 
     async def test_get_or_create_by_uuid_missing_row_inserts_and_overwrites_cache(
         self,
@@ -111,7 +123,7 @@ class TestProjectSettingsRepository(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "inserted-settings")
         self.assertEqual(session.execute.await_count, 2)
         self.assertEqual(len(cache_repo.set_items), 2)
-        self.assertIs(cache_repo.set_items[0][1], select_res)
+        self.assertIsNone(cache_repo.set_items[0][1])
         self.assertEqual(
             cache_repo.set_items[1],
             (

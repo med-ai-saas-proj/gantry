@@ -13,19 +13,14 @@ from gantry.management.project.permissions import ProjectPermission
 
 
 class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
-    async def test_permission_routes_return_catalog_and_audit(self):
+    async def test_permission_route_returns_catalog(self):
         apikey_service = Mock()
         apikey_service.getPermissionCatalog = Mock(return_value="catalog")
-        apikey_service.auditPermissions = AsyncMock(return_value="audit")
         user_info = {"id": "u1", "roles": [], "org_id": "org-1"}
 
         self.assertEqual(
             await routes.getApiKeyPermissions(user_info, apikey_service),
             "catalog",
-        )
-        self.assertEqual(
-            await routes.auditApiKeyPermissions(user_info, apikey_service),
-            "audit",
         )
 
     async def test_query_scoped_routes_authorize_then_call_service(self):

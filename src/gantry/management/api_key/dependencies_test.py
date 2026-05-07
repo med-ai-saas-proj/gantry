@@ -9,10 +9,6 @@ from starlette.requests import Request
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.api_key.permissions import (
-    listPermissions,
-    clearPermissions,
-)
 from gantry.management.api_key.dependencies import (
     getApiKeyInfo,
     requiredPermissions,
@@ -32,9 +28,6 @@ def _make_request() -> Request:
 
 
 class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
-    def setUp(self):
-        clearPermissions()
-
     async def test_required_permissions_registers_and_verifies(self):
         dependency = requiredPermissions(["chat.read"])
         service = Mock()
@@ -58,7 +51,6 @@ class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
         result = await dependency(request, "raw-key", service)
 
         self.assertEqual(result["api_key_uuid"], "api-key-uuid")
-        self.assertEqual(listPermissions(), ["chat.read"])
         service.verifyApiKey.assert_awaited_once_with("raw-key", ["chat.read"])
         self.assertEqual(request.headers["X-Organization-UUID"], "org-uuid")
         self.assertEqual(request.headers["X-Project-UUID"], "proj-uuid")

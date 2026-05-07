@@ -472,7 +472,14 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
     def test_list_api_key_permissions_returns_catalog(self):
         expected = ApiKeyPermissionCatalogResponse(
             total=2,
-            results=["apikey.read", "apikey.write"],
+            results=[
+                {"id": "apikey.read", "name": "apikey.read", "description": ""},
+                {
+                    "id": "apikey.write",
+                    "name": "apikey.write",
+                    "description": "",
+                },
+            ],
         )
         self.apikey_service.getPermissionCatalog = Mock(return_value=expected)
 
@@ -484,7 +491,9 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
     async def test_list_get_update_delete_api_keys_delegate(self):
         now = datetime.now(UTC)
         key = ApiKeyResponse(
+            api_key_id=11,
             api_key_uuid="api-key-1",
+            project_id=7,
             project_uuid="project-1",
             name="Key",
             description="desc",
@@ -495,7 +504,9 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         )
         keys = ApiKeyListResponse(total=1, results=[key])
         updated = ApiKeyResponse(
+            api_key_id=11,
             api_key_uuid="api-key-1",
+            project_id=7,
             project_uuid="project-1",
             name="Renamed Key",
             description="",
@@ -540,7 +551,9 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
     async def test_create_api_key_passes_actor_identity(self):
         now = datetime.now(UTC)
         expected = ApiKeyCreateResponse(
+            api_key_id=11,
             api_key_uuid="api-key-1",
+            project_id=7,
             project_uuid="project-1",
             name="Key",
             description="",
