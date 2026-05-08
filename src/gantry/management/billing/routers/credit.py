@@ -31,7 +31,7 @@ async def get_available_credits(
     credit_service: Annotated[CreditService, Depends(getCreditService)],
 ) -> ObjectResponse[CreditInfoResponse]:
     credits = await credit_service.getAvailableCredits(
-        org_id=user_info["org_id"]
+        org_id=user_info["org_uuid"]
     )
     return ObjectResponse[CreditInfoResponse](
         data=CreditInfoResponse(amount=credits)
@@ -51,7 +51,7 @@ async def list_credit_transactions(
     limit: int = 100,
 ) -> PaginatedResponse[CreditTransactionInfoResponse]:
     transactions, total = await credit_service.getCreditTransactions(
-        org_id=user_info["org_id"],
+        org_id=user_info["org_uuid"],
         offset=offset,
         limit=limit,
     )

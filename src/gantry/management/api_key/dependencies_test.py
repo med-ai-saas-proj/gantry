@@ -9,11 +9,7 @@ from starlette.requests import Request
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.api_keys.permissions import (
-    listPermissions,
-    clearPermissions,
-)
-from gantry.management.api_keys.dependencies import (
+from gantry.management.api_key.dependencies import (
     getApiKeyInfo,
     requiredPermissions,
 )
@@ -32,24 +28,16 @@ def _make_request() -> Request:
 
 
 class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
-    def setUp(self):
-        clearPermissions()
-
     async def test_required_permissions_registers_and_verifies(self):
         dependency = requiredPermissions(["chat.read"])
         service = Mock()
         service.verifyApiKey = AsyncMock(
             return_value=Ok(
                 {
-                    "api_key_id": 1,
                     "api_key_uuid": "api-key-uuid",
-                    "user_id": "u1",
-                    "project_id": 2,
+                    "user_uuid": "u1",
                     "project_uuid": "proj-uuid",
-                    "org_id": "org-uuid",
                     "organization_uuid": "org-uuid",
-                    "project_uid": "proj-uuid",
-                    "hashed_key": "hashed",
                     "permissions": ["chat.read"],
                     "rpm_limit_organization": 100,
                     "rpm_limit_project": -1,
@@ -62,8 +50,7 @@ class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
 
         result = await dependency(request, "raw-key", service)
 
-        self.assertEqual(result["api_key_id"], 1)
-        self.assertEqual(listPermissions(), ["chat.read"])
+        self.assertEqual(result["api_key_uuid"], "api-key-uuid")
         service.verifyApiKey.assert_awaited_once_with("raw-key", ["chat.read"])
         self.assertEqual(request.headers["X-Organization-UUID"], "org-uuid")
         self.assertEqual(request.headers["X-Project-UUID"], "proj-uuid")
@@ -84,15 +71,10 @@ class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
         service.parseApiKey = AsyncMock(
             return_value=Ok(
                 {
-                    "api_key_id": 1,
                     "api_key_uuid": "api-key-uuid",
-                    "user_id": "u1",
-                    "project_id": 2,
+                    "user_uuid": "u1",
                     "project_uuid": "proj-uuid",
-                    "org_id": "org-uuid",
                     "organization_uuid": "org-uuid",
-                    "project_uid": "proj-uuid",
-                    "hashed_key": "hashed",
                     "permissions": ["chat.run"],
                     "rpm_limit_organization": 50,
                     "rpm_limit_project": -1,

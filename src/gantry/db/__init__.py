@@ -12,7 +12,9 @@ from .settings import getDBSettings
 from .factories import (
     getRedis,
     getAsyncEngine,
+    getRedisBinary,
     getRedisCacheRepo,
     getSessionManager,
+    getRedisConnectionPool,
 )
 from .repositories import Repository, CacheRepository, RedisCacheRepository

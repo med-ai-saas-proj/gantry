@@ -1,6 +1,6 @@
 """Authentication and authorization module for management API."""
 
-from .entities import UserInfo
+from .entities import UserInfo, AdminInfo
 from .services import (
     AuthService,
     ForbiddenError,

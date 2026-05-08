@@ -61,7 +61,6 @@ __all__ = [
     "UserAlreadyInAnotherOrganizationError",
     "UserAlreadyInOrganizationError",
     "_DummyError",
-    "_DummyRedis",
     "_DummySessionManager",
     "_extract_org_ids",
     "datetime",
@@ -83,15 +82,6 @@ class _DummySessionManager:
         yield self.session
 
 
-class _DummyRedis:
-    """Minimal Redis stub for organization service unit tests."""
-
-    def __init__(self):
-        self.get = AsyncMock(return_value=None)
-        self.set = AsyncMock()
-        self.delete = AsyncMock()
-
-
 class _DummyError(Exception):
     """Test-only sentinel error for propagation assertions."""
 
@@ -103,12 +93,10 @@ class BaseOrgServiceTest(unittest.IsolatedAsyncioTestCase):
 
     def _make_service(self) -> OrgService:
         self.session_manager = _DummySessionManager()
-        self.redis = _DummyRedis()
         return OrgService(
             kc_client=Mock(),
             settings_repo=Mock(),
             deletion_repo=Mock(),
             session_manager=self.session_manager,
             logger=Mock(),
-            redis=self.redis,
         )

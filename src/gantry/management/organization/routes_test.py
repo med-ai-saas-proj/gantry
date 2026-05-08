@@ -18,9 +18,9 @@ from pyrusult import Ok
 class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
     async def test_metadata_and_settings_routes(self):
         service = Mock()
-        info = SimpleNamespace(id="org-1", name="Org", owner_id="u1")
+        info = SimpleNamespace(org_id="org-1", name="Org", owner_id="u1")
         delete_req = SimpleNamespace(
-            org_id="org-1",
+            id="org-1",
             requested_at="2026-03-17T00:00:00",
             cancel_before="2026-04-16T00:00:00",
         )
@@ -57,7 +57,7 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
             await routes.delete_org(user_info, "org-1", service), delete_req
         )
         cancel_res = await routes.cancel_delete_org(user_info, "org-1", service)
-        self.assertEqual(cancel_res.org_id, "org-1")
+        self.assertEqual(cancel_res.id, "org-1")
         self.assertTrue(cancel_res.cancelled)
         self.assertEqual(
             await routes.get_settings(user_info, "org-1", service), settings
@@ -80,7 +80,10 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
         service = Mock()
         users = SimpleNamespace(total=1, results=[])
         invitations = SimpleNamespace(results=[])
-        invitation = SimpleNamespace(id="inv-1", email="a@test")
+        invitation = SimpleNamespace(
+            id="inv-1",
+            email="a@test",
+        )
         perms = SimpleNamespace(permissions=["organization.owner"])
         service.getUsers = AsyncMock(return_value=Ok(users))
         service.removeUser = AsyncMock(return_value=Ok(True))

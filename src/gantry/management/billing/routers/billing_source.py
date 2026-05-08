@@ -36,7 +36,7 @@ async def create_billing_source(
     req: Annotated[AddBillingSourceRequest, Body()],
 ) -> ObjectResponse[BillingSourceResponse]:
     res = await billing_source_service.createBillingSource(
-        org_id=user_info["org_id"], req=req
+        org_id=user_info["org_uuid"], req=req
     )
     return ObjectResponse[BillingSourceResponse](data=res.unwrap())
 
@@ -53,7 +53,7 @@ async def billing_source_info(
     ],
 ) -> ObjectResponse[BillingSourceDetailResponse]:
     res = await billing_source_service.getBillingSource(
-        org_id=user_info["org_id"]
+        org_id=user_info["org_uuid"]
     )
     return ObjectResponse[BillingSourceDetailResponse](data=res.unwrap())
 
@@ -72,7 +72,7 @@ async def update_billing_source(
     req: Annotated[UpdateBillingSourceRequest, Body()],
 ):
     res = await billing_source_service.updateBillingSource(
-        org_id=user_info["org_id"],
+        org_id=user_info["org_uuid"],
         update_fields=req,
     )
     res.unwrap()
@@ -90,7 +90,7 @@ async def create_setup_intent(
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
-    res = await billing_source_service.createSetupIntent(user_info["org_id"])
+    res = await billing_source_service.createSetupIntent(user_info["org_uuid"])
     return res.unwrap()
 
 
@@ -108,7 +108,7 @@ async def delete_payment_method(
     ],
 ):
     res = await billing_source_service.deletePaymentMethod(
-        user_info["org_id"], payment_method_id
+        user_info["org_uuid"], payment_method_id
     )
     res.unwrap()
 
@@ -125,7 +125,7 @@ async def list_payment_methods(
         BillingSourceService, Depends(getBillingSourceService)
     ],
 ):
-    res = await billing_source_service.listPaymentMethods(user_info["org_id"])
+    res = await billing_source_service.listPaymentMethods(user_info["org_uuid"])
     return res.unwrap()
 
 
@@ -143,7 +143,7 @@ async def get_payment_method_details(
     ],
 ):
     res = await billing_source_service.getPaymentMethodDetails(
-        user_info["org_id"], payment_method_id
+        user_info["org_uuid"], payment_method_id
     )
     return res.unwrap()
 
@@ -161,7 +161,7 @@ async def list_required_action_setup_intents(
     ],
 ):
     res = await billing_source_service.listRequiredActionSetupIntents(
-        user_info["org_id"],
+        user_info["org_uuid"],
     )
     return res.unwrap()
 
@@ -180,6 +180,6 @@ async def cancel_setup_intent(
     ],
 ):
     res = await billing_source_service.cancelSetupIntent(
-        user_info["org_id"], setup_intent_id
+        user_info["org_uuid"], setup_intent_id
     )
     res.unwrap()

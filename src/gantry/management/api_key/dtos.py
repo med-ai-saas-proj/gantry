@@ -16,8 +16,8 @@ class ApiKeyWriteRequest(BaseDTO):
 class ApiKeyResponse(BaseDTO):
     """Output DTO for one API key resource."""
 
-    id: int
-    project_id: str
+    api_key_uuid: str
+    project_uuid: str
     name: str
     description: str
     hint: str
@@ -50,12 +50,3 @@ class ApiKeyPermissionCatalogResponse(BaseDTO):
 
     total: int
     results: list[ApiKeyPermissionResponse]
-
-
-class ApiKeyPermissionAuditResponse(BaseDTO):
-    """Describe mismatches between runtime and stored API key permissions."""
-
-    registered_permissions: list[str]
-    stored_permissions: list[str]
-    stale_permissions: list[str]
-    unused_permissions: list[str]

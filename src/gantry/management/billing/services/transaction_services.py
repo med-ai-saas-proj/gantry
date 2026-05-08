@@ -796,7 +796,7 @@ class TransactionService:
     async def getTransactions(
         self,
         org_id: str,
-        project_uids: list[UUID] | None = None,
+        project_uuids: list[UUID] | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         limit: int = 100,
@@ -811,7 +811,7 @@ class TransactionService:
             ) = await self.transaction_repo.getTransactionInfoList(
                 session=session,
                 org_id=org_id,
-                project_uids=project_uids,
+                project_uuids=project_uuids,
                 start_date=start_date,
                 end_date=end_date,
                 offset=offset,
@@ -821,7 +821,7 @@ class TransactionService:
                 [
                     TransactionInfoResponse(
                         transaction_uid=trx["transaction_uid"],
-                        project_uid=trx["project_uid"],
+                        project_uuid=trx["project_uuid"],
                         amount=trx["amount"],
                         details=trx["details"],
                         date=trx["date"],
@@ -848,7 +848,7 @@ class TransactionService:
             return Ok(
                 TransactionInfoResponse(
                     transaction_uid=trx["transaction_uid"],
-                    project_uid=trx["project_uid"],
+                    project_uuid=trx["project_uuid"],
                     amount=trx["amount"],
                     details=trx["details"],
                     date=trx["date"],

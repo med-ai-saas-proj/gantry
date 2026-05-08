@@ -21,3 +21,9 @@ prod.env
 node_modules/
 
 gantry.toml
+
+frontend/
+
+docs/
+
+test-results/

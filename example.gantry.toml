@@ -13,6 +13,20 @@ redis_connection_uri = "redis://localhost:6379/0"
 [apikey]
 secret = "your-minimum-16-char-secret-key"
 secret_length = 32
+permissions = [
+    { id = "chat.read", name = "Chat Read", description = "Allow reading chat resources" },
+    { id = "chat.run", name = "Chat Run", description = "Allow running chat operations" },
+    { id = "conversation.read", name = "Conversation Read", description = "Allow reading conversations" },
+    { id = "conversation.write", name = "Conversation Write", description = "Allow writing conversations" },
+    { id = "conversation.delete", name = "Conversation Delete", description = "Allow deleting conversations" },
+    { id = "file.read", name = "File Read", description = "Allow reading files" },
+    { id = "file.write", name = "File Write", description = "Allow uploading files" },
+    { id = "file.delete", name = "File Delete", description = "Allow deleting files" },
+    { id = "rag.read", name = "RAG Read", description = "Allow reading RAG resources" },
+    { id = "rag.write", name = "RAG Write", description = "Allow writing RAG resources" },
+    { id = "objects:read", name = "Read Objects", description = "Allow reading objects" },
+    { id = "objects:write", name = "Write Objects", description = "Allow creating objects" },
+]
 
 [keycloak]
 server_url = "http://localhost:8080/"
@@ -25,7 +39,7 @@ client_id = "gantry-frontend"
 admin_client_id = "gantry-admin"
 
 [rag]
-openai_api_key = "sk-example"               #apikey
+openai_api_key = "sk-example"              #apikey
 embedding_model = "text-embedding-3-small"
 
 [billing]
@@ -41,11 +55,11 @@ cache_limit = 50
 
 [file_storage]
 # Required: S3 / Object Storage configuration
-s3_bucket_name = "private-files"             #apikey
-s3_region_name = "us-east-1"                 #apikey
-s3_access_key_id = "rustfs-access-key"       #apikey
-s3_secret_access_key = "rustfs-secret-key"   #apikey
-s3_endpoint_url = "http://localhost:9000"    #apikey
+s3_bucket_name = "private-files"           #apikey
+s3_region_name = "us-east-1"               #apikey
+s3_access_key_id = "rustfs-access-key"     #apikey
+s3_secret_access_key = "rustfs-secret-key" #apikey
+s3_endpoint_url = "http://localhost:9000"  #apikey
 s3_presigned_url_expiry_seconds = 3600
 redis_cache_expiry_seconds = 3600
 
@@ -55,21 +69,11 @@ deletion_cancel_window_days = 30
 deletion_worker_interval_seconds = 60
 
 [api_gateway]
-permissions = [
-    { id = "objects:read", name = "Read Objects", description = "Allow reading objects" },
-    { id = "objects:write", name = "Write Objects", description = "Allow creating objects" },
-]
-
-[api_gateway.routes.get_objects]
-address = "https://api.restful-api.dev/objects"
-required_perms = ["objects:read"]
-rate_limit = 60
-
-[api_gateway.routes.create_object]
-address = "https://api.restful-api.dev/objects"
-required_perms = ["objects:read", "objects:write"]
-auto_charge = 1
-rate_limit = 30
+routes = { "get_objects" = { "address" = "https://api.restful-api.dev/objects", required_perms = [
+    "objects:read",
+] }, "create_object" = { "address" = "https://api.restful-api.dev/objects", required_perms = [
+    "object_write",
+] } }
 
 [observability]
 exporter_otlp_endpoint = "http://localhost:4317/"

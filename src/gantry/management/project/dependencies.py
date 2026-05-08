@@ -1,53 +1,89 @@
 """FastAPI dependencies for project permissions."""
 
-from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.auth import UserInfo, getUserInfo
+from gantry.management.organization import OrgPermission
 
+from .services import (
+    ProjectArchivedError,
+    UserNotInProjectError,
+    InsufficientProjectPermissionError,
+)
 from .factories import ProjectService, getProjectService
-from .permissions import ProjectPermission
+from .permissions import (
+    ProjectPermission,
+    get_effective_permissions,
+)
 
 from typing import Annotated
 
 from fastapi import Path, Depends
 
 
+async def assertProjectRole(
+    project_service: ProjectService,
+    project_uuid: str,
+    required_permissions: list[ProjectPermission],
+    user_info: UserInfo,
+    allow_archived: bool = False,
+):
+    if (
+        await project_service.isProjectArchived(project_uuid)
+        and not allow_archived
+    ):
+        raise ProjectArchivedError()
+    if OrgPermission.OWNER.value in user_info["org_permissions"]:
+        return
+    try:
+        effective_perms = get_effective_permissions(
+            user_info["project_permissions"][project_uuid]
+        )
+    except KeyError as e:
+        raise UserNotInProjectError() from e
+
+    if not effective_perms.issuperset(required_permissions):
+        raise InsufficientProjectPermissionError()
+    pass
+
+
 def requiredProjectPermission(
     permission: ProjectPermission, allow_archived: bool = False
 ):
-    """Return dependency enforcing project permission for path project_id."""
+    """Return dependency enforcing project permission for path project_uuid."""
 
     async def _dependency(
-        project_id: Annotated[str, Path()],
+        project_uuid: Annotated[str, Path()],
         user_info: Annotated[UserInfo, Depends(getUserInfo)],
         project_service: Annotated[ProjectService, Depends(getProjectService)],
     ) -> UserInfo:
-        authz_res = await project_service.authorizeProjectPermission(
-            project_uuid=project_id,
-            user_id=user_info["id"],
-            required=permission,
-            allow_archived=allow_archived,
+        await assertProjectRole(
+            project_service,
+            project_uuid,
+            [permission],
+            user_info,
+            allow_archived,
         )
-        authz_res.unwrap()
         return user_info
 
     return _dependency
 
 
-def userHasRole(required_permissions: list[ProjectPermission]):
+def userHasRole(
+    required_permissions: list[ProjectPermission], allow_archived: bool = False
+):
     """Return dependency enforcing all required project permissions."""
 
     async def _dependency(
-        project_id: Annotated[str, Path()],
+        project_uuid: Annotated[str, Path()],
         user_info: Annotated[UserInfo, Depends(getUserInfo)],
         project_service: Annotated[ProjectService, Depends(getProjectService)],
     ) -> UserInfo:
-        for permission in required_permissions:
-            authz_res = await project_service.authorizeProjectPermission(
-                project_uuid=project_id,
-                user_id=user_info["id"],
-                required=permission,
-            )
-            authz_res.unwrap()
+        await assertProjectRole(
+            project_service,
+            project_uuid,
+            required_permissions,
+            user_info,
+            allow_archived,
+        )
         return user_info
 
     return _dependency

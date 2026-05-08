@@ -5,7 +5,7 @@ import unittest
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
 from gantry.settings import AppSettings, ApiKeysSettings
-from gantry.management.api_keys.settings import getApiKeysSettings
+from gantry.management.api_key.settings import getApiKeysSettings
 
 
 class TestApiKeySettings(unittest.TestCase):

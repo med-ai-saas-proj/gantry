@@ -23,15 +23,30 @@ class PaginatedQuery(BaseDTO):
 class OrgInfoResponse(BaseDTO):
     """Organization metadata."""
 
-    id: str
+    org_id: str
     name: str
     owner_id: str | None = None
+
+
+class OrgListResponse(BaseDTO):
+    """Paginated organization list response."""
+
+    total: int
+    results: list[OrgInfoResponse]
+
+
+class CreateOrgRequest(BaseDTO):
+    """Body for creating an organization from an admin dashboard."""
+
+    name: str = Field(..., min_length=1, max_length=256)
+    alias: str | None = Field(None, min_length=1, max_length=256)
+    owner_id: str | None = Field(None, min_length=1, max_length=128)
 
 
 class DeleteRequestResponse(BaseDTO):
     """Org deletion request acknowledgement."""
 
-    org_id: str
+    id: str
     requested_at: str = Field(
         ...,
         description="ISO-8601 timestamp when deletion was requested",
@@ -48,7 +63,7 @@ class DeleteRequestResponse(BaseDTO):
 class DeleteCancelResponse(BaseDTO):
     """Deletion cancel acknowledgement."""
 
-    org_id: str
+    id: str
     cancelled: bool = Field(
         True,
         description="Always true when cancellation succeeds",

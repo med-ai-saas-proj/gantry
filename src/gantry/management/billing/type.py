@@ -34,7 +34,7 @@ class BillingTransactionInfo(TypedDict):
     date: datetime
     organization_id: str
     transaction_uid: UUID
-    project_uid: UUID
+    project_uuid: UUID
     details: dict
     captured_at: datetime | None
     status: TransactionStatus
@@ -55,7 +55,7 @@ class BillingInvoiceInfo(TypedDict):
 class BillingInvoiceLineItemInfo(TypedDict):
     description: str
     amount: Decimal
-    project_uid: UUID | None
+    project_uuid: UUID | None
     invoice_line_uuid: UUID
     project_name: str | None
     project_id: int | None

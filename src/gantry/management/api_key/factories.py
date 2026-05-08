@@ -1,5 +1,8 @@
-from gantry.db import getRedisCacheRepo
-from gantry.db.factories import getSessionManager
+from gantry.db import (
+    getRedisCacheRepo,
+    getSessionManager,
+    getRedisConnectionPool,
+)
 from gantry.management.project import getProjectRepository
 from gantry.shared.logging.logger import getLogger
 
@@ -8,6 +11,8 @@ from .settings import getApiKeysSettings
 from .repositories import ApiKeyRepository
 
 from functools import lru_cache
+
+from limits.aio import storage
 
 
 @lru_cache(1)
@@ -28,5 +33,12 @@ def getApiKeyService():
         logger=getLogger(),
         api_key_repo=getApiKeyRepository(),
         project_repo=getProjectRepository(),
+        permissions=list(apikeys_settings.permissions),
         session_manager=getSessionManager(),
+        limits_storage=storage.RedisStorage(
+            "redis://",
+            implementation="redispy",
+            # They don't pay much attention to this eh
+            connection_pool=getRedisConnectionPool(),  # type: ignore
+        ),
     )

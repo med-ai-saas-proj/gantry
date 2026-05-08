@@ -36,9 +36,9 @@ def getProjectService() -> ProjectService:
     return ProjectService(
         session_manager=getSessionManager(),
         logger=getLogger(),
+        kc_client=getKeycloakServiceClient(),
         project_repo=getProjectRepository(),
         membership_repo=getProjectMemeberRepository(),
         settings_repo=getProjectSettingsRepository(),
-        kc_client=getKeycloakServiceClient(),
         redis=getRedis(),
     )

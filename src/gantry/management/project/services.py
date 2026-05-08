@@ -114,7 +114,6 @@ class ProjectService:
         membership_repo: ProjectMemberRepository,
         settings_repo: ProjectSettingsRepository,
         kc_client: KeycloakServiceClient,
-        redis: Redis | None = None,
     ):
         self.session_manager = session_manager
         self.logger = logger
@@ -122,7 +121,6 @@ class ProjectService:
         self.membership_repo = membership_repo
         self.settings_repo = settings_repo
         self.kc = kc_client
-        self.redis = redis
 
     async def _ensureUserInOrg(
         self,
@@ -166,7 +164,7 @@ class ProjectService:
                     project.id,
                     project.organization_id,
                     ProjectInfoResponse(
-                        id=str(project.uuid),
+                        project_uuid=str(project.uuid),
                         name=project.name,
                         description=project.description,
                         organization_id=project.organization_id,
@@ -403,7 +401,7 @@ class ProjectService:
                     total=len(projects),
                     results=[
                         ProjectInfoResponse(
-                            id=str(p.uuid),
+                            project_uuid=str(p.uuid),
                             name=p.name,
                             description=p.description,
                             organization_id=p.organization_id,
@@ -439,7 +437,7 @@ class ProjectService:
                         total=len(projects),
                         results=[
                             ProjectInfoResponse(
-                                id=str(p.uuid),
+                                project_uuid=str(p.uuid),
                                 name=p.name,
                                 description=p.description,
                                 organization_id=p.organization_id,
@@ -495,7 +493,7 @@ class ProjectService:
                     total=len(projects),
                     results=[
                         ProjectInfoResponse(
-                            id=str(p.uuid),
+                            project_uuid=str(p.uuid),
                             name=p.name,
                             description=p.description,
                             organization_id=p.organization_id,
@@ -551,7 +549,7 @@ class ProjectService:
             if set_res.status == ResultStatus.Err:
                 return set_res.into()
             output = ProjectInfoResponse(
-                id=str(project.uuid),
+                project_uuid=str(project.uuid),
                 name=project.name,
                 description=project.description,
                 organization_id=project.organization_id,
@@ -610,7 +608,7 @@ class ProjectService:
             await session.commit()
             return Ok(
                 ProjectInfoResponse(
-                    id=str(updated.uuid),
+                    project_uuid=str(updated.uuid),
                     name=updated.name,
                     description=updated.description,
                     organization_id=updated.organization_id,
@@ -966,8 +964,17 @@ class ProjectService:
             project.is_archived = archived
             await session.flush()
             output = ProjectArchiveResponse(
-                project_id=str(project.uuid),
+                id=str(project.uuid),
                 archived=project.is_archived,
             )
             await session.commit()
             return Ok(output)
+
+    async def isProjectArchived(
+        self, project_uuid: str
+    ) -> Result[bool, ProjectNotFoundError]:
+        async with self.session_manager.get_session() as session:
+            project = await self.project_repo.getByUuid(session, project_uuid)
+        if project is None:
+            return Err(ProjectNotFoundError())
+        return Ok(project.is_archived)

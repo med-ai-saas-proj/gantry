@@ -1,6 +1,52 @@
 {
   "$defs": {
-    "ApiGatewayPermission": {
+    "ApiGatewayRoute": {
+      "properties": {
+        "address": {
+          "description": "Upstream service address for this route.",
+          "title": "Address",
+          "type": "string"
+        },
+        "required_perms": {
+          "default": [],
+          "description": "Permission IDs required to access this route.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Perms",
+          "type": "array"
+        }
+      },
+      "required": [
+        "address"
+      ],
+      "title": "ApiGatewayRoute",
+      "type": "object"
+    },
+    "ApiGatewaySettings": {
+      "properties": {
+        "routes": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ApiGatewayRoute"
+          },
+          "default": {},
+          "description": "Route definitions keyed by route name.",
+          "title": "Routes",
+          "type": "object"
+        },
+        "request_timeout": {
+          "default": "PT30S",
+          "description": "Timeout for proxy request",
+          "format": "duration",
+          "title": "Request Timeout",
+          "type": "string"
+        }
+      },
+      "title": "ApiGatewaySettings",
+      "type": "object"
+    },
+    "ApiKeyPermission": {
+      "additionalProperties": false,
       "properties": {
         "id": {
           "description": "Unique permission identifier.",
@@ -23,93 +69,7 @@
         "name",
         "description"
       ],
-      "title": "ApiGatewayPermission",
-      "type": "object"
-    },
-    "ApiGatewayRoute": {
-      "properties": {
-        "address": {
-          "description": "Upstream service address for this route.",
-          "title": "Address",
-          "type": "string"
-        },
-        "required_perms": {
-          "default": [],
-          "description": "Permission IDs required to access this route.",
-          "items": {
-            "type": "string"
-          },
-          "title": "Required Perms",
-          "type": "array"
-        },
-        "auto_hold": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Credits to hold automatically per request.",
-          "title": "Auto Hold"
-        },
-        "auto_charge": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Credits to charge automatically per request.",
-          "title": "Auto Charge"
-        },
-        "rate_limit": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "description": "Maximum requests per minute for this route.",
-          "title": "Rate Limit"
-        }
-      },
-      "required": [
-        "address"
-      ],
-      "title": "ApiGatewayRoute",
-      "type": "object"
-    },
-    "ApiGatewaySettings": {
-      "properties": {
-        "permissions": {
-          "default": [],
-          "description": "Available API gateway permissions.",
-          "items": {
-            "$ref": "#/$defs/ApiGatewayPermission"
-          },
-          "title": "Permissions",
-          "type": "array"
-        },
-        "routes": {
-          "additionalProperties": {
-            "$ref": "#/$defs/ApiGatewayRoute"
-          },
-          "default": {},
-          "description": "Route definitions keyed by route name.",
-          "title": "Routes",
-          "type": "object"
-        }
-      },
-      "title": "ApiGatewaySettings",
+      "title": "ApiKeyPermission",
       "type": "object"
     },
     "ApiKeysSettings": {
@@ -128,6 +88,15 @@
           "exclusiveMinimum": 16,
           "title": "Secret Length",
           "type": "integer"
+        },
+        "permissions": {
+          "default": [],
+          "description": "Available API key permissions.",
+          "items": {
+            "$ref": "#/$defs/ApiKeyPermission"
+          },
+          "title": "Permissions",
+          "type": "array"
         }
       },
       "required": [
@@ -243,6 +212,20 @@
           "minLength": 1,
           "title": "Redis Connection Uri",
           "type": "string"
+        },
+        "cache_ttl": {
+          "anyOf": [
+            {
+              "format": "duration",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "PT1H",
+          "description": "Cache time-to-live, None mean never expire",
+          "title": "Cache Ttl"
         }
       },
       "required": [
@@ -265,7 +248,6 @@
       "additionalProperties": false,
       "properties": {
         "server_url": {
-          "default": "http://localhost:8000/",
           "description": "Keycloak server base URL.",
           "format": "uri",
           "maxLength": 2083,
@@ -274,12 +256,27 @@
           "type": "string"
         },
         "realm_name": {
-          "default": "example_realm",
           "description": "Keycloak realm name.",
           "title": "Realm Name",
           "type": "string"
+        },
+        "service_client_id": {
+          "description": "Service account client id for Keycloak Admin API calls.",
+          "title": "Service Client Id",
+          "type": "string"
+        },
+        "service_client_secret": {
+          "description": "Service account client secret for Keycloak Admin API calls.",
+          "title": "Service Client Secret",
+          "type": "string"
         }
       },
+      "required": [
+        "server_url",
+        "realm_name",
+        "service_client_id",
+        "service_client_secret"
+      ],
       "title": "KeycloakSettings",
       "type": "object"
     },
@@ -408,17 +405,6 @@
     "OrgSettings": {
       "additionalProperties": false,
       "properties": {
-        "keycloak_service_client_id": {
-          "default": "med-ai-saas-backend",
-          "description": "Service account client id for Keycloak Admin API calls.",
-          "title": "Keycloak Service Client Id",
-          "type": "string"
-        },
-        "keycloak_service_client_secret": {
-          "description": "Service account client secret for Keycloak Admin API calls.",
-          "title": "Keycloak Service Client Secret",
-          "type": "string"
-        },
         "invite_redirect_uri": {
           "default": "http://localhost:3000",
           "description": "Redirect URI used for invitation registration links.",
@@ -453,9 +439,6 @@
           "type": "integer"
         }
       },
-      "required": [
-        "keycloak_service_client_secret"
-      ],
       "title": "OrgSettings",
       "type": "object"
     },

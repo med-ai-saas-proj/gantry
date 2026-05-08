@@ -21,6 +21,14 @@ from pyrusult import Ok
 
 class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
     async def test_list_and_create_routes(self):
+        user_info = {
+            "id": "u1",
+            "username": "alice",
+            "email": "a@test",
+            "org_uuid": "org-1",
+            "org_permissions": ["organization.projects.get_all"],
+            "project_permissions": {},
+        }
         service = Mock()
         service.listOrgProjects = AsyncMock(return_value=Ok("org-projects"))
         service.listUserProjects = AsyncMock(return_value=Ok("user-projects"))
@@ -38,7 +46,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             await routes.get_projects(
-                {"id": "u1", "roles": []},
+                user_info,
                 ProjectListQuery(organization="org-1"),
                 service,
             ),
@@ -46,7 +54,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             await routes.get_projects(
-                {"id": "u1", "roles": []},
+                user_info,
                 ProjectListQuery(),
                 service,
             ),
@@ -54,7 +62,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             await routes.create_project(
-                {"id": "u1", "roles": []},
+                user_info,
                 "org-1",
                 CreateProjectRequest(name="P1", description="desc"),
                 service,
@@ -63,7 +71,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             await routes.get_project(
-                {"id": "u1", "roles": []},
+                user_info,
                 "proj-1",
                 service,
             ),
@@ -71,7 +79,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             await routes.update_project(
-                {"id": "u1", "roles": []},
+                user_info,
                 "proj-1",
                 UpdateProjectRequest(name="P2", description="desc2"),
                 service,
@@ -80,7 +88,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             await routes.get_project_settings(
-                {"id": "u1", "roles": []},
+                user_info,
                 "proj-1",
                 service,
             ),
@@ -88,7 +96,7 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             await routes.update_project_settings(
-                {"id": "u1", "roles": []},
+                user_info,
                 "proj-1",
                 UpdateProjectSettingsRequest(
                     rate_limit=120,

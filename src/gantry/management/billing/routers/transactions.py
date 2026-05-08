@@ -33,9 +33,9 @@ async def listTransactions(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
-    project_uids: list[UUID] | None = Query(
+    project_uuids: list[UUID] | None = Query(
         None
-    ),  # filter by project_uid or whole organization
+    ),  # filter by project_uuid or whole organization
     start_date: datetime | None = None,  # ISO date string
     end_date: datetime | None = None,  # ISO date string
     limit: int = 100,
@@ -53,8 +53,8 @@ async def listTransactions(
         project_uids = [UUID(uid) for uid in user_info["project_uids"]]
 
     res, total = await billing_service.getTransactions(
-        org_id=user_info["org_id"],
-        project_uids=project_uids,
+        org_id=user_info["org_uuid"],
+        project_uuids=project_uuids,
         start_date=start_date,
         end_date=end_date,
         limit=limit,
@@ -80,7 +80,7 @@ async def getTransactionDetails(
 ) -> ObjectResponse[TransactionInfoResponse]:
     res = (
         await billing_service.getTransactionById(
-            org_id=user_info["org_id"], transaction_uid=transaction_uid
+            org_id=user_info["org_uuid"], transaction_uid=transaction_uid
         )
     ).unwrap()
     check_access_to_project(user_info=user_info, project_uid=res.project_uid)

@@ -1,266 +1,325 @@
 from gantry.management.admin import routes
 
 import unittest
+from datetime import UTC, datetime
 from unittest.mock import Mock, AsyncMock
 
-from pyrusult import Ok
+from fastapi import FastAPI
+
+
+ADMIN_INFO = {
+    "id": "admin-1",
+    "username": "admin",
+    "email": "admin@test",
+}
 
 
 class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
-    async def test_get_admin_me_returns_admin_identity(self):
-        result = await routes.get_admin_me(
-            {
-                "id": "admin-1",
-                "username": "admin",
-                "email": "admin@test",
-                "roles": ["ADMIN"],
-                "org_id": "",
-                "project_ids": [],
-            }
+    def test_admin_openapi_uses_canonical_two_module_paths(self):
+        app = FastAPI()
+        app.include_router(routes.admin_router)
+
+        paths = app.openapi()["paths"]
+
+        self.assertIn("/admin/organization-permissions", paths)
+        self.assertIn("/admin/project-permissions", paths)
+        self.assertIn("/admin/api-key-permissions", paths)
+        self.assertIn("/admin/organization-settings/{org_id}", paths)
+        self.assertIn("/admin/organization-users", paths)
+        self.assertIn("/admin/project-settings/{project_id}", paths)
+        self.assertIn("/admin/project-users", paths)
+        self.assertIn("/admin/user-organizations", paths)
+        self.assertIn("/admin/user-profiles/{user_id}", paths)
+        self.assertIn("/admin/user-permissions/{user_id}", paths)
+
+        self.assertNotIn("/admin/organizations/permissions", paths)
+        self.assertNotIn("/admin/projects/permissions", paths)
+        self.assertNotIn("/admin/api-keys/permissions", paths)
+        self.assertNotIn("/admin/organizations/{org_id}/settings", paths)
+        self.assertNotIn("/admin/organizations/{org_id}/users", paths)
+        self.assertNotIn("/admin/projects/{project_id}/settings", paths)
+        self.assertNotIn("/admin/projects/{project_id}/users", paths)
+        self.assertNotIn("/admin/users/{user_id}/organizations", paths)
+        self.assertNotIn("/admin/users/{user_id}/profile", paths)
+        self.assertNotIn("/admin/users/{user_id}/permissions", paths)
+
+    async def test_get_admin_me_delegates_to_admin_service(self):
+        admin_service = Mock()
+        expected = routes.AdminUserInfoResponse(
+            id="admin-1",
+            username="admin",
+            email="admin@test",
+        )
+        admin_service.getAdminInfo.return_value = expected
+
+        result = await routes.get_admin_me(ADMIN_INFO, admin_service)
+
+        self.assertEqual(result, expected)
+        admin_service.getAdminInfo.assert_called_once_with(ADMIN_INFO)
+
+    async def test_get_admin_dashboard_summary_delegates_to_admin_service(self):
+        admin_service = Mock()
+        expected = routes.AdminDashboardSummaryResponse(
+            organizations=3,
+            projects=5,
+            api_keys=8,
+            users=13,
+        )
+        admin_service.getDashboardSummary = AsyncMock(return_value=expected)
+
+        result = await routes.get_admin_dashboard_summary(
+            ADMIN_INFO,
+            admin_service,
         )
 
-        self.assertEqual(result.id, "admin-1")
-        self.assertEqual(result.roles, ["ADMIN"])
+        self.assertEqual(result, expected)
+        admin_service.getDashboardSummary.assert_awaited_once_with()
 
-    async def test_get_user_organizations_returns_keycloak_memberships(self):
-        kc = Mock()
-        kc.getMemberOrganizations = AsyncMock(
-            return_value=Ok(
-                [
-                    {"id": "org-1", "name": "Org 1", "alias": "org-1"},
-                    {"id": "org-2", "name": "Org 2"},
-                ]
-            )
+    async def test_list_admin_organizations_delegates_to_admin_service(self):
+        admin_service = Mock()
+        pagination = routes.AdminPaginationQuery(limit=10, offset=5, q="org")
+        expected = routes.OrgListResponse(
+            total=1,
+            results=[
+                routes.OrgInfoResponse(
+                    org_id="org-1",
+                    name="Org 1",
+                    owner_id=None,
+                )
+            ],
+        )
+        admin_service.listOrganizations = AsyncMock(return_value=expected)
+
+        result = await routes.list_admin_organizations(
+            ADMIN_INFO,
+            pagination,
+            admin_service,
         )
 
-        result = await routes.get_user_organizations(
-            {
-                "id": "admin-1",
-                "username": "admin",
-                "email": "admin@test",
-                "roles": ["ADMIN"],
-                "org_id": "",
-                "project_ids": [],
-            },
-            "user-1",
-            kc,
+        self.assertEqual(result, expected)
+        admin_service.listOrganizations.assert_awaited_once_with(pagination)
+
+    async def test_create_admin_project_delegates_to_admin_service(self):
+        admin_service = Mock()
+        input_data = routes.CreateProjectRequest(
+            name="Project 1",
+            description="desc",
+        )
+        expected = routes.ProjectInfoResponse(
+            project_uuid="project-1",
+            name="Project 1",
+            description="desc",
+            organization_id="org-1",
+            archived=False,
+        )
+        admin_service.createProject = AsyncMock(return_value=expected)
+
+        result = await routes.create_admin_project(
+            ADMIN_INFO,
+            "org-1",
+            input_data,
+            admin_service,
         )
 
-        self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].id, "org-1")
-        kc.getMemberOrganizations.assert_awaited_once_with("user-1")
+        self.assertEqual(result, expected)
+        admin_service.createProject.assert_awaited_once_with(
+            "org-1", input_data
+        )
 
-    async def test_get_user_profile_returns_profile_and_permissions(self):
-        kc = Mock()
-        kc.getUserProfile = AsyncMock(
-            return_value=Ok(
-                {
-                    "id": "user-1",
-                    "username": "alice",
-                    "email": "alice@test",
-                    "firstName": "Alice",
-                    "lastName": "Nguyen",
-                    "enabled": True,
-                    "emailVerified": True,
-                    "attributes": {
-                        "org_permissions": ["organization.owner"],
-                        "project_permissions": {
-                            "project-a": [
-                                "project.owner",
-                                "project.settings.read",
-                            ],
-                            "project-b": ["apikey.read"],
-                        },
-                    },
-                }
-            )
+    async def test_delete_admin_api_key_returns_200_after_service_delete(self):
+        admin_service = Mock()
+        admin_service.deleteApiKey = AsyncMock(return_value=True)
+
+        response = await routes.delete_admin_api_key(
+            ADMIN_INFO,
+            123,
+            admin_service,
         )
-        kc.getMemberOrganizations = AsyncMock(
-            return_value=Ok(
-                [{"id": "org-1", "name": "Org 1", "alias": "org-1"}]
-            )
+
+        self.assertEqual(response.status_code, 200)
+        admin_service.deleteApiKey.assert_awaited_once_with(123)
+
+    async def test_get_user_profile_delegates_to_admin_service(self):
+        admin_service = Mock()
+        expected = routes.AdminUserProfileResponse(
+            id="user-1",
+            username="alice",
+            email="alice@test",
+            first_name="Alice",
+            last_name="Nguyen",
+            enabled=True,
+            email_verified=True,
+            organizations=[],
+            permissions=routes.AdminUserPermissionSummaryResponse(
+                organization_permissions=[],
+                effective_organization_permissions=[],
+                project_permissions=[],
+            ),
         )
+        admin_service.getUserProfile = AsyncMock(return_value=expected)
 
         result = await routes.get_user_profile(
-            {
-                "id": "admin-1",
-                "username": "admin",
-                "email": "admin@test",
-                "roles": ["ADMIN"],
-                "org_id": "",
-                "project_ids": [],
-            },
+            ADMIN_INFO,
             "user-1",
-            kc,
+            admin_service,
         )
 
-        self.assertEqual(result.id, "user-1")
-        self.assertEqual(result.username, "alice")
-        self.assertTrue(result.enabled)
-        self.assertEqual(len(result.organizations), 1)
-        self.assertEqual(
-            result.permissions.organization_permissions,
-            ["organization.owner"],
-        )
-        self.assertIn(
-            "organization.settings.read",
-            result.permissions.effective_organization_permissions,
-        )
-        self.assertEqual(len(result.permissions.project_permissions), 2)
-        self.assertEqual(
-            result.permissions.project_permissions[0].project_id,
-            "project-a",
-        )
-        self.assertIn(
-            "project.users.add",
-            result.permissions.project_permissions[0].effective_permissions,
-        )
-        kc.getUserProfile.assert_awaited_once_with("user-1")
-        kc.getMemberOrganizations.assert_awaited_once_with("user-1")
+        self.assertEqual(result, expected)
+        admin_service.getUserProfile.assert_awaited_once_with("user-1")
 
-    async def test_set_user_permissions_updates_keycloak_and_returns_profile(
-        self,
-    ):
-        kc = Mock()
-        kc.setUserAttributes = AsyncMock(return_value=Ok(True))
-        kc.getUserProfile = AsyncMock(
-            return_value=Ok(
-                {
-                    "id": "user-1",
-                    "username": "alice",
-                    "email": "alice@test",
-                    "enabled": True,
-                    "emailVerified": True,
-                    "attributes": {
-                        "org_permissions": ["organization.settings.read"],
-                        "project_permissions": {
-                            "project-a": ["project.settings.read"]
-                        },
-                    },
-                }
-            )
+    async def test_set_user_permissions_delegates_to_admin_service(self):
+        admin_service = Mock()
+        payload = routes.AdminUserPermissionUpdateRequest(
+            organization_permissions=["organization.settings.read"],
+            project_permissions=[],
         )
-        kc.getMemberOrganizations = AsyncMock(return_value=Ok([]))
+        expected = routes.AdminUserProfileResponse(
+            id="user-1",
+            username="alice",
+            email="alice@test",
+            first_name=None,
+            last_name=None,
+            enabled=True,
+            email_verified=True,
+            organizations=[],
+            permissions=routes.AdminUserPermissionSummaryResponse(
+                organization_permissions=["organization.settings.read"],
+                effective_organization_permissions=[
+                    "organization.settings.read"
+                ],
+                project_permissions=[],
+            ),
+        )
+        admin_service.setUserPermissions = AsyncMock(return_value=expected)
 
         result = await routes.set_user_permissions(
-            {
-                "id": "admin-1",
-                "username": "admin",
-                "email": "admin@test",
-                "roles": ["ADMIN"],
-                "org_id": "",
-                "project_ids": [],
-            },
+            ADMIN_INFO,
             "user-1",
-            routes.AdminUserPermissionUpdateRequest(
-                organization_permissions=["organization.settings.read"],
-                project_permissions=[
-                    routes.AdminUserProjectPermissionUpdateRequest(
-                        project_id="project-a",
-                        permissions=["project.settings.read"],
-                    )
-                ],
+            payload,
+            admin_service,
+        )
+
+        self.assertEqual(result, expected)
+        admin_service.setUserPermissions.assert_awaited_once_with(
+            "user-1",
+            payload,
+        )
+
+    async def test_create_admin_api_key_passes_admin_identity_to_service(self):
+        admin_service = Mock()
+        now = datetime.now(UTC)
+        payload = routes.ApiKeyWriteRequest(
+            name="Key",
+            description="",
+            permissions=["objects:read"],
+        )
+        expected = routes.ApiKeyCreateResponse(
+            api_key_id=11,
+            api_key_uuid="api-key-1",
+            project_id=7,
+            project_uuid="project-1",
+            name="Key",
+            description="",
+            hint="sk_x...abcd",
+            created_at=now,
+            permissions=["objects:read"],
+            disabled=False,
+            key="sk_raw.secret",
+        )
+        admin_service.createApiKey = AsyncMock(return_value=expected)
+
+        result = await routes.create_admin_api_key(
+            ADMIN_INFO,
+            "project-1",
+            payload,
+            admin_service,
+        )
+
+        self.assertEqual(result, expected)
+        admin_service.createApiKey.assert_awaited_once_with(
+            ADMIN_INFO,
+            "project-1",
+            payload,
+        )
+
+    async def test_alias_routes_delegate_to_same_admin_service_methods(self):
+        admin_service = Mock()
+        pagination = routes.AdminPaginationQuery(limit=10, offset=0, q=None)
+        users = routes.OrgUserListResponse(total=0, results=[])
+        projects = routes.ProjectUserListResponse(total=0, results=[])
+        orgs = []
+        profile = routes.AdminUserProfileResponse(
+            id="user-1",
+            username="alice",
+            email="alice@test",
+            first_name=None,
+            last_name=None,
+            enabled=True,
+            email_verified=True,
+            organizations=[],
+            permissions=routes.AdminUserPermissionSummaryResponse(
+                organization_permissions=[],
+                effective_organization_permissions=[],
+                project_permissions=[],
             ),
-            kc,
         )
+        payload = routes.AdminUserPermissionUpdateRequest(
+            organization_permissions=[],
+            project_permissions=[],
+        )
+        admin_service.listOrganizationUsers = AsyncMock(return_value=users)
+        admin_service.listProjectUsers = AsyncMock(return_value=projects)
+        admin_service.getUserOrganizations = AsyncMock(return_value=orgs)
+        admin_service.getUserProfile = AsyncMock(return_value=profile)
+        admin_service.setUserPermissions = AsyncMock(return_value=profile)
+        admin_service.resetUserPermissions = AsyncMock(return_value=profile)
 
-        self.assertEqual(result.id, "user-1")
-        kc.setUserAttributes.assert_awaited_once_with(
+        await routes.list_admin_organization_users(
+            ADMIN_INFO,
+            "org-1",
+            pagination,
+            admin_service,
+        )
+        await routes.list_admin_project_users(
+            ADMIN_INFO,
+            "project-1",
+            pagination,
+            admin_service,
+        )
+        await routes.get_user_organizations(
+            ADMIN_INFO,
             "user-1",
-            {
-                "org_permissions": ["organization.settings.read"],
-                "project_permissions": {"project-a": ["project.settings.read"]},
-            },
+            admin_service,
         )
-
-    async def test_reset_user_permissions_clears_keycloak_attributes(self):
-        kc = Mock()
-        kc.setUserAttributes = AsyncMock(return_value=Ok(True))
-        kc.getUserProfile = AsyncMock(
-            return_value=Ok(
-                {
-                    "id": "user-1",
-                    "username": "alice",
-                    "email": "alice@test",
-                    "enabled": True,
-                    "emailVerified": True,
-                    "attributes": {},
-                }
-            )
-        )
-        kc.getMemberOrganizations = AsyncMock(return_value=Ok([]))
-
-        result = await routes.reset_user_permissions(
-            {
-                "id": "admin-1",
-                "username": "admin",
-                "email": "admin@test",
-                "roles": ["ADMIN"],
-                "org_id": "",
-                "project_ids": [],
-            },
+        await routes.get_user_profile(
+            ADMIN_INFO,
             "user-1",
-            kc,
+            admin_service,
         )
-
-        self.assertEqual(result.permissions.organization_permissions, [])
-        kc.setUserAttributes.assert_awaited_once_with(
+        await routes.set_user_permissions(
+            ADMIN_INFO,
             "user-1",
-            {
-                "org_permissions": [],
-                "project_permissions": {},
-            },
+            payload,
+            admin_service,
+        )
+        await routes.reset_user_permissions(
+            ADMIN_INFO,
+            "user-1",
+            admin_service,
         )
 
-    async def test_set_user_permissions_rejects_invalid_org_permission(self):
-        kc = Mock()
-
-        with self.assertRaises(routes.InvalidAdminPermissionError):
-            await routes.set_user_permissions(
-                {
-                    "id": "admin-1",
-                    "username": "admin",
-                    "email": "admin@test",
-                    "roles": ["ADMIN"],
-                    "org_id": "",
-                    "project_ids": [],
-                },
-                "user-1",
-                routes.AdminUserPermissionUpdateRequest(
-                    organization_permissions=["organization.nope"],
-                    project_permissions=[],
-                ),
-                kc,
-            )
-
-        kc.setUserAttributes.assert_not_called()
-
-    async def test_set_user_permissions_rejects_invalid_project_permission(
-        self,
-    ):
-        kc = Mock()
-
-        with self.assertRaises(routes.InvalidAdminPermissionError):
-            await routes.set_user_permissions(
-                {
-                    "id": "admin-1",
-                    "username": "admin",
-                    "email": "admin@test",
-                    "roles": ["ADMIN"],
-                    "org_id": "",
-                    "project_ids": [],
-                },
-                "user-1",
-                routes.AdminUserPermissionUpdateRequest(
-                    organization_permissions=[],
-                    project_permissions=[
-                        routes.AdminUserProjectPermissionUpdateRequest(
-                            project_id="project-a",
-                            permissions=["project.nope"],
-                        )
-                    ],
-                ),
-                kc,
-            )
-
-        kc.setUserAttributes.assert_not_called()
+        admin_service.listOrganizationUsers.assert_awaited_once_with(
+            "org-1",
+            pagination,
+        )
+        admin_service.listProjectUsers.assert_awaited_once_with(
+            "project-1",
+            pagination,
+        )
+        admin_service.getUserOrganizations.assert_awaited_once_with("user-1")
+        admin_service.getUserProfile.assert_awaited_once_with("user-1")
+        admin_service.setUserPermissions.assert_awaited_once_with(
+            "user-1",
+            payload,
+        )
+        admin_service.resetUserPermissions.assert_awaited_once_with("user-1")

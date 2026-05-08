@@ -17,6 +17,7 @@ from gantry.shared.custom_types.error_exception import RecoverableError
 
 from .dtos import (
     OrgInfoResponse,
+    OrgListResponse,
     OrgUserResponse,
     InvitationResponse,
     OrgSettingsResponse,
@@ -36,7 +37,6 @@ from typing import Any
 from datetime import UTC, datetime, timedelta
 
 from pyrusult import Ok, Err, Result, ResultStatus
-from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 
 
@@ -319,7 +319,7 @@ class OrgService:
             if isinstance(owner_id_res.err(), OwnerNotFoundError):
                 return Ok(
                     OrgInfoResponse(
-                        id=str(org.get("id") or org_id),
+                        org_id=str(org.get("id") or org_id),
                         name=name,
                         owner_id=None,
                     )
@@ -327,7 +327,7 @@ class OrgService:
             return owner_id_res.into()
         return Ok(
             OrgInfoResponse(
-                id=str(org.get("id") or org_id),
+                org_id=str(org.get("id") or org_id),
                 name=name,
                 owner_id=owner_id_res.unwrap(),
             )
@@ -360,7 +360,7 @@ class OrgService:
 
             return Ok(
                 DeleteRequestResponse(
-                    org_id=org_id,
+                    id=org_id,
                     requested_at=requested_at_dt.isoformat(),
                     cancel_before=cancel_before_dt.isoformat(),
                 )
@@ -435,6 +435,76 @@ class OrgService:
         """Return organization metadata enriched with resolved owner info."""
         return await self._syncMetadataFromKeycloak(org_id)
 
+    async def listOrgs(
+        self,
+        limit: int = 20,
+        offset: int = 0,
+        q: str | None = None,
+    ) -> Result[OrgListResponse, KeycloakOrgError]:
+        """List organizations for admin dashboard consumers."""
+        orgs_res = await self.kc.listOrgs(
+            first=offset,
+            max_results=limit,
+            search=q,
+        )
+        if orgs_res.status == ResultStatus.Err:
+            return orgs_res.into()
+        orgs = orgs_res.unwrap()
+
+        return Ok(
+            OrgListResponse(
+                total=len(orgs),
+                results=[
+                    OrgInfoResponse(
+                        org_id=str(org.get("id") or ""),
+                        name=str(org.get("name") or org.get("alias") or ""),
+                        owner_id=None,
+                    )
+                    for org in orgs
+                    if org.get("id")
+                ],
+            )
+        )
+
+    async def createOrg(
+        self,
+        name: str,
+        alias: str | None = None,
+        owner_id: str | None = None,
+    ) -> Result[
+        OrgInfoResponse,
+        KeycloakOrgError | MemberNotFoundError | OrgNotFoundError,
+    ]:
+        """Create an organization from the admin dashboard."""
+        payload: dict[str, Any] = {"name": name}
+        if alias:
+            payload["alias"] = alias
+
+        create_res = await self.kc.createOrg(payload)
+        if create_res.status == ResultStatus.Err:
+            return create_res.into()
+        org_id = create_res.unwrap()
+
+        if owner_id:
+            add_res = await self.kc.addMember(org_id, owner_id)
+            if add_res.status == ResultStatus.Err:
+                return add_res.into()
+            attr_res = await self.kc.setUserAttribute(
+                owner_id,
+                _ORG_PERM_ATTR,
+                [OrgPermission.OWNER.value],
+            )
+            if attr_res.status == ResultStatus.Err:
+                return attr_res.into()
+
+        return Ok(
+            OrgInfoResponse(
+                org_id=org_id,
+                name=name,
+                owner_id=owner_id,
+            )
+        )
+
     async def updateOrgInfo(
         self,
         org_id: str,
@@ -470,7 +540,7 @@ class OrgService:
 
         return Ok(
             OrgInfoResponse(
-                id=org_id,
+                org_id=org_id,
                 name=name,
                 owner_id=owner_id,
             )

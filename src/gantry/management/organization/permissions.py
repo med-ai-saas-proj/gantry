@@ -43,6 +43,7 @@ PERMISSION_HIERARCHY: Final[dict[OrgPermission, list[OrgPermission]]] = {
         OrgPermission.SETTINGS_READ,
         OrgPermission.SETTINGS_WRITE,
         OrgPermission.PROJECTS_CREATE,
+        OrgPermission.PROJECTS_GET_ALL,
     ],
 }
 

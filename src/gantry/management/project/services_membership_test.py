@@ -68,7 +68,7 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         service.kc.setUserAttribute.assert_awaited_once_with(
             "u2",
             PROJECT_PERMISSIONS_ATTR,
-            {},
+            {"proj-1": [ProjectPermission.MEMBER]},
         )
         self.session_manager.session.commit.assert_awaited()
 

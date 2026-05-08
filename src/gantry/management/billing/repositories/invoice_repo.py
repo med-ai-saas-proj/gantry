@@ -370,7 +370,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
                 BillingInvoiceLineItem.uuid,
                 BillingInvoiceLineItem.description,
                 BillingInvoiceLineItem.amount,
-                Project.uuid.label("project_uid"),
+                Project.uuid.label("project_uuid"),
                 Project.id.label("project_id"),
                 Project.name.label("name"),
             )
@@ -389,7 +389,7 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
                 "invoice_line_uuid": row.uuid,
                 "description": row.description,
                 "amount": row.amount,
-                "project_uid": row.project_uid,
+                "project_uuid": row.project_uuid,
                 "project_id": row.project_id,
                 "project_name": row.name,
             }
