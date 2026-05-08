@@ -51,7 +51,7 @@ def requiredPermissions(permissions: list[str]):
     ) -> ApiKeyInfo:
         user_info = await api_key_service.verifyApiKey(api_key, permissions)
         api_key_info = user_info.unwrap()
-        _inject_api_key_context_headers(request, api_key_info)
+        # _inject_api_key_context_headers(request, api_key_info)
         return api_key_info
 
     return get_api_key
@@ -65,5 +65,5 @@ async def getApiKeyInfo(
     """Dependency to get API key info without permission checks."""
     user_info = await api_key_service.parseApiKey(api_key)
     api_key_info = user_info.unwrap()
-    _inject_api_key_context_headers(request, api_key_info)
+    # _inject_api_key_context_headers(request, api_key_info)
     return api_key_info

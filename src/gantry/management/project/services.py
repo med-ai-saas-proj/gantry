@@ -114,7 +114,6 @@ class ProjectService:
         membership_repo: ProjectMemberRepository,
         settings_repo: ProjectSettingsRepository,
         kc_client: KeycloakServiceClient,
-        redis: Redis | None = None,
     ):
         self.session_manager = session_manager
         self.logger = logger
@@ -122,7 +121,6 @@ class ProjectService:
         self.membership_repo = membership_repo
         self.settings_repo = settings_repo
         self.kc = kc_client
-        self.redis = redis
 
     async def _ensureUserInOrg(
         self,
@@ -971,3 +969,12 @@ class ProjectService:
             )
             await session.commit()
             return Ok(output)
+
+    async def isProjectArchived(
+        self, project_uuid: str
+    ) -> Result[bool, ProjectNotFoundError]:
+        async with self.session_manager.get_session() as session:
+            project = await self.project_repo.getByUuid(session, project_uuid)
+        if project is None:
+            return Err(ProjectNotFoundError())
+        return Ok(project.is_archived)
