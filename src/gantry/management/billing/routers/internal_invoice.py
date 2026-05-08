@@ -23,7 +23,7 @@ async def mark_invoice_as_paid(
 ):
     (
         await invoice_service.markInvoiceAsPaidManually(
-            org_id=user_info["org_id"], invoice_uid=invoice_uid
+            org_id=user_info["org_uuid"], invoice_uid=invoice_uid
         )
     ).unwrap()
 
@@ -40,6 +40,6 @@ async def mark_invoice_as_refunded(
 ):
     (
         await invoice_service.markInvoiceAsRefundedManually(
-            org_id=user_info["org_id"], invoice_uid=invoice_uid
+            org_id=user_info["org_uuid"], invoice_uid=invoice_uid
         )
     ).unwrap()

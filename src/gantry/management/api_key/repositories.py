@@ -76,7 +76,7 @@ class ApiKeyRepository(Repository[ApiKey, int]):
                 api_key_uuid=row["api_key_uuid"],
                 user_uuid=str(row["user_id"]),
                 project_id=int(row["project_id"]),
-                org_id=str(row["organization_uuid"]),
+                # org_id=str(row["organization_uuid"]),
                 organization_uuid=str(row["organization_uuid"]),
                 project_uuid=str(row["project_uuid"]),
                 hashed_key=str(row["hashed_key"]),
@@ -85,22 +85,22 @@ class ApiKeyRepository(Repository[ApiKey, int]):
                 rpm_limit_organization=(
                     int(row["organization_rate_limit"])
                     if row["organization_rate_limit"] is not None
-                    else -1
+                    else None
                 ),
                 rpm_limit_project=(
                     int(row["project_rate_limit"])
                     if row["project_rate_limit"] is not None
-                    else -1
+                    else None
                 ),
                 spending_limit_organization=(
                     int(row["organization_spending_limit"])
                     if row["organization_spending_limit"] is not None
-                    else -1
+                    else None
                 ),
                 spending_limit_project=(
                     int(row["project_spending_limit"])
                     if row["project_spending_limit"] is not None
-                    else -1
+                    else None
                 ),
             )
 
@@ -135,7 +135,7 @@ class ApiKeyRepository(Repository[ApiKey, int]):
                     "user_uuid": str(key["user_id"]),
                     "project_id": int(key["project_id"]),
                     "project_uuid": str(key["project_uuid"]),
-                    "org_id": str(key["organization_id"]),
+                    # "org_id": str(key["organization_id"]),
                     "organization_uuid": str(key["organization_id"]),
                     "hashed_key": str(key["hashed_key"]),
                     "permissions": list(key["permissions"] or []),

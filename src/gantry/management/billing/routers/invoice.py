@@ -36,7 +36,7 @@ async def list_invoices(
 ) -> PaginatedResponse[InvoiceInfoResponse]:
     invoices, total = (
         await invoice_service.listInvoices(
-            org_id=user_info["org_id"],
+            org_id=user_info["org_uuid"],
             offset=offset,
             limit=limit,
             from_date=from_date,
@@ -63,7 +63,7 @@ async def get_invoice_details(
 ) -> ObjectResponse[InvoiceDetailInfoResponse]:
     res = (
         await invoice_service.getInvoiceById(
-            org_id=user_info["org_id"], invoice_uid=invoice_uid
+            org_id=user_info["org_uuid"], invoice_uid=invoice_uid
         )
     ).unwrap()
     return ObjectResponse(data=res)
@@ -79,7 +79,7 @@ async def pay_invoice(
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[ManualPaymentResponse]:
     res = await invoice_service.getInvoiceByIdPaymentLinkInProvider(
-        org_id=user_info["org_id"], invoice_uid=invoice_uid
+        org_id=user_info["org_uuid"], invoice_uid=invoice_uid
     )
     return ObjectResponse(
         data=ManualPaymentResponse(hosted_invoice_url=res.unwrap())

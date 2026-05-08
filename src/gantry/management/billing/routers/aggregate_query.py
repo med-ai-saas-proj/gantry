@@ -34,7 +34,7 @@ async def get_aggregate_by_projects(
     res = (
         await billing_service.get_aggregate_by_projects(
             project_uuids=project_uuids,
-            org_id=user_info["org_id"],
+            org_id=user_info["org_uuid"],
             start_time=period_start,
             end_time=period_end,
             aggregate_period=period,
@@ -64,7 +64,7 @@ async def get_aggregate_by_apikeys(
     res = (
         await billing_service.get_aggregate_by_apikeys(
             apikeys=apikeys,
-            org_id=user_info["org_id"],
+            org_id=user_info["org_uuid"],
             start_time=period_start,
             end_time=period_end,
             aggregate_period=period,
@@ -90,7 +90,7 @@ async def get_aggregate_by_org(
 ) -> ListResponse[BillingAggregateReport]:
     res = (
         await billing_service.get_aggregate_by_org(
-            org_id=user_info["org_id"],
+            org_id=user_info["org_uuid"],
             start_time=period_start,
             end_time=period_end,
             aggregate_period=period,

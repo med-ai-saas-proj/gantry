@@ -23,7 +23,7 @@ async def add_credits(
     body: Annotated[AddCreditRequest, Body()],
 ) -> ObjectResponse[CreditInfoResponse]:
     credits = await credit_service.addCredits(
-        org_id=user_info["org_id"],
+        org_id=user_info["org_uuid"],
         amount_to_add=body.amount,
         description=body.description,
     )

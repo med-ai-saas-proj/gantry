@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Annotated
+from datetime import timedelta
 
 from pydantic import Field, BaseModel
 
@@ -18,24 +19,24 @@ class ApiGatewayRoute(BaseModel):
             description="Permission IDs required to access this route.",
         ),
     ] = []
-    auto_hold: Annotated[
-        int | None,
-        Field(
-            description="Credits to hold automatically per request.",
-        ),
-    ] = None
-    auto_charge: Annotated[
-        int | None,
-        Field(
-            description="Credits to charge automatically per request.",
-        ),
-    ] = None
-    rate_limit: Annotated[
-        int | None,
-        Field(
-            description="Maximum requests per minute for this route.",
-        ),
-    ] = None
+    # auto_hold: Annotated[
+    #     int | None,
+    #     Field(
+    #         description="Credits to hold automatically per request.",
+    #     ),
+    # ] = None
+    # auto_charge: Annotated[
+    #     int | None,
+    #     Field(
+    #         description="Credits to charge automatically per request.",
+    #     ),
+    # ] = None
+    # rate_limit: Annotated[
+    #     int | None,
+    #     Field(
+    #         description="Maximum requests per minute for this route.",
+    #     ),
+    # ] = None
 
 
 class ApiGatewaySettings(BaseModel):
@@ -43,6 +44,9 @@ class ApiGatewaySettings(BaseModel):
         dict[str, ApiGatewayRoute],
         Field(description="Route definitions keyed by route name."),
     ] = {}
+    request_timeout: Annotated[
+        timedelta, Field(description="Timeout for proxy request")
+    ] = timedelta(seconds=30)
 
     # @model_validator(mode="after")
     # def validate_required_perms(self) -> Self:

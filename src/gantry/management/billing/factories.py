@@ -5,7 +5,10 @@ from gantry.db.factories import (
     getRedis,
     getSessionManager,
 )
-from gantry.management.project import ProjectSettingsRepository
+from gantry.management.project import (
+    ProjectSettingsRepository,
+    getProjectSettingsRepository,
+)
 from gantry.shared.logging.logger import getLogger
 from gantry.management.organization import OrgSettingsRepository
 
@@ -36,7 +39,7 @@ def getBillingTransactionService() -> TransactionService:
         session_manager=getSessionManager(),
         redis=getRedis(),
         org_settings_repo=OrgSettingsRepository(getRedisCacheRepo()),
-        project_settings_repo=ProjectSettingsRepository(),
+        project_settings_repo=getProjectSettingsRepository(),
         transaction_repo=TransactionRepository(),
     )
 

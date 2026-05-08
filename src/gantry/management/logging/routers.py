@@ -48,7 +48,7 @@ async def simple_query_log(
         filters_dict[key] = value
 
     res = log_query_service.search_logs(
-        user_info["org_id"],
+        user_info["org_uuid"],
         APP_NAME,
         start,
         end,
@@ -71,7 +71,7 @@ async def query_log(
     query_request: Annotated[QueryLogRequest, Body()],
 ) -> list[dict]:
     res = log_query_service.search_logs(
-        user_info["org_id"],
+        user_info["org_uuid"],
         APP_NAME,
         query_request.start,
         query_request.end,

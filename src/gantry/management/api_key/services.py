@@ -1,6 +1,6 @@
 """Service for managing project-scoped API keys."""
 
-from gantry.db import AsyncSessionManager
+from gantry.db import AsyncSessionManager, getRedisConnectionPool
 from gantry.settings import ApiKeyPermission
 from gantry.management.project import ProjectRepository, ProjectNotFoundError
 from gantry.management.organization import getOrgSettings
@@ -22,10 +22,13 @@ from .repositories import ApiKeyRepository
 
 import hmac
 import uuid
+import asyncio
 import secrets
 from typing import Callable, Sequence, TypedDict, NotRequired
 
+from limits import RateLimitItemPerMinute
 from pyrusult import Ok, Err, Result, ResultStatus
+from limits.aio import storage, strategies
 from structlog.stdlib import BoundLogger
 
 
@@ -88,6 +91,13 @@ class ApiKeyDisabledError(RecoverableError):
     detail = "This API key is disabled."
 
 
+class RateLimitExceeded(RecoverableError):
+    status = 429
+    code = "apikey_rate_limit_exceeded"
+    title = "Rate Limit Exceeded"
+    detail = "The api key rate limit has been exceeded. Please try again later."
+
+
 class ApiKeyServiceConfig(TypedDict):
     """Configuration for ApiKeyService."""
 
@@ -111,6 +121,7 @@ class ApiKeyService:
         project_repo: ProjectRepository,
         permissions: list[ApiKeyPermission],
         session_manager: AsyncSessionManager,
+        limits_storage: storage.Storage,
     ):
         self.logger = logger
         self.key_secret = config["key_secret"]
@@ -130,7 +141,8 @@ class ApiKeyService:
         self.default_org_rate_limit = getOrgSettings().default_rate_limit
         self.permissions = permissions
         self.permissions_ids_set = set(p.id for p in self.permissions)
-        # self.billing_transaction_service = billing_transaction_service
+        self.limits_storage = limits_storage
+        self.limiter = strategies.FixedWindowRateLimiter(self.limits_storage)
 
     def _createApiKeySecret(self) -> str:
         return secrets.token_urlsafe(self.api_key_secret_length)
@@ -205,6 +217,9 @@ class ApiKeyService:
 
         if context is None:
             return None
+        # Resolve api key's limit
+        if context["rpm_limit_organization"] is None:
+            context["rpm_limit_organization"] = self.default_org_rate_limit
 
         return context
 
@@ -220,7 +235,7 @@ class ApiKeyService:
                 "user_uuid": context["user_uuid"],
                 "project_id": context["project_id"],
                 "project_uuid": context["project_uuid"],
-                "org_id": context["org_id"],
+                # "org_id": context["org_id"],
                 "organization_uuid": context["organization_uuid"],
                 "hashed_key": context["hashed_key"],
                 "permissions": list(context["permissions"]),
@@ -602,7 +617,7 @@ class ApiKeyService:
         | UserNotFoundError
         | ProjectNotFoundError,
     ]:
-        """Verify an API key and resolve its project and organization context."""
+        """Verify an API key, resolve its project and organization context."""
         context_res = await self._resolveApiKeyContext(api_key)
         if context_res.status == ResultStatus.Err:
             return context_res.into()
@@ -626,19 +641,43 @@ class ApiKeyService:
         | ProjectNotFoundError,
     ]:
         """Verify an API key and resolve its project and organization context."""
-        context_res = await self._resolveApiKeyContext(api_key)
+        context_res = await self.parseApiKey(api_key)
         if context_res.status == ResultStatus.Err:
             return context_res.into()
 
-        api_key_uuid, context = context_res.unwrap()
-        if context["disabled"]:
-            return Err(ApiKeyDisabledError())
-        if not context["user_uuid"]:
-            return Err(UserNotFoundError())
+        context = context_res.unwrap()
 
         existing_permissions = set(context["permissions"])
         missing_permissions = set(required_permissions) - existing_permissions
         if missing_permissions:
             return Err(InsufficientPermission())
 
-        return Ok(self._toApiKeyInfo(api_key_uuid, context))
+        return Ok(context)
+
+    async def rateLimit(
+        self, apikey_info: ApiKeyInfo
+    ) -> Result[None, RateLimitExceeded]:
+        tasks = []
+        if apikey_info["rpm_limit_organization"]:
+            tasks.append(
+                self.limiter.hit(
+                    RateLimitItemPerMinute(
+                        apikey_info["rpm_limit_organization"]
+                    ),
+                    "apikey",
+                    "org",
+                    apikey_info["hashed_key"],
+                )
+            )
+        if apikey_info["rpm_limit_project"]:
+            tasks.append(
+                self.limiter.hit(
+                    RateLimitItemPerMinute(apikey_info["rpm_limit_project"]),
+                    "apikey",
+                    "org",
+                    apikey_info["hashed_key"],
+                )
+            )
+        if all(await asyncio.gather(*tasks)):
+            return Ok(None)
+        return Err(RateLimitExceeded())
