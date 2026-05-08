@@ -1,9 +1,6 @@
-from gantry.management.auth import UserInfo
-from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import (
-    requireRole,
-    check_access_to_project,
-)
+from gantry.management.auth.entities import UserInfo, UserInfoWithProjectContext
+from gantry.management.project.permissions import ProjectPermission
+from gantry.management.project.dependencies import requiredProjectPermission
 
 from ..dtos import (
     RagQueryResponse,
@@ -20,7 +17,6 @@ import uuid
 from typing import Sequence, Annotated
 
 from fastapi import Body, Query, Depends, Security, APIRouter
-from gantry.management.auth.roles import ManagementRole
 
 
 rag_user_router = APIRouter(tags=["rag-user"])
@@ -33,16 +29,12 @@ rag_user_router = APIRouter(tags=["rag-user"])
 )
 async def get_files(
     user_info: Annotated[
-        UserInfo, Security(requireRole(ManagementRole.RAG_MANAGE))
+        UserInfoWithProjectContext,
+        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
-    project_uid: uuid.UUID = Query(
-        ..., description="Project UID to filter files for a specific project."
-    ),
 ) -> Sequence[FileInfoResponse]:
-    check_access_to_project(user_info=user_info, project_uid=project_uid)
-
-    res = await rag_service.getFilesInRagByProjectUid(project_uid)
+    res = await rag_service.getFilesInRagByProjectUid(user_info["project_uuid"])
     return [
         FileInfoResponse(
             id=str(file_info["uid"]),
@@ -65,19 +57,15 @@ async def get_files(
 async def add_file(
     body: Annotated[AddRagFileRequest, Body()],
     user_info: Annotated[
-        UserInfo, Security(requireRole(ManagementRole.RAG_MANAGE))
+        UserInfoWithProjectContext,
+        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
-    project_uid: uuid.UUID = Query(
-        ..., description="Project UID to filter files for a specific project."
-    ),
 ) -> str:
-    check_access_to_project(user_info=user_info, project_uid=project_uid)
-
     task_id = (
         await rag_service.addFileByProjectUid(
             body.file_uid,
-            project_uid,
+            user_info["project_uuid"],
             body.chunk_splitter,
             body.chunk_size,
             body.chunk_overlap,
@@ -94,18 +82,16 @@ async def add_file(
 async def get_task_status(
     task_id: str,
     user_info: Annotated[
-        UserInfo, Security(requireRole(ManagementRole.RAG_MANAGE))
+        UserInfoWithProjectContext,
+        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
-    project_uid: uuid.UUID = Query(
-        ..., description="Project UID to filter files for a specific project."
-    ),
 ) -> EmbeddingTaskResponse:
     """Get the status of an asynchronous RAG embedding task."""
-    check_access_to_project(user_info=user_info, project_uid=project_uid)
-
     task_result = (
-        await rag_service.getTaskStatusByProjectUid(task_id, project_uid)
+        await rag_service.getTaskStatusByProjectUid(
+            task_id, user_info["project_uuid"]
+        )
     ).unwrap()
 
     return EmbeddingTaskResponse(
@@ -128,22 +114,18 @@ async def get_task_status(
 async def query_similar_by_text(
     body: Annotated[QueryRagQueryByTextRequest, Body()],
     user_info: Annotated[
-        UserInfo, Security(requireRole(ManagementRole.RAG_MANAGE))
+        UserInfoWithProjectContext,
+        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
-    project_uid: uuid.UUID = Query(
-        ..., description="Project UID to filter files for a specific project."
-    ),
     include_embedding: bool = Query(
         default=False,
         description="Whether to include embeddings in the response. Embeddings can be large, so they are excluded by default.",
     ),
 ):
-    check_access_to_project(user_info=user_info, project_uid=project_uid)
-
     results = (
         await rag_service.querySimilarByTextByProjectUid(
-            project_uid,
+            user_info["project_uuid"],
             body.query_text,
             body.filters,
             body.top_k,

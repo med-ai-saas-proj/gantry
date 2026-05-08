@@ -22,6 +22,9 @@ class ProjectPermission(str, Enum):
     APIKEY_READ = "apikey.read"
     APIKEY_WRITE = "apikey.write"
 
+    RAG_MANAGE = "project.rag.manage"
+    FILE_STORAGE_MANAGE = "project.file_storage.manage"
+
 
 PERMISSION_HIERARCHY: Final[
     dict[ProjectPermission, list[ProjectPermission]]
@@ -35,6 +38,7 @@ PERMISSION_HIERARCHY: Final[
         ProjectPermission.SETTINGS_WRITE,
         ProjectPermission.APIKEY_READ,
         ProjectPermission.APIKEY_WRITE,
+        ProjectPermission.RAG_MANAGE,
     ]
 }
 

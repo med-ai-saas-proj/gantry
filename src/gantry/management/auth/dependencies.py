@@ -12,12 +12,9 @@ from .factories import (
 )
 
 import os
-from re import A
-from math import e
-from uuid import UUID
 from typing import Annotated
 
-from fastapi import Depends, Security, HTTPException
+from fastapi import Depends, Security
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
@@ -111,9 +108,9 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
                 id="test_user",
                 username="test_user",
                 email="test_user@example.com",
-                roles=[],
-                org_id="test_org1",
-                project_uids=[],
+                org_uuid="test_org1",
+                org_permissions=[],
+                project_permissions={},
             )
         raise UnauthorizedError()
 
@@ -147,173 +144,3 @@ async def requireUserOrgUuid(
     if not org_id:
         raise MissingOrganizationContextError()
     return org_id
-
-
-def check_access_to_project(user_info: UserInfo, project_uid: UUID):
-    if (
-        "organization.owner" not in user_info["roles"]
-        and str(project_uid) not in user_info["project_uids"]
-    ):
-        raise HTTPException(
-            status_code=403, detail="User does not have access to this project"
-        )
-
-
-def check_access_to_projects(user_info: UserInfo, project_uids: set[str]):
-    if "organization.owner" not in user_info[
-        "roles"
-    ] and not project_uids.issubset(set(user_info["project_uids"])):
-        raise HTTPException(
-            status_code=403,
-            detail=f"You don't have access to some of the specified projects {project_uids - set(user_info['project_uids'])}",
-        )
-
-
-def requireRole(role: ManagementRole):
-    """Create a dependency that requires a specific role.
-
-    Usage:
-    ```python
-    @router.post(
-        "/members"
-    )
-    async def create_member(
-        user_info: Annotated[
-            UserInfo,
-            Depends(
-                requireRole(
-                    ManagementRole.MEMBER_ADD
-                )
-            ),
-        ],
-    ): ...
-    ```
-    """
-
-    async def dependency(
-        token: Annotated[str, Security(oauth_2_scheme)],
-        auth_service: Annotated[AuthService, Depends(getAuthService)],
-    ) -> UserInfo:
-        user_info = auth_service.verifyToken(token).unwrap()
-        auth_service.checkRole(user_info, role).unwrap()
-        return user_info
-
-    if enable_mock_auth and app_settings.stage == AppStage.DEV:
-        from gantry.management.auth.services import UnauthorizedError
-
-        from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
-        # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
-        security = HTTPBearer()
-
-        async def mock_dependency(
-            auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-        ) -> UserInfo:
-            if auth.credentials == "bypass_token":
-                return UserInfo(
-                    id="test_user",
-                    username="test_user",
-                    email="test_user@example.com",
-                    roles=[],
-                    org_id="test_org1",
-                    project_uids=[str(UUID(int=0))],
-                )
-            raise UnauthorizedError()
-
-        return mock_dependency
-
-    return dependency
-
-
-def requireAnyRole(roles: list[ManagementRole]):
-    """Create a dependency that requires any of the specified roles.
-
-    Usage:
-    ```python
-    @router.get(
-        "/members"
-    )
-    async def list_members(
-        user_info: Annotated[
-            UserInfo,
-            Depends(
-                requireAnyRole(
-                    [
-                        ManagementRole.MEMBER_VIEW,
-                        ManagementRole.MEMBER_ADMIN,
-                    ]
-                )
-            ),
-        ],
-    ): ...
-    ```
-    """
-
-    async def dependency(
-        token: Annotated[str, Security(oauth_2_scheme)],
-        auth_service: Annotated[AuthService, Depends(getAuthService)],
-    ) -> UserInfo:
-        user_info = auth_service.verifyToken(token).unwrap()
-        auth_service.checkAnyRole(user_info, roles).unwrap()
-        return user_info
-
-    if enable_mock_auth and app_settings.stage == AppStage.DEV:
-        from gantry.management.auth.services import UnauthorizedError
-
-        from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-
-        # If mock_auth is enabled, bypass all auth checks and return a dummy UserInfo
-        security = HTTPBearer()
-
-        async def mock_dependency(
-            auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-        ) -> UserInfo:
-            if auth.credentials == "bypass_token":
-                return UserInfo(
-                    id="test_user",
-                    username="test_user",
-                    email="test_user@example.com",
-                    roles=[],
-                    org_id="test_org1",
-                    project_uids=[str(UUID(int=0))],
-                )
-            raise UnauthorizedError()
-
-        return mock_dependency
-
-    return dependency
-
-
-def requireAllRoles(roles: list[ManagementRole]):
-    """Create a dependency that requires all of the specified roles.
-
-    Usage:
-    ```python
-    @router.post(
-        "/admin/critical"
-    )
-    async def critical_operation(
-        user_info: Annotated[
-            UserInfo,
-            Depends(
-                requireAllRoles(
-                    [
-                        ManagementRole.SUPER_ADMIN,
-                        ManagementRole.AUDIT_VIEW,
-                    ]
-                )
-            ),
-        ],
-    ): ...
-    ```
-    """
-
-    async def dependency(
-        token: Annotated[str, Security(oauth_2_scheme)],
-        auth_service: Annotated[AuthService, Depends(getAuthService)],
-    ) -> UserInfo:
-        user_info = auth_service.verifyToken(token).unwrap()
-        auth_service.checkAllRoles(user_info, roles).unwrap()
-        return user_info
-
-    return dependency

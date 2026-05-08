@@ -1,9 +1,6 @@
 from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import (
-    requireRole,
-    check_access_to_projects,
-)
+from gantry.management.auth.dependencies import getUserInfo
 from gantry.shared.custom_types.responses import ListResponse
 
 from ..type import AggregatePeriod, BillingAggregateReport
