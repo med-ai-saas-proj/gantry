@@ -1,9 +1,6 @@
 import os
 import unittest
 from types import SimpleNamespace
-from unittest.mock import Mock, AsyncMock
-
-from pyrusult import Ok, Err
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
@@ -12,9 +9,7 @@ from gantry.management.organization.permissions import OrgPermission
 from gantry.management.organization.dependencies import (
     getLimit,
     org_settings,
-    _get_user_info,
     requiredOrgPermission,
-    _get_permissions_or_raise,
     _InsufficientOrgPermission,
     _raise_permission_fetch_error,
 )
@@ -37,23 +32,19 @@ class _UpstreamClientErr(Exception):
 
 
 class TestOrganizationDependencies(unittest.IsolatedAsyncioTestCase):
-    async def test_get_user_info_and_limit(self):
-        auth_service = Mock()
-        auth_service.verifyToken.return_value = Ok(
-            {"id": "u1", "roles": [], "org_id": "org-1"}
-        )
-        self.assertEqual(
-            await _get_user_info("token", auth_service),
-            {"id": "u1", "roles": [], "org_id": "org-1"},
-        )
-
-        org_service = Mock()
-        org_service.getSettings = AsyncMock(
+    async def test_get_limit_uses_org_override_or_default(self):
+        org_service = unittest.mock.Mock()
+        org_service.getSettings = unittest.mock.AsyncMock(
             side_effect=[
-                Ok(SimpleNamespace(rate_limit=10)),
-                Ok(SimpleNamespace(rate_limit=None)),
+                unittest.mock.Mock(
+                    unwrap=lambda: SimpleNamespace(rate_limit=10)
+                ),
+                unittest.mock.Mock(
+                    unwrap=lambda: SimpleNamespace(rate_limit=None)
+                ),
             ]
         )
+
         self.assertEqual(await getLimit("org-1", org_service), 10)
         self.assertEqual(
             await getLimit("org-1", org_service),
@@ -73,34 +64,25 @@ class TestOrganizationDependencies(unittest.IsolatedAsyncioTestCase):
         passthrough_err = _raise_permission_fetch_error(_UpstreamClientErr())
         self.assertIsInstance(passthrough_err, _UpstreamClientErr)
 
-    async def test_get_permissions_or_raise_and_required_permission(self):
-        org_service = Mock()
-        org_service.getUserPermissions = AsyncMock(
-            side_effect=[
-                Ok(SimpleNamespace(permissions=["organization.settings.read"])),
-                Err(_MemberMissingErr()),
-                Ok(SimpleNamespace(permissions=["organization.owner"])),
-            ]
-        )
-
-        self.assertEqual(
-            await _get_permissions_or_raise(org_service, "org-1", "u1"),
-            ["organization.settings.read"],
-        )
-        with self.assertRaises(_InsufficientOrgPermission):
-            await _get_permissions_or_raise(org_service, "org-1", "u1")
-
+    async def test_required_org_permission_uses_user_info_permissions(self):
         dependency = requiredOrgPermission(OrgPermission.SETTINGS_READ)
-        user_info = {"id": "u1", "roles": []}
-        self.assertEqual(
-            await dependency("org-1", user_info, org_service), user_info
-        )
+        allowed_user = {
+            "id": "u1",
+            "username": "alice",
+            "email": "a@test",
+            "org_uuid": "org-1",
+            "org_permissions": ["organization.settings.read"],
+            "project_permissions": {},
+        }
+        denied_user = {
+            "id": "u1",
+            "username": "alice",
+            "email": "a@test",
+            "org_uuid": "org-1",
+            "org_permissions": [],
+            "project_permissions": {},
+        }
 
-    async def test_required_org_permission_deny(self):
-        dependency = requiredOrgPermission(OrgPermission.SETTINGS_READ)
-        org_service = Mock()
-        org_service.getUserPermissions = AsyncMock(
-            return_value=Ok(SimpleNamespace(permissions=[]))
-        )
+        self.assertEqual(await dependency(allowed_user), allowed_user)
         with self.assertRaises(_InsufficientOrgPermission):
-            await dependency("org-1", {"id": "u1", "roles": []}, org_service)
+            await dependency(denied_user)

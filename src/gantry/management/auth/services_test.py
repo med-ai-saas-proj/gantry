@@ -1,5 +1,6 @@
 import os
 import unittest
+from unittest.mock import Mock, AsyncMock, patch
 
 from pyrusult import ResultStatus
 
@@ -8,207 +9,140 @@ os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
 from gantry.management.auth.services import (
     AuthService,
+    ForbiddenError,
     MissingOrganizationClaimError,
 )
 
+from pyrusult import Ok
 
-class TestAuthService(unittest.TestCase):
+
+class TestAuthService(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        self.keycloak_client = Mock()
+        self.keycloak_client.getUserAttributes = AsyncMock(
+            return_value=Ok(
+                {
+                    "org_permissions": ["organization.settings.read"],
+                    "project_permissions": [
+                        "proj-1:project.owner",
+                        "proj-2:project.settings.read",
+                    ],
+                }
+            )
+        )
         self.service = AuthService(
             server_url="http://localhost:8080",
             realm="dev",
             client_id="med-ai-saas-app",
+            keycloak_client=self.keycloak_client,
         )
 
-    def test_map_claims_uses_single_organization_claim(self):
-        result = self.service._mapClaimsToAuthInfo(
+    async def test_map_claims_uses_single_organization_claim(self):
+        result = await self.service._mapClaimsToAuthInfo(
             {
                 "sub": "user-1",
-                "preferred_username": "alice",
+                "name": "alice",
                 "email": "alice@test",
                 "organization": "org-1",
-                "project_permissions": {
-                    "proj-1": ["project.owner"],
-                    "proj-2": ["project.settings.read"],
-                },
-                "realm_access": {"roles": ["r1"]},
-                "resource_access": {
-                    "med-ai-saas-app": {"roles": ["r2"]},
-                    "account": {"roles": ["r3"]},
-                },
-                "azp": "med-ai-saas-app",
             }
         )
 
         self.assertTrue(result.status == ResultStatus.Ok)
-        self.assertEqual(result.unwrap()["org_id"], "org-1")
-        self.assertEqual(result.unwrap()["roles"], ["r1", "r2", "r3"])
-        self.assertEqual(result.unwrap()["project_ids"], ["proj-1", "proj-2"])
-
-    def test_map_claims_extracts_project_ids_from_role_entries(self):
-        result = self.service._mapClaimsToAuthInfo(
+        self.assertEqual(result.unwrap()["org_uuid"], "org-1")
+        self.assertEqual(
+            result.unwrap()["org_permissions"],
+            ["organization.settings.read"],
+        )
+        self.assertEqual(
+            result.unwrap()["project_permissions"],
             {
-                "sub": "user-1",
-                "preferred_username": "alice",
-                "email": "alice@test",
-                "organization": "org-1",
-                "realm_access": {
-                    "roles": [
-                        "proj-1:project.owner",
-                        "proj-2:project.settings.read",
-                        "not-a-project-role",
-                    ]
-                },
-                "azp": "med-ai-saas-app",
-            }
+                "proj-1": ["project.owner"],
+                "proj-2": ["project.settings.read"],
+            },
         )
 
-        self.assertTrue(result.status == ResultStatus.Ok)
-        self.assertEqual(result.unwrap()["project_ids"], ["proj-1", "proj-2"])
-
-    def test_map_claims_deduplicates_project_ids(self):
-        result = self.service._mapClaimsToAuthInfo(
+    async def test_map_claims_supports_multivalued_organization_claim(self):
+        result = await self.service._mapClaimsToAuthInfo(
             {
                 "sub": "user-1",
-                "preferred_username": "alice",
-                "email": "alice@test",
-                "organization": "org-1",
-                "project_permissions": {
-                    "proj-1": [
-                        "project.owner",
-                        "project.settings.write",
-                    ]
-                },
-                "azp": "med-ai-saas-app",
-            }
-        )
-
-        self.assertTrue(result.status == ResultStatus.Ok)
-        self.assertEqual(result.unwrap()["project_ids"], ["proj-1"])
-
-    def test_map_claims_supports_multivalued_organization_claim(self):
-        result = self.service._mapClaimsToAuthInfo(
-            {
-                "sub": "user-1",
-                "preferred_username": "alice",
+                "name": "alice",
                 "email": "alice@test",
                 "organization": ["org-1", "org-2"],
-                "azp": "med-ai-saas-app",
             }
         )
 
         self.assertTrue(result.status == ResultStatus.Ok)
-        self.assertEqual(result.unwrap()["org_id"], "org-1")
+        self.assertEqual(result.unwrap()["org_uuid"], "org-1")
 
-    def test_map_claims_supports_organization_claim_object_with_id(self):
-        result = self.service._mapClaimsToAuthInfo(
+    async def test_map_claims_supports_organization_claim_object_with_id(self):
+        result = await self.service._mapClaimsToAuthInfo(
             {
                 "sub": "user-1",
-                "preferred_username": "alice",
+                "name": "alice",
                 "email": "alice@test",
-                "organization": {
-                    "demo-org": {"id": "org-1"},
-                },
-                "azp": "med-ai-saas-app",
+                "organization": {"demo-org": {"id": "org-1"}},
             }
         )
 
         self.assertTrue(result.status == ResultStatus.Ok)
-        self.assertEqual(result.unwrap()["org_id"], "org-1")
+        self.assertEqual(result.unwrap()["org_uuid"], "org-1")
 
-    def test_map_claims_rejects_organization_claim_object_without_id(self):
-        result = self.service._mapClaimsToAuthInfo(
+    async def test_map_claims_rejects_missing_organization_claim(self):
+        result = await self.service._mapClaimsToAuthInfo(
             {
                 "sub": "user-1",
-                "preferred_username": "alice",
+                "name": "alice",
                 "email": "alice@test",
-                "organization": {
-                    "demo-org": {"name": "demo-org"},
-                },
-                "azp": "med-ai-saas-app",
             }
         )
 
         self.assertTrue(result.status == ResultStatus.Err)
         self.assertIsInstance(result.err(), MissingOrganizationClaimError)
 
-    def test_map_claims_rejects_regular_user_without_organization_claim(self):
-        result = self.service._mapClaimsToAuthInfo(
-            {
-                "sub": "user-1",
-                "preferred_username": "alice",
-                "email": "alice@test",
-                "org_id": "legacy-org",
-                "organization_id": "legacy-org-2",
-                "azp": "med-ai-saas-app",
-            }
-        )
-
-        self.assertTrue(result.status == ResultStatus.Err)
-        self.assertIsInstance(result.err(), MissingOrganizationClaimError)
-
-    def test_map_claims_rejects_missing_organization_claim(self):
-        result = self.service._mapClaimsToAuthInfo(
-            {
-                "sub": "svc-1",
-                "preferred_username": "service-account-med-ai-saas-backend",
-                "email": None,
-                "azp": "med-ai-saas-backend",
-            }
-        )
-
-        self.assertTrue(result.status == ResultStatus.Err)
-        self.assertIsInstance(result.err(), MissingOrganizationClaimError)
-
-    def test_map_claims_allows_admin_without_organization_claim(self):
+    async def test_map_claims_allows_admin_without_organization_claim(self):
         admin_service = AuthService(
             server_url="http://localhost:8080",
             realm="dev",
             client_id="gantry-admin",
+            keycloak_client=self.keycloak_client,
             require_organization_claim=False,
         )
 
-        result = admin_service._mapClaimsToAuthInfo(
+        result = await admin_service._mapClaimsToAuthInfo(
             {
                 "sub": "admin-1",
-                "preferred_username": "admin",
+                "name": "admin",
                 "email": "admin@test",
-                "realm_access": {"roles": [AuthService.ADMIN_REALM_ROLE]},
-                "azp": "gantry-admin",
             }
         )
 
         self.assertTrue(result.status == ResultStatus.Ok)
-        self.assertEqual(result.unwrap()["org_id"], "")
-        self.assertEqual(
-            result.unwrap()["roles"],
-            [AuthService.ADMIN_REALM_ROLE],
-        )
+        self.assertEqual(result.unwrap()["org_uuid"], "")
 
-    def test_check_admin_role_requires_realm_admin_role(self):
-        missing_role = self.service.checkAdminRole(
-            {
-                "id": "u1",
-                "username": "alice",
-                "email": "a@test",
-                "roles": [],
-                "org_id": "",
-                "project_ids": [],
-            }
-        )
-        has_role = self.service.checkAdminRole(
-            {
-                "id": "u1",
-                "username": "alice",
-                "email": "a@test",
-                "roles": [AuthService.ADMIN_REALM_ROLE],
-                "org_id": "",
-                "project_ids": [],
-            }
-        )
+    def test_verify_token_admin_requires_realm_admin_role(self):
+        signing_key = Mock()
+        signing_key.key = "secret"
+        jwk_client = Mock()
+        jwk_client.get_signing_key_from_jwt.return_value = signing_key
 
-        self.assertTrue(missing_role.status == ResultStatus.Err)
-        self.assertTrue(has_role.status == ResultStatus.Ok)
+        with (
+            patch.object(
+                self.service, "_getJwkClient", return_value=jwk_client
+            ),
+            patch(
+                "gantry.management.auth.services.jwt.decode",
+                return_value={
+                    "sub": "u1",
+                    "name": "alice",
+                    "email": "a@test",
+                    "realm_access": {"roles": []},
+                },
+            ),
+        ):
+            result = self.service.verifyTokenAdmin("token")
+
+        self.assertTrue(result.status == ResultStatus.Err)
+        self.assertIsInstance(result.err(), ForbiddenError)
 
     def test_get_openid_metadata_uses_well_known_when_available(self):
         self.service._openid_client.well_known = lambda: {

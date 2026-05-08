@@ -80,7 +80,7 @@ class UpdateProjectSettingsRequest(BaseDTO):
 class ProjectInfoResponse(BaseDTO):
     """Project metadata response."""
 
-    id: str = Field(..., description="Project UUID")
+    project_uuid: str = Field(..., description="Project UUID")
     name: str
     description: str | None = None
     organization_id: str
@@ -133,7 +133,7 @@ class ProjectUserPermissionsResponse(BaseDTO):
 class ProjectArchiveResponse(BaseDTO):
     """Archive/unarchive response."""
 
-    project_id: str
+    id: str
     archived: bool
 
 

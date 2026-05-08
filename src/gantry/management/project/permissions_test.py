@@ -6,7 +6,7 @@ import unittest
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.shared.project_permissions import (
+from gantry.shared.utils.permission_utils import (
     normalize_project_permission_map,
     serialize_project_permission_map,
     serialize_project_permission_values,
@@ -37,9 +37,7 @@ class TestProjectPermissions(unittest.TestCase):
             has_permission(perms, ProjectPermission.USERS_PERMISSIONS_RW)
         )
         self.assertTrue(has_permission(perms, ProjectPermission.APIKEY_WRITE))
-        self.assertFalse(
-            has_permission(perms, ProjectPermission.PROJECTS_GET_ALL)
-        )
+        self.assertNotIn("organization.projects.get_all", effective)
 
     def test_non_owner_does_not_inherit(self):
         """Non-owner should not automatically inherit write permission."""

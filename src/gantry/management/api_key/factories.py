@@ -28,5 +28,6 @@ def getApiKeyService():
         logger=getLogger(),
         api_key_repo=getApiKeyRepository(),
         project_repo=getProjectRepository(),
+        permissions=list(apikeys_settings.permissions),
         session_manager=getSessionManager(),
     )

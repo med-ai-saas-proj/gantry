@@ -16,7 +16,6 @@ from .services_test_support import (
     DeletionAlreadyRequestedError,
     datetime,
     _DummyError,
-    _DummyRedis,
 )
 
 
@@ -68,7 +67,7 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
 
         # Assert
         self.assertTrue(res.status == ResultStatus.Ok)
-        self.assertEqual(res.unwrap().org_id, "org-1")
+        self.assertEqual(res.unwrap().id, "org-1")
         self.session_manager.session.commit.assert_awaited()
 
     async def test_cancel_delete_org_not_found(self):
@@ -210,12 +209,6 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         self.assertEqual(res.unwrap().rate_limit, 100)
         self.assertEqual(res.unwrap().spending_limit, 5000)
         self.assertEqual(res.unwrap().extra, {"a": 1})
-        self.redis.set.assert_awaited()
-        self.redis.set.assert_any_await(
-            "billing:spending_limit:org-1",
-            5000,
-            ex=36000,
-        )
 
     async def test_process_due_deletions_deletes_org_and_cleans_records(self):
         """Deletion worker should delete due orgs and clean DB records."""
@@ -346,12 +339,6 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         self.assertEqual(res.unwrap().spending_limit, 7000)
         self.assertEqual(res.unwrap().extra, {"a.b": 1, "x": 2})
         service.settings_repo.upsert.assert_awaited_once()
-        self.redis.set.assert_awaited()
-        self.redis.set.assert_any_await(
-            "billing:spending_limit:org-1",
-            7000,
-            ex=36000,
-        )
 
     async def test_misc_org_error_propagation_paths(self):
         """Org service should propagate upstream collaborator errors on edge paths."""

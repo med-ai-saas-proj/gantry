@@ -57,7 +57,7 @@ class TransactionInfoResponse(BaseModel):
     transaction_uid: UUID
     amount: Decimal
     date: datetime
-    project_uid: UUID
+    project_uuid: UUID
     details: dict
     captured_at: datetime | None
     status: TransactionStatus
@@ -75,7 +75,7 @@ class InvoiceInfoResponse(BaseModel):
 class InvoiceItemInfoResponse(BaseModel):
     description: str
     amount: Decimal
-    project_uid: UUID | None
+    project_uuid: UUID | None
     project_name: str | None
 
 
@@ -86,7 +86,7 @@ class InvoiceDetailInfoResponse(InvoiceInfoResponse):
 
 
 class SpendingLimitInfoResponse(BaseModel):
-    project_uid: str | None
+    project_uuid: str | None
     limit_amount: ScaledAmount
     current_spend: ScaledAmount
 

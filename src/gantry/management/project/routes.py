@@ -79,21 +79,21 @@ async def create_project(
     return result.unwrap()
 
 
-@project_router.get("/{project_id}", response_model=ProjectInfoResponse)
+@project_router.get("/{project_uuid}", response_model=ProjectInfoResponse)
 async def get_project(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectInfoResponse:
     """Return one project when the actor can access it."""
     result = await project_service.getProject(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         actor_user_id=user_info["id"],
     )
     return result.unwrap()
 
 
-@project_router.put("/{project_id}", response_model=ProjectInfoResponse)
+@project_router.put("/{project_uuid}", response_model=ProjectInfoResponse)
 async def update_project(
     user_info: Annotated[
         UserInfo,
@@ -104,8 +104,6 @@ async def update_project(
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectInfoResponse:
     """Update mutable metadata for one project."""
-    if project_uuid not in user_info["project_permissions"]:
-        raise ProjectNotFoundError()
     result = await project_service.updateProject(
         project_uuid=project_uuid,
         name=input_data.name,
@@ -115,7 +113,7 @@ async def update_project(
 
 
 @project_router.get(
-    "/{project_id}/settings",
+    "/{project_uuid}/settings",
     response_model=ProjectSettingsResponse,
 )
 async def get_project_settings(
@@ -123,17 +121,17 @@ async def get_project_settings(
         UserInfo,
         Depends(requiredProjectPermission(ProjectPermission.SETTINGS_READ)),
     ],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectSettingsResponse:
     """Return project settings for one readable project."""
     _ = user_info
-    result = await project_service.getProjectSettings(project_id)
+    result = await project_service.getProjectSettings(project_uuid)
     return result.unwrap()
 
 
 @project_router.patch(
-    "/{project_id}/settings",
+    "/{project_uuid}/settings",
     response_model=ProjectSettingsResponse,
 )
 async def update_project_settings(
@@ -141,14 +139,14 @@ async def update_project_settings(
         UserInfo,
         Depends(requiredProjectPermission(ProjectPermission.SETTINGS_WRITE)),
     ],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     input_data: Annotated[UpdateProjectSettingsRequest, Body()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectSettingsResponse:
     """Update per-project settings such as the project RPM limit."""
     _ = user_info
     result = await project_service.updateProjectSettings(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         rate_limit=input_data.rate_limit,
         spending_limit=input_data.spending_limit,
         extra=input_data.extra,
@@ -157,7 +155,7 @@ async def update_project_settings(
 
 
 @project_router.get(
-    "/{project_id}/users",
+    "/{project_uuid}/users",
     response_model=ProjectUserListResponse,
 )
 async def get_project_users(
@@ -165,13 +163,13 @@ async def get_project_users(
         UserInfo,
         Depends(requiredProjectPermission(ProjectPermission.USERS_GET_ALL)),
     ],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     pagination: Annotated[PaginationQuery, Depends()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectUserListResponse:
     """List users currently assigned to one project."""
     result = await project_service.listProjectUsers(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         offset=pagination.offset,
         limit=pagination.limit,
         q=pagination.q,
@@ -179,71 +177,71 @@ async def get_project_users(
     return result.unwrap()
 
 
-@project_router.post("/{project_id}/users")
+@project_router.post("/{project_uuid}/users")
 async def add_project_user(
     user_info: Annotated[
         UserInfo,
         Depends(requiredProjectPermission(ProjectPermission.USERS_ADD)),
     ],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     input_data: Annotated[AddProjectUserRequest, Body()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> Response:
     """Add an organization member into the project."""
     result = await project_service.addUserToProject(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         target_user_id=input_data.user_id,
     )
     result.unwrap()
     return Response(status_code=200)
 
 
-@project_router.delete("/{project_id}/users/{user_id}")
+@project_router.delete("/{project_uuid}/users/{user_id}")
 async def remove_project_user(
     user_info: Annotated[
         UserInfo,
         Depends(requiredProjectPermission(ProjectPermission.USERS_REMOVE)),
     ],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     user_id: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> Response:
     """Remove one user from the project."""
     result = await project_service.removeUserFromProject(
-        project_uuid=project_id, target_user_id=user_id
+        project_uuid=project_uuid, target_user_id=user_id
     )
     result.unwrap()
     return Response(status_code=200)
 
 
 @project_router.get(
-    "/{project_id}/users/{user_id}/permissions",
+    "/{project_uuid}/users/{user_id}/permissions",
     response_model=ProjectUserPermissionsResponse,
 )
 async def get_project_user_permissions(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     user_id: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectUserPermissionsResponse:
     """Return project permissions for a user, allowing self-read."""
     if user_info["id"] != user_id:
         authz_res = await project_service.authorizeProjectPermission(
-            project_uuid=project_id,
+            project_uuid=project_uuid,
             user_id=user_info["id"],
             required=ProjectPermission.USERS_PERMISSIONS_RW,
         )
         authz_res.unwrap()
 
     result = await project_service.getUserPermissions(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         target_user_id=user_id,
     )
     return result.unwrap()
 
 
 @project_router.put(
-    "/{project_id}/users/{user_id}/permissions",
+    "/{project_uuid}/users/{user_id}/permissions",
     response_model=ProjectUserPermissionsResponse,
 )
 async def update_project_user_permissions(
@@ -253,14 +251,14 @@ async def update_project_user_permissions(
             requiredProjectPermission(ProjectPermission.USERS_PERMISSIONS_RW)
         ),
     ],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     user_id: Annotated[str, Path()],
     input_data: Annotated[ProjectUserPermissionsRequest, Body()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectUserPermissionsResponse:
     """Replace all project permissions for one project member."""
     result = await project_service.updateUserPermissions(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         actor_user_id=user_info["id"],
         target_user_id=user_id,
         permissions=input_data.permissions,
@@ -269,7 +267,7 @@ async def update_project_user_permissions(
 
 
 @project_router.post(
-    "/{project_id}/archive",
+    "/{project_uuid}/archive",
     response_model=ProjectArchiveResponse,
 )
 async def archive_project(
@@ -277,18 +275,18 @@ async def archive_project(
         UserInfo,
         Depends(requiredProjectPermission(ProjectPermission.OWNER)),
     ],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectArchiveResponse:
     """Archive a project owned by the current actor."""
     result = await project_service.setProjectArchived(
-        project_uuid=project_id, archived=True
+        project_uuid=project_uuid, archived=True
     )
     return result.unwrap()
 
 
 @project_router.post(
-    "/{project_id}/unarchive",
+    "/{project_uuid}/unarchive",
     response_model=ProjectArchiveResponse,
 )
 async def unarchive_project(
@@ -300,11 +298,11 @@ async def unarchive_project(
             )
         ),
     ],
-    project_id: Annotated[str, Path()],
+    project_uuid: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ProjectArchiveResponse:
     """Unarchive a project owned by the current actor."""
     result = await project_service.setProjectArchived(
-        project_uuid=project_id, archived=False
+        project_uuid=project_uuid, archived=False
     )
     return result.unwrap()

@@ -13,7 +13,6 @@ from .dtos import (
     ApiKeyListResponse,
     ApiKeyWriteRequest,
     ApiKeyCreateResponse,
-    ApiKeyPermissionAuditResponse,
     ApiKeyPermissionCatalogResponse,
 )
 from .factories import ApiKeyService, getApiKeyService
@@ -45,39 +44,39 @@ async def getApiKeyPermissions(
 @apikey_router.get("", response_model=ApiKeyListResponse)
 async def getApiKeys(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    project_id: Annotated[str, Query(..., min_length=1, alias="project_id")],
+    project_uuid: Annotated[str, Query(..., min_length=1, alias="project_id")],
     apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ApiKeyListResponse:
     """List API keys belonging to one project."""
     authz_res = await project_service.authorizeProjectPermission(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         user_id=user_info["id"],
         required=ProjectPermission.APIKEY_READ,
     )
     authz_res.unwrap()
-    result = await apikey_service.getApiKeys(project_uuid=project_id)
+    result = await apikey_service.getApiKeys(project_uuid=project_uuid)
     return result.unwrap()
 
 
 @apikey_router.post("", response_model=ApiKeyCreateResponse, status_code=201)
 async def createApiKey(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    project_id: Annotated[str, Query(..., min_length=1, alias="project_id")],
+    project_uuid: Annotated[str, Query(..., min_length=1, alias="project_id")],
     input_data: Annotated[ApiKeyWriteRequest, Body()],
     apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ApiKeyCreateResponse:
     """Create a new API key in one project."""
     authz_res = await project_service.authorizeProjectPermission(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         user_id=user_info["id"],
         required=ProjectPermission.APIKEY_WRITE,
     )
     authz_res.unwrap()
     result = await apikey_service.createApiKey(
         actor_user_id=user_info["id"],
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         name=input_data.name,
         description=input_data.description,
         permissions=input_data.permissions,
@@ -85,47 +84,47 @@ async def createApiKey(
     return result.unwrap()
 
 
-@apikey_router.get("/{apikey_id}", response_model=ApiKeyResponse)
+@apikey_router.get("/{api_key_uuid}", response_model=ApiKeyResponse)
 async def getApiKey(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    apikey_id: Annotated[int, Path()],
+    api_key_uuid: Annotated[str, Path(min_length=1)],
     apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ApiKeyResponse:
-    """Get one API key by id after project permission authorization."""
-    project_id_res = await apikey_service.getApiKeyProjectId(apikey_id)
-    project_id = project_id_res.unwrap()
+    """Get one API key by uuid after project permission authorization."""
+    project_uuid_res = await apikey_service.getApiKeyProjectUuid(api_key_uuid)
+    project_uuid = project_uuid_res.unwrap()
     authz_res = await project_service.authorizeProjectPermission(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         user_id=user_info["id"],
         required=ProjectPermission.APIKEY_READ,
     )
     authz_res.unwrap()
 
-    result = await apikey_service.getApiKey(apikey_id)
+    result = await apikey_service.getApiKey(api_key_uuid)
     return result.unwrap()
 
 
-@apikey_router.put("/{apikey_id}", response_model=ApiKeyResponse)
+@apikey_router.put("/{api_key_uuid}", response_model=ApiKeyResponse)
 async def updateApiKey(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    apikey_id: Annotated[int, Path()],
+    api_key_uuid: Annotated[str, Path(min_length=1)],
     input_data: Annotated[ApiKeyWriteRequest, Body()],
     apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ApiKeyResponse:
     """Update one API key after project write permission authorization."""
-    project_id_res = await apikey_service.getApiKeyProjectId(apikey_id)
-    project_id = project_id_res.unwrap()
+    project_uuid_res = await apikey_service.getApiKeyProjectUuid(api_key_uuid)
+    project_uuid = project_uuid_res.unwrap()
     authz_res = await project_service.authorizeProjectPermission(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         user_id=user_info["id"],
         required=ProjectPermission.APIKEY_WRITE,
     )
     authz_res.unwrap()
 
     result = await apikey_service.updateApiKey(
-        api_key_id=apikey_id,
+        api_key_uuid=api_key_uuid,
         name=input_data.name,
         description=input_data.description,
         permissions=input_data.permissions,
@@ -133,71 +132,71 @@ async def updateApiKey(
     return result.unwrap()
 
 
-@apikey_router.post("/{apikey_id}/disable", response_model=ApiKeyResponse)
+@apikey_router.post("/{api_key_uuid}/disable", response_model=ApiKeyResponse)
 async def disableApiKey(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    apikey_id: Annotated[int, Path()],
+    api_key_uuid: Annotated[str, Path(min_length=1)],
     apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ApiKeyResponse:
     """Disable one API key after project write permission authorization."""
-    project_id_res = await apikey_service.getApiKeyProjectId(apikey_id)
-    project_id = project_id_res.unwrap()
+    project_uuid_res = await apikey_service.getApiKeyProjectUuid(api_key_uuid)
+    project_uuid = project_uuid_res.unwrap()
     authz_res = await project_service.authorizeProjectPermission(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         user_id=user_info["id"],
         required=ProjectPermission.APIKEY_WRITE,
     )
     authz_res.unwrap()
 
     result = await apikey_service.setApiKeyDisabled(
-        api_key_id=apikey_id,
+        api_key_uuid=api_key_uuid,
         disabled=True,
     )
     return result.unwrap()
 
 
-@apikey_router.post("/{apikey_id}/enable", response_model=ApiKeyResponse)
+@apikey_router.post("/{api_key_uuid}/enable", response_model=ApiKeyResponse)
 async def enableApiKey(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    apikey_id: Annotated[int, Path()],
+    api_key_uuid: Annotated[str, Path(min_length=1)],
     apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ApiKeyResponse:
     """Enable one API key after project write permission authorization."""
-    project_id_res = await apikey_service.getApiKeyProjectId(apikey_id)
-    project_id = project_id_res.unwrap()
+    project_uuid_res = await apikey_service.getApiKeyProjectUuid(api_key_uuid)
+    project_uuid = project_uuid_res.unwrap()
     authz_res = await project_service.authorizeProjectPermission(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         user_id=user_info["id"],
         required=ProjectPermission.APIKEY_WRITE,
     )
     authz_res.unwrap()
 
     result = await apikey_service.setApiKeyDisabled(
-        api_key_id=apikey_id,
+        api_key_uuid=api_key_uuid,
         disabled=False,
     )
     return result.unwrap()
 
 
-@apikey_router.delete("/{apikey_id}")
+@apikey_router.delete("/{api_key_uuid}")
 async def deleteApiKey(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    apikey_id: Annotated[int, Path()],
+    api_key_uuid: Annotated[str, Path(min_length=1)],
     apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> Response:
     """Delete one API key after project write permission authorization."""
-    project_id_res = await apikey_service.getApiKeyProjectId(apikey_id)
-    project_id = project_id_res.unwrap()
+    project_uuid_res = await apikey_service.getApiKeyProjectUuid(api_key_uuid)
+    project_uuid = project_uuid_res.unwrap()
     authz_res = await project_service.authorizeProjectPermission(
-        project_uuid=project_id,
+        project_uuid=project_uuid,
         user_id=user_info["id"],
         required=ProjectPermission.APIKEY_WRITE,
     )
     authz_res.unwrap()
 
-    result = await apikey_service.deleteApiKey(apikey_id)
+    result = await apikey_service.deleteApiKey(api_key_uuid)
     result.unwrap()
     return Response(status_code=200)

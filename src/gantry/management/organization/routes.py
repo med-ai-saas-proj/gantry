@@ -120,7 +120,7 @@ async def cancel_delete_org(
     """Cancel a previously requested organization deletion."""
     result = await org_service.cancelDeleteOrg(org_id)
     result.unwrap()
-    return DeleteCancelResponse(org_id=org_id, cancelled=True)
+    return DeleteCancelResponse(id=org_id, cancelled=True)
 
 
 @org_router.get(

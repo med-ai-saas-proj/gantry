@@ -311,6 +311,50 @@ class KeycloakServiceClient:
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 
+    async def listOrgs(
+        self,
+        first: int = 0,
+        max_results: int = 20,
+        search: str | None = None,
+    ) -> Result[list[dict[str, Any]], KeycloakOrgError]:
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
+
+        query: dict[str, Any] = {"first": first, "max": max_results}
+        if search:
+            query["search"] = search
+
+        try:
+            payload = await self._admin.a_get_organizations(query=query)
+            if isinstance(payload, list):
+                return Ok(payload)
+            return Err(KeycloakOrgError())
+        except KeycloakError as exc:
+            return Err(self._mapKeycloakError(exc, include_conflict=False))
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
+
+    async def createOrg(
+        self,
+        payload: dict[str, Any],
+    ) -> Result[str, KeycloakPossibleError]:
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
+
+        try:
+            org_id = await self._admin.a_create_organization(payload)
+            if isinstance(org_id, str) and org_id:
+                return Ok(org_id)
+            return Err(KeycloakOrgError())
+        except KeycloakError as exc:
+            return Err(self._mapKeycloakError(exc))
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
+
     async def updateOrg(
         self,
         org_id: str,
@@ -350,6 +394,31 @@ class KeycloakServiceClient:
                 self._mapKeycloakError(
                     exc,
                     not_found_error=OrgNotFoundError(),
+                )
+            )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
+
+    async def addMember(
+        self,
+        org_id: str,
+        user_id: str,
+    ) -> Result[
+        bool, OrgNotFoundError | MemberNotFoundError | KeycloakOrgError
+    ]:
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
+
+        try:
+            await self._admin.a_organization_user_add(user_id, org_id)
+            return Ok(True)
+        except KeycloakError as exc:
+            return Err(
+                self._mapKeycloakError(
+                    exc,
+                    not_found_error=MemberNotFoundError(),
                 )
             )
         except Exception as exc:
@@ -414,6 +483,54 @@ class KeycloakServiceClient:
                     not_found_error=OrgNotFoundError(),
                 )
             )
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
+
+    async def listUsers(
+        self,
+        first: int = 0,
+        max_results: int = 20,
+        search: str | None = None,
+    ) -> Result[list[dict[str, Any]], KeycloakOrgError]:
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
+
+        query: dict[str, Any] = {"first": first, "max": max_results}
+        if search:
+            query["search"] = search
+
+        try:
+            payload = await self._admin.a_get_users(query=query)
+            if isinstance(payload, list):
+                return Ok(payload)
+            return Err(KeycloakOrgError())
+        except KeycloakError as exc:
+            return Err(self._mapKeycloakError(exc, include_conflict=False))
+        except Exception as exc:
+            return Err(KeycloakOrgError(from_exception=exc))
+
+    async def countUsers(
+        self,
+        search: str | None = None,
+    ) -> Result[int, KeycloakOrgError]:
+        if self._init_error is not None:
+            return Err(self._init_error)
+        if self._admin is None:
+            return Err(KeycloakOrgError())
+
+        query: dict[str, Any] = {}
+        if search:
+            query["search"] = search
+
+        try:
+            count = await self._admin.a_users_count(query=query)
+            if isinstance(count, int):
+                return Ok(count)
+            return Err(KeycloakOrgError())
+        except KeycloakError as exc:
+            return Err(self._mapKeycloakError(exc, include_conflict=False))
         except Exception as exc:
             return Err(KeycloakOrgError(from_exception=exc))
 

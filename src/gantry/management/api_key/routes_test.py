@@ -7,25 +7,20 @@ from pyrusult import Ok
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
-from gantry.management.api_keys import routes
-from gantry.management.api_keys.dtos import ApiKeyWriteRequest
+from gantry.management.api_key import routes
+from gantry.management.api_key.dtos import ApiKeyWriteRequest
 from gantry.management.project.permissions import ProjectPermission
 
 
 class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
-    async def test_permission_routes_return_catalog_and_audit(self):
+    async def test_permission_route_returns_catalog(self):
         apikey_service = Mock()
         apikey_service.getPermissionCatalog = Mock(return_value="catalog")
-        apikey_service.auditPermissions = AsyncMock(return_value="audit")
         user_info = {"id": "u1", "roles": [], "org_id": "org-1"}
 
         self.assertEqual(
             await routes.getApiKeyPermissions(user_info, apikey_service),
             "catalog",
-        )
-        self.assertEqual(
-            await routes.auditApiKeyPermissions(user_info, apikey_service),
-            "audit",
         )
 
     async def test_query_scoped_routes_authorize_then_call_service(self):
@@ -73,9 +68,11 @@ class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
             required=ProjectPermission.APIKEY_WRITE,
         )
 
-    async def test_id_routes_authorize_via_resolved_project(self):
+    async def test_uuid_routes_authorize_via_resolved_project(self):
         apikey_service = Mock()
-        apikey_service.getApiKeyProjectId = AsyncMock(return_value=Ok("proj-1"))
+        apikey_service.getApiKeyProjectUuid = AsyncMock(
+            return_value=Ok("proj-1")
+        )
         apikey_service.getApiKey = AsyncMock(return_value=Ok("detail"))
         apikey_service.updateApiKey = AsyncMock(return_value=Ok("updated"))
         apikey_service.setApiKeyDisabled = AsyncMock(
@@ -90,14 +87,14 @@ class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             await routes.getApiKey(
-                user_info, 11, apikey_service, project_service
+                user_info, "api-key-11", apikey_service, project_service
             ),
             "detail",
         )
         self.assertEqual(
             await routes.updateApiKey(
                 user_info,
-                11,
+                "api-key-11",
                 ApiKeyWriteRequest(
                     name="Key 1",
                     description="desc",
@@ -109,18 +106,18 @@ class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
             "updated",
         )
         delete_res = await routes.deleteApiKey(
-            user_info, 11, apikey_service, project_service
+            user_info, "api-key-11", apikey_service, project_service
         )
         self.assertEqual(delete_res.status_code, 200)
         self.assertEqual(
             await routes.disableApiKey(
-                user_info, 11, apikey_service, project_service
+                user_info, "api-key-11", apikey_service, project_service
             ),
             "disabled",
         )
         self.assertEqual(
             await routes.enableApiKey(
-                user_info, 11, apikey_service, project_service
+                user_info, "api-key-11", apikey_service, project_service
             ),
             "enabled",
         )

@@ -3,6 +3,7 @@
 from gantry.db import Repository, CacheRepository
 from gantry.management.project import Project, ProjectSettings
 from gantry.management.organization import OrgSettings
+from gantry.shared.utils.uuid_utils import uuid7
 
 from .models import ApiKey
 from .entities import ApiKeyInfo, ApiKeyContextRecord
@@ -75,6 +76,7 @@ class ApiKeyRepository(Repository[ApiKey, int]):
                 api_key_uuid=row["api_key_uuid"],
                 user_uuid=str(row["user_id"]),
                 project_id=int(row["project_id"]),
+                org_id=str(row["organization_uuid"]),
                 organization_uuid=str(row["organization_uuid"]),
                 project_uuid=str(row["project_uuid"]),
                 hashed_key=str(row["hashed_key"]),
@@ -117,7 +119,7 @@ class ApiKeyRepository(Repository[ApiKey, int]):
                 ApiKey.project_id,
                 ApiKey.id,
                 ApiKey.permissions,
-                Project.uuid.label("project_uid"),
+                Project.uuid.label("project_uuid"),
                 Project.organization_id,
             )
             .select_from(ApiKey)
@@ -128,16 +130,19 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         return [
             ApiKeyInfo(
                 {
+                    "api_key_id": int(key["id"]),
                     "api_key_uuid": str(key["uuid"]),
                     "user_uuid": str(key["user_id"]),
-                    "project_uuid": str(key["project_uid"]),
+                    "project_id": int(key["project_id"]),
+                    "project_uuid": str(key["project_uuid"]),
+                    "org_id": str(key["organization_id"]),
                     "organization_uuid": str(key["organization_id"]),
+                    "hashed_key": str(key["hashed_key"]),
                     "permissions": list(key["permissions"] or []),
                     "rpm_limit_organization": -1,
                     "rpm_limit_project": -1,
                     "spending_limit_organization": -1,
                     "spending_limit_project": -1,
-                    # "hashed_key": key["hashed_key"],
                 }
             )
             for key in result.mappings().all()
@@ -165,6 +170,22 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         res = await session.execute(stmt)
         return int(res.scalar_one() or 0)
 
+    async def countAll(self, session: AsyncSession) -> int:
+        stmt = select(func.count()).select_from(ApiKey)
+        res = await session.execute(stmt)
+        return int(res.scalar_one() or 0)
+
+    async def getByUuid(
+        self, session: AsyncSession, api_key_uuid: str
+    ) -> ApiKey | None:
+        stmt = (
+            select(ApiKey)
+            .select_from(ApiKey)
+            .where(ApiKey.uuid == api_key_uuid)
+            .limit(1)
+        )
+        return await self.selectOne(session, stmt)
+
     async def create(
         self,
         session: AsyncSession,
@@ -180,6 +201,7 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         stmt = (
             insert(ApiKey)
             .values(
+                uuid=uuid7(),
                 user_id=user_id,
                 project_id=project_id,
                 hashed_key=hashed_key,
@@ -215,6 +237,28 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         res = await session.execute(stmt)
         return res.scalar_one_or_none()
 
+    async def updateByUuid(
+        self,
+        session: AsyncSession,
+        api_key_uuid: str,
+        *,
+        name: str,
+        description: str,
+        permissions: list[str],
+    ) -> ApiKey | None:
+        stmt = (
+            update(ApiKey)
+            .where(ApiKey.uuid == api_key_uuid)
+            .values(
+                name=name,
+                description=description,
+                permissions=permissions,
+            )
+            .returning(ApiKey)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none()
+
     async def updateDisabledById(
         self,
         session: AsyncSession,
@@ -231,22 +275,36 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         res = await session.execute(stmt)
         return res.scalar_one_or_none()
 
-    async def listDistinctPermissions(
+    async def updateDisabledByUuid(
         self,
         session: AsyncSession,
-    ) -> list[str]:
+        api_key_uuid: str,
+        *,
+        disabled: bool,
+    ) -> ApiKey | None:
         stmt = (
-            select(func.unnest(ApiKey.permissions).label("permission"))
-            .select_from(ApiKey)
-            .distinct()
-            .order_by("permission")
+            update(ApiKey)
+            .where(ApiKey.uuid == api_key_uuid)
+            .values(disabled=disabled)
+            .returning(ApiKey)
         )
         res = await session.execute(stmt)
-        return [permission for permission in res.scalars().all() if permission]
+        return res.scalar_one_or_none()
 
     async def deleteById(self, session: AsyncSession, api_key_id: int) -> bool:
         stmt = (
             delete(ApiKey).where(ApiKey.id == api_key_id).returning(ApiKey.id)
+        )
+        res = await session.execute(stmt)
+        return res.scalar_one_or_none() is not None
+
+    async def deleteByUuid(
+        self, session: AsyncSession, api_key_uuid: str
+    ) -> bool:
+        stmt = (
+            delete(ApiKey)
+            .where(ApiKey.uuid == api_key_uuid)
+            .returning(ApiKey.id)
         )
         res = await session.execute(stmt)
         return res.scalar_one_or_none() is not None

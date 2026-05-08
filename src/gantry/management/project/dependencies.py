@@ -45,15 +45,23 @@ async def assertProjectRole(
 def requiredProjectPermission(
     permission: ProjectPermission, allow_archived: bool = False
 ):
-    """Return dependency enforcing project permission for path project_id."""
+    """Return dependency enforcing project permission for path project_uuid."""
 
     async def _dependency(
-        project_id: Annotated[str, Path()],
+        project_uuid: Annotated[str, Path()],
         user_info: Annotated[UserInfo, Depends(getUserInfo)],
         project_service: Annotated[ProjectService, Depends(getProjectService)],
     ) -> UserInfo:
+<<<<<<< ntnam22/med-104-admin-dashboard-api-user-api-key-organization-project
+        authz_res = await project_service.authorizeProjectPermission(
+            project_uuid=project_uuid,
+            user_id=user_info["id"],
+            required=permission,
+            allow_archived=allow_archived,
+=======
         await assertProjectRole(
             project_service, project_id, [permission], user_info, allow_archived
+>>>>>>> dev
         )
         return user_info
 
@@ -66,10 +74,19 @@ def userHasRole(
     """Return dependency enforcing all required project permissions."""
 
     async def _dependency(
-        project_id: Annotated[str, Path()],
+        project_uuid: Annotated[str, Path()],
         user_info: Annotated[UserInfo, Depends(getUserInfo)],
         project_service: Annotated[ProjectService, Depends(getProjectService)],
     ) -> UserInfo:
+<<<<<<< ntnam22/med-104-admin-dashboard-api-user-api-key-organization-project
+        for permission in required_permissions:
+            authz_res = await project_service.authorizeProjectPermission(
+                project_uuid=project_uuid,
+                user_id=user_info["id"],
+                required=permission,
+            )
+            authz_res.unwrap()
+=======
         await assertProjectRole(
             project_service,
             project_id,
@@ -77,6 +94,7 @@ def userHasRole(
             user_info,
             allow_archived,
         )
+>>>>>>> dev
         return user_info
 
     return _dependency
