@@ -1,6 +1,7 @@
 """FastAPI dependencies for project permissions."""
 
 from gantry.management.auth import UserInfo, getUserInfo
+from gantry.management.organization import OrgPermission
 
 from .services import (
     ProjectArchivedError,
@@ -30,6 +31,8 @@ async def assertProjectRole(
         and not allow_archived
     ):
         raise ProjectArchivedError()
+    if OrgPermission.OWNER.value in user_info["org_permissions"]:
+        return
     try:
         effective_perms = get_effective_permissions(
             user_info["project_permissions"][project_uuid]
@@ -52,16 +55,12 @@ def requiredProjectPermission(
         user_info: Annotated[UserInfo, Depends(getUserInfo)],
         project_service: Annotated[ProjectService, Depends(getProjectService)],
     ) -> UserInfo:
-<<<<<<< ntnam22/med-104-admin-dashboard-api-user-api-key-organization-project
-        authz_res = await project_service.authorizeProjectPermission(
-            project_uuid=project_uuid,
-            user_id=user_info["id"],
-            required=permission,
-            allow_archived=allow_archived,
-=======
         await assertProjectRole(
-            project_service, project_id, [permission], user_info, allow_archived
->>>>>>> dev
+            project_service,
+            project_uuid,
+            [permission],
+            user_info,
+            allow_archived,
         )
         return user_info
 
@@ -78,23 +77,13 @@ def userHasRole(
         user_info: Annotated[UserInfo, Depends(getUserInfo)],
         project_service: Annotated[ProjectService, Depends(getProjectService)],
     ) -> UserInfo:
-<<<<<<< ntnam22/med-104-admin-dashboard-api-user-api-key-organization-project
-        for permission in required_permissions:
-            authz_res = await project_service.authorizeProjectPermission(
-                project_uuid=project_uuid,
-                user_id=user_info["id"],
-                required=permission,
-            )
-            authz_res.unwrap()
-=======
         await assertProjectRole(
             project_service,
-            project_id,
+            project_uuid,
             required_permissions,
             user_info,
             allow_archived,
         )
->>>>>>> dev
         return user_info
 
     return _dependency
