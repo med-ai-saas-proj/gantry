@@ -1,6 +1,6 @@
-from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import requireRole
+from gantry.management.organization.permissions import OrgPermission
+from gantry.management.organization.dependencies import requiredOrgPermission
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
 )
@@ -28,7 +28,7 @@ from fastapi import Body, Depends
 )
 async def create_billing_source(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
@@ -46,7 +46,7 @@ async def create_billing_source(
 )
 async def billing_source_info(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
@@ -64,7 +64,7 @@ async def billing_source_info(
 )
 async def update_billing_source(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
@@ -84,7 +84,7 @@ async def update_billing_source(
 )
 async def create_setup_intent(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
@@ -101,7 +101,7 @@ async def create_setup_intent(
 async def delete_payment_method(
     payment_method_id: str,  # e.g. "pm_12345" for Stripe
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
@@ -119,7 +119,7 @@ async def delete_payment_method(
 )
 async def list_payment_methods(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
@@ -136,7 +136,7 @@ async def list_payment_methods(
 async def get_payment_method_details(
     payment_method_id: str,  # e.g. "pm_12345" for Stripe
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
@@ -154,7 +154,7 @@ async def get_payment_method_details(
 )
 async def list_required_action_setup_intents(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)
@@ -173,7 +173,7 @@ async def list_required_action_setup_intents(
 async def cancel_setup_intent(
     setup_intent_id: str,
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     billing_source_service: Annotated[
         BillingSourceService, Depends(getBillingSourceService)

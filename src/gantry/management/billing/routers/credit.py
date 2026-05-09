@@ -1,6 +1,6 @@
-from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import requireRole
+from gantry.management.organization.permissions import OrgPermission
+from gantry.management.organization.dependencies import requiredOrgPermission
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
@@ -26,7 +26,7 @@ from fastapi import Depends
 )
 async def get_available_credits(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     credit_service: Annotated[CreditService, Depends(getCreditService)],
 ) -> ObjectResponse[CreditInfoResponse]:
@@ -44,7 +44,7 @@ async def get_available_credits(
 )
 async def list_credit_transactions(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     credit_service: Annotated[CreditService, Depends(getCreditService)],
     offset: int = 0,

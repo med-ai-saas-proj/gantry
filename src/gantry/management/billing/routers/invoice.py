@@ -1,6 +1,6 @@
-from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import getUserInfo, requireRole
+from gantry.management.organization.permissions import OrgPermission
+from gantry.management.organization.dependencies import requiredOrgPermission
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
@@ -28,7 +28,7 @@ from fastapi import Depends
 )
 async def list_invoices(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
     from_date: datetime | None = None,  # ISO date string
@@ -62,7 +62,7 @@ async def list_invoices(
 async def get_invoice_details(
     invoice_uid: UUID,
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[InvoiceDetailInfoResponse]:
@@ -81,7 +81,7 @@ async def get_invoice_details(
 async def pay_invoice(
     invoice_uid: UUID,
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_MANAGE))
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
     ],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[ManualPaymentResponse]:

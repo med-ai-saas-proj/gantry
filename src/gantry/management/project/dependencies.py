@@ -48,6 +48,32 @@ async def assertProjectRole(
     pass
 
 
+async def assertProjectsRole(
+    project_service: ProjectService,
+    project_uuids: list[str],
+    required_permissions: list[ProjectPermission],
+    user_info: UserInfo,
+    allow_archived: bool = False,
+):
+    for project_uuid in project_uuids:
+        if (
+            await project_service.isProjectArchived(project_uuid)
+            and not allow_archived
+        ):
+            raise ProjectArchivedError()
+        if OrgPermission.OWNER.value in user_info["org_permissions"]:
+            return
+        try:
+            effective_perms = get_effective_permissions(
+                user_info["project_permissions"][project_uuid]
+            )
+        except KeyError as e:
+            raise UserNotInProjectError() from e
+
+        if not effective_perms.issuperset(required_permissions):
+            raise InsufficientProjectPermissionError()
+
+
 class ProjectExtractFrom(enum.Enum, str):
     PATH = "path"
     QUERY = "query"

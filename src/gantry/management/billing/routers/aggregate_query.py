@@ -1,7 +1,11 @@
-from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
 from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.project.factories import getProjectService
 from gantry.shared.custom_types.responses import ListResponse
+from gantry.management.project.permissions import ProjectPermission
+from gantry.management.project.dependencies import assertProjectsRole
+from gantry.management.organization.permissions import OrgPermission
+from gantry.management.organization.dependencies import requiredOrgPermission
 
 from ..type import AggregatePeriod, BillingAggregateReport
 from .router import billing_router
@@ -20,9 +24,7 @@ from fastapi import Query, Depends
     description="Get aggregated billing data for a given period (e.g. daily, monthly) and optional filters (e.g. project_id). Useful for dashboards, reports, etc.",
 )
 async def get_aggregate_by_projects(
-    user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
-    ],
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],
@@ -35,19 +37,24 @@ async def get_aggregate_by_projects(
     ),  # filter by project_uuid or whole organization
 ) -> ListResponse[BillingAggregateReport]:
     project_uids_set = (
-        set([str(uid) for uid in project_uids]) if project_uids else set()
+        [str(uid) for uid in project_uuids] if project_uuids else []
     )
     if project_uids_set:
-        check_access_to_projects(
-            user_info=user_info, project_uids=project_uids_set
+        await assertProjectsRole(
+            project_service=getProjectService(),
+            user_info=user_info,
+            project_uuids=project_uids_set,
+            required_permissions=[ProjectPermission.BILLING_VIEW_USAGE],
         )
         project_uids = [UUID(uid) for uid in project_uids_set]
     else:  # if no project_uids filter provided, default to all projects user has access to
-        project_uids = [UUID(uid) for uid in user_info["project_uids"]]
+        project_uids = [
+            UUID(uid) for uid in user_info["project_permissions"].keys()
+        ]
 
     res = (
         await billing_service.get_aggregate_by_projects(
-            project_uuids=project_uuids,
+            project_uuids=project_uids,
             org_id=user_info["org_uuid"],
             start_time=period_start,
             end_time=period_end,
@@ -96,7 +103,8 @@ async def get_aggregate_by_projects(
 )
 async def get_aggregate_by_org(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE_ALL))
+        UserInfo,
+        Depends(requiredOrgPermission(OrgPermission.BILLING_VIEW_USAGE)),
     ],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)

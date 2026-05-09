@@ -1,9 +1,11 @@
-from gantry.management.auth.roles import ManagementRole
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import (
-    requireRole,
-    check_access_to_project,
-    check_access_to_projects,
+from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.project.factories import getProjectService
+from gantry.management.project.permissions import ProjectPermission
+from gantry.management.project.dependencies import (
+    assertProjectRole,
+    assertProjectsRole,
+    requiredProjectPermission,
 )
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
@@ -28,7 +30,10 @@ from fastapi import Query, Depends
 )
 async def listTransactions(
     user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
+        UserInfo,
+        Depends(
+            requiredProjectPermission(ProjectPermission.BILLING_VIEW_USAGE)
+        ),
     ],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
@@ -42,15 +47,21 @@ async def listTransactions(
     offset: int = 0,
 ) -> PaginatedResponse[TransactionInfoResponse]:
     project_uids_set = (
-        set([str(uid) for uid in project_uids]) if project_uids else set()
+        [str(uid) for uid in project_uuids] if project_uuids else []
     )
+
     if project_uids_set:
-        check_access_to_projects(
-            user_info=user_info, project_uids=project_uids_set
+        await assertProjectsRole(
+            project_service=getProjectService(),
+            user_info=user_info,
+            project_uuids=project_uids_set,
+            required_permissions=[ProjectPermission.BILLING_VIEW_USAGE],
         )
-        project_uids = [UUID(uid) for uid in project_uids_set]
+        project_uuids = [UUID(uid) for uid in project_uids_set]
     else:  # if no project_uids filter provided, default to all projects user has access to
-        project_uids = [UUID(uid) for uid in user_info["project_uids"]]
+        project_uuids = [
+            UUID(uid) for uid in user_info["project_permissions"].keys()
+        ]
 
     res, total = await billing_service.getTransactions(
         org_id=user_info["org_uuid"],
@@ -71,9 +82,7 @@ async def listTransactions(
 )
 async def getTransactionDetails(
     transaction_uid: UUID,
-    user_info: Annotated[
-        UserInfo, Depends(requireRole(ManagementRole.BILLING_VIEW_USAGE))
-    ],
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
@@ -83,6 +92,12 @@ async def getTransactionDetails(
             org_id=user_info["org_uuid"], transaction_uid=transaction_uid
         )
     ).unwrap()
-    check_access_to_project(user_info=user_info, project_uid=res.project_uid)
+
+    await assertProjectRole(
+        project_service=getProjectService(),
+        user_info=user_info,
+        project_uuid=str(res.project_uuid),
+        required_permissions=[ProjectPermission.BILLING_VIEW_USAGE],
+    )
 
     return ObjectResponse[TransactionInfoResponse](data=res)
