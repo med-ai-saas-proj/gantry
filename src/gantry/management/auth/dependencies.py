@@ -108,9 +108,9 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
                 id="test_user",
                 username="test_user",
                 email="test_user@example.com",
-                roles=[],
-                org_id="test_org1",
-                project_ids=[],
+                org_uuid="test_org1",
+                org_permissions=[],
+                project_permissions={},
             )
         raise UnauthorizedError()
 
@@ -118,15 +118,12 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
 
     async def mock_getAdminUserInfo(
         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
-    ) -> UserInfo:
+    ) -> AdminInfo:
         if auth.credentials == "bypass_token":
-            return UserInfo(
+            return AdminInfo(
                 id="test_admin",
                 username="test_admin",
                 email="test_admin@example.com",
-                roles=[AuthService.ADMIN_REALM_ROLE],
-                org_id="",
-                project_ids=[],
             )
         raise UnauthorizedError()
 

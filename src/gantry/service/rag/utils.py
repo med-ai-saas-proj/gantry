@@ -31,6 +31,7 @@ def get_orm_class(table_name, dimension) -> type[RagData]:
         ),
         Column("project_id", Integer, nullable=False),
         schema="Rag",
+        extend_existing=True,
     )
 
     DynamicClass = type(

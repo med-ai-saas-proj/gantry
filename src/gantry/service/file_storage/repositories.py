@@ -5,7 +5,7 @@ from .models import File, FileStatus
 import uuid
 from typing import Sequence
 
-from sqlalchemy import text, delete, select, update
+from sqlalchemy import and_, text, delete, select, update
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 
@@ -40,17 +40,16 @@ class FileRepository(Repository):
     ) -> Sequence[File]:
         """Get file IDs by metadata filters."""
         stmt = select(File).where(
-            (File.project_id == project_id)
-            & (File.status == FileStatus.AVAILABLE)
-            & text(
-                " AND ".join(
-                    [
-                        f"extra_metadata ->> :{key} = :{key}"
-                        for key in metadata_filters.keys()
-                    ]
-                )
-            )
+            File.project_id == project_id, File.status == FileStatus.AVAILABLE
         )
+
+        if metadata_filters:
+            filters = []
+            for key, value in metadata_filters.items():
+                filters.append(File.extra_metadata[key].astext == str(value))
+
+            stmt = stmt.where(and_(*filters))
+
         res = await session.execute(stmt.params(**metadata_filters))
         files = res.scalars().all()
         return files

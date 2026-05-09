@@ -8,6 +8,9 @@ from gantry.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
 )
+from gantry.management.billing.services.transaction_services import (
+    TransactionService,
+)
 
 from .dtos import (
     ApiKeyResponse,

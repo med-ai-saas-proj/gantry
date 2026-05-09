@@ -1,7 +1,8 @@
 import enum
-from typing import Literal, TypedDict
+from re import S
+from typing import Literal, Annotated, TypedDict
 
-from pydantic import SecretStr
+from pydantic import Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings
 
 
@@ -37,16 +38,53 @@ class RagParameters(TypedDict):
 
 
 class RagSettings(BaseSettings):
-    openai_api_key: SecretStr
-    openai_base_url: str | None = None
-    embedding_model: str
+    embedding_model: Annotated[
+        str,
+        Field(description="Model to use for generating embeddings."),
+    ]
+    openai_api_key: Annotated[
+        SecretStr,
+        Field(description="OpenAI API key for RAG functionality."),
+    ]
+    openai_base_url: Annotated[
+        HttpUrl,
+        Field(description="Base URL for the OpenAI API."),
+    ]
 
-    rag_store_dimension: int = 1536
-    rag_store_index_type: VectorIndexType = VectorIndexType.hnsw
-    rag_store_index_params_hnsw_m: int = 16
-    rag_store_index_params_hnsw_ef_construction: int = 200
-    rag_store_index_params_ivfflat_lists: int = 100
-    rag_store_ops_type: VectorOpsType = VectorOpsType.cosine
+    rag_store_dimension: Annotated[
+        int,
+        Field(
+            description="Dimensionality of the vector embeddings stored in the RAG store."
+        ),
+    ] = 1536
+    rag_store_index_type: Annotated[
+        VectorIndexType,
+        Field(description="Type of vector index to use for the RAG store."),
+    ] = VectorIndexType.hnsw
+    rag_store_index_params_hnsw_m: Annotated[
+        int,
+        Field(
+            description="HNSW index parameter 'm', which controls the number of bi-directional links created for each new element during index construction."
+        ),
+    ] = 16
+    rag_store_index_params_hnsw_ef_construction: Annotated[
+        int,
+        Field(
+            description="HNSW index parameter 'ef_construction', which controls the accuracy/speed trade-off during index construction. Higher values lead to better recall but slower indexing."
+        ),
+    ] = 200
+    rag_store_index_params_ivfflat_lists: Annotated[
+        int,
+        Field(
+            description="IVFFlat index parameter 'lists', which determines the number of Voronoi cells (or clusters) used in the index. More lists can improve recall but may increase search time."
+        ),
+    ] = 100
+    rag_store_ops_type: Annotated[
+        VectorOpsType,
+        Field(
+            description="Type of vector operations to use for similarity search in the RAG store."
+        ),
+    ] = VectorOpsType.cosine
 
     @property
     def rag_store_parameters(self) -> RagParameters:

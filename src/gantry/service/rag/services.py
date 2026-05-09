@@ -589,79 +589,6 @@ class RagService:
                     ),
                 )
 
-    async def addFile(
-        self,
-        file_uid: uuid.UUID,
-        project_id: int,
-        project_uuid: uuid.UUID,
-        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
-        chunk_size: int = 1000,
-        chunk_overlap: int = 150,
-    ) -> Result[str, FileNotFoundInSystemError]:
-        task_id = str(uuid.uuid4())
-        async with self.session_manager.get_session() as session:
-            file_info = await self.file_repo.getAvailableByUUID(
-                session, file_uid, project_id
-            )
-            if not file_info:
-                return Err(FileNotFoundInSystemError())
-
-            task_dict = {
-                "task_id": task_id,
-                "file_id": file_info.id,
-                "file_uid": str(file_uid),
-                "project_id": project_id,
-                "project_uuid": str(project_uuid),
-                "chunk_splitter": chunk_splitter.value,
-                "chunk_size": chunk_size,
-                "chunk_overlap": chunk_overlap,
-                "status": "pending",
-            }
-
-        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
-        async with self.redis.pipeline() as pipe:
-            await cast(
-                Awaitable[None],
-                pipe.set(result_key, json.dumps(task_dict), ex=self.TASK_TTL),
-            )
-            await cast(
-                Awaitable[None], pipe.rpush(self.REDIS_TASK_QUEUE, task_id)
-            )
-            await pipe.execute()
-
-        return Ok(task_id)
-
-    async def getTaskStatus(
-        self,
-        task_id: str,
-        project_id: int,
-    ) -> Result[EmbeddingTask, TaskNotFoundError]:
-        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
-        task_info = await cast(
-            Awaitable[str | bytes | None], self.redis.get(result_key)
-        )
-        if not task_info:
-            return Err(TaskNotFoundError())
-
-        task_dict = json.loads(task_info)
-        if task_dict.get("project_id") != project_id:
-            return Err(TaskNotFoundError())
-
-        return Ok(
-            EmbeddingTask(
-                task_id=task_dict["task_id"],
-                file_id=task_dict["file_id"],
-                file_uid=uuid.UUID(task_dict["file_uid"]),
-                project_id=task_dict["project_id"],
-                project_uuid=uuid.UUID(task_dict["project_uuid"]),
-                chunk_splitter=ChunkSplitterType(task_dict["chunk_splitter"]),
-                chunk_size=task_dict["chunk_size"],
-                chunk_overlap=task_dict["chunk_overlap"],
-                status=task_dict["status"],
-                failed_reason=task_dict.get("failed_reason"),
-            )
-        )
-
     async def processEmbedding(
         self,
         file_uid: uuid.UUID,
@@ -735,7 +662,6 @@ class RagService:
                 .on_conflict_do_update(
                     index_elements=[
                         RagMetadata.file_id,
-                        RagMetadata.project_id,
                     ],
                     set_={
                         "created_at": func.now(),
@@ -756,7 +682,7 @@ class RagService:
                     DynamicBucket(
                         embedding=embedding,
                         file_id=file_info["id"],
-                        text=chunk,
+                        text=chunk.replace("\x00", "").strip(),
                         project_id=project_id,
                     )
                     for chunk, embedding in zip(chunks, embeddings)
@@ -766,6 +692,108 @@ class RagService:
             await session.commit()
 
         return Ok(None)
+
+    async def addFile(
+        self,
+        file_uid: uuid.UUID,
+        project_id: int,
+        project_uuid: uuid.UUID,
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+    ) -> Result[str, FileNotFoundInSystemError]:
+        task_id = str(uuid.uuid4())
+        async with self.session_manager.get_session() as session:
+            file_info = await self.file_repo.getAvailableByUUID(
+                session, file_uid, project_id
+            )
+            if not file_info:
+                return Err(FileNotFoundInSystemError())
+
+            task_dict = {
+                "task_id": task_id,
+                "file_id": file_info.id,
+                "file_uid": str(file_uid),
+                "project_id": project_id,
+                "project_uuid": str(project_uuid),
+                "chunk_splitter": chunk_splitter.value,
+                "chunk_size": chunk_size,
+                "chunk_overlap": chunk_overlap,
+                "status": "pending",
+            }
+
+        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
+        async with self.redis.pipeline() as pipe:
+            await cast(
+                Awaitable[None],
+                pipe.set(result_key, json.dumps(task_dict), ex=self.TASK_TTL),
+            )
+            await cast(
+                Awaitable[None], pipe.rpush(self.REDIS_TASK_QUEUE, task_id)
+            )
+            await pipe.execute()
+
+        return Ok(task_id)
+
+    async def addFileByProjectUid(
+        self,
+        file_uid: uuid.UUID,
+        project_uid: uuid.UUID,
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+    ) -> Result[str, FileNotFoundInSystemError]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.addFile,
+            file_uid=file_uid,
+            project_uuid=project_uid,
+            chunk_splitter=chunk_splitter,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+        )
+
+    async def getTaskStatus(
+        self,
+        task_id: str,
+        project_id: int,
+    ) -> Result[EmbeddingTask, TaskNotFoundError]:
+        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
+        task_info = await cast(
+            Awaitable[str | bytes | None], self.redis.get(result_key)
+        )
+        if not task_info:
+            return Err(TaskNotFoundError())
+
+        task_dict = json.loads(task_info)
+        if task_dict.get("project_id") != project_id:
+            return Err(TaskNotFoundError())
+
+        return Ok(
+            EmbeddingTask(
+                task_id=task_dict["task_id"],
+                file_id=task_dict["file_id"],
+                file_uid=uuid.UUID(task_dict["file_uid"]),
+                project_id=task_dict["project_id"],
+                project_uuid=uuid.UUID(task_dict["project_uuid"]),
+                chunk_splitter=ChunkSplitterType(task_dict["chunk_splitter"]),
+                chunk_size=task_dict["chunk_size"],
+                chunk_overlap=task_dict["chunk_overlap"],
+                status=task_dict["status"],
+                failed_reason=task_dict.get("failed_reason"),
+            )
+        )
+
+    async def getTaskStatusByProjectUid(
+        self,
+        task_id: str,
+        project_uid: uuid.UUID,
+    ) -> Result[EmbeddingTask, TaskNotFoundError]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.getTaskStatus,
+            task_id=task_id,
+        )
 
     async def addEmbedding(
         self,
@@ -835,12 +863,22 @@ class RagService:
                 for file_info in files_info
             ]
 
+    async def getFilesInRagByProjectUid(
+        self,
+        project_uid: uuid.UUID,
+    ) -> Sequence[FileRecord]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.getFilesInRag,
+        )
+
     async def querySimilarByText(
         self,
         project_id: int,
         query: str,
         filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
         top_k: int = 5,
+        include_embedding: bool = False,
     ) -> Result[
         Sequence[RagEmbeddingRecord],
         FileNotFoundInSystemError
@@ -867,6 +905,27 @@ class RagService:
             embedding=query_embedding,
             filters=filters,
             top_k=top_k,
+            include_embedding=include_embedding,
+        )
+
+    async def querySimilarByTextByProjectUid(
+        self,
+        project_uid: uuid.UUID,
+        query: str,
+        filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
+        top_k: int = 5,
+        include_embedding: bool = False,
+    ) -> Result[
+        Sequence[RagEmbeddingRecord],
+        FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
+    ]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.querySimilarByText,
+            query=query,
+            filters=filters,
+            top_k=top_k,
+            include_embedding=include_embedding,
         )
 
     async def querySimilarByVector(
@@ -875,6 +934,7 @@ class RagService:
         embedding: Sequence[float],
         filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
         top_k: int = 5,
+        include_embedding: bool = False,
     ) -> Result[
         Sequence[RagEmbeddingRecord],
         FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
@@ -891,16 +951,22 @@ class RagService:
 
         async with self.session_manager.get_session() as session:
             DynamicBucket = get_orm_class(table_name, target_dimension)
+
             if ops_type == VectorOpsType.cosine:
-                distance_func = "embedding <=> :embedding"
+                distance_expr = DynamicBucket.embedding.cosine_distance(
+                    embedding
+                )
             elif ops_type == VectorOpsType.l2:
-                distance_func = "embedding <-> :embedding"
+                distance_expr = DynamicBucket.embedding.l2_distance(embedding)
             elif ops_type == VectorOpsType.ip:
-                distance_func = "embedding <#> :embedding"
+                distance_expr = DynamicBucket.embedding.max_inner_product(
+                    embedding
+                )
             else:
                 raise ValueError(f"Unsupported ops type: {ops_type}")
+
             stmt = select(DynamicBucket)
-            resolved_file_ids: Sequence[int] = []
+            resolved_file_ids: Sequence[int] | None = None
             if isinstance(filters, QueryFilterByFileUid):
                 resolved_files = await self.file_repo.getAvailableIdsByUUIDs(
                     session, filters.file_uids, project_id
@@ -925,15 +991,16 @@ class RagService:
                     file_info.id for file_info in resolved_files
                 ]
 
-            if resolved_file_ids:
+            if resolved_file_ids is not None:
+                # If filters were applied but no files matched, return empty result early to avoid unnecessary distance calculations
+                if len(resolved_file_ids) == 0:
+                    return Ok([])
                 stmt = stmt.where(DynamicBucket.file_id.in_(resolved_file_ids))
-            stmt = stmt.order_by(text(distance_func)).limit(top_k)
+
+            stmt = stmt.order_by(distance_expr).limit(top_k)
             result = await session.execute(stmt.params(embedding=embedding))
             records: list = []
             for row in result.scalars().all():
-                file_model = await self.file_repo.getByKey(session, row.file_id)
-                if not file_model:
-                    continue
                 records.append(
                     {
                         "file_id": row.file_id,
@@ -951,33 +1018,46 @@ class RagService:
             }
             results: list[RagEmbeddingRecord] = []
             for record in records:
-                results.append(
-                    {
-                        "text": record["text"],
-                        "embedding": record["embedding"],
-                        "created_at": record["created_at"],
-                        "file_info": {
-                            "id": file_info_map[record["file_id"]].id,
-                            "uid": file_info_map[record["file_id"]].uuid,
-                            "filename": file_info_map[
-                                record["file_id"]
-                            ].original_filename,
-                            "mime_type": file_info_map[
-                                record["file_id"]
-                            ].mime_type,
-                            "size": file_info_map[
-                                record["file_id"]
-                            ].size_in_bytes,
-                            "created_at": file_info_map[
-                                record["file_id"]
-                            ].created_at,
-                            "extra_metadata": file_info_map[
-                                record["file_id"]
-                            ].extra_metadata,
-                            "storage_path": file_info_map[
-                                record["file_id"]
-                            ].filepath,
-                        },
-                    }
-                )
+                data: RagEmbeddingRecord = {
+                    "text": record["text"],
+                    "created_at": record["created_at"],
+                    "embedding": record["embedding"]
+                    if include_embedding
+                    else [],
+                    "file_info": {
+                        "id": file_info_map[record["file_id"]].id,
+                        "uid": file_info_map[record["file_id"]].uuid,
+                        "filename": file_info_map[
+                            record["file_id"]
+                        ].original_filename,
+                        "mime_type": file_info_map[record["file_id"]].mime_type,
+                        "size": file_info_map[record["file_id"]].size_in_bytes,
+                        "created_at": file_info_map[
+                            record["file_id"]
+                        ].created_at,
+                        "extra_metadata": file_info_map[
+                            record["file_id"]
+                        ].extra_metadata,
+                        "storage_path": file_info_map[
+                            record["file_id"]
+                        ].filepath,
+                    },
+                }
+                if include_embedding:
+                    data["embedding"] = record["embedding"]
+                results.append(data)
             return Ok(results)
+
+    async def _wrapProjectUUID(
+        self, project_uid: uuid.UUID, async_func, **kwargs
+    ):
+        async with self.session_manager.get_session() as session:
+            project = await self.project_repo.getByUuid(
+                session, str(project_uid)
+            )
+            if not project:
+                raise InternalServiceError(
+                    message=f"Project with UUID {project_uid} not found."
+                )
+            project_id = project.id
+        return await async_func(project_id=project_id, **kwargs)

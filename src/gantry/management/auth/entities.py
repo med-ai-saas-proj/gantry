@@ -1,3 +1,4 @@
+from uuid import UUID
 from typing import TypedDict
 
 
@@ -10,6 +11,10 @@ class UserInfo(TypedDict):
     project_permissions: dict[
         str, list[str]
     ]  # mapping of project_uuid and permissions
+
+
+class UserInfoWithProjectContext(UserInfo):
+    project_uuid: UUID
 
 
 class AdminInfo(TypedDict):

@@ -1,5 +1,6 @@
-from gantry.management.auth import UserInfo, getUserInfo
-from gantry.service.file_storage.dtos import FileInfoResponse
+from gantry.management.auth.entities import UserInfo, UserInfoWithProjectContext
+from gantry.management.project.permissions import ProjectPermission
+from gantry.management.project.dependencies import requiredProjectPermission
 
 from ..dtos import (
     RagQueryResponse,
@@ -10,11 +11,12 @@ from ..dtos import (
 from .routers import rag_router
 from ..services import RagService
 from ..factories import getRagService
+from ...file_storage.dtos import FileInfoResponse
 
 import uuid
 from typing import Sequence, Annotated
 
-from fastapi import Body, Depends, Security, APIRouter
+from fastapi import Body, Query, Depends, Security, APIRouter
 
 
 rag_user_router = APIRouter(tags=["rag-user"])
@@ -26,10 +28,13 @@ rag_user_router = APIRouter(tags=["rag-user"])
     description="Endpoint to list distinct file ids stored in a RAG.",
 )
 async def get_files(
-    user_info: Annotated[UserInfo, Security(getUserInfo)],
+    user_info: Annotated[
+        UserInfoWithProjectContext,
+        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
+    ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> Sequence[FileInfoResponse]:
-    res = await rag_service.getFilesInRag(api_key_info["project_id"])
+    res = await rag_service.getFilesInRagByProjectUid(user_info["project_uuid"])
     return [
         FileInfoResponse(
             id=str(file_info["uid"]),
@@ -51,14 +56,16 @@ async def get_files(
 )
 async def add_file(
     body: Annotated[AddRagFileRequest, Body()],
-    user_info: Annotated[UserInfo, Security(getUserInfo)],
+    user_info: Annotated[
+        UserInfoWithProjectContext,
+        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
+    ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> str:
     task_id = (
-        await rag_service.addFile(
+        await rag_service.addFileByProjectUid(
             body.file_uid,
-            api_key_info["project_id"],
-            uuid.UUID(api_key_info["project_uuid"]),
+            user_info["project_uuid"],
             body.chunk_splitter,
             body.chunk_size,
             body.chunk_overlap,
@@ -74,12 +81,17 @@ async def add_file(
 )
 async def get_task_status(
     task_id: str,
-    user_info: Annotated[UserInfo, Security(getUserInfo)],
+    user_info: Annotated[
+        UserInfoWithProjectContext,
+        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
+    ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> EmbeddingTaskResponse:
     """Get the status of an asynchronous RAG embedding task."""
     task_result = (
-        await rag_service.getTaskStatus(task_id, api_key_info["project_id"])
+        await rag_service.getTaskStatusByProjectUid(
+            task_id, user_info["project_uuid"]
+        )
     ).unwrap()
 
     return EmbeddingTaskResponse(
@@ -101,15 +113,23 @@ async def get_task_status(
 )
 async def query_similar_by_text(
     body: Annotated[QueryRagQueryByTextRequest, Body()],
-    user_info: Annotated[UserInfo, Security(getUserInfo)],
+    user_info: Annotated[
+        UserInfoWithProjectContext,
+        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
+    ],
     rag_service: Annotated[RagService, Depends(getRagService)],
+    include_embedding: bool = Query(
+        default=False,
+        description="Whether to include embeddings in the response. Embeddings can be large, so they are excluded by default.",
+    ),
 ):
     results = (
-        await rag_service.querySimilarByText(
-            api_key_info["project_id"],
+        await rag_service.querySimilarByTextByProjectUid(
+            user_info["project_uuid"],
             body.query_text,
             body.filters,
             body.top_k,
+            include_embedding,
         )
     ).unwrap()
     return [

@@ -1,5 +1,6 @@
 from gantry.management.auth.entities import UserInfo
-from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.organization.permissions import OrgPermission
+from gantry.management.organization.dependencies import requiredOrgPermission
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
@@ -26,7 +27,9 @@ from fastapi import Depends
     description="List invoices, with filters for project_id, billing_period, payment_status, etc.",
 )
 async def list_invoices(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
+    ],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
     from_date: datetime | None = None,  # ISO date string
     to_date: datetime | None = None,  # ISO date string
@@ -58,7 +61,9 @@ async def list_invoices(
 )
 async def get_invoice_details(
     invoice_uid: UUID,
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
+    ],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[InvoiceDetailInfoResponse]:
     res = (
@@ -75,7 +80,9 @@ async def get_invoice_details(
 )
 async def pay_invoice(
     invoice_uid: UUID,
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
+    ],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
 ) -> ObjectResponse[ManualPaymentResponse]:
     res = await invoice_service.getInvoiceByIdPaymentLinkInProvider(

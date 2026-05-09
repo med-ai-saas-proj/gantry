@@ -1,5 +1,12 @@
 from gantry.management.auth.entities import UserInfo
 from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.project.factories import getProjectService
+from gantry.management.project.permissions import ProjectPermission
+from gantry.management.project.dependencies import (
+    assertProjectRole,
+    assertProjectsRole,
+    requiredProjectPermission,
+)
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
@@ -22,7 +29,12 @@ from fastapi import Query, Depends
     description="List transactions with optional filters (e.g. project_id, date range, etc.). Supports pagination.",
 )
 async def listTransactions(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo,
+        Depends(
+            requiredProjectPermission(ProjectPermission.BILLING_VIEW_USAGE)
+        ),
+    ],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
@@ -34,6 +46,23 @@ async def listTransactions(
     limit: int = 100,
     offset: int = 0,
 ) -> PaginatedResponse[TransactionInfoResponse]:
+    project_uids_set = (
+        [str(uid) for uid in project_uuids] if project_uuids else []
+    )
+
+    if project_uids_set:
+        await assertProjectsRole(
+            project_service=getProjectService(),
+            user_info=user_info,
+            project_uuids=project_uids_set,
+            required_permissions=[ProjectPermission.BILLING_VIEW_USAGE],
+        )
+        project_uuids = [UUID(uid) for uid in project_uids_set]
+    else:  # if no project_uids filter provided, default to all projects user has access to
+        project_uuids = [
+            UUID(uid) for uid in user_info["project_permissions"].keys()
+        ]
+
     res, total = await billing_service.getTransactions(
         org_id=user_info["org_uuid"],
         project_uuids=project_uuids,
@@ -41,7 +70,7 @@ async def listTransactions(
         end_date=end_date,
         limit=limit,
         offset=offset,
-    )  # .unwrap()
+    )
     return PaginatedResponse[TransactionInfoResponse](
         data=res, total=total, offset=offset, limit=limit
     )
@@ -63,4 +92,12 @@ async def getTransactionDetails(
             org_id=user_info["org_uuid"], transaction_uid=transaction_uid
         )
     ).unwrap()
+
+    await assertProjectRole(
+        project_service=getProjectService(),
+        user_info=user_info,
+        project_uuid=str(res.project_uuid),
+        required_permissions=[ProjectPermission.BILLING_VIEW_USAGE],
+    )
+
     return ObjectResponse[TransactionInfoResponse](data=res)

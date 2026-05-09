@@ -1,6 +1,11 @@
 from gantry.management.auth.entities import UserInfo
 from gantry.management.auth.dependencies import getUserInfo
+from gantry.management.project.factories import getProjectService
 from gantry.shared.custom_types.responses import ListResponse
+from gantry.management.project.permissions import ProjectPermission
+from gantry.management.project.dependencies import assertProjectsRole
+from gantry.management.organization.permissions import OrgPermission
+from gantry.management.organization.dependencies import requiredOrgPermission
 
 from ..type import AggregatePeriod, BillingAggregateReport
 from .router import billing_router
@@ -31,9 +36,25 @@ async def get_aggregate_by_projects(
         None
     ),  # filter by project_uuid or whole organization
 ) -> ListResponse[BillingAggregateReport]:
+    project_uids_set = (
+        [str(uid) for uid in project_uuids] if project_uuids else []
+    )
+    if project_uids_set:
+        await assertProjectsRole(
+            project_service=getProjectService(),
+            user_info=user_info,
+            project_uuids=project_uids_set,
+            required_permissions=[ProjectPermission.BILLING_VIEW_USAGE],
+        )
+        project_uids = [UUID(uid) for uid in project_uids_set]
+    else:  # if no project_uids filter provided, default to all projects user has access to
+        project_uids = [
+            UUID(uid) for uid in user_info["project_permissions"].keys()
+        ]
+
     res = (
         await billing_service.get_aggregate_by_projects(
-            project_uuids=project_uuids,
+            project_uuids=project_uids,
             org_id=user_info["org_uuid"],
             start_time=period_start,
             end_time=period_end,
@@ -44,34 +65,36 @@ async def get_aggregate_by_projects(
     return ListResponse[BillingAggregateReport](data=res)
 
 
-@billing_router.get(
-    "/aggregates/apikeys",
-    description="Get aggregated billing data for a given period (e.g. daily, monthly) and optional filters (e.g. apikey_id). Useful for dashboards, reports, etc.",
-)
-async def get_aggregate_by_apikeys(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
-    billing_service: Annotated[
-        BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
-    ],
-    period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
-    period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
-    period: AggregatePeriod,
-    period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
-    apikeys: list[str] | None = Query(
-        None
-    ),  # filter by apikey_id or whole organization
-) -> ListResponse[BillingAggregateReport]:
-    res = (
-        await billing_service.get_aggregate_by_apikeys(
-            apikeys=apikeys,
-            org_id=user_info["org_uuid"],
-            start_time=period_start,
-            end_time=period_end,
-            aggregate_period=period,
-            period_scale=period_scale,
-        )
-    ).unwrap()
-    return ListResponse[BillingAggregateReport](data=res)
+# NOTE: frontend can't call this endpoint due to api key can't show again in the UI after it's created and it without uuid
+# so we can't let users filter by apikeys.
+# @billing_router.get(
+#     "/aggregates/apikeys",
+#     description="Get aggregated billing data for a given period (e.g. daily, monthly) and optional filters (e.g. apikey_id). Useful for dashboards, reports, etc.",
+# )
+# async def get_aggregate_by_apikeys(
+#     user_info: Annotated[UserInfo, Depends(getUserInfo)],
+#     billing_service: Annotated[
+#         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
+#     ],
+#     period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
+#     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
+#     period: AggregatePeriod,
+#     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
+#     apikeys: list[str] | None = Query(
+#         None
+#     ),  # filter by apikey_id or whole organization
+# ) -> ListResponse[BillingAggregateReport]:
+#     res = (
+#         await billing_service.get_aggregate_by_apikeys(
+#             apikeys=apikeys,
+#             org_id=user_info["org_id"],
+#             start_time=period_start,
+#             end_time=period_end,
+#             aggregate_period=period,
+#             period_scale=period_scale,
+#         )
+#     ).unwrap()
+#     return ListResponse[BillingAggregateReport](data=res)
 
 
 @billing_router.get(
@@ -79,7 +102,10 @@ async def get_aggregate_by_apikeys(
     description="Get aggregated billing data for a given period (e.g. daily, monthly) for the whole organization. Useful for dashboards, reports, etc.",
 )
 async def get_aggregate_by_org(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo,
+        Depends(requiredOrgPermission(OrgPermission.BILLING_VIEW_USAGE)),
+    ],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],

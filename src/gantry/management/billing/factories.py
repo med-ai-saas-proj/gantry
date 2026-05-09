@@ -6,7 +6,6 @@ from gantry.db.factories import (
     getSessionManager,
 )
 from gantry.management.project import (
-    ProjectSettingsRepository,
     getProjectSettingsRepository,
 )
 from gantry.shared.logging.logger import getLogger

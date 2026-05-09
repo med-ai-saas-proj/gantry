@@ -125,6 +125,7 @@ class CreditInfoResponse(BaseModel):
 
 
 class AddCreditRequest(BaseModel):
+    org_id: str
     amount: ScaledAmount
     description: str | None = None
 
