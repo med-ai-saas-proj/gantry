@@ -1,4 +1,4 @@
-from gantry.management.auth.entities import UserInfo, UserInfoWithProjectContext
+from gantry.management.auth.entities import UserInfoWithProjectContext
 from gantry.management.project.permissions import ProjectPermission
 from gantry.management.project.dependencies import requiredProjectPermission
 
@@ -13,7 +13,6 @@ from ..services import RagService
 from ..factories import getRagService
 from ...file_storage.dtos import FileInfoResponse
 
-import uuid
 from typing import Sequence, Annotated
 
 from fastapi import Body, Query, Depends, Security, APIRouter

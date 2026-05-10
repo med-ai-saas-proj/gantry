@@ -10,7 +10,7 @@ from .types import (
 )
 
 import uuid
-from typing import Union, Literal, Sequence
+from typing import Literal, Sequence
 from datetime import datetime
 
 from pydantic import BaseModel
@@ -60,11 +60,11 @@ class RequestMessage(BaseModel):
 
 
 class ResponseMessageResponse(ResponseMessage):
-    message_seq_id: int
+    message_uid: uuid.UUID
 
 
 class RequestMessageResponse(RequestMessage):
-    message_seq_id: int
+    message_uid: uuid.UUID
 
 
 class AddMessageRequest(BaseModel):

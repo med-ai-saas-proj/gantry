@@ -75,15 +75,6 @@ class MessageNotFoundError(RecoverableError):
     title = "Message not found"
     detail = "The specified message does not exist in the conversation"
 
-    async def get_message_by_seq_id(
-        self,
-        session,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-        message_seq_id: int,
-    ):
-        raise NotImplementedError
-
 
 class ConversationService:
     def __init__(
@@ -511,7 +502,7 @@ class ConversationService:
         conversation_uid: uuid.UUID,
         project_id: int,
         limit: int = 20,
-        last_cursor: int | None = None,
+        last_cursor: uuid.UUID | None = None,
         order_by: Literal["asc", "desc"] = "asc",
     ) -> Result[Sequence[Message], ConversationNotFoundError]:
         async with self.session_manager.get_session() as session:
@@ -535,7 +526,7 @@ class ConversationService:
         self,
         conversation_id: int,
         limit: int = 20,
-        last_cursor: int | None = None,
+        last_cursor: uuid.UUID | None = None,
         order_by: Literal["asc", "desc"] = "asc",
     ) -> Sequence[Message]:
         async with self.session_manager.get_session() as session:
@@ -554,7 +545,7 @@ class ConversationService:
         conversation_id: int,
         conversation_uid: uuid.UUID,
         limit: int = 20,
-        last_cursor: int | None = None,
+        last_cursor: uuid.UUID | None = None,
         order_by: Literal["asc", "desc"] = "asc",
     ) -> Sequence[Message]:
         can_cache = (
@@ -702,6 +693,7 @@ class ConversationService:
                     conversation_uid, serialized_msgs
                 )
 
+    # avoid appending to cache when cache is not loaded to prevent cache have only new messages but miss old messages
     async def _tryAppendConversationMessagesCache(
         self, conversation_uid: uuid.UUID, msgs: Sequence[Message]
     ):
@@ -711,7 +703,7 @@ class ConversationService:
         # (avoid appending to cache when cache is not loaded
         # to prevent cache have only new messages but miss old messages)
         append_script = """
-        -- ARGV: seq_id1, msg1, seq_id2, msg2, ..., ttl, cache_limit
+        -- ARGV: message_id1, msg1, message_id2, msg2, ..., ttl, cache_limit
         -- check if cache exists, if not exist then return 0
         local ttl = tonumber(ARGV[#ARGV - 1])
         local limit = tonumber(ARGV[#ARGV])
@@ -729,7 +721,9 @@ class ConversationService:
         """
         mappings: list[str | int] = []
         for msg in msgs:
-            mappings.append(msg.seq_id)
+            mappings.append(
+                msg.id
+            )  # use database id (ascending) as score to maintain correct order in cache
             mappings.append(json.dumps(asdict(msg), default=json_serializer))
         mappings.append(self.setting.cache_ttl)
         mappings.append(self.setting.cache_limit)
@@ -750,7 +744,7 @@ class ConversationService:
             return
         cache_key = ConversationService._message_cache_key(conversation_uid)
         mappings = {
-            json.dumps(asdict(msg), default=json_serializer): msg.seq_id
+            json.dumps(asdict(msg), default=json_serializer): msg.id
             for msg in msgs
         }
 
@@ -796,11 +790,11 @@ class ConversationService:
         self,
         conversation_uid: uuid.UUID,
         project_id: int,
-        message_seq_id: int,
+        message_uid: uuid.UUID,
     ) -> Result[Message, MessageNotFoundError]:
         async with self.session_manager.get_session() as session:
-            msg = await self.conversation_repo.getMessageBySeqId(
-                session, conversation_uid, project_id, message_seq_id
+            msg = await self.conversation_repo.getMessageByUuid(
+                session, conversation_uid, project_id, message_uid
             )
             if msg is None:
                 return Err(MessageNotFoundError())
@@ -811,15 +805,15 @@ class ConversationService:
         self,
         conversation_uid: uuid.UUID,
         project_id: int,
-        message_seq_id: int,
+        message_uid: uuid.UUID,
     ):
         mess_cache_key = ConversationService._message_cache_key(
             conversation_uid
         )
 
         async with self.session_manager.get_session() as session:
-            deleted = await self.conversation_repo.deleteMessageBySeqId(
-                session, conversation_uid, project_id, message_seq_id
+            deleted = await self.conversation_repo.deleteMessageByUuid(
+                session, conversation_uid, project_id, message_uid
             )
             if deleted is None:
                 return Err(MessageNotFoundError())

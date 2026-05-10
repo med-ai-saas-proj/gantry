@@ -42,12 +42,12 @@ class ConversationRepository(Repository[Conversation, int]):
             else None
         )
 
-    async def getMessageBySeqId(
+    async def getMessageByUuid(
         self,
         session: AsyncSession,
         conversation_uuid: uuid.UUID,
         project_id: int,
-        message_seq_id: int,
+        message_uid: uuid.UUID,
     ) -> Message | None:
         stmt = (
             select(Message)
@@ -56,7 +56,7 @@ class ConversationRepository(Repository[Conversation, int]):
             .where(
                 Conversation.uuid == conversation_uuid,
                 Conversation.project_id == project_id,
-                Message.seq_id == message_seq_id,
+                Message.uuid == message_uid,
             )
         )
         res = await session.execute(stmt)
@@ -67,7 +67,7 @@ class ConversationRepository(Repository[Conversation, int]):
         session: AsyncSession,
         conversation_id: int,
         limit: int = 20,
-        last_cursor: int | None = None,
+        last_cursor: uuid.UUID | None = None,
         order_by: Literal["asc", "desc"] = "asc",
     ) -> Sequence[Message]:
         stmt = (
@@ -78,23 +78,23 @@ class ConversationRepository(Repository[Conversation, int]):
 
         if order_by == "asc":
             if last_cursor is not None:
-                stmt = stmt.where(Message.seq_id > last_cursor)
-            stmt = stmt.order_by(Message.seq_id.asc())
+                stmt = stmt.where(Message.uuid > last_cursor)
+            stmt = stmt.order_by(Message.uuid.asc())
         else:
             if last_cursor is not None:
-                stmt = stmt.where(Message.seq_id < last_cursor)
-            stmt = stmt.order_by(Message.seq_id.desc())
+                stmt = stmt.where(Message.uuid < last_cursor)
+            stmt = stmt.order_by(Message.uuid.desc())
 
         stmt = stmt.limit(limit)
         res = await session.execute(stmt)
         return res.scalars().all()
 
-    async def deleteMessageBySeqId(
+    async def deleteMessageByUuid(
         self,
         session: AsyncSession,
         conversation_uuid: uuid.UUID,
         project_id: int,
-        message_seq_id: int,
+        message_uid: uuid.UUID,
     ) -> int | None:
         stmt = (
             delete(Message)
@@ -107,7 +107,7 @@ class ConversationRepository(Repository[Conversation, int]):
                         Conversation.project_id == project_id,
                     )
                 ),
-                Message.seq_id == message_seq_id,
+                Message.uuid == message_uid,
             )
             .returning(Message.id)
         )

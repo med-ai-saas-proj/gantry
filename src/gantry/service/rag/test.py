@@ -2,7 +2,7 @@
 
 from gantry.db.factories import getSessionManager
 from gantry.settings.rag import VectorOpsType, VectorIndexType
-from gantry.service.utils.rag.utils import getTableName, get_orm_class
+from gantry.service.rag.utils import getTableName, get_orm_class
 
 import unittest
 

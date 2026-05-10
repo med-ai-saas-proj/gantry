@@ -48,13 +48,6 @@ class Message(WithID, WithUUID, ConversationBaseSQLModel):
         index=True,
         nullable=False,
     )
-    seq_id: Mapped[int] = mapped_column(
-        BigInteger,
-        index=True,
-        nullable=False,
-        init=False,
-        server_default=FetchedValue(),
-    )
     kind: Mapped[str] = mapped_column(String(32), nullable=True)
     parts: Mapped[list[MessagePart]] = mapped_column(JSONB, nullable=False)
 
@@ -75,5 +68,4 @@ class Message(WithID, WithUUID, ConversationBaseSQLModel):
         )
         mess.id = raw["id"]
         mess.uuid = raw["uuid"]
-        mess.seq_id = raw["seq_id"]
         return mess

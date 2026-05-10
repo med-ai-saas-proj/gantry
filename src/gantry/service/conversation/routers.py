@@ -143,7 +143,7 @@ async def get_conversation_messages(
     conversation_service: Annotated[
         ConversationService, Depends(getConversationService)
     ],
-    last_cursor: Annotated[int | None, Query(gt=0)] = None,
+    last_cursor: Annotated[uuid.UUID | None, Query()] = None,
     limit: Annotated[int, Query(gt=0, le=100)] = 20,
     order_by: Annotated[Literal["asc", "desc"], Query()] = "asc",
 ):
@@ -163,7 +163,7 @@ async def get_conversation_messages(
         if mess.kind == "request":
             res.append(
                 RequestMessageResponse(
-                    message_seq_id=mess.seq_id,
+                    message_uid=mess.uuid,
                     kind="request",
                     parts=cast(list[RequestMessagePart], mess.parts),
                     model_name=mess.model_name,
@@ -174,7 +174,7 @@ async def get_conversation_messages(
         elif mess.kind == "response":
             res.append(
                 ResponseMessageResponse(
-                    message_seq_id=mess.seq_id,
+                    message_uid=mess.uuid,
                     kind="response",
                     parts=cast(list[ResponseMessagePart], mess.parts),
                     model_name=mess.model_name,
@@ -211,14 +211,14 @@ async def add_message_to_conversation(
 
 
 @conversation_router.delete(
-    "/{conversation_uid}/messages/{message_seq_id}",
+    "/{conversation_uid}/messages/{message_uid}",
     summary="Delete a message from the conversation.",
-    description="Endpoint to delete a message from the conversation by conversation UID and message sequence ID.",
+    description="Endpoint to delete a message from the conversation by conversation UID and message UID.",
     status_code=204,
 )
 async def delete_message_from_conversation(
     conversation_uid: uuid.UUID,
-    message_seq_id: int,
+    message_uid: uuid.UUID,
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
     ],
@@ -226,25 +226,25 @@ async def delete_message_from_conversation(
         ConversationService, Depends(getConversationService)
     ],
 ):
-    """Delete a message from the conversation by conversation UID and message sequence ID."""
+    """Delete a message from the conversation by conversation UID and message UID."""
     (
         await conversation_service.deleteConversationMessage(
             conversation_uid=conversation_uid,
             project_id=api_key_info["project_id"],
-            message_seq_id=message_seq_id,
+            message_uid=message_uid,
         )
     ).unwrap()
 
 
 @conversation_router.get(
-    "/{conversation_uid}/messages/{message_seq_id}",
+    "/{conversation_uid}/messages/{message_uid}",
     summary="Get a specific message from the conversation.",
-    description="Endpoint to retrieve a specific message from the conversation by conversation UID and message sequence ID.",
+    description="Endpoint to retrieve a specific message from the conversation by conversation UID and message UID.",
     response_model=ResponseMessageResponse | RequestMessageResponse,
 )
 async def get_message_from_conversation(
     conversation_uid: uuid.UUID,
-    message_seq_id: int,
+    message_uid: uuid.UUID,
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
     ],
@@ -256,12 +256,12 @@ async def get_message_from_conversation(
         await conversation_service.getConversationMessage(
             conversation_uid=conversation_uid,
             project_id=api_key_info["project_id"],
-            message_seq_id=message_seq_id,
+            message_uid=message_uid,
         )
     ).unwrap()
     if res.kind == "request":
         return RequestMessageResponse(
-            message_seq_id=res.seq_id,
+            message_uid=res.uuid,
             kind="request",
             parts=cast(list[RequestMessagePart], res.parts),
             model_name=res.model_name,
@@ -270,7 +270,7 @@ async def get_message_from_conversation(
         )
     elif res.kind == "response":
         return ResponseMessageResponse(
-            message_seq_id=res.seq_id,
+            message_uid=res.uuid,
             kind="response",
             parts=cast(list[ResponseMessagePart], res.parts),
             model_name=res.model_name,

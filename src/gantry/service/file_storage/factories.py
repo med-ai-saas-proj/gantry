@@ -1,5 +1,5 @@
 from gantry.db.factories import getRedis, getSessionManager
-from gantry.management.project.repositories import ProjectRepository
+from gantry.management.project.factories import getProjectRepository
 
 from .services import FileStorageService
 from .settings import getObjectStorageSettings
@@ -18,5 +18,5 @@ def getFileStorageService():
         getObjectStorageSettings(),
         FileRepository(),
         getRedis(),
-        ProjectRepository(),
+        getProjectRepository(),
     )

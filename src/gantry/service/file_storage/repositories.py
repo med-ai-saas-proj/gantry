@@ -5,7 +5,7 @@ from .models import File, FileStatus
 import uuid
 from typing import Sequence
 
-from sqlalchemy import and_, text, delete, select, update
+from sqlalchemy import and_, delete, select, update
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 
