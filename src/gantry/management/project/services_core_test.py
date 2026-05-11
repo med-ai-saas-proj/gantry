@@ -70,7 +70,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Known project uuid should map repository row into DTO tuple."""
         # Arrange
         service = self._make_service()
-        service.project_repo.getByUuid = AsyncMock(
+        service.project_repo.getSnapshotByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 id=10,
                 uuid="proj-1",
@@ -183,7 +183,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         """Unknown project uuid should return project_not_found."""
         # Arrange
         service = self._make_service()
-        service.project_repo.getByUuid = AsyncMock(return_value=None)
+        service.project_repo.getSnapshotByUuid = AsyncMock(return_value=None)
 
         # Act
         res = await service._getProjectOrErr("missing")

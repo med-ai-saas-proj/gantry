@@ -23,10 +23,10 @@ class TestAuthService(unittest.IsolatedAsyncioTestCase):
             return_value=Ok(
                 {
                     "org_permissions": ["organization.settings.read"],
-                    "project_permissions": [
-                        "proj-1:project.owner",
-                        "proj-2:project.settings.read",
-                    ],
+                    "project_permissions": {
+                        "proj-1": ["project.owner"],
+                        "proj-2": ["project.settings.read"],
+                    },
                 }
             )
         )

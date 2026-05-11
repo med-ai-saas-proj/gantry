@@ -7,6 +7,9 @@ from unittest.mock import patch
 class TestProjectFactories(unittest.TestCase):
     def tearDown(self):
         factories.getProjectService.cache_clear()
+        factories.getProjectRepository.cache_clear()
+        factories.getProjectMemeberRepository.cache_clear()
+        factories.getProjectSettingsRepository.cache_clear()
 
     def test_get_project_service_builds_singleton(self):
         with (
@@ -23,20 +26,16 @@ class TestProjectFactories(unittest.TestCase):
                 return_value="kc-client",
             ),
             patch(
-                "gantry.management.project.factories.ProjectRepository",
+                "gantry.management.project.factories.getProjectRepository",
                 return_value="project-repo",
             ),
             patch(
-                "gantry.management.project.factories.ProjectMemberRepository",
+                "gantry.management.project.factories.getProjectMemeberRepository",
                 return_value="membership-repo",
             ),
             patch(
-                "gantry.management.project.factories.ProjectSettingsRepository",
+                "gantry.management.project.factories.getProjectSettingsRepository",
                 return_value="settings-repo",
-            ),
-            patch(
-                "gantry.management.project.factories.getRedis",
-                return_value="redis-client",
             ),
             patch(
                 "gantry.management.project.factories.ProjectService"
@@ -56,5 +55,4 @@ class TestProjectFactories(unittest.TestCase):
             membership_repo="membership-repo",
             settings_repo="settings-repo",
             kc_client="kc-client",
-            redis="redis-client",
         )

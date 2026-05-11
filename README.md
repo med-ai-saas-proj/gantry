@@ -40,7 +40,9 @@
 
 - Generate `example.env` files for `.env` files: `scripts/gen-example-env.sh`
 - Reset the database state: `scripts/reset-db.sh`. Remember to migrate and recreate the test account.
-- Smoke test admin-only routes: `./scripts/test_admin_api.sh`
+- Smoke test admin-only routes: `./test/regression/curl/admin/test_admin_api.sh`
+- Run all curl regression suites: `./test/regression/curl/test_e2e_all.sh`
+- Run pytest regression suites: `./test/regression/pytest/test_e2e_all.sh`
 
 ### Getting API keys
 

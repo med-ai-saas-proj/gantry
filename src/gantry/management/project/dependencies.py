@@ -20,6 +20,7 @@ from uuid import UUID
 from typing import Annotated
 
 from fastapi import Path, Query, Depends
+from pyrusult import ResultStatus
 
 
 async def assertProjectRole(
@@ -29,10 +30,10 @@ async def assertProjectRole(
     user_info: UserInfo,
     allow_archived: bool = False,
 ):
-    if (
-        await project_service.isProjectArchived(project_uuid)
-        and not allow_archived
-    ):
+    archived_res = await project_service.isProjectArchived(project_uuid)
+    if archived_res.status == ResultStatus.Err:
+        archived_res.unwrap()
+    if archived_res.unwrap() and not allow_archived:
         raise ProjectArchivedError()
     if OrgPermission.OWNER.value in user_info["org_permissions"]:
         return
@@ -56,10 +57,10 @@ async def assertProjectsRole(
     allow_archived: bool = False,
 ):
     for project_uuid in project_uuids:
-        if (
-            await project_service.isProjectArchived(project_uuid)
-            and not allow_archived
-        ):
+        archived_res = await project_service.isProjectArchived(project_uuid)
+        if archived_res.status == ResultStatus.Err:
+            archived_res.unwrap()
+        if archived_res.unwrap() and not allow_archived:
             raise ProjectArchivedError()
         if OrgPermission.OWNER.value in user_info["org_permissions"]:
             return
@@ -74,7 +75,7 @@ async def assertProjectsRole(
             raise InsufficientProjectPermissionError()
 
 
-class ProjectExtractFrom(enum.Enum, str):
+class ProjectExtractFrom(str, enum.Enum):
     PATH = "path"
     QUERY = "query"
 

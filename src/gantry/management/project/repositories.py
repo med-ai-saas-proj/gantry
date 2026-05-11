@@ -7,16 +7,40 @@ from gantry.shared.utils.uuid_utils import uuid7
 from .models import Project, ProjectMember, ProjectSettings
 
 from uuid import UUID
+from dataclasses import dataclass
 
 from sqlalchemy import func, delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 
+@dataclass(frozen=True)
+class ProjectSnapshot:
+    """Cache-safe project representation detached from SQLAlchemy sessions."""
+
+    id: int
+    uuid: str
+    name: str
+    description: str | None
+    organization_id: str
+    is_archived: bool
+
+    @classmethod
+    def fromProject(cls, project: Project) -> "ProjectSnapshot":
+        return cls(
+            id=project.id,
+            uuid=str(project.uuid),
+            name=project.name,
+            description=project.description,
+            organization_id=project.organization_id,
+            is_archived=project.is_archived,
+        )
+
+
 class ProjectRepository(Repository[Project, int]):
     """Repository for Project table."""
 
-    CACHE_KEY = "project:{project_id}"
+    CACHE_KEY = "project:snapshot:{project_id}"
 
     def __init__(self, cache_repo: CacheRepository):
         self.cache_repo = cache_repo
@@ -49,7 +73,6 @@ class ProjectRepository(Repository[Project, int]):
         )
         res = await session.execute(stmt)
         res = res.scalar_one()
-        await self.cache_repo.setCache(self.getCacheKey(res.uuid), res)
         return res
 
     async def getByUuid(
@@ -60,18 +83,64 @@ class ProjectRepository(Repository[Project, int]):
         except ValueError:
             return None
 
-        async def _lamda():
+        stmt = (
+            select(Project)
+            .select_from(Project)
+            .where(Project.uuid == parsed)
+            .limit(1)
+        )
+        return (await session.execute(stmt)).scalar_one_or_none()
+
+    async def getSnapshotByUuid(
+        self, session: AsyncSession, project_uuid: str
+    ) -> ProjectSnapshot | None:
+        try:
+            parsed = UUID(project_uuid)
+        except ValueError:
+            return None
+
+        async def _loadSnapshot() -> ProjectSnapshot | None:
             stmt = (
-                select(Project)
+                select(
+                    Project.id,
+                    Project.uuid,
+                    Project.name,
+                    Project.description,
+                    Project.organization_id,
+                    Project.is_archived,
+                )
                 .select_from(Project)
                 .where(Project.uuid == parsed)
                 .limit(1)
             )
-
-            return (await session.execute(stmt)).scalar_one_or_none()
+            row = (await session.execute(stmt)).one_or_none()
+            if row is None:
+                return None
+            return ProjectSnapshot(
+                id=row.id,
+                uuid=str(row.uuid),
+                name=row.name,
+                description=row.description,
+                organization_id=row.organization_id,
+                is_archived=row.is_archived,
+            )
 
         return await self.cache_repo.getCachedOrCall(
-            self.getCacheKey(parsed), _lamda
+            self.getCacheKey(parsed),
+            _loadSnapshot,
+        )
+
+    async def setSnapshotCache(
+        self, project: Project | ProjectSnapshot
+    ) -> None:
+        snapshot = (
+            project
+            if isinstance(project, ProjectSnapshot)
+            else ProjectSnapshot.fromProject(project)
+        )
+        await self.cache_repo.setCache(
+            self.getCacheKey(snapshot.uuid),
+            snapshot,
         )
 
     async def updateByUuid(
@@ -93,8 +162,6 @@ class ProjectRepository(Repository[Project, int]):
         )
         res = await session.execute(stmt)
         res = res.scalar_one_or_none()
-        if res is not None:
-            await self.cache_repo.setCache(self.getCacheKey(project_uuid), res)
         return res
 
     async def listByOrg(
@@ -102,18 +169,13 @@ class ProjectRepository(Repository[Project, int]):
         session: AsyncSession,
         organization_id: str,
     ) -> list[Project]:
-        async def _lambda():
-            stmt = (
-                select(Project)
-                .select_from(Project)
-                .where(Project.organization_id == organization_id)
-                .order_by(Project.created_at.desc())
-            )
-            return list((await session.execute(stmt)).scalars().all())
-
-        return await self.cache_repo.getCachedOrCall(
-            self.getCacheKey(organization_id), _lambda
+        stmt = (
+            select(Project)
+            .select_from(Project)
+            .where(Project.organization_id == organization_id)
+            .order_by(Project.created_at.desc())
         )
+        return list((await session.execute(stmt)).scalars().all())
 
     async def listByMember(
         self,
@@ -121,25 +183,20 @@ class ProjectRepository(Repository[Project, int]):
         user_id: str,
         organization_id: str | None,
     ) -> list[Project]:
-        async def _lambda():
-            stmt = (
-                select(Project)
-                .select_from(Project)
-                .join(
-                    ProjectMember,
-                    ProjectMember.project_id == Project.id,
-                )
-                .where(ProjectMember.user_id == user_id)
-                .order_by(Project.created_at.desc())
+        stmt = (
+            select(Project)
+            .select_from(Project)
+            .join(
+                ProjectMember,
+                ProjectMember.project_id == Project.id,
             )
-            if organization_id is not None:
-                stmt.where(Project.organization_id == organization_id)
-
-            return list((await session.execute(stmt)).scalars().all())
-
-        return await self.cache_repo.getCachedOrCall(
-            self.getCacheKey(user_id), _lambda
+            .where(ProjectMember.user_id == user_id)
+            .order_by(Project.created_at.desc())
         )
+        if organization_id is not None:
+            stmt = stmt.where(Project.organization_id == organization_id)
+
+        return list((await session.execute(stmt)).scalars().all())
 
     async def countAll(self, session: AsyncSession) -> int:
         stmt = select(func.count()).select_from(Project)

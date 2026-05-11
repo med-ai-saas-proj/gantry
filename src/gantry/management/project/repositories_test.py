@@ -2,6 +2,7 @@ import os
 import inspect
 import unittest
 from uuid import uuid4
+from types import SimpleNamespace
 from unittest.mock import Mock, AsyncMock
 
 from pyrusult import Ok, Err
@@ -10,7 +11,11 @@ from pyrusult import Ok, Err
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
 from gantry.db.repositories import CacheRepository
-from gantry.management.project.repositories import ProjectSettingsRepository
+from gantry.management.project.repositories import (
+    ProjectSnapshot,
+    ProjectRepository,
+    ProjectSettingsRepository,
+)
 
 
 class _CacheSpy(CacheRepository):
@@ -43,6 +48,74 @@ class _CacheSpy(CacheRepository):
         self.set_items.append((key, res))
         self.cached = res
         return res
+
+
+class TestProjectRepository(unittest.IsolatedAsyncioTestCase):
+    async def test_get_snapshot_by_uuid_cache_hit_skips_db(self):
+        project_uuid = uuid4()
+        cached = ProjectSnapshot(
+            id=7,
+            uuid=str(project_uuid),
+            name="cached",
+            description=None,
+            organization_id="org-1",
+            is_archived=False,
+        )
+        cache_repo = _CacheSpy(cached=cached)
+        repo = ProjectRepository(cache_repo)
+        session = Mock()
+        session.execute = AsyncMock()
+
+        result = await repo.getSnapshotByUuid(session, str(project_uuid))
+
+        self.assertEqual(result, cached)
+        self.assertEqual(
+            cache_repo.get_keys,
+            [ProjectRepository.getCacheKey(project_uuid)],
+        )
+        session.execute.assert_not_awaited()
+
+    async def test_get_snapshot_by_uuid_cache_miss_caches_plain_snapshot(self):
+        project_uuid = uuid4()
+        cache_repo = _CacheSpy()
+        repo = ProjectRepository(cache_repo)
+        session = Mock()
+        execute_res = Mock()
+        execute_res.one_or_none.return_value = SimpleNamespace(
+            id=9,
+            uuid=project_uuid,
+            name="db-project",
+            description="db",
+            organization_id="org-1",
+            is_archived=True,
+        )
+        session.execute = AsyncMock(return_value=execute_res)
+
+        result = await repo.getSnapshotByUuid(session, str(project_uuid))
+
+        self.assertEqual(
+            result,
+            ProjectSnapshot(
+                id=9,
+                uuid=str(project_uuid),
+                name="db-project",
+                description="db",
+                organization_id="org-1",
+                is_archived=True,
+            ),
+        )
+        self.assertEqual(len(cache_repo.set_items), 1)
+        self.assertIsInstance(cache_repo.set_items[0][1], ProjectSnapshot)
+
+    async def test_get_snapshot_by_uuid_invalid_uuid_skips_db(self):
+        repo = ProjectRepository(_CacheSpy())
+        session = Mock()
+        session.execute = AsyncMock()
+
+        result = await repo.getSnapshotByUuid(session, "not-a-uuid")
+
+        self.assertIsNone(result)
+        session.execute.assert_not_awaited()
 
 
 class TestProjectSettingsRepository(unittest.IsolatedAsyncioTestCase):

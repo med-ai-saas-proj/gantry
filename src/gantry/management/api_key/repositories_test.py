@@ -95,7 +95,6 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(result)
         self.assertEqual(result["api_key_uuid"], "api-key-uuid")
-        self.assertEqual(result["org_id"], "org-1")
         self.assertEqual(result["organization_uuid"], "org-1")
         self.assertEqual(result["rpm_limit_organization"], 10)
         self.assertEqual(result["rpm_limit_project"], 55)

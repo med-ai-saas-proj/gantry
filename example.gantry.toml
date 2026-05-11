@@ -40,6 +40,7 @@ admin_client_id = "gantry-admin"
 
 [rag]
 openai_api_key = "sk-example"              #apikey
+openai_base_url = "https://api.openai.com/v1"
 embedding_model = "text-embedding-3-small"
 
 [billing]

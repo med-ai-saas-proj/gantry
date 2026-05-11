@@ -1,12 +1,17 @@
 import os
 import unittest
+from uuid import UUID
 from unittest.mock import Mock, AsyncMock
 
-from pyrusult import Ok, Err
+from pyrusult import Ok
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
+from gantry.management.project.services import (
+    ProjectArchivedError,
+    InsufficientProjectPermissionError,
+)
 from gantry.management.project.permissions import ProjectPermission
 from gantry.management.project.dependencies import (
     userHasRole,
@@ -23,36 +28,48 @@ class TestProjectDependencies(unittest.IsolatedAsyncioTestCase):
         self,
     ):
         service = Mock()
-        service.authorizeProjectPermission = AsyncMock(return_value=Ok(True))
+        service.isProjectArchived = AsyncMock(return_value=Ok(False))
         dependency = requiredProjectPermission(
             ProjectPermission.USERS_GET_ALL,
             allow_archived=True,
         )
 
-        user_info = {"id": "u1", "roles": []}
-        result = await dependency("proj-1", user_info, service)
+        project_uuid = UUID("00000000-0000-0000-0000-000000000001")
+        user_info = {
+            "id": "u1",
+            "roles": [],
+            "org_permissions": [],
+            "project_permissions": {
+                str(project_uuid): [ProjectPermission.USERS_GET_ALL.value]
+            },
+        }
+        result = await dependency(user_info, service, project_uuid)
 
-        self.assertEqual(result, user_info)
-        service.authorizeProjectPermission.assert_awaited_once_with(
-            project_uuid="proj-1",
-            user_id="u1",
-            required=ProjectPermission.USERS_GET_ALL,
-            allow_archived=True,
-        )
+        self.assertEqual(result["id"], user_info["id"])
+        self.assertEqual(result["project_uuid"], project_uuid)
+        service.isProjectArchived.assert_awaited_once_with(str(project_uuid))
 
     async def test_required_project_permission_propagates_error(self):
         service = Mock()
-        service.authorizeProjectPermission = AsyncMock(
-            return_value=Err(_DummyError("denied"))
-        )
+        service.isProjectArchived = AsyncMock(return_value=Ok(False))
         dependency = requiredProjectPermission(ProjectPermission.OWNER)
+        project_uuid = UUID("00000000-0000-0000-0000-000000000001")
 
-        with self.assertRaises(_DummyError):
-            await dependency("proj-1", {"id": "u1", "roles": []}, service)
+        with self.assertRaises(InsufficientProjectPermissionError):
+            await dependency(
+                {
+                    "id": "u1",
+                    "roles": [],
+                    "org_permissions": [],
+                    "project_permissions": {str(project_uuid): []},
+                },
+                service,
+                project_uuid,
+            )
 
     async def test_user_has_role_checks_all_permissions_in_order(self):
         service = Mock()
-        service.authorizeProjectPermission = AsyncMock(return_value=Ok(True))
+        service.isProjectArchived = AsyncMock(return_value=Ok(False))
         dependency = userHasRole(
             [
                 ProjectPermission.USERS_GET_ALL,
@@ -60,11 +77,65 @@ class TestProjectDependencies(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        user_info = {"id": "u1", "roles": []}
-        result = await dependency("proj-1", user_info, service)
+        project_uuid = UUID("00000000-0000-0000-0000-000000000001")
+        user_info = {
+            "id": "u1",
+            "roles": [],
+            "org_permissions": [],
+            "project_permissions": {
+                str(project_uuid): [
+                    ProjectPermission.USERS_GET_ALL.value,
+                    ProjectPermission.USERS_REMOVE.value,
+                ]
+            },
+        }
+        result = await dependency(user_info, service, project_uuid)
 
-        self.assertEqual(result, user_info)
-        self.assertEqual(
-            service.authorizeProjectPermission.await_count,
-            2,
+        self.assertEqual(result["id"], user_info["id"])
+        self.assertEqual(result["project_uuid"], project_uuid)
+
+    async def test_required_project_permission_blocks_archived_project(self):
+        service = Mock()
+        service.isProjectArchived = AsyncMock(return_value=Ok(True))
+        dependency = requiredProjectPermission(ProjectPermission.OWNER)
+
+        project_uuid = UUID("00000000-0000-0000-0000-000000000001")
+        with self.assertRaises(ProjectArchivedError):
+            await dependency(
+                {
+                    "id": "u1",
+                    "roles": [],
+                    "org_permissions": [],
+                    "project_permissions": {
+                        str(project_uuid): [ProjectPermission.OWNER.value]
+                    },
+                },
+                service,
+                project_uuid,
+            )
+
+    async def test_required_project_permission_allows_archived_when_configured(
+        self,
+    ):
+        service = Mock()
+        service.isProjectArchived = AsyncMock(return_value=Ok(True))
+        dependency = requiredProjectPermission(
+            ProjectPermission.OWNER,
+            allow_archived=True,
         )
+
+        project_uuid = UUID("00000000-0000-0000-0000-000000000001")
+        result = await dependency(
+            {
+                "id": "u1",
+                "roles": [],
+                "org_permissions": [],
+                "project_permissions": {
+                    str(project_uuid): [ProjectPermission.OWNER.value]
+                },
+            },
+            service,
+            project_uuid,
+        )
+
+        self.assertEqual(result["project_uuid"], project_uuid)
