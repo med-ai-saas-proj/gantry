@@ -1,4 +1,4 @@
-from .routers import conversation_router
+from .routers.sequence import conversation_router
 
 
 __all__ = ["conversation_router"]

@@ -1,0 +1,161 @@
+from gantry.db.session import AsyncSessionManager
+from gantry.shared.custom_types.error_exception import RecoverableError
+
+from ..types import (
+    ConversationMetadata,
+)
+from ..models import (
+    Message,
+)
+from ..settings import ConversationSettings
+from .serializer import Serializer
+from ..repository import ConversationRepository
+from ...file_storage.services import FileStorageService
+
+import uuid
+from typing import Sequence
+
+from pyrusult import Ok, Err, Result
+from redis.asyncio import Redis
+
+
+class ConversationNotFoundError(RecoverableError):
+    """Raised when a conversation is not found."""
+
+    status = 404
+    code = "conversation_not_found"
+    title = "Conversation not found"
+    detail = "The specified conversation does not exist or is not accessible with the provided API key"
+
+
+class MessageNotFoundError(RecoverableError):
+    """Raised when a message is not found."""
+
+    status = 404
+    code = "message_not_found"
+    title = "Message not found"
+    detail = "The specified message does not exist in the conversation"
+
+
+class ConversationService:
+    def __init__(
+        self,
+        session_manager: AsyncSessionManager,
+        conversation_repo: ConversationRepository,
+        file_service: FileStorageService,
+        redis_client: Redis,
+        setting: ConversationSettings,
+    ) -> None:
+        """Initialize ConversationService."""
+        self.redis_client = redis_client
+        self.session_manager = session_manager
+        self.conversation_repo = conversation_repo
+        self.file_service = file_service
+        self.setting = setting
+
+    async def getConversationMetadata(
+        self, conversation_uid: uuid.UUID, project_id: int
+    ) -> Result[ConversationMetadata, ConversationNotFoundError]:
+        """Get conversation metadata by its UID and project ID."""
+        async with self.session_manager.get_session() as session:
+            metadata = (
+                await self.conversation_repo.getConversationMetadataByUUID(
+                    session, conversation_uid, project_id
+                )
+            )
+            if metadata is None:
+                return Err(ConversationNotFoundError())
+            return Ok(metadata)
+
+    async def getConversationMessageByUuid(
+        self,
+        conversation_uid: uuid.UUID,
+        project_id: int,
+        message_uid: uuid.UUID,
+    ) -> Result[Message, MessageNotFoundError]:
+        async with self.session_manager.get_session() as session:
+            msg = await self.conversation_repo.getMessageByUuid(
+                session, conversation_uid, project_id, message_uid
+            )
+            if msg is None:
+                return Err(MessageNotFoundError())
+            session.expunge_all()
+            return Ok(msg)
+
+    async def getConversationMessagesByUuids(
+        self,
+        conversation_uid: uuid.UUID,
+        project_id: int,
+        message_uids: Sequence[uuid.UUID],
+    ) -> Result[Sequence[Message], MessageNotFoundError]:
+        if len(message_uids) == 0:
+            return Ok([])
+
+        async with self.session_manager.get_session() as session:
+            msgs = await self.conversation_repo.getMessagesByUuids(
+                session, conversation_uid, project_id, message_uids
+            )
+            session.expunge_all()
+            return Ok(msgs)
+
+    async def deleteConversationMessage(
+        self,
+        conversation_uid: uuid.UUID,
+        project_id: int,
+        message_uid: uuid.UUID,
+    ):
+        mess_cache_key = ConversationService._message_cache_key(
+            conversation_uid
+        )
+
+        async with self.session_manager.get_session() as session:
+            deleted = await self.conversation_repo.deleteMessageByUuid(
+                session, conversation_uid, project_id, message_uid
+            )
+            if deleted is None:
+                return Err(MessageNotFoundError())
+            await session.commit()
+
+        await self.redis_client.delete(mess_cache_key)
+        return Ok(None)
+
+    async def deleteConversation(
+        self,
+        conversation_uid: uuid.UUID,
+        project_id: int,
+    ):
+        mess_cache_key = ConversationService._message_cache_key(
+            conversation_uid
+        )
+
+        async with self.session_manager.get_session() as session:
+            deleted = await self.conversation_repo.deleteConversationByUUID(
+                session, conversation_uid, project_id
+            )
+            if deleted is None:
+                return Err(ConversationNotFoundError())
+            await session.commit()
+
+        await self.redis_client.delete(mess_cache_key)
+        return Ok(None)
+
+    @staticmethod
+    def _message_cache_key(conversation_uid: uuid.UUID) -> str:
+        return f"conversation_cache:{{{conversation_uid}}}"
+
+    async def updateConversationMetadata(
+        self,
+        conversation_uid: uuid.UUID,
+        project_id: int,
+        extra_metadata: dict | None,
+    ):
+        async with self.session_manager.get_session() as session:
+            updated = (
+                await self.conversation_repo.updateConversationMetadataByUUID(
+                    session, conversation_uid, project_id, extra_metadata
+                )
+            )
+            if updated is None:
+                return Err(ConversationNotFoundError())
+            await session.commit()
+        return Ok(None)

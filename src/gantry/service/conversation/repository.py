@@ -62,6 +62,26 @@ class ConversationRepository(Repository[Conversation, int]):
         res = await session.execute(stmt)
         return res.scalar_one_or_none()
 
+    async def getMessagesByUuids(
+        self,
+        session: AsyncSession,
+        conversation_uuid: uuid.UUID,
+        project_id: int,
+        message_uids: Sequence[uuid.UUID],
+    ) -> Sequence[Message]:
+        stmt = (
+            select(Message)
+            .select_from(Message)
+            .join(Conversation, Message.conversation_id == Conversation.id)
+            .where(
+                Conversation.uuid == conversation_uuid,
+                Conversation.project_id == project_id,
+                Message.uuid.in_(message_uids),
+            )
+        )
+        res = await session.execute(stmt)
+        return res.scalars().all()
+
     async def getMessagesByConversationId(
         self,
         session: AsyncSession,

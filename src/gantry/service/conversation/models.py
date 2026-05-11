@@ -8,9 +8,13 @@ from gantry.db.utils import (
 from gantry.management.project.models import Project
 from gantry.service.conversation.types import MessagePart
 
+import enum
+import uuid
+from typing import TypedDict
 from datetime import datetime
 
-from sqlalchemy import String, ForeignKey, FetchedValue
+import sqlalchemy
+from sqlalchemy import String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.sqltypes import DateTime, BigInteger
 from sqlalchemy.dialects.postgresql import JSONB
@@ -21,6 +25,20 @@ class ConversationBaseSQLModel(BaseSQLModel):
 
     __abstract__ = True
     __table_args__ = {"schema": "Conversation"}
+
+
+class ConversationType(str, enum.Enum):
+    """Enum for conversation types."""
+
+    SEQUENCE = "sequence"
+    CHECKPOINT = "checkpoint"
+
+
+class TreeNode(TypedDict):
+    """Represents a node in the conversation tree structure."""
+
+    message_id: uuid.UUID
+    parent_id: uuid.UUID | None
 
 
 class Conversation(
@@ -36,6 +54,14 @@ class Conversation(
         index=True,
     )
     extra_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    conversation_type: Mapped[ConversationType] = mapped_column(
+        sqlalchemy.Enum(ConversationType, schema="Conversation"),
+        nullable=False,
+        server_default=ConversationType.SEQUENCE,
+    )
+    tree_structure: Mapped[list[TreeNode] | None] = mapped_column(
+        JSONB, nullable=True
+    )
 
 
 class Message(WithID, WithUUID, ConversationBaseSQLModel):

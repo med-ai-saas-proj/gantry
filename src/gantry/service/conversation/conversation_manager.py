@@ -5,7 +5,7 @@ from gantry.service.file_storage.services import FileStorageService
 from gantry.shared.utils.redis_auto_extend_lock import RedisAutoExtendAsyncLock
 
 from .types import FileUploadInfo
-from .services import ConversationService
+from .services.sequence import SequenceConversationWithSerializerService
 from .conversation_session import (
     ConversationSession,
 )
@@ -29,7 +29,9 @@ class ConversationManager:
         self,
         logger: BoundLogger,
         redis_client: Redis,
-        conversation_service: ConversationService,
+        conversation_service: SequenceConversationWithSerializerService[
+            ModelMessage
+        ],
         file_service: FileStorageService,
     ):
         self.logger = logger

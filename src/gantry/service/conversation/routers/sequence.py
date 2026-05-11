@@ -1,6 +1,6 @@
 from gantry.management.api_key import ApiKeyInfo, requiredPermissions
 
-from .dtos import (
+from ..dtos import (
     AddMessageRequest,
     RequestMessagePart,
     ResponseMessagePart,
@@ -11,8 +11,8 @@ from .dtos import (
     ConversationMetadataResponse,
     UpdateConversationMetadataRequest,
 )
-from .services import ConversationService
-from .factories import getConversationService
+from ..factories import getSequenceConversationService
+from ..services.sequence import SequenceConversationService
 
 import uuid
 from typing import Literal, Sequence, Annotated, cast
@@ -21,7 +21,7 @@ from fastapi import Body, Query, Depends, Security, APIRouter
 
 
 conversation_router = APIRouter(
-    prefix="/conversations",
+    prefix="/conversations/sequence",
     tags=["Conversation"],
 )
 
@@ -39,7 +39,7 @@ async def create_conversation(
     ],
     body: Annotated[CreateConversationRequest, Body()],
     conversation_service: Annotated[
-        ConversationService, Depends(getConversationService)
+        SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
     """Create a new conversation."""
@@ -63,7 +63,7 @@ async def get_conversation_metadata(
         ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
     ],
     conversation_service: Annotated[
-        ConversationService, Depends(getConversationService)
+        SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
     """Get conversation metadata by conversation UID."""
@@ -93,7 +93,7 @@ async def update_conversation_metadata(
         ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
     ],
     conversation_service: Annotated[
-        ConversationService, Depends(getConversationService)
+        SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
     """Update conversation metadata by conversation UID."""
@@ -118,7 +118,7 @@ async def delete_conversation(
         ApiKeyInfo, Security(requiredPermissions(["conversation.delete"]))
     ],
     conversation_service: Annotated[
-        ConversationService, Depends(getConversationService)
+        SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
     """Delete a conversation by conversation UID."""
@@ -141,7 +141,7 @@ async def get_conversation_messages(
         ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
     ],
     conversation_service: Annotated[
-        ConversationService, Depends(getConversationService)
+        SequenceConversationService, Depends(getSequenceConversationService)
     ],
     last_cursor: Annotated[uuid.UUID | None, Query()] = None,
     limit: Annotated[int, Query(gt=0, le=100)] = 20,
@@ -198,7 +198,7 @@ async def add_message_to_conversation(
         ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
     ],
     conversation_service: Annotated[
-        ConversationService, Depends(getConversationService)
+        SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
     (
@@ -223,7 +223,7 @@ async def delete_message_from_conversation(
         ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
     ],
     conversation_service: Annotated[
-        ConversationService, Depends(getConversationService)
+        SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
     """Delete a message from the conversation by conversation UID and message UID."""
@@ -249,11 +249,11 @@ async def get_message_from_conversation(
         ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
     ],
     conversation_service: Annotated[
-        ConversationService, Depends(getConversationService)
+        SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
     res = (
-        await conversation_service.getConversationMessage(
+        await conversation_service.getConversationMessageByUuid(
             conversation_uid=conversation_uid,
             project_id=api_key_info["project_id"],
             message_uid=message_uid,
