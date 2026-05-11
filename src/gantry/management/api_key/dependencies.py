@@ -2,7 +2,6 @@ from .entities import ApiKeyInfo
 from .factories import ApiKeyService, getApiKeyService
 
 import os
-import json
 from typing import Annotated
 
 from fastapi import Depends, Request, Security

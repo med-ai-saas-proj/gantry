@@ -40,5 +40,4 @@ def getProjectService() -> ProjectService:
         project_repo=getProjectRepository(),
         membership_repo=getProjectMemeberRepository(),
         settings_repo=getProjectSettingsRepository(),
-        redis=getRedis(),
     )

@@ -182,23 +182,12 @@ class AuthService:
             "email": claims.get("email"),
             "org_uuid": org_id or "",
             "org_permissions": other_attributes.get("org_permissions", []),
-            "project_permissions": self._groupProjectPerms(
-                other_attributes.get("project_permissions", [])
+            "project_permissions": other_attributes.get(
+                "project_permissions", {}
             ),
         }
 
         return Ok(auth_info)
-
-    def _groupProjectPerms(self, perms: list[str]):
-        res: dict[str, list[str]] = {}
-        for entry in perms:
-            project_uuid, separator, permission = entry.partition(":")
-            if not separator or not project_uuid or not permission:
-                continue
-            if project_uuid not in res:
-                res[project_uuid] = []
-            res[project_uuid].append(permission)
-        return res
 
     def _extractOrganizationId(self, organization_claim: Any) -> str | None:
         """Extract an organization id from supported Keycloak claim shapes."""
