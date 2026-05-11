@@ -17,7 +17,12 @@ from .dtos import (
     ApiKeyPermissionCatalogResponse,
 )
 from .models import ApiKey
-from .entities import ApiKeyInfo, ApiKeyContextRecord
+from .entities import (
+    ApiKeyInfo,
+    ApiKeySnapshot,
+    ApiKeyInternalIds,
+    ApiKeyContextRecord,
+)
 from .repositories import ApiKeyRepository
 
 import hmac
@@ -248,7 +253,7 @@ class ApiKeyService:
             }
         )
 
-    def _snapshotApiKey(self, api_key: ApiKey) -> dict[str, object]:
+    def _snapshotApiKey(self, api_key: ApiKey) -> ApiKeySnapshot:
         """Detach the fields needed outside the ORM session boundary."""
         return {
             "api_key_id": api_key.id,
@@ -265,7 +270,7 @@ class ApiKeyService:
 
     async def _getApiKeyByUuid(
         self, api_key_uuid: str
-    ) -> Result[dict[str, object], ApiKeyNotFoundError]:
+    ) -> Result[ApiKeySnapshot, ApiKeyNotFoundError]:
         async with self.session_manager.get_session() as session:
             api_key = await self.api_key_repo.getByUuid(session, api_key_uuid)
             if api_key is None:
@@ -289,7 +294,7 @@ class ApiKeyService:
             return Ok(str(project.uuid))
 
     def _toResponse(
-        self, api_key: dict[str, object], project_uuid: str
+        self, api_key: ApiKeySnapshot, project_uuid: str
     ) -> ApiKeyResponse:
         return ApiKeyResponse(
             api_key_id=int(api_key["api_key_id"]),
@@ -499,7 +504,7 @@ class ApiKeyService:
 
     async def getApiKeyInternalIds(
         self, api_key_uuid: str
-    ) -> Result[dict[str, int], ApiKeyNotFoundError]:
+    ) -> Result[ApiKeyInternalIds, ApiKeyNotFoundError]:
         """Resolve internal numeric ids used by internal routers."""
         api_key_res = await self._getApiKeyByUuid(api_key_uuid)
         if api_key_res.status == ResultStatus.Err:

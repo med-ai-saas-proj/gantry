@@ -2,14 +2,11 @@
 
 from gantry.keycloak import KeycloakServiceClient
 from gantry.shared.consts import messages_const
-from gantry.shared.utils.permission_utils import (
-    normalize_project_permission_map,
-)
 from gantry.shared.custom_types.error_exception import RecoverableError
 
 from .entities import UserInfo, AdminInfo
 
-from typing import Any, Callable
+from typing import Any
 
 import jwt
 from jwt import PyJWKClient

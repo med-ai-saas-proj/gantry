@@ -27,6 +27,11 @@ from .dtos import (
     ProjectUserListResponse,
     ProjectUserPermissionsResponse,
 )
+from .entities import (
+    KeycloakOrgPayload,
+    KeycloakUserPayload,
+    UserAttributePayload,
+)
 from .permissions import (
     PROJECT_PERMISSIONS_ATTR,
     ProjectPermission,
@@ -38,7 +43,7 @@ from .repositories import (
     ProjectSettingsRepository,
 )
 
-from typing import Any
+from typing import Any, cast
 
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
@@ -134,7 +139,7 @@ class ProjectService:
         orgs_res = await self.kc.getMemberOrganizations(user_id)
         if orgs_res.status == ResultStatus.Err:
             return orgs_res.into()
-        for org in orgs_res.unwrap():
+        for org in cast(list[KeycloakOrgPayload], orgs_res.unwrap()):
             if str(org.get("id", "")) == org_id:
                 return Ok(None)
         return Err(UserNotInOrganizationError())
@@ -201,7 +206,7 @@ class ProjectService:
 
     def _extractProjectPermissions(
         self,
-        attrs: dict[str, Any],
+        attrs: UserAttributePayload,
         project_uuid: str,
     ) -> list[str]:
         """Extract project-scoped permissions from grouped Keycloak attrs."""
@@ -210,7 +215,7 @@ class ProjectService:
         )
         return list(grouped.get(project_uuid, []))
 
-    def _extractOrgPermissions(self, attrs: dict[str, Any]) -> list[str]:
+    def _extractOrgPermissions(self, attrs: UserAttributePayload) -> list[str]:
         """Extract organization-scoped permissions from Keycloak attrs."""
         raw = attrs.get("org_permissions", [])
         if isinstance(raw, str):
@@ -716,7 +721,7 @@ class ProjectService:
         )
         if users_res.status == ResultStatus.Err:
             return users_res.into()
-        users = users_res.unwrap()
+        users = cast(list[KeycloakUserPayload], users_res.unwrap())
 
         results = []
         for user in users:
