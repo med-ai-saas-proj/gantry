@@ -185,8 +185,8 @@ class AuthService:
             "email": claims.get("email"),
             "org_uuid": org_id or "",
             "org_permissions": other_attributes.get("org_permissions", []),
-            "project_permissions": normalize_project_permission_map(
-                other_attributes.get("project_permissions", {})
+            "project_permissions": other_attributes.get(
+                "project_permissions", {}
             ),
         }
 

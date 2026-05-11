@@ -1,8 +1,8 @@
-from alembic import command as AlembicCmd
 from gantry.db.factories import getAsyncEngine
 
 from pathlib import Path
 
+from alembic import command as AlembicCmd
 from alembic.config import Config
 from pydantic_settings import (
     BaseSettings,

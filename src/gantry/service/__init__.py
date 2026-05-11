@@ -27,6 +27,7 @@ service_app = FastAPI(
         422: {"model": ProblemDetails},
         500: {"model": ProblemDetails},
     },
+    debug=getAppSettings().stage == AppStage.DEV,
 )
 
 service_app.add_middleware(
