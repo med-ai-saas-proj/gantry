@@ -500,21 +500,6 @@ class ApiKeyService:
             permissions=permissions,
         )
 
-    async def getApiKeyInternalIds(
-        self, api_key_uuid: str
-    ) -> Result[dict[str, int], ApiKeyNotFoundError]:
-        """Resolve internal numeric ids used by internal routers."""
-        api_key_res = await self._getApiKeyByUuid(api_key_uuid)
-        if api_key_res.status == ResultStatus.Err:
-            return api_key_res.into()
-        api_key = api_key_res.unwrap()
-        return Ok(
-            {
-                "api_key_id": int(api_key["api_key_id"]),
-                "project_id": int(api_key["project_id"]),
-            }
-        )
-
     async def getApiKeysInfo(
         self, api_key: list[str]
     ) -> Result[Sequence[ApiKeyInfo], InvalidAPIKey]:

@@ -8,7 +8,7 @@ from .models import (
 )
 
 from uuid import UUID
-from typing import Literal, Sequence, TypedDict
+from typing import Literal, Sequence
 from decimal import Decimal
 from datetime import date, datetime
 
@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 
 class PostRequest(BaseModel):
+    api_key_uuid: UUID
     amount: ScaledAmount
     details: dict = {}
     capture: bool = False
