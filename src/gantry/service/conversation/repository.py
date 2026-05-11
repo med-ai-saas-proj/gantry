@@ -4,9 +4,10 @@ from .types import ConversationMetadata
 from .models import Message, Conversation
 
 import uuid
+from math import e
 from typing import Literal, Sequence
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import func, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -96,14 +97,30 @@ class ConversationRepository(Repository[Conversation, int]):
             .where(Message.conversation_id == conversation_id)
         )
 
-        if order_by == "asc":
-            if last_cursor is not None:
-                stmt = stmt.where(Message.uuid > last_cursor)
-            stmt = stmt.order_by(Message.uuid.asc())
+        if last_cursor is not None:
+            uuid_to_id_subquery = (
+                select(Message.id)
+                .select_from(Message)
+                .where(
+                    Message.conversation_id == conversation_id,
+                    Message.uuid == last_cursor,
+                )
+            ).scalar_subquery()
+            if order_by == "asc":
+                effective_id = func.coalesce(uuid_to_id_subquery, 0)
+                stmt = stmt.where(Message.id > effective_id)
+                stmt = stmt.order_by(Message.id.asc())
+            else:
+                effective_id = func.coalesce(
+                    uuid_to_id_subquery, func.pow(2, 63) - 1
+                )
+                stmt = stmt.where(Message.id < effective_id)
+                stmt = stmt.order_by(Message.id.desc())
         else:
-            if last_cursor is not None:
-                stmt = stmt.where(Message.uuid < last_cursor)
-            stmt = stmt.order_by(Message.uuid.desc())
+            if order_by == "asc":
+                stmt = stmt.order_by(Message.id.asc())
+            else:
+                stmt = stmt.order_by(Message.id.desc())
 
         stmt = stmt.limit(limit)
         res = await session.execute(stmt)
