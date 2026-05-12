@@ -975,6 +975,6 @@ class ProjectService:
     ) -> Result[bool, ProjectNotFoundError]:
         async with self.session_manager.get_session() as session:
             project = await self.project_repo.getByUuid(session, project_uuid)
-        if project is None:
-            return Err(ProjectNotFoundError())
-        return Ok(project.is_archived)
+            if project is None:
+                return Err(ProjectNotFoundError())
+            return Ok(project.is_archived)
