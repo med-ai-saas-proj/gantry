@@ -31,8 +31,7 @@ async def assertProjectRole(
 ):
     if (
         await project_service.isProjectArchived(project_uuid)
-        and not allow_archived
-    ):
+    ).unwrap() and not allow_archived:
         raise ProjectArchivedError()
     if OrgPermission.OWNER.value in user_info["org_permissions"]:
         return
@@ -74,7 +73,7 @@ async def assertProjectsRole(
             raise InsufficientProjectPermissionError()
 
 
-class ProjectExtractFrom(enum.Enum, str):
+class ProjectExtractFrom(str, enum.Enum):
     PATH = "path"
     QUERY = "query"
 

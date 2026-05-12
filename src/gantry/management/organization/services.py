@@ -723,7 +723,7 @@ class OrgService:
             redirect_uri=settings.invite_redirect_uri,
         )
         if invite_res.status == ResultStatus.Err:
-            return invite_res
+            return invite_res.into()
         return Ok(True)
 
     async def deleteInvitation(

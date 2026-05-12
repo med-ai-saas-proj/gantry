@@ -1,9 +1,5 @@
+from gantry.settings import AppStage, getAppSettings
 from gantry.management.api_key import ApiKeyInfo, getApiKeyInfo
-from gantry.management.billing.dtos import PostRequest
-from gantry.management.billing.factories import getBillingTransactionService
-from gantry.management.billing.services.transaction_services import (
-    TransactionService,
-)
 
 from .service import ApiGatewayService
 from .settings import getApiGatewaySettings
@@ -14,15 +10,12 @@ from typing import Annotated
 from urllib.parse import urljoin
 
 import httpx
-from fastapi import Path, Depends, Request, APIRouter
+from fastapi import Path, Depends, FastAPI, Request
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
 
 
-gateway_router = APIRouter(
-    prefix="/services",
-    tags=["gateway"],
-)
+gateway_app = FastAPI(debug=getAppSettings().stage == AppStage.DEV)
 
 
 HOP_BY_HOP_HEADERS = {
@@ -79,11 +72,11 @@ def _inject_api_key_context_headers(
     return headers
 
 
-@gateway_router.api_route(
+@gateway_app.api_route(
     "/{route_name}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
 )
-@gateway_router.api_route(
+@gateway_app.api_route(
     "/{route_name}/{full_path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
 )
