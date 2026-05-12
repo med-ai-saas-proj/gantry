@@ -5,7 +5,6 @@ from gantry.management.project.permissions import ProjectPermission
 from gantry.management.project.dependencies import (
     assertProjectRole,
     assertProjectsRole,
-    requiredProjectPermission,
 )
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
@@ -21,7 +20,8 @@ from uuid import UUID
 from typing import Annotated
 from datetime import datetime
 
-from fastapi import Query, Depends
+from fastapi import Query, Security
+from fastapi.params import Depends
 
 
 @billing_router.get(
@@ -31,9 +31,7 @@ from fastapi import Query, Depends
 async def listTransactions(
     user_info: Annotated[
         UserInfo,
-        Depends(
-            requiredProjectPermission(ProjectPermission.BILLING_VIEW_USAGE)
-        ),
+        Security(getUserInfo),
     ],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
@@ -82,7 +80,7 @@ async def listTransactions(
 )
 async def getTransactionDetails(
     transaction_uid: UUID,
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[UserInfo, Security(getUserInfo)],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],

@@ -1,7 +1,10 @@
 from gantry.management.auth import UserInfo
 from gantry.management.auth.entities import UserInfo, UserInfoWithProjectContext
 from gantry.management.project.permissions import ProjectPermission
-from gantry.management.project.dependencies import requiredProjectPermission
+from gantry.management.project.dependencies import (
+    ProjectExtractFrom,
+    requiredProjectPermission,
+)
 
 from ..dtos import (
     FileInfoResponse,
@@ -21,7 +24,6 @@ from typing import Annotated
 
 from fastapi import (
     Body,
-    Query,
     Depends,
     Security,
     APIRouter,
@@ -49,7 +51,10 @@ async def upload_file(
     user_info: Annotated[
         UserInfoWithProjectContext,
         Security(
-            requiredProjectPermission(ProjectPermission.FILE_STORAGE_MANAGE)
+            requiredProjectPermission(
+                ProjectPermission.FILE_STORAGE_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
         ),
     ],
 ):
@@ -95,7 +100,10 @@ async def list_files(
     user_info: Annotated[
         UserInfoWithProjectContext,
         Security(
-            requiredProjectPermission(ProjectPermission.FILE_STORAGE_MANAGE)
+            requiredProjectPermission(
+                ProjectPermission.FILE_STORAGE_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
         ),
     ],
 ):
@@ -141,7 +149,10 @@ async def download_file(
     user_info: Annotated[
         UserInfoWithProjectContext,
         Security(
-            requiredProjectPermission(ProjectPermission.FILE_STORAGE_MANAGE)
+            requiredProjectPermission(
+                ProjectPermission.FILE_STORAGE_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
         ),
     ],
     file_storage_service: Annotated[
@@ -210,7 +221,10 @@ async def get_file_info(
     user_info: Annotated[
         UserInfoWithProjectContext,
         Security(
-            requiredProjectPermission(ProjectPermission.FILE_STORAGE_MANAGE)
+            requiredProjectPermission(
+                ProjectPermission.FILE_STORAGE_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
         ),
     ],
 ):
@@ -242,7 +256,10 @@ async def get_file_presigned_url(
     user_info: Annotated[
         UserInfoWithProjectContext,
         Security(
-            requiredProjectPermission(ProjectPermission.FILE_STORAGE_MANAGE)
+            requiredProjectPermission(
+                ProjectPermission.FILE_STORAGE_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
         ),
     ],
     file_storage_service: Annotated[
@@ -272,7 +289,10 @@ async def delete_file(
     user_info: Annotated[
         UserInfoWithProjectContext,
         Security(
-            requiredProjectPermission(ProjectPermission.FILE_STORAGE_MANAGE)
+            requiredProjectPermission(
+                ProjectPermission.FILE_STORAGE_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
         ),
     ],
     file_storage_service: Annotated[
@@ -300,7 +320,10 @@ async def update_file_metadata(
     user_info: Annotated[
         UserInfoWithProjectContext,
         Security(
-            requiredProjectPermission(ProjectPermission.FILE_STORAGE_MANAGE)
+            requiredProjectPermission(
+                ProjectPermission.FILE_STORAGE_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
         ),
     ],
     file_storage_service: Annotated[

@@ -77,6 +77,20 @@ class FileStorageService:
             self.redis = redis
             self.project_repo = project_repo
 
+    def create_bucket_if_not_exists(self):
+        """Create the S3 bucket if it doesn't exist."""
+        try:
+            self.storage_backend.head_bucket(
+                Bucket=self.file_storage_settings.s3_bucket_name
+            )
+        except self.storage_backend.exceptions.NoSuchBucket:
+            self.storage_backend.create_bucket(
+                Bucket=self.file_storage_settings.s3_bucket_name,
+                CreateBucketConfiguration={
+                    "LocationConstraint": self.file_storage_settings.s3_region_name  # type: ignore
+                },
+            )
+
     def _uploadFileToStorage(
         self,
         file_name: str,

@@ -175,6 +175,7 @@ class SequenceConversationService(ConversationService):
                     extra_metadata=extra_metadata,
                     conversation_type=conversation_type,
                     tree_structure=None,
+                    activePath=None,
                 )
                 session.add(conversation)
                 await session.flush()

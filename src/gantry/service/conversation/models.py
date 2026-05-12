@@ -31,7 +31,7 @@ class ConversationType(str, enum.Enum):
     """Enum for conversation types."""
 
     SEQUENCE = "sequence"
-    CHECKPOINT = "checkpoint"
+    TREE = "tree"
 
 
 class TreeNode(TypedDict):
@@ -60,6 +60,9 @@ class Conversation(
         server_default=ConversationType.SEQUENCE,
     )
     tree_structure: Mapped[list[TreeNode] | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    activePath: Mapped[list[uuid.UUID] | None] = mapped_column(
         JSONB, nullable=True
     )
 

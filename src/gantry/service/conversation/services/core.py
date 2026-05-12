@@ -8,7 +8,6 @@ from ..models import (
     Message,
 )
 from ..settings import ConversationSettings
-from .serializer import Serializer
 from ..repository import ConversationRepository
 from ...file_storage.services import FileStorageService
 
