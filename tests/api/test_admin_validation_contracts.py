@@ -17,7 +17,7 @@ AUTH = {"Authorization": "Bearer admin-token"}
         ("patch", "/v1/admin/organizations/org-1", {"name": ""}),
         ("post", "/v1/admin/projects?org_id=org-1", {"name": ""}),
         ("put", f"/v1/admin/projects/{PROJECT_UUID}", {"name": ""}),
-        ("patch", f"/v1/admin/project-settings/{PROJECT_UUID}", {"rate_limit": 0}),
+        ("patch", f"/v1/admin/projects/{PROJECT_UUID}/settings", {"rate_limit": 0}),
         ("post", f"/v1/admin/api-keys?project_id={PROJECT_UUID}", {"name": ""}),
         ("put", "/v1/admin/api-keys/api-key-1", {"name": ""}),
     ],
@@ -39,10 +39,7 @@ async def test_admin_invalid_bodies_return_422(
     "path",
     [
         "/v1/admin/projects",
-        "/v1/admin/project-users",
         "/v1/admin/api-keys",
-        "/v1/admin/organization-users",
-        "/v1/admin/user-organizations",
     ],
 )
 async def test_admin_missing_required_query_params_return_422(

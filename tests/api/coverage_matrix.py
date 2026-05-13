@@ -6,7 +6,7 @@ from typing import Any
 from tests.helpers.routes import HTTP_METHODS, operations
 
 EXPECTED_OPERATION_COUNTS = {
-    "management": 90,
+    "management": 92,
     "service": 34,
     "gateway": 10,
     "internal": 9,

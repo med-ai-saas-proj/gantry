@@ -9,8 +9,10 @@ from tests.settings import REALM
 pytestmark = pytest.mark.integration
 
 
-def test_identity_metadata_supports_management_token_validation(identity_metadata_url: str) -> None:
-    response = httpx.get(identity_metadata_url, timeout=8.0)
+def test_identity_metadata_supports_management_token_validation(
+    integration_stack,
+) -> None:
+    response = httpx.get(integration_stack.identity_metadata_url, timeout=8.0)
 
     assert response.status_code == 200
     body = response.json()
@@ -19,13 +21,15 @@ def test_identity_metadata_supports_management_token_validation(identity_metadat
     assert body["jwks_uri"].endswith("/protocol/openid-connect/certs")
 
 
-def test_frontend_user_can_obtain_management_identity_token(keycloak_url: str) -> None:
+def test_frontend_user_can_obtain_management_identity_token(
+    integration_stack,
+) -> None:
     token = password_token(
         "gantry-test-user",
         "password",
         "gantry-frontend",
         scope="openid profile email organization:*",
-        keycloak_url=keycloak_url,
+        keycloak_url=integration_stack.keycloak_url,
     )
     claims = token_claims(token["access_token"])
 
@@ -34,12 +38,14 @@ def test_frontend_user_can_obtain_management_identity_token(keycloak_url: str) -
     assert claims["organization"]
 
 
-def test_admin_user_identity_token_contains_admin_role(keycloak_url: str) -> None:
+def test_admin_user_identity_token_contains_admin_role(
+    integration_stack,
+) -> None:
     token = password_token(
         "gantry-admin-user",
         "password",
         "gantry-admin",
-        keycloak_url=keycloak_url,
+        keycloak_url=integration_stack.keycloak_url,
     )
     claims = token_claims(token["access_token"])
 
@@ -47,16 +53,18 @@ def test_admin_user_identity_token_contains_admin_role(keycloak_url: str) -> Non
     assert "ADMIN" in claims["realm_access"]["roles"]
 
 
-def test_frontend_user_profile_is_available_after_login(keycloak_url: str) -> None:
+def test_frontend_user_profile_is_available_after_login(
+    integration_stack,
+) -> None:
     token = password_token(
         "gantry-test-user",
         "password",
         "gantry-frontend",
         scope="openid profile email organization:*",
-        keycloak_url=keycloak_url,
+        keycloak_url=integration_stack.keycloak_url,
     )
     response = httpx.get(
-        f"{keycloak_url}/realms/{REALM}/protocol/openid-connect/userinfo",
+        f"{integration_stack.keycloak_url}/realms/{REALM}/protocol/openid-connect/userinfo",
         headers=bearer(token["access_token"]),
         timeout=12.0,
     )
@@ -67,13 +75,15 @@ def test_frontend_user_profile_is_available_after_login(keycloak_url: str) -> No
     assert payload["email_verified"] is True
 
 
-def test_wrong_password_is_rejected_by_identity_provider(keycloak_url: str) -> None:
+def test_wrong_password_is_rejected_by_identity_provider(
+    integration_stack,
+) -> None:
     with pytest.raises(httpx.HTTPStatusError):
         password_token(
             "gantry-test-user",
             "wrong-password",
             "gantry-frontend",
-            keycloak_url=keycloak_url,
+            keycloak_url=integration_stack.keycloak_url,
         )
 
 
@@ -92,7 +102,7 @@ def test_service_client_can_read_permission_attributes_from_realm(
 @pytest.mark.asyncio
 async def test_management_auth_service_maps_real_token_to_user_info(
     integration_config_file,
-    keycloak_url: str,
+    integration_stack,
 ) -> None:
     from gantry.management.auth.factories import getAuthService
 
@@ -101,7 +111,7 @@ async def test_management_auth_service_maps_real_token_to_user_info(
         "password",
         "gantry-frontend",
         scope="openid profile email organization:*",
-        keycloak_url=keycloak_url,
+        keycloak_url=integration_stack.keycloak_url,
     )
     result = await getAuthService().verifyToken(token["access_token"])
 

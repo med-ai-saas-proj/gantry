@@ -140,7 +140,7 @@ async def test_admin_permission_change_response_can_drive_user_project_read(
     authenticated_api,
 ) -> None:
     permission_update = await api_client.put(
-        "/v1/admin/user-permissions/user-1",
+        "/v1/admin/users/user-1/permissions",
         headers=ADMIN_AUTH,
         json={
             "organization_permissions": ["organization.settings.read"],

@@ -11,12 +11,9 @@ AUTH = {"Authorization": "Bearer admin-token"}
 
 
 @pytest.mark.asyncio
-async def test_admin_organization_routes_and_aliases(api_client, authenticated_api) -> None:
-    permissions = await api_client.get("/v1/admin/organization-permissions", headers=AUTH)
-    alias_permissions = await api_client.get("/v1/admin/organizations/permissions", headers=AUTH)
+async def test_admin_organization_routes(api_client, authenticated_api) -> None:
+    permissions = await api_client.get("/v1/admin/organizations/permissions", headers=AUTH)
     assert permissions.status_code == 200
-    assert alias_permissions.status_code == 200
-    assert permissions.json() == alias_permissions.json()
 
     listed = await api_client.get(
         "/v1/admin/organizations",
@@ -50,14 +47,11 @@ async def test_admin_organization_routes_and_aliases(api_client, authenticated_a
     assert updated.status_code == 200
     assert updated.json()["name"] == "Renamed Org"
 
-    settings = await api_client.get("/v1/admin/organization-settings/org-1", headers=AUTH)
-    alias_settings = await api_client.get("/v1/admin/organizations/org-1/settings", headers=AUTH)
+    settings = await api_client.get("/v1/admin/organizations/org-1/settings", headers=AUTH)
     assert settings.status_code == 200
-    assert alias_settings.status_code == 200
-    assert settings.json() == alias_settings.json()
 
     patched_settings = await api_client.patch(
-        "/v1/admin/organization-settings/org-1",
+        "/v1/admin/organizations/org-1/settings",
         headers=AUTH,
         json={"rate_limit": 200, "spending_limit": 3000, "extra": {"tier": "team"}},
     )
@@ -65,19 +59,12 @@ async def test_admin_organization_routes_and_aliases(api_client, authenticated_a
     assert patched_settings.json()["extra"] == {"tier": "team"}
 
     users = await api_client.get(
-        "/v1/admin/organization-users",
-        headers=AUTH,
-        params={"org_id": "org-1", "limit": 6, "offset": 2, "q": "alice"},
-    )
-    alias_users = await api_client.get(
         "/v1/admin/organizations/org-1/users",
         headers=AUTH,
         params={"limit": 6, "offset": 2, "q": "alice"},
     )
     assert users.status_code == 200
-    assert alias_users.status_code == 200
     assert_paginated(users.json())
-    assert users.json() == alias_users.json()
 
     delete_org = await api_client.delete("/v1/admin/organizations/org-1", headers=AUTH)
     assert delete_org.status_code == 202
@@ -85,12 +72,9 @@ async def test_admin_organization_routes_and_aliases(api_client, authenticated_a
 
 
 @pytest.mark.asyncio
-async def test_admin_project_routes_and_aliases(api_client, authenticated_api) -> None:
-    permissions = await api_client.get("/v1/admin/project-permissions", headers=AUTH)
-    alias_permissions = await api_client.get("/v1/admin/projects/permissions", headers=AUTH)
+async def test_admin_project_routes(api_client, authenticated_api) -> None:
+    permissions = await api_client.get("/v1/admin/projects/permissions", headers=AUTH)
     assert permissions.status_code == 200
-    assert alias_permissions.status_code == 200
-    assert permissions.json() == alias_permissions.json()
 
     listed = await api_client.get("/v1/admin/projects", headers=AUTH, params={"org_id": "org-1"})
     assert listed.status_code == 200
@@ -117,14 +101,11 @@ async def test_admin_project_routes_and_aliases(api_client, authenticated_api) -
     assert updated.status_code == 200
     assert updated.json()["name"] == "Updated Project"
 
-    settings = await api_client.get(f"/v1/admin/project-settings/{PROJECT_UUID}", headers=AUTH)
-    alias_settings = await api_client.get(f"/v1/admin/projects/{PROJECT_UUID}/settings", headers=AUTH)
+    settings = await api_client.get(f"/v1/admin/projects/{PROJECT_UUID}/settings", headers=AUTH)
     assert settings.status_code == 200
-    assert alias_settings.status_code == 200
-    assert settings.json() == alias_settings.json()
 
     patched_settings = await api_client.patch(
-        f"/v1/admin/project-settings/{PROJECT_UUID}",
+        f"/v1/admin/projects/{PROJECT_UUID}/settings",
         headers=AUTH,
         json={"rate_limit": 120, "spending_limit": 4567, "extra": {"mode": "strict"}},
     )
@@ -132,31 +113,29 @@ async def test_admin_project_routes_and_aliases(api_client, authenticated_api) -
     assert patched_settings.json()["spending_limit"] == 4567
 
     users = await api_client.get(
-        "/v1/admin/project-users",
-        headers=AUTH,
-        params={"project_id": PROJECT_UUID, "limit": 3, "offset": 1, "q": "bob"},
-    )
-    alias_users = await api_client.get(
         f"/v1/admin/projects/{PROJECT_UUID}/users",
         headers=AUTH,
         params={"limit": 3, "offset": 1, "q": "bob"},
     )
     assert users.status_code == 200
-    assert alias_users.status_code == 200
-    assert users.json() == alias_users.json()
 
-    archived = await api_client.delete(f"/v1/admin/projects/{PROJECT_UUID}", headers=AUTH)
+    archived = await api_client.post(f"/v1/admin/projects/{PROJECT_UUID}/archive", headers=AUTH)
     assert archived.status_code == 200
     assert archived.json() == {"id": PROJECT_UUID, "archived": True}
 
+    unarchived = await api_client.post(f"/v1/admin/projects/{PROJECT_UUID}/unarchive", headers=AUTH)
+    assert unarchived.status_code == 200
+    assert unarchived.json() == {"id": PROJECT_UUID, "archived": False}
+
+    delete_archive = await api_client.delete(f"/v1/admin/projects/{PROJECT_UUID}", headers=AUTH)
+    assert delete_archive.status_code == 200
+    assert delete_archive.json() == {"id": PROJECT_UUID, "archived": True}
+
 
 @pytest.mark.asyncio
-async def test_admin_api_key_routes_and_aliases(api_client, authenticated_api) -> None:
-    permissions = await api_client.get("/v1/admin/api-key-permissions", headers=AUTH)
-    alias_permissions = await api_client.get("/v1/admin/api-keys/permissions", headers=AUTH)
+async def test_admin_api_key_routes(api_client, authenticated_api) -> None:
+    permissions = await api_client.get("/v1/admin/api-keys/permissions", headers=AUTH)
     assert permissions.status_code == 200
-    assert alias_permissions.status_code == 200
-    assert permissions.json() == alias_permissions.json()
 
     listed = await api_client.get(
         "/v1/admin/api-keys",
@@ -193,25 +172,15 @@ async def test_admin_api_key_routes_and_aliases(api_client, authenticated_api) -
 
 
 @pytest.mark.asyncio
-async def test_admin_user_profile_permission_and_organization_aliases(api_client, authenticated_api) -> None:
+async def test_admin_user_profile_permission_and_organization_routes(api_client, authenticated_api) -> None:
     organizations = await api_client.get(
-        "/v1/admin/user-organizations",
-        headers=AUTH,
-        params={"user_id": "user-1"},
-    )
-    alias_organizations = await api_client.get(
         "/v1/admin/users/user-1/organizations",
         headers=AUTH,
     )
     assert organizations.status_code == 200
-    assert alias_organizations.status_code == 200
-    assert organizations.json() == alias_organizations.json()
 
-    profile = await api_client.get("/v1/admin/user-profiles/user-1", headers=AUTH)
-    alias_profile = await api_client.get("/v1/admin/users/user-1/profile", headers=AUTH)
+    profile = await api_client.get("/v1/admin/users/user-1/profile", headers=AUTH)
     assert profile.status_code == 200
-    assert alias_profile.status_code == 200
-    assert profile.json() == alias_profile.json()
 
     project_permissions = [
         {"project_id": PROJECT_UUID, "permissions": ["project.settings.read"]}
@@ -224,17 +193,7 @@ async def test_admin_user_profile_permission_and_organization_aliases(api_client
             "project_permissions": project_permissions,
         },
     )
-    canonical_updated = await api_client.put(
-        "/v1/admin/user-permissions/user-1",
-        headers=AUTH,
-        json={
-            "organization_permissions": ["organization.settings.read"],
-            "project_permissions": project_permissions,
-        },
-    )
     assert updated.status_code == 200
-    assert canonical_updated.status_code == 200
-    assert updated.json()["permissions"] == canonical_updated.json()["permissions"]
     assert updated.json()["permissions"]["project_permissions"][0]["id"] == PROJECT_UUID
 
     reset = await api_client.delete("/v1/admin/users/user-1/permissions", headers=AUTH)

@@ -220,12 +220,12 @@ async def test_admin_dashboard_users_and_permission_write_contract(api_client, a
     assert pagination.offset == 3
     assert pagination.q == "alice"
 
-    profile = await api_client.get("/v1/admin/user-profiles/user-1", headers=AUTH)
+    profile = await api_client.get("/v1/admin/users/user-1/profile", headers=AUTH)
     assert profile.status_code == 200
     assert profile.json()["permissions"]["project_permissions"] == []
 
     set_permissions = await api_client.put(
-        "/v1/admin/user-permissions/user-1",
+        "/v1/admin/users/user-1/permissions",
         headers=AUTH,
         json={"organization_permissions": ["organization.settings.read"], "project_permissions": []},
     )
@@ -234,6 +234,6 @@ async def test_admin_dashboard_users_and_permission_write_contract(api_client, a
         "organization_permissions"
     ] == ["organization.settings.read"]
 
-    reset = await api_client.delete("/v1/admin/user-permissions/user-1", headers=AUTH)
+    reset = await api_client.delete("/v1/admin/users/user-1/permissions", headers=AUTH)
     assert reset.status_code == 200
     assert reset.json()["permissions"]["organization_permissions"] == []

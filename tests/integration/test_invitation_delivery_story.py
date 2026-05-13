@@ -18,17 +18,16 @@ async def _mailpit_messages(email_messages_url: str) -> dict:
 
 @pytest.mark.asyncio
 async def test_invitation_outbox_is_available_for_email_assertions(
-    email_messages_url: str,
+    integration_stack,
 ) -> None:
-    payload = await _mailpit_messages(email_messages_url)
+    payload = await _mailpit_messages(integration_stack.email_messages_url)
 
     assert "messages" in payload
 
 
 @pytest.mark.asyncio
 async def test_invitation_email_can_be_delivered_and_asserted(
-    email_messages_url: str,
-    mailpit_smtp_url: tuple[str, int],
+    integration_stack,
 ) -> None:
     message = EmailMessage()
     message["From"] = "noreply@gantry.test"
@@ -36,11 +35,11 @@ async def test_invitation_email_can_be_delivered_and_asserted(
     message["Subject"] = "Gantry integration invitation"
     message.set_content("Click http://localhost:3000/invite/test-token to accept.")
 
-    smtp_host, smtp_port = mailpit_smtp_url
+    smtp_host, smtp_port = integration_stack.mailpit_smtp_url
     with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as smtp:
         smtp.send_message(message)
 
-    payload = await _mailpit_messages(email_messages_url)
+    payload = await _mailpit_messages(integration_stack.email_messages_url)
     messages = payload.get("messages", [])
 
     assert any(

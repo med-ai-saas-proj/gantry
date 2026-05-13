@@ -28,6 +28,7 @@ from .repositories import ApiKeyRepository
 
 import hmac
 import asyncio
+import inspect
 import secrets
 from typing import Callable, Sequence, TypedDict, NotRequired
 
@@ -191,6 +192,22 @@ class ApiKeyService:
     @staticmethod
     def _cacheKey(hashed_key: str) -> str:
         return f"apikey:context:{hashed_key}"
+
+    @staticmethod
+    def _contextRecordCacheKey(hashed_key: str) -> str:
+        return f"api_keys:context_record:{hashed_key}"
+
+    async def _invalidateContextRecordCache(self, hashed_key: str) -> None:
+        """Drop cached runtime context after mutable API-key changes."""
+        if not hashed_key:
+            return
+        cache_repo = getattr(self.api_key_repo, "cache_repo", None)
+        invalidate = getattr(cache_repo, "invalidateCached", None)
+        if invalidate is None:
+            return
+        result = invalidate(self._contextRecordCacheKey(hashed_key))
+        if inspect.isawaitable(result):
+            await result
 
     @staticmethod
     def generateHint(api_key: str) -> str:
@@ -478,6 +495,7 @@ class ApiKeyService:
                 return Err(ProjectNotFoundError())
 
             await session.commit()
+            await self._invalidateContextRecordCache(api_key["hashed_key"])
             return Ok(
                 self._toResponse(
                     self._snapshotApiKey(updated),
@@ -573,6 +591,7 @@ class ApiKeyService:
                 return Err(ProjectNotFoundError())
 
             await session.commit()
+            await self._invalidateContextRecordCache(api_key["hashed_key"])
             return Ok(
                 self._toResponse(
                     self._snapshotApiKey(updated),
@@ -587,7 +606,7 @@ class ApiKeyService:
         api_key_res = await self._getApiKeyByUuid(api_key_uuid)
         if api_key_res.status == ResultStatus.Err:
             return api_key_res.into()
-        _ = api_key_res.unwrap()
+        api_key = api_key_res.unwrap()
 
         async with self.session_manager.get_session() as session:
             deleted = await self.api_key_repo.deleteByUuid(
@@ -596,6 +615,7 @@ class ApiKeyService:
             if not deleted:
                 return Err(ApiKeyNotFoundError())
             await session.commit()
+            await self._invalidateContextRecordCache(api_key["hashed_key"])
             return Ok(True)
 
     async def _resolveApiKeyContext(

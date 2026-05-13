@@ -66,6 +66,7 @@ async def _create_billing_subject(org_id: str):
 @pytest.mark.asyncio
 async def test_billing_spending_limits_load_from_db_then_cache_and_invalidate(
     migrated_management_storage,
+    integration_stack,
 ) -> None:
     from gantry.db.factories import getRedis, getSessionManager
     from gantry.management.billing.cache_settings import (
@@ -76,6 +77,8 @@ async def test_billing_spending_limits_load_from_db_then_cache_and_invalidate(
     from gantry.management.organization.factories import getOrgSettingsRepository
     from gantry.management.project.factories import getProjectSettingsRepository
 
+    assert integration_stack.timescale_asyncpg_uri
+    assert integration_stack.redis_url
     org_id = "integration-billing-limit-org"
     project_id, _, _ = await _create_billing_subject(org_id)
     service = getBillingTransactionService()
@@ -121,11 +124,14 @@ async def test_billing_spending_limits_load_from_db_then_cache_and_invalidate(
 @pytest.mark.asyncio
 async def test_billing_transaction_post_capture_and_read_path_uses_real_db_and_redis(
     migrated_management_storage,
+    integration_stack,
 ) -> None:
     from gantry.management.billing.dtos import PostRequest
     from gantry.management.billing.factories import getBillingTransactionService
     from gantry.management.billing.models import TransactionStatus
 
+    assert integration_stack.timescale_asyncpg_uri
+    assert integration_stack.redis_url
     org_id = "integration-billing-transaction-org"
     project_id, project_uuid, api_key_id = await _create_billing_subject(org_id)
     service = getBillingTransactionService()

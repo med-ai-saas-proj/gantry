@@ -356,6 +356,14 @@ class FakeAdminService(ConfigurableFake):
         self.calls.append(("deleteProject", project_id))
         return {"id": project_id, "archived": True}
 
+    async def archiveProject(self, project_id: str):
+        self.calls.append(("archiveProject", project_id))
+        return {"id": project_id, "archived": True}
+
+    async def unarchiveProject(self, project_id: str):
+        self.calls.append(("unarchiveProject", project_id))
+        return {"id": project_id, "archived": False}
+
     async def getProjectSettings(self, project_id: str):
         self.calls.append(("getProjectSettings", project_id))
         return {"rate_limit": 120, "spending_limit": 5000, "extra": {"mode": "burst"}}

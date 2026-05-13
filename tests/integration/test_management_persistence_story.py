@@ -26,7 +26,13 @@ def _decode(value):
 
 
 @pytest.mark.asyncio
-async def test_management_storage_accepts_queries_after_migration(migrated_management_storage) -> None:
+async def test_management_storage_accepts_queries_after_migration(
+    migrated_management_storage,
+    integration_stack,
+) -> None:
+    assert getDBSettings().timescale_connection_uri.encoded_string() == (
+        integration_stack.timescale_asyncpg_uri
+    )
     engine = _engine()
     async with engine.connect() as connection:
         result = await connection.execute(sa.text("SELECT 1"))
@@ -36,7 +42,11 @@ async def test_management_storage_accepts_queries_after_migration(migrated_manag
 
 
 @pytest.mark.asyncio
-async def test_management_migration_version_is_recorded(migrated_management_storage) -> None:
+async def test_management_migration_version_is_recorded(
+    migrated_management_storage,
+    integration_stack,
+) -> None:
+    assert integration_stack.timescale_plain_uri
     engine = _engine()
     async with engine.connect() as connection:
         result = await connection.execute(
@@ -50,7 +60,9 @@ async def test_management_migration_version_is_recorded(migrated_management_stor
 @pytest.mark.asyncio
 async def test_management_migration_is_idempotent(
     migrated_management_storage_twice,
+    integration_stack,
 ) -> None:
+    assert integration_stack.timescale_asyncpg_uri
     engine = _engine()
     async with engine.connect() as connection:
         result = await connection.execute(
@@ -62,7 +74,11 @@ async def test_management_migration_is_idempotent(
 
 
 @pytest.mark.asyncio
-async def test_management_schemas_and_api_key_uuid_contract_exist(migrated_management_storage) -> None:
+async def test_management_schemas_and_api_key_uuid_contract_exist(
+    migrated_management_storage,
+    integration_stack,
+) -> None:
+    assert integration_stack.timescale_asyncpg_uri
     engine = _engine()
     async with engine.connect() as connection:
         schemas = {
@@ -139,9 +155,9 @@ async def test_management_schemas_and_api_key_uuid_contract_exist(migrated_manag
 @pytest.mark.asyncio
 async def test_management_asyncpg_transaction_commit_and_rollback(
     migrated_management_storage,
-    timescale_plain_uri: str,
+    integration_stack,
 ) -> None:
-    connection = await asyncpg.connect(timescale_plain_uri)
+    connection = await asyncpg.connect(integration_stack.timescale_plain_uri)
     try:
         await connection.execute(
             'CREATE TEMP TABLE integration_tx_check (id int PRIMARY KEY, value text)'
@@ -173,7 +189,11 @@ async def test_management_asyncpg_transaction_commit_and_rollback(
 @pytest.mark.asyncio
 async def test_management_cache_round_trip_ttl_and_delete_behavior(
     integration_config_file,
+    integration_stack,
 ) -> None:
+    assert getDBSettings().redis_connection_uri.encoded_string() == (
+        integration_stack.redis_url
+    )
     getRedisConnectionPool.cache_clear()
     getRedis.cache_clear()
     cache_client = getRedis()
@@ -195,7 +215,9 @@ async def test_management_cache_round_trip_ttl_and_delete_behavior(
 @pytest.mark.asyncio
 async def test_management_cache_text_and_binary_clients_have_expected_decode_behavior(
     integration_config_file,
+    integration_stack,
 ) -> None:
+    assert integration_stack.redis_url
     getRedisConnectionPool.cache_clear()
     getRedis.cache_clear()
     getRedisBinary.cache_clear()
@@ -215,7 +237,9 @@ async def test_management_cache_text_and_binary_clients_have_expected_decode_beh
 @pytest.mark.asyncio
 async def test_management_cache_repository_hit_miss_invalidate_and_get_or_call(
     integration_config_file,
+    integration_stack,
 ) -> None:
+    assert integration_stack.redis_url
     getRedisConnectionPool.cache_clear()
     getRedisBinary.cache_clear()
     cache_client = getRedisBinary()

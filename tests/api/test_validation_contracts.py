@@ -16,7 +16,7 @@ PROJECT_UUID = "11111111-1111-1111-1111-111111111111"
         ("patch", "/v1/projects/11111111-1111-1111-1111-111111111111/settings", {"rate_limit": 0}),
         ("post", "/v1/api-keys?project_id=11111111-1111-1111-1111-111111111111", {"name": ""}),
         ("patch", "/v1/organizations/org-1/settings", {"rate_limit": 0}),
-        ("put", "/v1/admin/user-permissions/user-1", {"project_permissions": [{"permissions": ["project.owner"]}]}),
+        ("put", "/v1/admin/users/user-1/permissions", {"project_permissions": [{"permissions": ["project.owner"]}]}),
     ],
 )
 async def test_invalid_request_bodies_return_422(

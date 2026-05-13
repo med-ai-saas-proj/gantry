@@ -511,7 +511,7 @@ def e2e_org(
     settings = _fetch(
         playwright_backend_context,
         "PATCH",
-        f"/management/v1/admin/organization-settings/{org_id}",
+        f"/management/v1/admin/organizations/{org_id}/settings",
         headers=admin_headers,
         json=settings_payload,
     )

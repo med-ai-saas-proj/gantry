@@ -4,6 +4,7 @@ import os
 import subprocess
 import time
 from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 import asyncpg
@@ -34,6 +35,19 @@ MAILPIT_IMAGE = os.getenv(
 REQUIRE_FULL_STORAGE = os.getenv(
     "GANTRY_INTEGRATION_REQUIRE_FULL_STORAGE", ""
 ).lower() in {"1", "true", "yes"}
+
+
+@dataclass(frozen=True)
+class IntegrationStack:
+    """Container-backed endpoints used by integration story tests."""
+
+    timescale_asyncpg_uri: str
+    timescale_plain_uri: str
+    redis_url: str
+    keycloak_url: str
+    identity_metadata_url: str
+    mailpit_smtp_url: tuple[str, int]
+    email_messages_url: str
 
 
 def wait_for_http_200(url: str, attempts: int = 90) -> None:
@@ -129,7 +143,7 @@ def keycloak_container() -> Iterator[KeycloakContainer]:
         KEYCLOAK_IMAGE,
         username="admin",
         password="admin",
-        cmd="start-dev --http-access-log-enabled=true",
+        cmd="start-dev --http-access-log-enabled=true --health-enabled=true",
     ).with_realm_import_file(str(realm_file))
     with container:
         wait_for_http_200(
@@ -185,6 +199,28 @@ def email_messages_url(mailpit_container: DockerContainer) -> str:
     return (
         f"http://{mailpit_container.get_container_host_ip()}:"
         f"{mailpit_container.get_exposed_port(8025)}/api/v1/messages"
+    )
+
+
+@pytest.fixture(scope="session")
+def integration_stack(
+    timescale_asyncpg_uri: str,
+    timescale_plain_uri: str,
+    redis_url: str,
+    keycloak_url: str,
+    mailpit_smtp_url: tuple[str, int],
+    email_messages_url: str,
+) -> IntegrationStack:
+    return IntegrationStack(
+        timescale_asyncpg_uri=timescale_asyncpg_uri,
+        timescale_plain_uri=timescale_plain_uri,
+        redis_url=redis_url,
+        keycloak_url=keycloak_url,
+        identity_metadata_url=(
+            f"{keycloak_url}/realms/{REALM}/.well-known/openid-configuration"
+        ),
+        mailpit_smtp_url=mailpit_smtp_url,
+        email_messages_url=email_messages_url,
     )
 
 

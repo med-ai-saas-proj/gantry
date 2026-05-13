@@ -36,15 +36,31 @@ def test_operation_contracts_match_snapshots(
     )
 
 
-def test_alias_admin_paths_stay_hidden_from_public_openapi(management_paths: dict) -> None:
-    hidden_aliases = {
+def test_admin_paths_use_nested_module_convention(management_paths: dict) -> None:
+    canonical_paths = {
         "/v1/admin/organizations/permissions",
         "/v1/admin/organizations/{org_id}/settings",
+        "/v1/admin/organizations/{org_id}/users",
         "/v1/admin/projects/permissions",
         "/v1/admin/projects/{project_id}/settings",
+        "/v1/admin/projects/{project_id}/users",
         "/v1/admin/api-keys/permissions",
+        "/v1/admin/users/{user_id}/organizations",
         "/v1/admin/users/{user_id}/profile",
         "/v1/admin/users/{user_id}/permissions",
     }
+    removed_aliases = {
+        "/v1/admin/organization-permissions",
+        "/v1/admin/organization-settings/{org_id}",
+        "/v1/admin/organization-users",
+        "/v1/admin/project-permissions",
+        "/v1/admin/project-settings/{project_id}",
+        "/v1/admin/project-users",
+        "/v1/admin/api-key-permissions",
+        "/v1/admin/user-organizations",
+        "/v1/admin/user-profiles/{user_id}",
+        "/v1/admin/user-permissions/{user_id}",
+    }
 
-    assert not (hidden_aliases & set(management_paths))
+    assert canonical_paths <= set(management_paths)
+    assert not (removed_aliases & set(management_paths))

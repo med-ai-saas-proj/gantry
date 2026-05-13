@@ -17,7 +17,7 @@ def test_project_lifecycle_and_user_visibility_flow(backend_e2e) -> None:
     )
     settings = backend_e2e.admin_request(
         "PATCH",
-        f"/management/v1/admin/project-settings/{project_uuid}",
+        f"/management/v1/admin/projects/{project_uuid}/settings",
         json={"rate_limit": 60, "spending_limit": None, "extra": {"e2e.project": "true"}},
     )
     user_list = backend_e2e.user_request(
@@ -36,15 +36,14 @@ def test_project_lifecycle_and_user_visibility_flow(backend_e2e) -> None:
     assert user_list.status_code < 500
     assert project_uuid in {item["project_uuid"] for item in user_list.json().get("results", [])}
 
-    archive = backend_e2e.admin_request("DELETE", f"/management/v1/admin/projects/{project_uuid}")
+    archive = backend_e2e.admin_request("POST", f"/management/v1/admin/projects/{project_uuid}/archive")
     assert archive.status_code == 200, archive.text
     assert archive.json()["archived"] is True
 
-    unarchive = backend_e2e.user_request("POST", f"/management/v1/projects/{project_uuid}/unarchive")
-    assert unarchive.status_code in {200, 401, 403, 404}, unarchive.text
+    unarchive = backend_e2e.admin_request("POST", f"/management/v1/admin/projects/{project_uuid}/unarchive")
+    assert unarchive.status_code == 200, unarchive.text
     assert unarchive.status_code < 500
-    if unarchive.status_code == 200:
-        assert unarchive.json()["archived"] is False
+    assert unarchive.json()["archived"] is False
 
 
 def test_admin_permission_update_affects_user_project_permissions(backend_e2e) -> None:
@@ -54,7 +53,7 @@ def test_admin_permission_update_affects_user_project_permissions(backend_e2e) -
 
     response = backend_e2e.admin_request(
         "PUT",
-        f"/management/v1/admin/user-permissions/{user_id}",
+        f"/management/v1/admin/users/{user_id}/permissions",
         json={
             "organization_permissions": ["organization.owner"],
             "project_permissions": [

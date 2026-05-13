@@ -21,9 +21,9 @@ def test_fresh_organization_detail_settings_and_users_are_available(backend_e2e)
     org_id = backend_e2e.context.org_id
 
     detail = backend_e2e.admin_request("GET", f"/management/v1/admin/organizations/{org_id}")
-    settings = backend_e2e.admin_request("GET", f"/management/v1/admin/organization-settings/{org_id}")
+    settings = backend_e2e.admin_request("GET", f"/management/v1/admin/organizations/{org_id}/settings")
     users = backend_e2e.admin_request(
-        "GET", "/management/v1/admin/organization-users", params={"org_id": org_id}
+        "GET", f"/management/v1/admin/organizations/{org_id}/users"
     )
 
     assert detail.status_code == 200, detail.text
@@ -38,7 +38,7 @@ def test_organization_settings_can_be_updated_without_5xx(backend_e2e) -> None:
     org_id = backend_e2e.context.org_id
     response = backend_e2e.admin_request(
         "PATCH",
-        f"/management/v1/admin/organization-settings/{org_id}",
+        f"/management/v1/admin/organizations/{org_id}/settings",
         json={"rate_limit": 1200, "spending_limit": None, "extra": {"e2e.backend": "true"}},
     )
 

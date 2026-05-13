@@ -46,9 +46,12 @@ async def _create_project_for_api_key_story(org_id: str):
 @pytest.mark.asyncio
 async def test_api_key_create_parse_and_verify_uses_real_storage_and_cache(
     migrated_management_storage,
+    integration_stack,
 ) -> None:
     from gantry.management.api_key.factories import getApiKeyService
 
+    assert integration_stack.timescale_asyncpg_uri
+    assert integration_stack.redis_url
     org_id = "integration-api-key-org"
     project_id, project_uuid = await _create_project_for_api_key_story(org_id)
     service = getApiKeyService()
@@ -89,9 +92,12 @@ async def test_api_key_create_parse_and_verify_uses_real_storage_and_cache(
 @pytest.mark.asyncio
 async def test_api_key_auth_rejects_invalid_missing_permission_and_disabled_keys(
     migrated_management_storage,
+    integration_stack,
 ) -> None:
     from gantry.management.api_key.factories import getApiKeyService
 
+    assert integration_stack.timescale_asyncpg_uri
+    assert integration_stack.redis_url
     _, project_uuid = await _create_project_for_api_key_story(
         "integration-api-key-negative-org"
     )
