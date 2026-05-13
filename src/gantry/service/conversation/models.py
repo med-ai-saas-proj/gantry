@@ -16,7 +16,7 @@ from datetime import datetime
 import sqlalchemy
 from sqlalchemy import String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.sql.sqltypes import DateTime, BigInteger
+from sqlalchemy.sql.sqltypes import UUID, DateTime, BigInteger
 from sqlalchemy.dialects.postgresql import JSONB
 
 
@@ -32,13 +32,6 @@ class ConversationType(str, enum.Enum):
 
     SEQUENCE = "sequence"
     TREE = "tree"
-
-
-class TreeNode(TypedDict):
-    """Represents a node in the conversation tree structure."""
-
-    message_id: uuid.UUID
-    parent_id: uuid.UUID | None
 
 
 class Conversation(
@@ -59,11 +52,11 @@ class Conversation(
         nullable=False,
         server_default=ConversationType.SEQUENCE,
     )
-    tree_structure: Mapped[list[TreeNode] | None] = mapped_column(
+    tree_structure: Mapped[dict[str, str | None] | None] = mapped_column(
         JSONB, nullable=True
     )
-    activePath: Mapped[list[uuid.UUID] | None] = mapped_column(
-        JSONB, nullable=True
+    active_leaf_message_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
     )
 
 

@@ -1,3 +1,5 @@
+from gantry.service.conversation.models import ConversationType
+
 import enum
 import uuid
 from typing import Any, Literal, TypedDict
@@ -162,6 +164,9 @@ class ConversationMetadata(TypedDict):
     project_id: int
     extra_metadata: dict | None
     created_at: datetime
+    tree_structure: dict[str, str | None] | None
+    active_leaf_message_id: uuid.UUID | None
+    conversation_type: ConversationType
 
 
 RequestMessagePart = (

@@ -40,11 +40,13 @@ async def create_conversation(
     ],
 ):
     """Create a new conversation."""
-    conversation_uid = await conversation_service.createConversation(
-        project_id=api_key_info["project_id"],
-        extra_metadata=body.extra_metadata,
-        messages=body.messages,
-    )
+    conversation_uid = (
+        await conversation_service.createConversation(
+            project_id=api_key_info["project_id"],
+            extra_metadata=body.extra_metadata,
+            messages=body.messages,
+        )
+    ).unwrap()
     return CreateConversationResponse(conversation_uid=conversation_uid)
 
 

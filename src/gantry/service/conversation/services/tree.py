@@ -1,6 +1,7 @@
 from gantry.db.session import AsyncSessionManager
 from gantry.shared.utils.json_utils import json_serializer
 from gantry.shared.utils.uuid_utils import uuid7
+from gantry.shared.custom_types.error_exception import InternalServiceError
 
 from .core import (
     ConversationService,
@@ -28,15 +29,15 @@ from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
 
 
-class SequenceConversationService(ConversationService):
+class TreeConversationService(ConversationService):
     """Implements a conversation service where messages are stored in a single sequence, and the entire sequence is retrieved for each request."""
 
     async def getConversationMessages(
         self,
         conversation_uid: uuid.UUID,
         project_id: int,
+        offset: int = 0,
         limit: int = 20,
-        last_cursor: uuid.UUID | None = None,
         order_by: Literal["asc", "desc"] = "asc",
     ) -> Result[Sequence[Message], ConversationNotFoundError]:
         async with self.session_manager.get_session() as session:
@@ -50,86 +51,33 @@ class SequenceConversationService(ConversationService):
         messages = await self._getConversationMessagesWithCache(
             metadata["conversation_id"],
             conversation_uid,
+            offset=offset,
             limit=limit,
-            last_cursor=last_cursor,
             order_by=order_by,
         )
         return Ok(messages)
-
-    async def _getConversationMessagesFromDB(
-        self,
-        conversation_id: int,
-        limit: int = 20,
-        last_cursor: uuid.UUID | None = None,
-        order_by: Literal["asc", "desc"] = "asc",
-    ) -> Sequence[Message]:
-        async with self.session_manager.get_session() as session:
-            msgs = await self.conversation_repo.getMessagesByConversationId(
-                session,
-                conversation_id,
-                limit=limit,
-                last_cursor=last_cursor,
-                order_by=order_by,
-            )
-            session.expunge_all()
-        return msgs
 
     async def _getConversationMessagesWithCache(
         self,
         conversation_id: int,
         conversation_uid: uuid.UUID,
+        offset: int = 0,
         limit: int = 20,
-        last_cursor: uuid.UUID | None = None,
         order_by: Literal["asc", "desc"] = "asc",
     ) -> Sequence[Message]:
-        can_cache = (
-            last_cursor is None
-            and order_by == "desc"
-            and limit <= self.setting.cache_limit
-        )
-        if not can_cache:
-            return await self._getConversationMessagesFromDB(
-                conversation_id,
-                limit=limit,
-                last_cursor=last_cursor,
-                order_by=order_by,
-            )
-
-        cache_key = ConversationService._message_list_cache_key(
-            conversation_uid
-        )
-        # atomic check if cache exists and is ready, if so get from cache, otherwise get from db and update cache
-        lua_script = """
-           if redis.call('EXISTS', KEYS[1]) == 1 then
-                redis.call('EXPIRE', KEYS[1], ARGV[1])
-                return redis.call('ZREVRANGE', KEYS[1], 0, -1)
-           else
-               return nil
-           end
-           """
-        result = await cast(
-            Awaitable[list[str] | None],
-            self.redis_client.eval(
-                lua_script, 1, cache_key, self.setting.cache_ttl
-            ),
-        )
-        if result is not None:
-            return [Message.parse_raw(json.loads(msg)) for msg in result]
-        msgs = await self._getConversationMessagesFromDB(
-            conversation_id,
-            limit=self.setting.cache_limit,
-            last_cursor=last_cursor,
-            order_by=order_by,
-        )
-        await self._addConversationMessagesCache(conversation_uid, msgs)
-        return msgs
+        return []  # get active branch messages
 
     async def storeConversationMessages(
         self,
         conversation_uid: uuid.UUID,
         project_id: int,
         msgs: Sequence[RequestMessage],
-    ) -> Result[None, ConversationNotFoundError | InvalidConversationTypeError]:
+    ) -> Result[
+        None,
+        ConversationNotFoundError
+        | InvalidConversationTypeError
+        | InternalServiceError,
+    ]:
         if len(msgs) == 0:
             return Ok(None)
         return await self._storeConversationMessagesWithCache(
@@ -148,7 +96,40 @@ class SequenceConversationService(ConversationService):
             ]
             if msgs is not None
             else [],
+            conversation_type=ConversationType.SEQUENCE,
         )
+
+    def rebuildTreeStructure(
+        self,
+        current_structure: dict[str, str | None],
+        messages: Sequence[Message],
+        from_node_id: uuid.UUID | None = None,
+        active_leaf_id: uuid.UUID | None = None,
+    ) -> tuple[dict[str, str | None], uuid.UUID]:
+        new_structure = current_structure.copy()
+        if from_node_id is not None:
+            parent_id_str = str(from_node_id)
+            if parent_id_str not in new_structure:
+                raise ValueError(
+                    f"from_node_id {from_node_id} not found in current tree structure."
+                )
+        elif active_leaf_id is not None:
+            parent_id_str = str(active_leaf_id)
+            if parent_id_str not in new_structure:
+                raise ValueError(
+                    f"active_leaf_id {active_leaf_id} not found in current tree structure."
+                )
+        else:
+            parent_id_str = None
+
+        prev_message_id = parent_id_str
+        for msg in messages:
+            msg_id = str(msg.uuid)
+            new_structure[msg_id] = prev_message_id
+            prev_message_id = msg_id
+        if prev_message_id is None:
+            raise ValueError("No messages to add to the tree structure.")
+        return new_structure, uuid.UUID(prev_message_id)
 
     # create a new conversation with given messages if conversation_id is None,
     # otherwise append messages to existing conversation
@@ -159,35 +140,63 @@ class SequenceConversationService(ConversationService):
         conversation_uid: uuid.UUID,
         project_id: int,
         serialized_msgs: Sequence[Message],
+        conversation_type: ConversationType,
         extra_metadata: dict | None = None,
-    ) -> Result[None, ConversationNotFoundError | InvalidConversationTypeError]:
+        from_node_id: uuid.UUID | None = None,
+    ) -> Result[
+        None,
+        ConversationNotFoundError
+        | InvalidConversationTypeError
+        | InternalServiceError,
+    ]:
         async with self.session_manager.get_session() as session:
             if is_new_conversation:
+                tree_structure, active_leaf_id = self.rebuildTreeStructure(
+                    current_structure={},
+                    messages=serialized_msgs,
+                    from_node_id=from_node_id,
+                )
                 conversation = Conversation(
                     uuid=conversation_uid,
                     project_id=project_id,
                     extra_metadata=extra_metadata,
-                    conversation_type=ConversationType.SEQUENCE,
-                    tree_structure=None,
-                    active_leaf_message_id=None,
+                    conversation_type=conversation_type,
+                    tree_structure=tree_structure,
+                    active_leaf_message_id=active_leaf_id,
                 )
                 session.add(conversation)
                 await session.flush()
                 conversation_id = conversation.id
             else:
-                conversation_metadata = (
+                metadata = (
                     await self.conversation_repo.getConversationMetadataByUUID(
-                        session, conversation_uid, project_id
+                        session, conversation_uid, project_id, for_="update"
                     )
                 )
-                if conversation_metadata is None:
+                if metadata is None:
                     return Err(ConversationNotFoundError())
-                if (
-                    conversation_metadata["conversation_type"]
-                    != ConversationType.SEQUENCE
-                ):
+                conversation_id = metadata["conversation_id"]
+                if metadata["conversation_type"] != ConversationType.SEQUENCE:
                     return Err(InvalidConversationTypeError())
-                conversation_id = conversation_metadata["conversation_id"]
+                tree_structure, active_leaf_id = self.rebuildTreeStructure(
+                    current_structure=metadata["tree_structure"]
+                    if metadata["tree_structure"] is not None
+                    else {},
+                    messages=serialized_msgs,
+                    from_node_id=from_node_id,
+                    active_leaf_id=metadata["active_leaf_message_id"],
+                )
+                updated_metadata = await self.conversation_repo.updateConversationTreeStructureByUUID(
+                    session,
+                    conversation_uuid=conversation_uid,
+                    project_id=project_id,
+                    tree_structure=tree_structure,
+                    active_leaf_message_id=active_leaf_id,
+                )
+                if updated_metadata is None:
+                    return Err(
+                        InternalServiceError()
+                    )  # this should not happen as we have locked the conversation row, just in case to prevent data inconsistency
 
             if len(serialized_msgs) > 0:
                 for msg in serialized_msgs:
@@ -197,86 +206,10 @@ class SequenceConversationService(ConversationService):
             await session.commit()
 
         if len(serialized_msgs) > 0:
-            if is_new_conversation:
-                # create new cache for the conversation, no need to check if cache exists as it's a new conversation
-                await self._addConversationMessagesCache(
-                    conversation_uid, serialized_msgs
-                )
-            else:
-                # append to cache if cache exists, if cache does not exist then do nothing and let next read update the cache (avoid appending to cache when cache is not loaded to prevent cache have only new messages but miss old messages)
-                await self._tryAppendConversationMessagesCache(
-                    conversation_uid, serialized_msgs
-                )
-        return Ok(None)
-
-    # avoid appending to cache when cache is not loaded to prevent cache have only new messages but miss old messages
-    async def _tryAppendConversationMessagesCache(
-        self, conversation_uid: uuid.UUID, msgs: Sequence[Message]
-    ):
-        cache_key = ConversationService._message_list_cache_key(
-            conversation_uid
-        )
-        # atomic check if cache exists and is ready,
-        # if so append to cache, otherwise do nothing and let next read update the cache
-        # (avoid appending to cache when cache is not loaded
-        # to prevent cache have only new messages but miss old messages)
-        append_script = """
-        -- ARGV: message_id1, msg1, message_id2, msg2, ..., ttl, cache_limit
-        -- check if cache exists, if not exist then return 0
-        local ttl = tonumber(ARGV[#ARGV - 1])
-        local limit = tonumber(ARGV[#ARGV])
-        if redis.call('EXISTS', KEYS[1]) then
-            for i = 1, #ARGV-2, 2 do
-                redis.call('ZADD', KEYS[1], ARGV[i], ARGV[i+1])
-            end
-            redis.call('EXPIRE', KEYS[1], ttl)
-            -- trim to cache limit
-            redis.call('ZREMRANGEBYRANK', KEYS[1], 0, -limit-1)
-            return 1
-        else
-            return 0
-        end
-        """
-        mappings: list[str | int] = []
-        for msg in msgs:
-            mappings.append(
-                msg.id
-            )  # use database id (ascending) as score to maintain correct order in cache
-            mappings.append(json.dumps(asdict(msg), default=json_serializer))
-        mappings.append(self.setting.cache_ttl)
-        mappings.append(self.setting.cache_limit)
-        res = await cast(
-            Awaitable[int],
-            self.redis_client.eval(
-                append_script,
-                1,
-                cache_key,
-                *mappings,
-            ),
-        )
-
-    async def _addConversationMessagesCache(
-        self, conversation_uid: uuid.UUID, msgs: Sequence[Message]
-    ):
-        if len(msgs) == 0:
-            return
-        cache_key = ConversationService._message_list_cache_key(
-            conversation_uid
-        )
-        mappings = {
-            json.dumps(asdict(msg), default=json_serializer): msg.id
-            for msg in msgs
-        }
-
-        async with self.redis_client.pipeline(
-            transaction=True,
-        ) as pipe:
-            await pipe.zadd(cache_key, mappings)
-            await pipe.zremrangebyrank(
-                cache_key, 0, -self.setting.cache_limit - 1
+            await self.addConversationMessagesCache(
+                conversation_uid, serialized_msgs
             )
-            await pipe.expire(cache_key, self.setting.cache_ttl)
-            await pipe.execute()
+        return Ok(None)
 
     async def createConversation(
         self,
@@ -284,7 +217,10 @@ class SequenceConversationService(ConversationService):
         extra_metadata: dict | None,
         messages: Sequence[RequestMessage] | None,
     ) -> Result[
-        uuid.UUID, ConversationNotFoundError | InvalidConversationTypeError
+        uuid.UUID,
+        ConversationNotFoundError
+        | InvalidConversationTypeError
+        | InternalServiceError,
     ]:
         conversation_uid = uuid7()
         res = await self._storeConversationMessagesWithCache(
@@ -304,14 +240,14 @@ class SequenceConversationService(ConversationService):
             ]
             if messages is not None
             else [],
+            conversation_type=ConversationType.TREE,
         )
-
         if res.status == ResultStatus.Err:
             return res.into()
         return Ok(conversation_uid)
 
 
-class SequenceConversationWithSerializerService[T](SequenceConversationService):
+class TreeConversationWithSerializerService[T](TreeConversationService):
     def __init__(
         self,
         session_manager: AsyncSessionManager,
@@ -340,6 +276,7 @@ class SequenceConversationWithSerializerService[T](SequenceConversationService):
         serialized_msgs = await self._getConversationMessagesWithCache(
             conversation_id,
             conversation_uid,
+            offset=0,
             limit=limit,
             order_by="desc",
         )
@@ -366,11 +303,10 @@ class SequenceConversationWithSerializerService[T](SequenceConversationService):
             for msg in msgs
         ]
         serialized_msgs = await asyncio.gather(*tasks)
-        (
-            await self._storeConversationMessagesWithCache(
-                is_new_conversation=is_new_conversation,
-                conversation_uid=conversation_uid,
-                project_id=project_id,
-                serialized_msgs=serialized_msgs,
-            )
-        ).unwrap()
+        await self._storeConversationMessagesWithCache(
+            is_new_conversation=is_new_conversation,
+            conversation_uid=conversation_uid,
+            project_id=project_id,
+            serialized_msgs=serialized_msgs,
+            conversation_type=ConversationType.TREE,
+        )

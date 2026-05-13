@@ -20,6 +20,7 @@ class ConversationRepository(Repository[Conversation, int]):
         session: AsyncSession,
         conversation_uuid: uuid.UUID,
         project_id: int,
+        for_: Literal["share", "update"] | None = None,
     ) -> ConversationMetadata | None:
         stmt = (
             select(Conversation)
@@ -29,6 +30,10 @@ class ConversationRepository(Repository[Conversation, int]):
                 Conversation.project_id == project_id,
             )
         )
+        if for_ == "share":
+            stmt = stmt.with_for_update(read=True, of=Conversation)
+        elif for_ == "update":
+            stmt = stmt.with_for_update(of=Conversation)
         res = await session.execute(stmt)
         conversation = res.scalar_one_or_none()
         return (
@@ -38,6 +43,9 @@ class ConversationRepository(Repository[Conversation, int]):
                 "project_id": conversation.project_id,
                 "extra_metadata": conversation.extra_metadata,
                 "created_at": conversation.created_at,
+                "tree_structure": conversation.tree_structure,
+                "active_leaf_message_id": conversation.active_leaf_message_id,
+                "conversation_type": conversation.conversation_type,
             }
             if conversation
             else None
@@ -170,6 +178,43 @@ class ConversationRepository(Repository[Conversation, int]):
         deleted_conversation_id = res.scalar_one_or_none()
         return deleted_conversation_id
 
+    async def updateConversationTreeStructureByUUID(
+        self,
+        session: AsyncSession,
+        conversation_uuid: uuid.UUID,
+        project_id: int,
+        tree_structure: dict[str, str | None],
+        active_leaf_message_id: uuid.UUID | None = None,
+    ) -> ConversationMetadata | None:
+        stmt = (
+            update(Conversation)
+            .where(
+                Conversation.uuid == conversation_uuid,
+                Conversation.project_id == project_id,
+            )
+            .values(
+                tree_structure=tree_structure,
+                active_leaf_message_id=active_leaf_message_id,
+            )
+            .returning(Conversation)
+        )
+        res = await session.execute(stmt)
+        conversation = res.scalar_one_or_none()
+        return (
+            {
+                "conversation_id": conversation.id,
+                "conversation_uid": conversation.uuid,
+                "project_id": conversation.project_id,
+                "extra_metadata": conversation.extra_metadata,
+                "created_at": conversation.created_at,
+                "tree_structure": conversation.tree_structure,
+                "active_leaf_message_id": conversation.active_leaf_message_id,
+                "conversation_type": conversation.conversation_type,
+            }
+            if conversation
+            else None
+        )
+
     async def updateConversationMetadataByUUID(
         self,
         session: AsyncSession,
@@ -195,6 +240,9 @@ class ConversationRepository(Repository[Conversation, int]):
                 "project_id": conversation.project_id,
                 "extra_metadata": conversation.extra_metadata,
                 "created_at": conversation.created_at,
+                "tree_structure": conversation.tree_structure,
+                "active_leaf_message_id": conversation.active_leaf_message_id,
+                "conversation_type": conversation.conversation_type,
             }
             if conversation
             else None

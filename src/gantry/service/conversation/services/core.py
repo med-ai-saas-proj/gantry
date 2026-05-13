@@ -1,4 +1,5 @@
 from gantry.db.session import AsyncSessionManager
+from gantry.shared.utils.json_utils import json_serializer
 from gantry.shared.custom_types.error_exception import RecoverableError
 
 from ..types import (
@@ -11,11 +12,26 @@ from ..settings import ConversationSettings
 from ..repository import ConversationRepository
 from ...file_storage.services import FileStorageService
 
+import json
 import uuid
-from typing import Sequence
+from re import M
+from typing import Sequence, Awaitable, cast
+from calendar import c
+from dataclasses import asdict
 
+from jwt import decode
+from redis import cache
 from pyrusult import Ok, Err, Result
 from redis.asyncio import Redis
+
+
+class InvalidConversationTypeError(RecoverableError):
+    """Raised when the conversation type is invalid."""
+
+    status = 400
+    code = "invalid_conversation_type"
+    title = "Invalid conversation type"
+    detail = "The specified conversation type is invalid or not supported"
 
 
 class ConversationNotFoundError(RecoverableError):
@@ -72,6 +88,14 @@ class ConversationService:
         project_id: int,
         message_uid: uuid.UUID,
     ) -> Result[Message, MessageNotFoundError]:
+        cache_key = ConversationService._message_set_cache_key(conversation_uid)
+        cached_msg = await cast(
+            Awaitable[str | None],
+            self.redis_client.hget(cache_key, str(message_uid)),
+        )
+        if cached_msg:
+            return Ok(Message.parse_raw(json.loads(cached_msg)))
+
         async with self.session_manager.get_session() as session:
             msg = await self.conversation_repo.getMessageByUuid(
                 session, conversation_uid, project_id, message_uid
@@ -79,7 +103,9 @@ class ConversationService:
             if msg is None:
                 return Err(MessageNotFoundError())
             session.expunge_all()
-            return Ok(msg)
+
+        await self.addConversationMessagesCache(conversation_uid, [msg])
+        return Ok(msg)
 
     async def getConversationMessagesByUuids(
         self,
@@ -90,12 +116,51 @@ class ConversationService:
         if len(message_uids) == 0:
             return Ok([])
 
+        cache_key = ConversationService._message_set_cache_key(conversation_uid)
+        raw_cached_msgs = await cast(
+            Awaitable[list[str | None]],
+            self.redis_client.hmget(
+                cache_key, [str(uid) for uid in message_uids]
+            ),
+        )
+
+        cached_msgs = [
+            Message.parse_raw(json.loads(msg)) for msg in raw_cached_msgs if msg
+        ]
+        if len(cached_msgs) == len(message_uids):
+            return Ok(cached_msgs)
+
+        cached_msg_uids = {msg.uuid for msg in cached_msgs}
+        missing_uids = [
+            uid for uid in message_uids if uid not in cached_msg_uids
+        ]
+
         async with self.session_manager.get_session() as session:
             msgs = await self.conversation_repo.getMessagesByUuids(
-                session, conversation_uid, project_id, message_uids
+                session, conversation_uid, project_id, missing_uids
             )
             session.expunge_all()
-            return Ok(msgs)
+
+        await self.addConversationMessagesCache(conversation_uid, msgs)
+        return Ok([*cached_msgs, *msgs])
+
+    async def addConversationMessagesCache(
+        self, conversation_uid: uuid.UUID, msgs: Sequence[Message]
+    ):
+        if len(msgs) == 0:
+            return
+        cache_key = ConversationService._message_set_cache_key(conversation_uid)
+        mappings = {
+            msg.uuid: json.dumps(asdict(msg), default=json_serializer)
+            for msg in msgs
+        }
+
+        async with self.redis_client.pipeline(
+            transaction=True,
+        ) as pipe:
+            await cast(Awaitable[int], pipe.hset(cache_key, mapping=mappings))
+            await pipe.expire(cache_key, self.setting.cache_ttl)
+            await pipe.execute()
 
     async def deleteConversationMessage(
         self,
@@ -103,10 +168,6 @@ class ConversationService:
         project_id: int,
         message_uid: uuid.UUID,
     ):
-        mess_cache_key = ConversationService._message_cache_key(
-            conversation_uid
-        )
-
         async with self.session_manager.get_session() as session:
             deleted = await self.conversation_repo.deleteMessageByUuid(
                 session, conversation_uid, project_id, message_uid
@@ -115,7 +176,12 @@ class ConversationService:
                 return Err(MessageNotFoundError())
             await session.commit()
 
-        await self.redis_client.delete(mess_cache_key)
+        await self.redis_client.delete(
+            ConversationService._message_set_cache_key(conversation_uid)
+        )
+        await self.redis_client.delete(
+            ConversationService._message_list_cache_key(conversation_uid)
+        )
         return Ok(None)
 
     async def deleteConversation(
@@ -123,10 +189,6 @@ class ConversationService:
         conversation_uid: uuid.UUID,
         project_id: int,
     ):
-        mess_cache_key = ConversationService._message_cache_key(
-            conversation_uid
-        )
-
         async with self.session_manager.get_session() as session:
             deleted = await self.conversation_repo.deleteConversationByUUID(
                 session, conversation_uid, project_id
@@ -135,12 +197,28 @@ class ConversationService:
                 return Err(ConversationNotFoundError())
             await session.commit()
 
-        await self.redis_client.delete(mess_cache_key)
+        await self.redis_client.delete(
+            ConversationService._conversation_cache_key(conversation_uid)
+        )
+        await self.redis_client.delete(
+            ConversationService._message_list_cache_key(conversation_uid)
+        )
+        await self.redis_client.delete(
+            ConversationService._message_set_cache_key(conversation_uid)
+        )
         return Ok(None)
 
     @staticmethod
-    def _message_cache_key(conversation_uid: uuid.UUID) -> str:
-        return f"conversation_cache:{{{conversation_uid}}}"
+    def _conversation_cache_key(conversation_uid: uuid.UUID) -> str:
+        return f"conv_cache:{{{conversation_uid}}}"
+
+    @staticmethod
+    def _message_list_cache_key(conversation_uid: uuid.UUID) -> str:
+        return f"conv_mess_list_cache:{{{conversation_uid}}}"
+
+    @staticmethod
+    def _message_set_cache_key(conversation_uid: uuid.UUID) -> str:
+        return f"conv_mess_set_cache:{{{conversation_uid}}}"
 
     async def updateConversationMetadata(
         self,
