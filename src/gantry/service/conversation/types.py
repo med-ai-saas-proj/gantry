@@ -162,3 +162,32 @@ class ConversationMetadata(TypedDict):
     project_id: int
     extra_metadata: dict | None
     created_at: datetime
+
+
+RequestMessagePart = (
+    SerializedRequestUserPromptMessagePart
+    | SerializedRequestRetryPromptMessagePart
+    | SerializedRequestToolReturnMessagePart
+)
+
+ResponseMessagePart = (
+    SerializedResponseTextMessagePart
+    | SerializedResponseThinkingMessagePart
+    | SerializedResponseToolCallMessagePart
+    | SerializedResponseBuiltInToolCallMessagePart
+    | SerializedResponseBuiltInToolResultMessagePart
+)
+
+
+class ResponseMessage(TypedDict):
+    """Represents a response message in a conversation."""
+
+    kind: Literal["response"]
+    parts: list[ResponseMessagePart]
+
+
+class RequestMessage(TypedDict):
+    """Represents a request message in a conversation."""
+
+    kind: Literal["request"]
+    parts: list[RequestMessagePart]

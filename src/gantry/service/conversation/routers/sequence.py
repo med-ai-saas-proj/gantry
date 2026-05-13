@@ -1,11 +1,8 @@
 from gantry.management.api_key import ApiKeyInfo, requiredPermissions
 
 from ..dtos import (
+    Message,
     AddMessageRequest,
-    RequestMessagePart,
-    ResponseMessagePart,
-    RequestMessageResponse,
-    ResponseMessageResponse,
     CreateConversationRequest,
     CreateConversationResponse,
     ConversationMetadataResponse,
@@ -133,7 +130,7 @@ async def delete_conversation(
     "/{conversation_uid}/messages",
     summary="Get conversation messages",
     description="Endpoint to retrieve conversation details and messages by conversation UID.",
-    response_model=Sequence[ResponseMessageResponse | RequestMessageResponse],
+    response_model=Sequence[Message],
 )
 async def get_conversation_messages(
     conversation_uid: uuid.UUID,
@@ -157,31 +154,18 @@ async def get_conversation_messages(
             order_by=order_by,
         )
     ).unwrap()
-    res: list[ResponseMessageResponse | RequestMessageResponse] = []
+    res: list[Message] = []
 
     for mess in messages:
-        if mess.kind == "request":
-            res.append(
-                RequestMessageResponse(
-                    message_uid=mess.uuid,
-                    kind="request",
-                    parts=cast(list[RequestMessagePart], mess.parts),
-                    model_name=mess.model_name,
-                    timestamp=mess.timestamp,
-                    run_id=mess.run_id,
-                )
+        res.append(
+            Message(
+                message_uid=mess.uuid,
+                payload=mess.payload,
+                run_id=mess.run_id,
+                timestamp=mess.timestamp,
+                extra_metadata=mess.extra_metadata,
             )
-        elif mess.kind == "response":
-            res.append(
-                ResponseMessageResponse(
-                    message_uid=mess.uuid,
-                    kind="response",
-                    parts=cast(list[ResponseMessagePart], mess.parts),
-                    model_name=mess.model_name,
-                    timestamp=mess.timestamp,
-                    run_id=mess.run_id,
-                )
-            )
+        )
     return res
 
 
@@ -240,7 +224,7 @@ async def delete_message_from_conversation(
     "/{conversation_uid}/messages/{message_uid}",
     summary="Get a specific message from the conversation.",
     description="Endpoint to retrieve a specific message from the conversation by conversation UID and message UID.",
-    response_model=ResponseMessageResponse | RequestMessageResponse,
+    response_model=Message,
 )
 async def get_message_from_conversation(
     conversation_uid: uuid.UUID,
@@ -259,21 +243,10 @@ async def get_message_from_conversation(
             message_uid=message_uid,
         )
     ).unwrap()
-    if res.kind == "request":
-        return RequestMessageResponse(
-            message_uid=res.uuid,
-            kind="request",
-            parts=cast(list[RequestMessagePart], res.parts),
-            model_name=res.model_name,
-            timestamp=res.timestamp,
-            run_id=res.run_id,
-        )
-    elif res.kind == "response":
-        return ResponseMessageResponse(
-            message_uid=res.uuid,
-            kind="response",
-            parts=cast(list[ResponseMessagePart], res.parts),
-            model_name=res.model_name,
-            timestamp=res.timestamp,
-            run_id=res.run_id,
-        )
+    return Message(
+        message_uid=res.uuid,
+        payload=res.payload,
+        run_id=res.run_id,
+        timestamp=res.timestamp,
+        extra_metadata=res.extra_metadata,
+    )

@@ -67,6 +67,9 @@ class Conversation(
     )
 
 
+from ag_ui.core.types import Message as AgUiMessage
+
+
 class Message(WithID, WithUUID, ConversationBaseSQLModel):
     """Represents a message in a conversation."""
 
@@ -77,23 +80,20 @@ class Message(WithID, WithUUID, ConversationBaseSQLModel):
         index=True,
         nullable=False,
     )
-    kind: Mapped[str] = mapped_column(String(32), nullable=True)
-    parts: Mapped[list[MessagePart]] = mapped_column(JSONB, nullable=False)
 
-    # metadata fields
-    model_name: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    payload: Mapped[AgUiMessage | dict] = mapped_column(JSONB, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     run_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    extra_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     @classmethod
     def parse_raw(cls, raw: dict) -> "Message":
         mess = Message(
             conversation_id=raw["conversation_id"],
-            kind=raw["kind"],
-            parts=raw["parts"],
-            model_name=raw.get("model_name"),
+            payload=raw["payload"],
             timestamp=raw["timestamp"],
             run_id=raw.get("run_id"),
+            extra_metadata=raw.get("extra_metadata"),
         )
         mess.id = raw["id"]
         mess.uuid = raw["uuid"]

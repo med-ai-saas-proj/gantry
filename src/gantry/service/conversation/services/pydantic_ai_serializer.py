@@ -242,12 +242,14 @@ class PydanticAISerializer(Serializer[ModelMessage]):
                     )
             return Message(
                 conversation_id=conversation_id,
-                kind=msg.kind,
-                parts=parts,
+                payload={
+                    "parts": parts,
+                    "kind": msg.kind,
+                },
                 timestamp=msg.timestamp.astimezone(UTC).replace(tzinfo=None)
                 if msg.timestamp
                 else datetime.now(UTC).replace(tzinfo=None),
-                model_name=None,
+                extra_metadata={},
                 run_id=msg.run_id,
             )
         if msg.kind == "response":
@@ -313,11 +315,15 @@ class PydanticAISerializer(Serializer[ModelMessage]):
                     )
             return Message(
                 conversation_id=conversation_id,
-                kind=msg.kind,
-                model_name=msg.model_name,
-                parts=parts,
+                payload={
+                    "parts": parts,
+                    "kind": msg.kind,
+                },
                 timestamp=msg.timestamp.astimezone(UTC).replace(tzinfo=None),
                 run_id=msg.run_id,
+                extra_metadata={
+                    "model_name": msg.model_name,
+                },
             )
         raise ValueError("Unsupported message kind")
 
@@ -325,9 +331,16 @@ class PydanticAISerializer(Serializer[ModelMessage]):
         self, message: Message, project_id: int
     ) -> ModelMessage:
         """Deserialize a stored Message into a ModelMessage."""
-        if message.kind == "request":
+        payload = message.payload
+        if (
+            not isinstance(payload, dict)
+            or "kind" not in payload
+            or "parts" not in payload
+        ):
+            raise ValueError("Invalid message payload format")
+        if payload["kind"] == "request":
             parts = []
-            for part in message.parts:
+            for part in payload["parts"]:
                 if part["part_kind"] == "user-prompt":
                     part = cast(SerializedRequestUserPromptMessagePart, part)
                     content = await self.deserializePartContent(
@@ -372,9 +385,9 @@ class PydanticAISerializer(Serializer[ModelMessage]):
                 timestamp=message.timestamp if message.timestamp else None,
                 run_id=message.run_id,
             )
-        if message.kind == "response":
+        if payload["kind"] == "response":
             parts = []
-            for part in message.parts:
+            for part in payload["parts"]:
                 if part["part_kind"] == "text":
                     part = cast(SerializedResponseTextMessagePart, part)
                     parts.append(
@@ -439,7 +452,9 @@ class PydanticAISerializer(Serializer[ModelMessage]):
                     )
             return ModelResponse(
                 parts=parts,
-                model_name=message.model_name,
+                model_name=message.extra_metadata.get("model_name")
+                if message.extra_metadata
+                else None,
                 timestamp=message.timestamp,
                 run_id=message.run_id,
             )

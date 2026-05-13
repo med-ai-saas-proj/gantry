@@ -3,10 +3,7 @@ from gantry.shared.utils.json_utils import json_serializer
 from gantry.shared.utils.uuid_utils import uuid7
 
 from .core import ConversationService, ConversationNotFoundError
-from ..dtos import RequestMessage, ResponseMessage
-from ..types import (
-    MessagePart,
-)
+from ..dtos import Message as RequestMessage
 from ..models import (
     Message,
     Conversation,
@@ -125,7 +122,7 @@ class SequenceConversationService(ConversationService):
         self,
         conversation_uid: uuid.UUID,
         project_id: int,
-        msgs: Sequence[RequestMessage | ResponseMessage],
+        msgs: Sequence[RequestMessage],
     ) -> Result[None, ConversationNotFoundError]:
         res = await self.getConversationMetadata(conversation_uid, project_id)
         if res.status == ResultStatus.Err:
@@ -138,11 +135,10 @@ class SequenceConversationService(ConversationService):
             [
                 Message(
                     conversation_id=-1,
-                    kind=msg.kind,
-                    parts=cast(list[MessagePart], msg.parts),
+                    payload=msg.payload if hasattr(msg, "payload") else {},
                     timestamp=msg.timestamp,
-                    model_name=msg.model_name
-                    if hasattr(msg, "model_name")
+                    extra_metadata=msg.extra_metadata
+                    if hasattr(msg, "extra_metadata")
                     else None,
                     run_id=msg.run_id if hasattr(msg, "run_id") else None,
                 )
@@ -270,7 +266,7 @@ class SequenceConversationService(ConversationService):
         self,
         project_id: int,
         extra_metadata: dict | None,
-        messages: Sequence[RequestMessage | ResponseMessage] | None,
+        messages: Sequence[RequestMessage] | None,
     ):
         conversation_uid = uuid7()
         await self._storeConversationMessagesWithCache(
@@ -281,10 +277,11 @@ class SequenceConversationService(ConversationService):
             serialized_msgs=[
                 Message(
                     conversation_id=-1,
-                    kind=msg.kind,
-                    parts=cast(list[MessagePart], msg.parts),
+                    payload=msg.payload if hasattr(msg, "payload") else {},
                     timestamp=msg.timestamp,
-                    model_name=msg.model_name if msg.model_name else None,
+                    extra_metadata=msg.extra_metadata
+                    if hasattr(msg, "extra_metadata")
+                    else None,
                     run_id=msg.run_id if msg.run_id else None,
                 )
                 for msg in messages
