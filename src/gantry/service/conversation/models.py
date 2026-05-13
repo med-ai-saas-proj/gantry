@@ -6,11 +6,9 @@ from gantry.db.utils import (
     WithCreateUpdateTimestamp,
 )
 from gantry.management.project.models import Project
-from gantry.service.conversation.types import MessagePart
 
 import enum
 import uuid
-from typing import TypedDict
 from datetime import datetime
 
 import sqlalchemy
@@ -52,11 +50,14 @@ class Conversation(
         nullable=False,
         server_default=ConversationType.SEQUENCE,
     )
-    tree_structure: Mapped[dict[str, str | None] | None] = mapped_column(
+    tree_structure: Mapped[dict[str, str] | None] = mapped_column(
         JSONB, nullable=True
     )
     active_leaf_message_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True
+    )
+    relationships_map: Mapped[dict[str, str] | None] = mapped_column(
+        JSONB, nullable=True
     )
 
 

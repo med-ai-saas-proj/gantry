@@ -164,8 +164,9 @@ class ConversationMetadata(TypedDict):
     project_id: int
     extra_metadata: dict | None
     created_at: datetime
-    tree_structure: dict[str, str | None] | None
+    tree_structure: dict[str, str] | None
     active_leaf_message_id: uuid.UUID | None
+    relationships_map: dict[str, str] | None
     conversation_type: ConversationType
 
 

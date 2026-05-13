@@ -46,6 +46,7 @@ class ConversationRepository(Repository[Conversation, int]):
                 "tree_structure": conversation.tree_structure,
                 "active_leaf_message_id": conversation.active_leaf_message_id,
                 "conversation_type": conversation.conversation_type,
+                "relationships_map": conversation.relationships_map,
             }
             if conversation
             else None
@@ -183,8 +184,9 @@ class ConversationRepository(Repository[Conversation, int]):
         session: AsyncSession,
         conversation_uuid: uuid.UUID,
         project_id: int,
-        tree_structure: dict[str, str | None],
+        tree_structure: dict[str, str],
         active_leaf_message_id: uuid.UUID | None = None,
+        relationships_map: dict[str, str] | None = None,
     ) -> ConversationMetadata | None:
         stmt = (
             update(Conversation)
@@ -195,6 +197,7 @@ class ConversationRepository(Repository[Conversation, int]):
             .values(
                 tree_structure=tree_structure,
                 active_leaf_message_id=active_leaf_message_id,
+                relationships_map=relationships_map,
             )
             .returning(Conversation)
         )
@@ -210,6 +213,7 @@ class ConversationRepository(Repository[Conversation, int]):
                 "tree_structure": conversation.tree_structure,
                 "active_leaf_message_id": conversation.active_leaf_message_id,
                 "conversation_type": conversation.conversation_type,
+                "relationships_map": conversation.relationships_map,
             }
             if conversation
             else None
@@ -243,6 +247,7 @@ class ConversationRepository(Repository[Conversation, int]):
                 "tree_structure": conversation.tree_structure,
                 "active_leaf_message_id": conversation.active_leaf_message_id,
                 "conversation_type": conversation.conversation_type,
+                "relationships_map": conversation.relationships_map,
             }
             if conversation
             else None

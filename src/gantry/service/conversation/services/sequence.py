@@ -18,6 +18,7 @@ from .serializer import Serializer
 from ..repository import ConversationRepository
 from ...file_storage.services import FileStorageService
 
+import re
 import json
 import uuid
 import asyncio
@@ -170,6 +171,7 @@ class SequenceConversationService(ConversationService):
                     conversation_type=ConversationType.SEQUENCE,
                     tree_structure=None,
                     active_leaf_message_id=None,
+                    relationships_map=None,
                 )
                 session.add(conversation)
                 await session.flush()

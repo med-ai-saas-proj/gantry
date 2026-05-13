@@ -77,6 +77,7 @@ async def get_conversation_metadata(
         tree_structure=metadata.get("tree_structure"),
         active_leaf_message_id=metadata.get("active_leaf_message_id"),
         conversation_type=metadata.get("conversation_type"),
+        relationships_map=metadata.get("relationships_map"),
     )
 
 

@@ -18,12 +18,19 @@ from .serializer import Serializer
 from ..repository import ConversationRepository
 from ...file_storage.services import FileStorageService
 
+import re
 import uuid
 import asyncio
+from hmac import new
 from typing import Literal, Sequence
 
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
+
+
+ROOT_NODE_ID = str(
+    uuid.UUID(int=0)
+)  # a sentinel node id to represent the root of the tree
 
 
 class TreeConversationService(ConversationService):
@@ -79,6 +86,19 @@ class TreeConversationService(ConversationService):
             if metadata["tree_structure"] is not None
             else {}
         )
+
+        if (
+            branch_node_id is not None
+            and str(branch_node_id) not in tree_structure
+        ):
+            return Ok(
+                []
+            )  # if branch_node_id is provided but not found in the tree structure, return empty result as it may indicate client has reached the end of the conversation branch
+        if last_cursor is not None and str(last_cursor) not in tree_structure:
+            return Ok(
+                []
+            )  # if last_cursor is provided but not found in the tree structure, return empty result as it may indicate client has reached the end of the conversation history
+
         stack = []
         cur_node = None
         if branch_node_id is not None:
@@ -90,7 +110,7 @@ class TreeConversationService(ConversationService):
                 else None
             )
 
-        while cur_node is not None:
+        while cur_node is not None and cur_node != ROOT_NODE_ID:
             stack.append(cur_node)
             cur_node = tree_structure.get(cur_node)
 
@@ -159,11 +179,11 @@ class TreeConversationService(ConversationService):
 
     def rebuildTreeStructure(
         self,
-        current_structure: dict[str, str | None],
-        messages: Sequence[Message],
+        current_structure: dict[str, str],  # <message_id, parent_message_id>
+        new_messages: Sequence[Message],
         from_node_id: uuid.UUID | None = None,
         active_leaf_id: uuid.UUID | None = None,
-    ) -> tuple[dict[str, str | None], uuid.UUID]:
+    ) -> tuple[dict[str, str], uuid.UUID]:
         new_structure = current_structure.copy()
         if from_node_id is not None:
             parent_id_str = str(from_node_id)
@@ -180,14 +200,36 @@ class TreeConversationService(ConversationService):
         else:
             parent_id_str = None
 
-        prev_message_id = parent_id_str
-        for msg in messages:
+        prev_message_id = (
+            parent_id_str if parent_id_str is not None else ROOT_NODE_ID
+        )
+        for msg in new_messages:
             msg_id = str(msg.uuid)
             new_structure[msg_id] = prev_message_id
             prev_message_id = msg_id
         if prev_message_id is None:
             raise ValueError("No messages to add to the tree structure.")
         return new_structure, uuid.UUID(prev_message_id)
+
+    def rebuildRelationshipsMap(
+        self,
+        current_map: dict[str, str],  # <message_id, next_message_id>
+        new_messages: Sequence[Message],
+        from_node_id: uuid.UUID | None = None,
+    ) -> dict[str, str]:
+        new_map = current_map.copy()
+        if from_node_id is not None:
+            if str(from_node_id) not in new_map:
+                raise ValueError(
+                    f"from_node_id {from_node_id} not found in current relationships map."
+                )
+        cur_message_id = (
+            str(from_node_id) if from_node_id is not None else ROOT_NODE_ID
+        )
+        for msg in new_messages:
+            new_map[cur_message_id] = str(msg.uuid)
+            cur_message_id = str(msg.uuid)
+        return new_map
 
     # create a new conversation with given messages if conversation_id is None,
     # otherwise append messages to existing conversation
@@ -209,18 +251,20 @@ class TreeConversationService(ConversationService):
     ]:
         async with self.session_manager.get_session() as session:
             if is_new_conversation:
-                tree_structure, active_leaf_id = self.rebuildTreeStructure(
-                    current_structure={},
-                    messages=serialized_msgs,
-                    from_node_id=from_node_id,
+                new_tree_structure, new_active_leaf_id = (
+                    self.rebuildTreeStructure(
+                        current_structure={},
+                        new_messages=serialized_msgs,
+                    )
                 )
                 conversation = Conversation(
                     uuid=conversation_uid,
                     project_id=project_id,
                     extra_metadata=extra_metadata,
                     conversation_type=conversation_type,
-                    tree_structure=tree_structure,
-                    active_leaf_message_id=active_leaf_id,
+                    tree_structure=new_tree_structure,
+                    active_leaf_message_id=new_active_leaf_id,
+                    relationships_map={},
                 )
                 session.add(conversation)
                 await session.flush()
@@ -236,20 +280,30 @@ class TreeConversationService(ConversationService):
                 conversation_id = metadata["conversation_id"]
                 if metadata["conversation_type"] != ConversationType.SEQUENCE:
                     return Err(InvalidConversationTypeError())
-                tree_structure, active_leaf_id = self.rebuildTreeStructure(
-                    current_structure=metadata["tree_structure"]
-                    if metadata["tree_structure"] is not None
+                new_tree_structure, new_active_leaf_id = (
+                    self.rebuildTreeStructure(
+                        current_structure=metadata["tree_structure"]
+                        if metadata["tree_structure"] is not None
+                        else {},
+                        new_messages=serialized_msgs,
+                        from_node_id=from_node_id,
+                        active_leaf_id=metadata["active_leaf_message_id"],
+                    )
+                )
+                new_relationships_map = self.rebuildRelationshipsMap(
+                    current_map=metadata["relationships_map"]
+                    if metadata["relationships_map"] is not None
                     else {},
-                    messages=serialized_msgs,
+                    new_messages=serialized_msgs,
                     from_node_id=from_node_id,
-                    active_leaf_id=metadata["active_leaf_message_id"],
                 )
                 updated_metadata = await self.conversation_repo.updateConversationTreeStructureByUUID(
                     session,
                     conversation_uuid=conversation_uid,
                     project_id=project_id,
-                    tree_structure=tree_structure,
-                    active_leaf_message_id=active_leaf_id,
+                    tree_structure=new_tree_structure,
+                    active_leaf_message_id=new_active_leaf_id,
+                    relationships_map=new_relationships_map,
                 )
                 if updated_metadata is None:
                     return Err(
