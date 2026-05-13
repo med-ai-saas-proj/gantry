@@ -1,7 +1,5 @@
 from gantry.db.session import AsyncSessionManager
-from gantry.shared.utils.json_utils import json_serializer
 from gantry.shared.utils.uuid_utils import uuid7
-from gantry.service.conversation.routers import tree
 from gantry.shared.custom_types.error_exception import InternalServiceError
 
 from .core import (
@@ -23,7 +21,6 @@ from ...file_storage.services import FileStorageService
 import uuid
 import asyncio
 from typing import Literal, Sequence
-from tkinter import N
 
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
@@ -268,6 +265,9 @@ class TreeConversationService(ConversationService):
             await self.addConversationMessagesCache(
                 conversation_uid, serialized_msgs
             )
+        await self.redis_client.delete(
+            ConversationService._conversation_cache_key(conversation_uid)
+        )
         return Ok(None)
 
     async def createConversation(

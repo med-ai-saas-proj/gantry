@@ -14,13 +14,9 @@ from ...file_storage.services import FileStorageService
 
 import json
 import uuid
-from re import M
 from typing import Sequence, Awaitable, cast
-from calendar import c
 from dataclasses import asdict
 
-from jwt import decode
-from redis import cache
 from pyrusult import Ok, Err, Result
 from redis.asyncio import Redis
 
@@ -72,6 +68,15 @@ class ConversationService:
         self, conversation_uid: uuid.UUID, project_id: int
     ) -> Result[ConversationMetadata, ConversationNotFoundError]:
         """Get conversation metadata by its UID and project ID."""
+        cache_key = ConversationService._conversation_cache_key(
+            conversation_uid
+        )
+        cached_metadata = await cast(
+            Awaitable[str | None], self.redis_client.get(cache_key)
+        )
+        if cached_metadata:
+            return Ok(json.loads(cached_metadata))
+
         async with self.session_manager.get_session() as session:
             metadata = (
                 await self.conversation_repo.getConversationMetadataByUUID(
@@ -80,7 +85,13 @@ class ConversationService:
             )
             if metadata is None:
                 return Err(ConversationNotFoundError())
-            return Ok(metadata)
+
+        await self.redis_client.set(
+            cache_key,
+            json.dumps(metadata, default=json_serializer),
+            ex=self.setting.cache_ttl,
+        )
+        return Ok(metadata)
 
     async def getConversationMessageByUuid(
         self,
