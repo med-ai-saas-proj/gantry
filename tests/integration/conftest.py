@@ -12,7 +12,6 @@ import httpx
 import pytest
 from keycloak import KeycloakAdmin
 from testcontainers.core.container import DockerContainer
-from testcontainers.keycloak import KeycloakContainer
 from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
@@ -35,6 +34,31 @@ MAILPIT_IMAGE = os.getenv(
 REQUIRE_FULL_STORAGE = os.getenv(
     "GANTRY_INTEGRATION_REQUIRE_FULL_STORAGE", ""
 ).lower() in {"1", "true", "yes"}
+
+
+class GantryKeycloakContainer(DockerContainer):
+    """Keycloak container with Gantry-specific readiness.
+
+    testcontainers' Keycloak wrapper probes `/health/ready` on the management
+    port. Some Keycloak 26 images still return 404 there while the public realm
+    endpoints are usable. Integration tests need the realm metadata, so we wait
+    on that endpoint directly instead of relying on the wrapper probe.
+    """
+
+    def __init__(self, image: str) -> None:
+        super().__init__(image=image)
+        self.with_exposed_ports(8080)
+        self.with_env("KEYCLOAK_ADMIN", "admin")
+        self.with_env("KEYCLOAK_ADMIN_PASSWORD", "admin")
+        self.with_env("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
+        self.with_env("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin")
+        self.with_env("KC_HEALTH_ENABLED", "true")
+
+    def get_url(self) -> str:
+        return (
+            f"http://{self.get_container_host_ip()}:"
+            f"{self.get_exposed_port(8080)}"
+        )
 
 
 @dataclass(frozen=True)
@@ -136,15 +160,14 @@ def redis_container() -> Iterator[RedisContainer]:
 
 
 @pytest.fixture(scope="session")
-def keycloak_container() -> Iterator[KeycloakContainer]:
+def keycloak_container() -> Iterator[GantryKeycloakContainer]:
     _require_docker()
     realm_file = REPO_ROOT / "asset" / "gantry-realm.json"
-    container = KeycloakContainer(
-        KEYCLOAK_IMAGE,
-        username="admin",
-        password="admin",
-        cmd="start-dev --http-access-log-enabled=true --health-enabled=true",
-    ).with_realm_import_file(str(realm_file))
+    container = (
+        GantryKeycloakContainer(KEYCLOAK_IMAGE)
+        .with_volume_mapping(str(realm_file), "/opt/keycloak/data/import/realm.json")
+        .with_command("start-dev --import-realm --health-enabled=true")
+    )
     with container:
         wait_for_http_200(
             f"{container.get_url()}/realms/{REALM}/.well-known/openid-configuration"
@@ -182,7 +205,7 @@ def redis_url(redis_container: RedisContainer) -> str:
 
 
 @pytest.fixture(scope="session")
-def keycloak_url(keycloak_container: KeycloakContainer) -> str:
+def keycloak_url(keycloak_container: GantryKeycloakContainer) -> str:
     return keycloak_container.get_url()
 
 
@@ -321,7 +344,9 @@ def identity_metadata_url(keycloak_url: str) -> str:
 
 
 @pytest.fixture(scope="session")
-def keycloak_admin_client(keycloak_container: KeycloakContainer) -> KeycloakAdmin:
+def keycloak_admin_client(
+    keycloak_container: GantryKeycloakContainer,
+) -> KeycloakAdmin:
     return KeycloakAdmin(
         server_url=f"{keycloak_container.get_url()}/",
         username="admin",
