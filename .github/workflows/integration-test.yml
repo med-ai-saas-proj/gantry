@@ -1,0 +1,61 @@
+name: Integration Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - main-db-migrations/**
+      - src/gantry/db/**
+      - src/gantry/keycloak/**
+      - src/gantry/management/**
+      - asset/gantry-realm.json
+      - compose.yaml
+      - tests/integration/**
+      - pyproject.toml
+      - uv.lock
+      - .github/workflows/integration-test.yml
+  pull_request:
+    branches: [dev]
+    paths:
+      - main-db-migrations/**
+      - src/gantry/db/**
+      - src/gantry/keycloak/**
+      - src/gantry/management/**
+      - asset/gantry-realm.json
+      - compose.yaml
+      - tests/integration/**
+      - pyproject.toml
+      - uv.lock
+      - .github/workflows/integration-test.yml
+
+concurrency:
+  group: integration-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv python install 3.13.5
+      - run: uv sync --group dev
+      - name: Verify Docker for Testcontainers
+        run: docker info
+      - name: Run Testcontainers integration stories
+        env:
+          PYTHONPATH: src
+          GANTRY_SERVER__CONFIG_FILE: gantry.toml
+          TESTCONTAINERS_RYUK_DISABLED: "false"
+        run: make test-integration
+      - name: Upload integration reports
+        if: ${{ always() && env.ACT != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-reports
+          path: reports/integration
+          if-no-files-found: ignore

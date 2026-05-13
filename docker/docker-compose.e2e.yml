@@ -1,0 +1,39 @@
+services:
+  timescale_db:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gantry -d gantry"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  gantry:
+    # E2E needs the API reachable from the host. The base compose uses
+    # host networking for local development, which Docker Desktop does not
+    # expose consistently, so backend E2E runs gantry on the compose bridge.
+    network_mode: !reset null
+    environment:
+      GANTRY_SERVER__HOST: "0.0.0.0"
+      GANTRY_SERVER__DB__TIMESCALE_CONNECTION_URI: "postgresql+asyncpg://gantry:123456@${E2E_GANTRY_DB_HOST:-timescale_db}:5432/gantry"
+      GANTRY_SERVER__DB__PGVECTOR_CONNECTION_URI: "postgresql+asyncpg://gantry:123456@${E2E_GANTRY_DB_HOST:-timescale_db}:5432/gantry"
+      GANTRY_SERVER__DB__REDIS_CONNECTION_URI: "redis://${E2E_GANTRY_REDIS_HOST:-redis}:6379/0"
+      GANTRY_SERVER__KEYCLOAK__SERVER_URL: "${E2E_GANTRY_KEYCLOAK_URL:-http://keycloak:8080/}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      timescale_db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+      mailpit:
+        condition: service_started
+    ports: !override
+      - "${E2E_HOST_PORT:-8000}:8000"

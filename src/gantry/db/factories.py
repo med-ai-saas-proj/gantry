@@ -29,14 +29,22 @@ def getSessionManager():
 def getRedisConnectionPool():
     return ConnectionPool.from_url(
         getDBSettings().redis_connection_uri.encoded_string(),
+        decode_responses=False,
+    )
+
+
+@lru_cache(1)
+def getRedisTextConnectionPool():
+    return ConnectionPool.from_url(
+        getDBSettings().redis_connection_uri.encoded_string(),
+        decode_responses=True,
     )
 
 
 @lru_cache(1)
 def getRedis() -> Redis:
     return Redis(
-        connection_pool=getRedisConnectionPool(),
-        decode_responses=True,
+        connection_pool=getRedisTextConnectionPool(),
     )
 
 

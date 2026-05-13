@@ -11,7 +11,7 @@ from typing import Any
 import jwt
 from jwt import PyJWKClient
 from keycloak import KeycloakOpenID
-from pyrusult import Ok, Err, Result
+from pyrusult import Ok, Err, Result, ResultStatus
 
 
 class UnauthorizedError(RecoverableError):
@@ -172,7 +172,7 @@ class AuthService:
         other_attributes = (
             await self.keycloak_client.getUserAttributes(claims["sub"])
         ).unwrap()
-        org_id = self._extractOrganizationId(claims.get("organization"))
+        org_id = await self._resolveOrganizationId(claims)
         if self.require_organization_claim and org_id is None:
             return Err(MissingOrganizationClaimError())
 
@@ -188,6 +188,32 @@ class AuthService:
         }
 
         return Ok(auth_info)
+
+    async def _resolveOrganizationId(
+        self, claims: dict[str, Any]
+    ) -> str | None:
+        """Resolve organization id from token claims, then Keycloak membership."""
+        org_id = self._extractOrganizationId(claims.get("organization"))
+        if org_id is not None:
+            return org_id
+
+        if not self.require_organization_claim:
+            return None
+
+        orgs_res = await self.keycloak_client.getMemberOrganizations(
+            claims["sub"]
+        )
+        if orgs_res.status == ResultStatus.Err:
+            orgs_res.unwrap()
+
+        org_ids = {
+            str(org.get("id"))
+            for org in orgs_res.unwrap()
+            if isinstance(org, dict) and org.get("id")
+        }
+        if len(org_ids) == 1:
+            return next(iter(org_ids))
+        return None
 
     def _extractOrganizationId(self, organization_claim: Any) -> str | None:
         """Extract an organization id from supported Keycloak claim shapes."""

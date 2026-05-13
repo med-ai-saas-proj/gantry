@@ -1,0 +1,161 @@
+{
+  "CaptureRequest": {
+    "properties": {
+      "real_amount": {
+        "$ref": "#/components/schemas/ScaledAmount"
+      }
+    },
+    "required": [
+      "real_amount"
+    ],
+    "title": "CaptureRequest",
+    "type": "object"
+  },
+  "CreditInfoResponse": {
+    "properties": {
+      "amount": {
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+        "title": "Amount",
+        "type": "string"
+      }
+    },
+    "required": [
+      "amount"
+    ],
+    "title": "CreditInfoResponse",
+    "type": "object"
+  },
+  "InvoiceDetailInfoResponse": {
+    "properties": {
+      "billing_period": {
+        "format": "date",
+        "title": "Billing Period",
+        "type": "string"
+      },
+      "details": {
+        "additionalProperties": true,
+        "title": "Details",
+        "type": "object"
+      },
+      "invoice_uid": {
+        "format": "uuid",
+        "title": "Invoice Uid",
+        "type": "string"
+      },
+      "line_items": {
+        "items": {
+          "$ref": "#/components/schemas/InvoiceItemInfoResponse"
+        },
+        "title": "Line Items",
+        "type": "array"
+      },
+      "paid_at": {
+        "anyOf": [
+          {
+            "format": "date-time",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Paid At"
+      },
+      "total_amount": {
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+        "title": "Total Amount",
+        "type": "string"
+      },
+      "used_credits": {
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+        "title": "Used Credits",
+        "type": "string"
+      }
+    },
+    "required": [
+      "invoice_uid",
+      "billing_period",
+      "total_amount",
+      "paid_at",
+      "details",
+      "used_credits",
+      "line_items"
+    ],
+    "title": "InvoiceDetailInfoResponse",
+    "type": "object"
+  },
+  "InvoiceInfoResponse": {
+    "properties": {
+      "billing_period": {
+        "format": "date",
+        "title": "Billing Period",
+        "type": "string"
+      },
+      "details": {
+        "additionalProperties": true,
+        "title": "Details",
+        "type": "object"
+      },
+      "invoice_uid": {
+        "format": "uuid",
+        "title": "Invoice Uid",
+        "type": "string"
+      },
+      "paid_at": {
+        "anyOf": [
+          {
+            "format": "date-time",
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Paid At"
+      },
+      "total_amount": {
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+        "title": "Total Amount",
+        "type": "string"
+      },
+      "used_credits": {
+        "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+        "title": "Used Credits",
+        "type": "string"
+      }
+    },
+    "required": [
+      "invoice_uid",
+      "billing_period",
+      "total_amount",
+      "paid_at",
+      "details",
+      "used_credits"
+    ],
+    "title": "InvoiceInfoResponse",
+    "type": "object"
+  },
+  "PostRequest": {
+    "properties": {
+      "amount": {
+        "$ref": "#/components/schemas/ScaledAmount"
+      },
+      "capture": {
+        "default": false,
+        "title": "Capture",
+        "type": "boolean"
+      },
+      "details": {
+        "additionalProperties": true,
+        "default": {},
+        "title": "Details",
+        "type": "object"
+      }
+    },
+    "required": [
+      "amount"
+    ],
+    "title": "PostRequest",
+    "type": "object"
+  }
+}

@@ -4,6 +4,7 @@ from gantry.db import AsyncSessionManager, getRedisConnectionPool
 from gantry.settings import ApiKeyPermission
 from gantry.management.project import ProjectRepository, ProjectNotFoundError
 from gantry.management.organization import getOrgSettings
+from gantry.shared.utils.uuid_utils import uuid7
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
@@ -26,7 +27,6 @@ from .entities import (
 from .repositories import ApiKeyRepository
 
 import hmac
-import uuid
 import asyncio
 import secrets
 from typing import Callable, Sequence, TypedDict, NotRequired
@@ -359,13 +359,15 @@ class ApiKeyService:
         project_id, _, normalized_project_uuid = project_res.unwrap()
 
         api_key_secret = self._createApiKeySecret()
-        formatted_key = self.api_key_format(str(uuid.uuid4()), api_key_secret)
+        api_key_uuid = uuid7()
+        formatted_key = self.api_key_format(str(api_key_uuid), api_key_secret)
         hashed_key = self._hashApiKey(formatted_key)
         hint = self.generateHint(formatted_key)
 
         async with self.session_manager.get_session() as session:
             created = await self.api_key_repo.create(
                 session,
+                api_key_uuid=api_key_uuid,
                 user_id=actor_user_id,
                 project_id=project_id,
                 hashed_key=hashed_key,

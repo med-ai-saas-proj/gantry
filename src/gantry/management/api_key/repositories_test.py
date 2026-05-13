@@ -193,6 +193,7 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
 
         result = await self.repo.create(
             self.session,
+            api_key_uuid=uuid4(),
             user_id="u1",
             project_id=7,
             hashed_key="hashed",

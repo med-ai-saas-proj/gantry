@@ -3,11 +3,11 @@
 from gantry.db import Repository, CacheRepository
 from gantry.management.project import Project, ProjectSettings
 from gantry.management.organization import OrgSettings
-from gantry.shared.utils.uuid_utils import uuid7
 
 from .models import ApiKey
 from .entities import ApiKeyInfo, ApiKeyContextRecord
 
+from uuid import UUID
 from typing import Sequence
 
 from sqlalchemy import func, delete, insert, select, update
@@ -190,6 +190,7 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         self,
         session: AsyncSession,
         *,
+        api_key_uuid: UUID,
         user_id: str,
         project_id: int,
         hashed_key: str,
@@ -201,7 +202,7 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         stmt = (
             insert(ApiKey)
             .values(
-                uuid=uuid7(),
+                uuid=api_key_uuid,
                 user_id=user_id,
                 project_id=project_id,
                 hashed_key=hashed_key,

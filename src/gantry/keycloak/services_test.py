@@ -9,7 +9,7 @@ from gantry.keycloak.services import (
 import unittest
 from unittest.mock import AsyncMock
 
-from pyrusult import ResultStatus
+from pyrusult import Ok, ResultStatus
 
 
 def _client(admin=None) -> KeycloakServiceClient:
@@ -90,6 +90,24 @@ class TestKeycloakServiceClientAdminLists(unittest.IsolatedAsyncioTestCase):
         admin.a_organization_user_add.assert_awaited_once_with(
             "user-1",
             "org-1",
+        )
+
+    async def test_get_member_organizations_uses_keycloak_26_endpoint(self):
+        response = type("Response", (), {})()
+        response.status_code = 200
+        response.content = b"[]"
+        response.json = lambda: [{"id": "org-1", "name": "Org 1"}]
+        client = _client(type("Admin", (), {})())
+        client._rawRequest = AsyncMock(return_value=Ok(response))
+
+        result = await client.getMemberOrganizations("user-1")
+
+        self.assertEqual(result.status, ResultStatus.Ok)
+        self.assertEqual(result.unwrap()[0]["id"], "org-1")
+        client._rawRequest.assert_awaited_once_with(
+            "get",
+            "/admin/realms/gantry/organizations/members/user-1/organizations",
+            params={"briefRepresentation": "true"},
         )
 
     async def test_list_users_forwards_pagination_and_search(self):
