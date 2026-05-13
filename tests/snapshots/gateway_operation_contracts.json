@@ -1,6 +1,6 @@
 {
   "DELETE /{route_name}": {
-    "operationId": "gateway_proxy_delete_route_name",
+    "operationId": "gateway_proxy",
     "parameters": [
       {
         "in": "path",
@@ -40,7 +40,7 @@
     ]
   },
   "DELETE /{route_name}/{full_path}": {
-    "operationId": "gateway_proxy_delete_route_name_full_path",
+    "operationId": "gateway_proxy",
     "parameters": [
       {
         "in": "path",
@@ -80,7 +80,7 @@
     ]
   },
   "GET /{route_name}": {
-    "operationId": "gateway_proxy_get_route_name",
+    "operationId": "gateway_proxy",
     "parameters": [
       {
         "in": "path",
@@ -120,7 +120,7 @@
     ]
   },
   "GET /{route_name}/{full_path}": {
-    "operationId": "gateway_proxy_get_route_name_full_path",
+    "operationId": "gateway_proxy",
     "parameters": [
       {
         "in": "path",
@@ -160,7 +160,7 @@
     ]
   },
   "PATCH /{route_name}": {
-    "operationId": "gateway_proxy_patch_route_name",
+    "operationId": "gateway_proxy",
     "parameters": [
       {
         "in": "path",
@@ -200,7 +200,7 @@
     ]
   },
   "PATCH /{route_name}/{full_path}": {
-    "operationId": "gateway_proxy_patch_route_name_full_path",
+    "operationId": "gateway_proxy",
     "parameters": [
       {
         "in": "path",
@@ -240,7 +240,7 @@
     ]
   },
   "POST /{route_name}": {
-    "operationId": "gateway_proxy_post_route_name",
+    "operationId": "gateway_proxy",
     "parameters": [
       {
         "in": "path",
@@ -280,7 +280,7 @@
     ]
   },
   "POST /{route_name}/{full_path}": {
-    "operationId": "gateway_proxy_post_route_name_full_path",
+    "operationId": "gateway_proxy",
     "parameters": [
       {
         "in": "path",
@@ -320,7 +320,7 @@
     ]
   },
   "PUT /{route_name}": {
-    "operationId": "gateway_proxy_put_route_name",
+    "operationId": "gateway_proxy",
     "parameters": [
       {
         "in": "path",
@@ -360,7 +360,7 @@
     ]
   },
   "PUT /{route_name}/{full_path}": {
-    "operationId": "gateway_proxy_put_route_name_full_path",
+    "operationId": "gateway_proxy",
     "parameters": [
       {
         "in": "path",
