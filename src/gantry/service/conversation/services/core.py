@@ -112,9 +112,9 @@ class ConversationService:
         conversation_uid: uuid.UUID,
         project_id: int,
         message_uids: Sequence[uuid.UUID],
-    ) -> Result[Sequence[Message], MessageNotFoundError]:
+    ) -> Sequence[Message]:
         if len(message_uids) == 0:
-            return Ok([])
+            return []
 
         cache_key = ConversationService._message_set_cache_key(conversation_uid)
         raw_cached_msgs = await cast(
@@ -128,7 +128,7 @@ class ConversationService:
             Message.parse_raw(json.loads(msg)) for msg in raw_cached_msgs if msg
         ]
         if len(cached_msgs) == len(message_uids):
-            return Ok(cached_msgs)
+            return cached_msgs
 
         cached_msg_uids = {msg.uuid for msg in cached_msgs}
         missing_uids = [
@@ -142,7 +142,7 @@ class ConversationService:
             session.expunge_all()
 
         await self.addConversationMessagesCache(conversation_uid, msgs)
-        return Ok([*cached_msgs, *msgs])
+        return [*cached_msgs, *msgs]
 
     async def addConversationMessagesCache(
         self, conversation_uid: uuid.UUID, msgs: Sequence[Message]

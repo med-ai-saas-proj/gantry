@@ -1,6 +1,7 @@
 from gantry.db.session import AsyncSessionManager
 from gantry.shared.utils.json_utils import json_serializer
 from gantry.shared.utils.uuid_utils import uuid7
+from gantry.service.conversation.routers import tree
 from gantry.shared.custom_types.error_exception import InternalServiceError
 
 from .core import (
@@ -19,11 +20,10 @@ from .serializer import Serializer
 from ..repository import ConversationRepository
 from ...file_storage.services import FileStorageService
 
-import json
 import uuid
 import asyncio
-from typing import Literal, Sequence, Awaitable, cast
-from dataclasses import asdict
+from typing import Literal, Sequence
+from tkinter import N
 
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
@@ -36,9 +36,10 @@ class TreeConversationService(ConversationService):
         self,
         conversation_uid: uuid.UUID,
         project_id: int,
-        offset: int = 0,
         limit: int = 20,
         order_by: Literal["asc", "desc"] = "asc",
+        last_cursor: uuid.UUID | None = None,
+        branch_node_id: uuid.UUID | None = None,
     ) -> Result[Sequence[Message], ConversationNotFoundError]:
         async with self.session_manager.get_session() as session:
             metadata = (
@@ -48,24 +49,82 @@ class TreeConversationService(ConversationService):
             )
             if metadata is None:
                 return Err(ConversationNotFoundError())
-        messages = await self._getConversationMessagesWithCache(
-            metadata["conversation_id"],
-            conversation_uid,
-            offset=offset,
+        return await self._getConversationMessagesWithCache(
+            conversation_uid=conversation_uid,
+            project_id=project_id,
+            last_cursor=last_cursor,
             limit=limit,
             order_by=order_by,
+            branch_node_id=branch_node_id,
         )
-        return Ok(messages)
 
     async def _getConversationMessagesWithCache(
         self,
-        conversation_id: int,
         conversation_uid: uuid.UUID,
-        offset: int = 0,
+        project_id: int,
+        last_cursor: uuid.UUID | None = None,
         limit: int = 20,
         order_by: Literal["asc", "desc"] = "asc",
-    ) -> Sequence[Message]:
-        return []  # get active branch messages
+        branch_node_id: uuid.UUID | None = None,
+    ) -> Result[Sequence[Message], ConversationNotFoundError]:
+        async with self.session_manager.get_session() as session:
+            metadata = (
+                await self.conversation_repo.getConversationMetadataByUUID(
+                    session, conversation_uid, project_id=project_id
+                )
+            )
+            if metadata is None:
+                return Err(ConversationNotFoundError())
+        if metadata["conversation_type"] != ConversationType.TREE:
+            raise InvalidConversationTypeError()
+        tree_structure = (
+            metadata["tree_structure"]
+            if metadata["tree_structure"] is not None
+            else {}
+        )
+        stack = []
+        cur_node = None
+        if branch_node_id is not None:
+            cur_node = str(branch_node_id)
+        else:
+            cur_node = (
+                str(metadata["active_leaf_message_id"])
+                if metadata["active_leaf_message_id"] is not None
+                else None
+            )
+
+        while cur_node is not None:
+            stack.append(cur_node)
+            cur_node = tree_structure.get(cur_node)
+
+        if order_by == "asc":
+            stack.reverse()
+
+        if last_cursor is not None:
+            last_cursor_str = str(last_cursor)
+            if last_cursor_str in stack:
+                if last_cursor_str in stack:
+                    cursor_idx = stack.index(last_cursor_str)
+                    stack = stack[cursor_idx + 1 :]
+            else:
+                # if last_cursor is not found, return empty result as it may indicate client has reached the end of the conversation history
+                return Ok([])
+
+        stack = stack[:limit]
+
+        if len(stack) == 0:
+            return Ok([])
+
+        messages = await self.getConversationMessagesByUuids(
+            conversation_uid=conversation_uid,
+            message_uids=[uuid.UUID(msg_id) for msg_id in stack],
+            project_id=project_id,
+        )
+        messages_dict = {str(msg.uuid): msg for msg in messages}
+        sorted_messages = [
+            messages_dict[msg_id] for msg_id in stack if msg_id in messages_dict
+        ]
+        return Ok(sorted_messages)
 
     async def storeConversationMessages(
         self,
@@ -268,18 +327,20 @@ class TreeConversationWithSerializerService[T](TreeConversationService):
 
     async def getAndDeserializeConversationMessages(
         self,
-        conversation_id: int,
         conversation_uid: uuid.UUID,
         project_id: int,
         limit: int = 20,
     ) -> Sequence[T]:
-        serialized_msgs = await self._getConversationMessagesWithCache(
-            conversation_id,
-            conversation_uid,
-            offset=0,
-            limit=limit,
-            order_by="desc",
-        )
+        serialized_msgs = (
+            await self._getConversationMessagesWithCache(
+                conversation_uid,
+                last_cursor=None,
+                limit=limit,
+                order_by="desc",
+                branch_node_id=None,
+                project_id=project_id,
+            )
+        ).unwrap()
         tasks = [
             self.serializer.deserializeConversationMessages(
                 msg, project_id=project_id
