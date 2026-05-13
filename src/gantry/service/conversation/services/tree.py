@@ -128,6 +128,7 @@ class TreeConversationService(ConversationService):
         conversation_uid: uuid.UUID,
         project_id: int,
         msgs: Sequence[RequestMessage],
+        from_node_id: uuid.UUID | None = None,
     ) -> Result[
         None,
         ConversationNotFoundError
@@ -153,6 +154,7 @@ class TreeConversationService(ConversationService):
             if msgs is not None
             else [],
             conversation_type=ConversationType.SEQUENCE,
+            from_node_id=from_node_id,
         )
 
     def rebuildTreeStructure(

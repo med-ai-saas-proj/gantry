@@ -1,6 +1,7 @@
 from gantry.db.factories import getRedis, getSessionManager
 from gantry.shared.logging.logger import getLogger
 from gantry.service.file_storage.factories import getFileStorageService
+from gantry.service.conversation.services.tree import TreeConversationService
 from gantry.service.conversation.services.pydantic_ai_serializer import (
     PydanticAISerializer,
 )
@@ -35,6 +36,18 @@ def getPydanticAISequenceConversationService():
 def getSequenceConversationService():
     """Returns a cached instance of the ConversationService."""
     return SequenceConversationService(
+        getSessionManager(),
+        ConversationRepository(),
+        getFileStorageService(),
+        getRedis(),
+        getConversationSettings(),
+    )
+
+
+@lru_cache(1)
+def getTreeConversationService():
+    """Returns a cached instance of the ConversationService."""
+    return TreeConversationService(
         getSessionManager(),
         ConversationRepository(),
         getFileStorageService(),

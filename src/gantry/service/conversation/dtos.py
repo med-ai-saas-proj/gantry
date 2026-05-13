@@ -1,9 +1,13 @@
+from gantry.service.conversation.models import ConversationType
+
 import uuid
 from re import A
+from ast import Add
 from typing import Sequence
 from datetime import datetime
 
 from pydantic import BaseModel
+from redis.utils import C
 from ag_ui.core.types import Message as AgUiMessage
 
 
@@ -19,6 +23,10 @@ class AddMessageRequest(BaseModel):
     """Represents a request to add a message to a conversation."""
 
     messages: Sequence[Message]
+
+
+class AddTreeMessageRequest(AddMessageRequest):
+    from_message_uid: uuid.UUID | None = None
 
 
 class CreateConversationRequest(BaseModel):
@@ -41,6 +49,9 @@ class ConversationMetadataResponse(BaseModel):
     project_id: int
     extra_metadata: dict | None = None
     created_at: datetime
+    tree_structure: dict[str, str | None] | None
+    active_leaf_message_id: uuid.UUID | None = None
+    conversation_type: ConversationType
 
 
 class UpdateConversationMetadataRequest(BaseModel):
