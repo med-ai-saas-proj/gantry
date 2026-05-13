@@ -346,7 +346,22 @@ class FileStorageService:
                 return Err(FileNotFoundInSystemError())
 
             await session.commit()
-        await self.redis.delete(cache_key)  # Invalidate cache
+
+            res: FileRecord = {
+                "id": file_record.id,
+                "uid": file_record.uuid,
+                "filename": file_record.original_filename,
+                "storage_path": file_record.filepath,
+                "mime_type": file_record.mime_type,
+                "size": file_record.size_in_bytes,
+                "created_at": file_record.created_at,
+                "extra_metadata": file_record.extra_metadata,
+            }
+        await self.redis.set(
+            cache_key,
+            json.dumps(res, default=json_serializer),
+            ex=self.file_storage_settings.redis_cache_expiry_seconds,
+        )
         return Ok(None)
 
     async def updateFileMetadataByProjectUUID(

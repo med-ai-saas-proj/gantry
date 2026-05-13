@@ -21,7 +21,7 @@ class CreditService:
             credit = await self.credit_repository.getCreditByOrgId(
                 session, org_id
             )
-        return credit.amount if credit else Decimal(0)
+            return credit.amount if credit else Decimal(0)
 
     async def addCredits(
         self,

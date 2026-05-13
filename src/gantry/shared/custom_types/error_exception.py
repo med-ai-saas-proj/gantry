@@ -48,6 +48,8 @@ class RecoverableError(Exception):
             res.update({"code": self.code})
         if self.detail:
             res.update({"detail": self.detail})
+        if self.message:
+            res.update({"message": self.message})
         return res
 
 
@@ -71,6 +73,8 @@ class UnrecoverableError(Exception):
         res: ProblemDetails = {"status": 500, "title": "Unrecoverable Error"}
         if self.detail:
             res.update({"detail": self.detail})
+        if self.message:
+            res.update({"message": self.message})
         return res
 
 
