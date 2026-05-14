@@ -50,6 +50,9 @@ class ProjectRepository(Repository[Project, int]):
         res = await session.execute(stmt)
         res = res.scalar_one()
         await self.cache_repo.setCache(self.getCacheKey(res.uuid), res)
+        await self.cache_repo.invalidateCached(
+            self.getCacheKey(organization_id)
+        )
         return res
 
     async def getByUuid(
@@ -94,7 +97,9 @@ class ProjectRepository(Repository[Project, int]):
         res = await session.execute(stmt)
         res = res.scalar_one_or_none()
         if res is not None:
-            await self.cache_repo.setCache(self.getCacheKey(project_uuid), res)
+            await self.cache_repo.invalidateCached(
+                self.getCacheKey(project_uuid)
+            )
         return res
 
     async def listByOrg(

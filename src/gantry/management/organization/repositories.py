@@ -77,7 +77,7 @@ class OrgSettingsRepository(Repository[OrgSettings, str]):
         )
         result = await session.execute(stmt)
         result = result.scalar_one()
-        await self.cache_repo.setCache(self.getCacheKey(org_id), result)
+        await self.cache_repo.invalidateCached(self.getCacheKey(org_id))
         return result
 
     async def deleteByOrgId(self, session: AsyncSession, org_id: str) -> bool:
