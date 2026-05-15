@@ -108,21 +108,6 @@ project-includes = ["src", "scripts", "alembic", "templates"]
 project-excludes = ["**/.[!/.]*", "**/tests", "**/__pycache__"]
 search-path = ["."]
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
-addopts = "-v --tb=short -p no:warnings"
-markers = [
-    "api: HTTP contract tests with mocked external services",
-    "integration: real service wiring with Docker containers",
-    "regression: snapshot, backward compatibility, and OpenAPI fuzz tests",
-    "performance: benchmark and load tests",
-    "e2e: backend-first full-stack E2E tests",
-    "backend_e2e: backend-first full-stack E2E tests without frontend UI",
-    "automation: scheduled/headless automation checks",
-    "smoke: quick sanity checks run on every deploy",
-]
-
 [tool.coverage.run]
 source = ["src/gantry"]
 omit = ["*/tests/*", "*/migrations/*"]
