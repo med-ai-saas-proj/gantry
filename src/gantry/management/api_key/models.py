@@ -46,4 +46,4 @@ class ApiKey(WithCreateUpdateTimestamp, WithID, WithUUID, ApiKeyBaseSQLModel):
         index=True,
     )
 
-    project: Mapped[Project] = relationship(Project)
+    # project: Mapped[Project] = relationship(Project)
