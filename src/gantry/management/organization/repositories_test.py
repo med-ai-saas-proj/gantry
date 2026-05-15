@@ -111,7 +111,7 @@ class TestOrgSettingsRepository(unittest.IsolatedAsyncioTestCase):
         self.assertIn("rate_limit", str(stmt))
         self.assertIn("RETURNING", str(stmt))
 
-    async def test_upsert_sets_cache_with_fresh_settings(self):
+    async def test_upsert_invalidates_settings_cache(self):
         cache_repo = _CacheSpy()
         repo = OrgSettingsRepository(cache_repo)
         session = Mock()
@@ -128,9 +128,8 @@ class TestOrgSettingsRepository(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result, "settings")
-        self.assertEqual(
-            cache_repo.set_items, [("org:settings:org-1", "settings")]
-        )
+        self.assertEqual(cache_repo.invalidated_keys, ["org:settings:org-1"])
+        self.assertEqual(cache_repo.set_items, [])
 
     async def test_delete_by_org_id_invalidates_cache(self):
         cache_repo = _CacheSpy(cached="settings")
