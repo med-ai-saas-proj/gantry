@@ -267,6 +267,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         service.project_repo.getByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid="p1",
+                organization_id="org-1",
                 is_archived=False,
             )
         )
@@ -282,6 +283,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         service.project_repo.getByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid="p1",
+                organization_id="org-1",
                 is_archived=True,
             )
         )
@@ -297,6 +299,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         service.project_repo.getByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid="p1",
+                organization_id="org-1",
                 is_archived=True,
             )
         )
@@ -322,7 +325,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
             == ResultStatus.Err
         )
 
-        service.project_repo.getSnapshotByUuid = AsyncMock(return_value=None)
+        service.project_repo.getByUuid = AsyncMock(return_value=None)
         self.assertTrue(
             (await service._getProjectOrErr("missing")).status
             == ResultStatus.Err

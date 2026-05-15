@@ -161,8 +161,8 @@ class ProjectService:
     ) -> Result[tuple[int, str, ProjectInfoResponse], ProjectNotFoundError]:
         """Load a project row and map it into the public DTO shape."""
         async with self.session_manager.get_session() as session:
-            project = await self.project_repo.getSnapshotByUuid(
-                session, project_uuid
+            project = await self.project_repo.getByUuid(
+                session, project_uuid, use_cache=False
             )
             if project is None:
                 return Err(ProjectNotFoundError())
@@ -171,7 +171,7 @@ class ProjectService:
                     project.id,
                     project.organization_id,
                     ProjectInfoResponse(
-                        project_uuid=project.uuid,
+                        project_uuid=str(project.uuid),
                         name=project.name,
                         description=project.description,
                         organization_id=project.organization_id,
@@ -563,7 +563,6 @@ class ProjectService:
                 archived=project.is_archived,
             )
             await session.commit()
-            await self.project_repo.setSnapshotCache(project)
             return Ok(output)
 
     async def getProject(
@@ -621,7 +620,6 @@ class ProjectService:
                 archived=updated.is_archived,
             )
             await session.commit()
-            await self.project_repo.setSnapshotCache(updated)
             return Ok(output)
 
     async def getProjectSettings(
@@ -963,7 +961,9 @@ class ProjectService:
     ]:
         """Archive or unarchive a project after validating current state."""
         async with self.session_manager.get_session() as session:
-            project = await self.project_repo.getByUuid(session, project_uuid)
+            project = await self.project_repo.getByUuid(
+                session, project_uuid, use_cache=False
+            )
             if project is None:
                 return Err(ProjectNotFoundError())
             # Archived project is immutable except owner-triggered unarchive.
@@ -976,16 +976,17 @@ class ProjectService:
                 archived=project.is_archived,
             )
             await session.commit()
-            await self.project_repo.setSnapshotCache(project)
+            await self.project_repo.invalidateProjectCache(
+                project.uuid,
+                project.organization_id,
+            )
             return Ok(output)
 
     async def isProjectArchived(
         self, project_uuid: str
     ) -> Result[bool, ProjectNotFoundError]:
         async with self.session_manager.get_session() as session:
-            project = await self.project_repo.getSnapshotByUuid(
-                session, project_uuid
-            )
+            project = await self.project_repo.getByUuid(session, project_uuid)
             if project is None:
                 return Err(ProjectNotFoundError())
             return Ok(project.is_archived)

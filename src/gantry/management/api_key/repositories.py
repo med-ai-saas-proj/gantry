@@ -21,6 +21,18 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         self.cache_repo = cache_repo
         super().__init__(ApiKey, ApiKey.id)
 
+    @staticmethod
+    def contextRecordCacheKey(hashed_key: str) -> str:
+        return f"api_keys:context_record:{hashed_key}"
+
+    async def invalidateContextRecordCache(self, hashed_key: str) -> None:
+        """Drop cached runtime context after mutable API-key changes."""
+        if not hashed_key:
+            return
+        await self.cache_repo.invalidateCached(
+            self.contextRecordCacheKey(hashed_key)
+        )
+
     async def getByHashedKey(
         self, session: AsyncSession, hashed_key: str
     ) -> ApiKey | None:
@@ -105,7 +117,7 @@ class ApiKeyRepository(Repository[ApiKey, int]):
             )
 
         return await self.cache_repo.getCachedOrCall(
-            f"api_keys:context_record:{hashed_key}", _inner
+            self.contextRecordCacheKey(hashed_key), _inner
         )
 
     async def getByHashedKeys(

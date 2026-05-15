@@ -83,8 +83,8 @@ class BaseProjectServiceTest(unittest.IsolatedAsyncioTestCase):
     def _make_service(self) -> ProjectService:
         self.session_manager = _DummySessionManager()
         project_repo = Mock()
-        project_repo.getSnapshotByUuid = AsyncMock()
-        project_repo.setSnapshotCache = AsyncMock()
+        project_repo.getByUuid = AsyncMock()
+        project_repo.invalidateProjectCache = AsyncMock()
         service = ProjectService(
             session_manager=self.session_manager,
             logger=Mock(),

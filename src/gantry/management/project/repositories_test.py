@@ -12,7 +12,6 @@ os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
 from gantry.db.repositories import CacheRepository
 from gantry.management.project.repositories import (
-    ProjectSnapshot,
     ProjectRepository,
     ProjectSettingsRepository,
 )
@@ -51,11 +50,38 @@ class _CacheSpy(CacheRepository):
 
 
 class TestProjectRepository(unittest.IsolatedAsyncioTestCase):
-    async def test_get_snapshot_by_uuid_cache_hit_skips_db(self):
+    async def test_create_invalidates_org_list_without_caching_uncommitted_project(
+        self,
+    ):
         project_uuid = uuid4()
-        cached = ProjectSnapshot(
+        cache_repo = _CacheSpy()
+        repo = ProjectRepository(cache_repo)
+        session = Mock()
+        execute_res = Mock()
+        execute_res.scalar_one.return_value = SimpleNamespace(
+            uuid=project_uuid,
+        )
+        session.execute = AsyncMock(return_value=execute_res)
+
+        result = await repo.create(
+            session,
+            name="project",
+            description="desc",
+            organization_id="org-1",
+        )
+
+        self.assertEqual(result.uuid, project_uuid)
+        self.assertEqual(cache_repo.set_items, [])
+        self.assertEqual(
+            cache_repo.invalidated_keys,
+            [ProjectRepository.getOrgProjectsCacheKey("org-1")],
+        )
+
+    async def test_get_by_uuid_cache_hit_skips_db(self):
+        project_uuid = uuid4()
+        cached = SimpleNamespace(
             id=7,
-            uuid=str(project_uuid),
+            uuid=project_uuid,
             name="cached",
             description=None,
             organization_id="org-1",
@@ -66,7 +92,7 @@ class TestProjectRepository(unittest.IsolatedAsyncioTestCase):
         session = Mock()
         session.execute = AsyncMock()
 
-        result = await repo.getSnapshotByUuid(session, str(project_uuid))
+        result = await repo.getByUuid(session, str(project_uuid))
 
         self.assertEqual(result, cached)
         self.assertEqual(
@@ -75,13 +101,12 @@ class TestProjectRepository(unittest.IsolatedAsyncioTestCase):
         )
         session.execute.assert_not_awaited()
 
-    async def test_get_snapshot_by_uuid_cache_miss_caches_plain_snapshot(self):
+    async def test_get_by_uuid_cache_miss_queries_and_caches_project(self):
         project_uuid = uuid4()
         cache_repo = _CacheSpy()
         repo = ProjectRepository(cache_repo)
         session = Mock()
-        execute_res = Mock()
-        execute_res.one_or_none.return_value = SimpleNamespace(
+        project = SimpleNamespace(
             id=9,
             uuid=project_uuid,
             name="db-project",
@@ -89,33 +114,100 @@ class TestProjectRepository(unittest.IsolatedAsyncioTestCase):
             organization_id="org-1",
             is_archived=True,
         )
+        execute_res = Mock()
+        execute_res.scalar_one_or_none.return_value = project
         session.execute = AsyncMock(return_value=execute_res)
 
-        result = await repo.getSnapshotByUuid(session, str(project_uuid))
+        result = await repo.getByUuid(session, str(project_uuid))
 
+        self.assertEqual(result, project)
+        session.execute.assert_awaited_once()
         self.assertEqual(
-            result,
-            ProjectSnapshot(
-                id=9,
-                uuid=str(project_uuid),
-                name="db-project",
-                description="db",
-                organization_id="org-1",
-                is_archived=True,
-            ),
+            cache_repo.get_keys,
+            [ProjectRepository.getCacheKey(project_uuid)],
         )
-        self.assertEqual(len(cache_repo.set_items), 1)
-        self.assertIsInstance(cache_repo.set_items[0][1], ProjectSnapshot)
+        self.assertEqual(
+            cache_repo.set_items,
+            [(ProjectRepository.getCacheKey(project_uuid), project)],
+        )
+        stmt = session.execute.await_args.args[0]
+        self.assertIn(".uuid", str(stmt))
+        self.assertIn("LIMIT", str(stmt))
 
-    async def test_get_snapshot_by_uuid_invalid_uuid_skips_db(self):
+    async def test_update_by_uuid_invalidates_project_cache_on_success(self):
+        project_uuid = str(uuid4())
+        cache_repo = _CacheSpy(cached="old")
+        repo = ProjectRepository(cache_repo)
+        session = Mock()
+        execute_res = Mock()
+        execute_res.scalar_one_or_none.return_value = SimpleNamespace(
+            id=9,
+            uuid=project_uuid,
+            name="updated",
+            description=None,
+            organization_id="org-1",
+        )
+        session.execute = AsyncMock(return_value=execute_res)
+
+        result = await repo.updateByUuid(
+            session,
+            project_uuid,
+            name="updated",
+            description=None,
+        )
+
+        self.assertEqual(result.id, 9)
+        self.assertEqual(
+            cache_repo.invalidated_keys,
+            [
+                ProjectRepository.getCacheKey(project_uuid),
+                ProjectRepository.getOrgProjectsCacheKey("org-1"),
+            ],
+        )
+
+    async def test_list_by_member_is_not_cached_because_membership_changes_are_frequent(
+        self,
+    ):
+        repo = ProjectRepository(_CacheSpy(cached=["stale-project"]))
+        session = Mock()
+        execute_res = Mock()
+        execute_res.scalars.return_value.all.return_value = ["db-project"]
+        session.execute = AsyncMock(return_value=execute_res)
+
+        result = await repo.listByMember(session, "user-1", "org-1")
+
+        self.assertEqual(result, ["db-project"])
+        session.execute.assert_awaited_once()
+        stmt = session.execute.await_args.args[0]
+        self.assertIn("organization_id", str(stmt))
+
+    async def test_get_by_uuid_invalid_uuid_skips_db(self):
         repo = ProjectRepository(_CacheSpy())
         session = Mock()
         session.execute = AsyncMock()
 
-        result = await repo.getSnapshotByUuid(session, "not-a-uuid")
+        result = await repo.getByUuid(session, "not-a-uuid")
 
         self.assertIsNone(result)
         session.execute.assert_not_awaited()
+
+    async def test_get_by_uuid_can_bypass_cache_for_mutating_paths(self):
+        project_uuid = uuid4()
+        cache_repo = _CacheSpy(cached=SimpleNamespace(id=1))
+        repo = ProjectRepository(cache_repo)
+        session = Mock()
+        fresh_project = SimpleNamespace(id=2, uuid=project_uuid)
+        execute_res = Mock()
+        execute_res.scalar_one_or_none.return_value = fresh_project
+        session.execute = AsyncMock(return_value=execute_res)
+
+        result = await repo.getByUuid(
+            session, str(project_uuid), use_cache=False
+        )
+
+        self.assertEqual(result, fresh_project)
+        self.assertEqual(cache_repo.get_keys, [])
+        session.execute.assert_awaited_once()
 
 
 class TestProjectSettingsRepository(unittest.IsolatedAsyncioTestCase):
