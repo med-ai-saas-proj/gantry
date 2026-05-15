@@ -186,14 +186,14 @@ class FileStorageService:
         return res["Body"].read()
 
     @staticmethod
-    def _cache_key(project_id: int, file_uuid: uuid.UUID) -> str:
-        return f"file_info:{project_id}:{file_uuid}"
+    def _cache_key(project_id: int, file_uid: uuid.UUID) -> str:
+        return f"file_info:{project_id}:{file_uid}"
 
     async def getFileContent(
-        self, file_uuid: uuid.UUID, project_id: int
+        self, file_uid: uuid.UUID, project_id: int
     ) -> Result[bytes, FileNotFoundInSystemError]:
         """Retrieve file content by UUID."""
-        res = await self.getFileInfo(file_uuid, project_id)
+        res = await self.getFileInfo(file_uid, project_id)
         if res.status == ResultStatus.Err:
             return res.into()
         file_record = res.unwrap()
@@ -204,10 +204,10 @@ class FileStorageService:
         return Ok(file_content)
 
     async def getFileInfoAndContent(
-        self, file_uuid: uuid.UUID, project_id: int
+        self, file_uid: uuid.UUID, project_id: int
     ) -> Result[tuple[FileRecord, bytes], FileNotFoundInSystemError]:
         """Retrieve file info and content by UUID."""
-        res = await self.getFileInfo(file_uuid, project_id)
+        res = await self.getFileInfo(file_uid, project_id)
         if res.status == ResultStatus.Err:
             return res.into()
         file_record = res.unwrap()
@@ -218,10 +218,10 @@ class FileStorageService:
         return Ok((file_record, file_content))
 
     async def getFileUrl(
-        self, file_uuid: uuid.UUID, project_id: int
+        self, file_uid: uuid.UUID, project_id: int
     ) -> Result[str, FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID."""
-        res = await self.getFileInfo(file_uuid, project_id)
+        res = await self.getFileInfo(file_uid, project_id)
         if res.status == ResultStatus.Err:
             return res.into()
         file_record = res.unwrap()
@@ -236,20 +236,20 @@ class FileStorageService:
         return Ok(url)
 
     async def getFileUrlByProjectUUID(
-        self, file_uuid: uuid.UUID, project_uid: uuid.UUID
+        self, file_uid: uuid.UUID, project_uid: uuid.UUID
     ) -> Result[str, FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID and project UUID."""
         return await self._wrapProjectUUID(
             project_uid,
             self.getFileUrl,
-            file_uuid=file_uuid,
+            file_uid=file_uid,
         )
 
     async def getFileInfoAndUrl(
-        self, file_uuid: uuid.UUID, project_id: int
+        self, file_uid: uuid.UUID, project_id: int
     ) -> Result[tuple[str, FileRecord], FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID."""
-        res = await self.getFileInfo(file_uuid, project_id)
+        res = await self.getFileInfo(file_uid, project_id)
         if res.status == ResultStatus.Err:
             return res.into()
         file_record = res.unwrap()
@@ -264,20 +264,20 @@ class FileStorageService:
         return Ok((url, file_record))
 
     async def getFileInfoAndUrlByProjectUUID(
-        self, file_uuid: uuid.UUID, project_uid: uuid.UUID
+        self, file_uid: uuid.UUID, project_uid: uuid.UUID
     ) -> Result[tuple[str, FileRecord], FileNotFoundInSystemError]:
         """Generate a presigned URL for the file by UUID and project UUID."""
         return await self._wrapProjectUUID(
             project_uid,
             self.getFileInfoAndUrl,
-            file_uuid=file_uuid,
+            file_uid=file_uid,
         )
 
     async def getFileInfo(
-        self, file_uuid: uuid.UUID, project_id: int
+        self, file_uid: uuid.UUID, project_id: int
     ) -> Result[FileRecord, FileNotFoundInSystemError]:
         """Retrieve file info by UUID."""
-        cache_key = FileStorageService._cache_key(project_id, file_uuid)
+        cache_key = FileStorageService._cache_key(project_id, file_uid)
         cached_info = await self.redis.get(cache_key)
         if cached_info:
             json_data = json.loads(cached_info)
@@ -300,7 +300,7 @@ class FileStorageService:
 
         async with self.session_manager.get_session() as session:
             file_record = await self.file_repo.getAvailableByUUID(
-                session, file_uuid, project_id
+                session, file_uid, project_id
             )
             if not file_record or file_record.status != FileStatus.AVAILABLE:
                 return Err(FileNotFoundInSystemError())
@@ -324,23 +324,23 @@ class FileStorageService:
         return Ok(res)
 
     async def getFileInfoByProjectUUID(
-        self, file_uuid: uuid.UUID, project_uuid: uuid.UUID
+        self, file_uid: uuid.UUID, project_uuid: uuid.UUID
     ) -> Result[FileRecord, FileNotFoundInSystemError]:
         """Retrieve file info by UUID and project UUID."""
         return await self._wrapProjectUUID(
             project_uuid,
             self.getFileInfo,
-            file_uuid=file_uuid,
+            file_uid=file_uid,
         )
 
     async def updateFileMetadata(
-        self, file_uuid: uuid.UUID, project_id: int, extra_metadata: dict | None
+        self, file_uid: uuid.UUID, project_id: int, extra_metadata: dict | None
     ) -> Result[None, FileNotFoundInSystemError]:
         """Update file metadata by UUID."""
-        cache_key = FileStorageService._cache_key(project_id, file_uuid)
+        cache_key = FileStorageService._cache_key(project_id, file_uid)
         async with self.session_manager.get_session() as session:
             file_record = await self.file_repo.updateExtraMetadataByUUID(
-                session, file_uuid, project_id, extra_metadata
+                session, file_uid, project_id, extra_metadata
             )
             if not file_record:
                 return Err(FileNotFoundInSystemError())
@@ -351,7 +351,7 @@ class FileStorageService:
 
     async def updateFileMetadataByProjectUUID(
         self,
-        file_uuid: uuid.UUID,
+        file_uid: uuid.UUID,
         project_uuid: uuid.UUID,
         extra_metadata: dict | None,
     ) -> Result[None, FileNotFoundInSystemError]:
@@ -359,7 +359,7 @@ class FileStorageService:
         return await self._wrapProjectUUID(
             project_uuid,
             self.updateFileMetadata,
-            file_uuid=file_uuid,
+            file_uid=file_uid,
             extra_metadata=extra_metadata,
         )
 
@@ -400,7 +400,7 @@ class FileStorageService:
         return await self._wrapProjectUUID(
             project_uid,
             self.deleteFile,
-            file_uuid=file_uid,
+            file_uid=file_uid,
         )
 
     async def listFilesInProject(self, project_id: int) -> list[FileRecord]:
