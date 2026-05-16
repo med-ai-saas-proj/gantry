@@ -10,8 +10,8 @@ from ..dtos import (
     CreditInfoResponse,
     CreditTransactionInfoResponse,
 )
+from .router import billing_router
 from ..factories import getCreditService
-from .internal_router import internal_billing_router
 from ..services.credit_service import CreditService
 
 from typing import Annotated
@@ -19,8 +19,8 @@ from typing import Annotated
 from fastapi import Body, Depends
 
 
-@internal_billing_router.post(
-    "/credits",
+@billing_router.post(
+    "/admin/credits",
     tags=["admin"],
     description="Add credits to an organization or project (e.g. from a promotion, refund, etc.).",
 )
@@ -39,9 +39,10 @@ async def add_credits(
     )
 
 
-@internal_billing_router.get(
-    "/credits/{org_id}/available",
+@billing_router.get(
+    "/admin/credits/{org_id}/available",
     description="Get available credits for the organization",
+    tags=["admin"],
 )
 async def get_available_credits(
     admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -54,9 +55,10 @@ async def get_available_credits(
     )
 
 
-@internal_billing_router.get(
-    "/credits/{org_id}/transactions",
+@billing_router.get(
+    "/admin/credits/{org_id}/transactions",
     description="List credit transactions (e.g. when credits were added from promotions, refunds, or used to offset an invoice).",
+    tags=["admin"],
 )
 async def list_credit_transactions(
     admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
