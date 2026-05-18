@@ -13,6 +13,10 @@
 .env*
 prod.env
 *.yml
+!.github/workflows/*.yml
+!docker/*.yml
+!docker/**/*.yml
+!deploy/*.yml
 
 .venv/
 
@@ -27,3 +31,10 @@ frontend/
 docs/
 
 test-results/
+
+# Deployment runtime state
+/deploy/runtime/*
+!/deploy/runtime/.gitkeep
+
+reports/
+temp/

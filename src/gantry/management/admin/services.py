@@ -413,9 +413,27 @@ class AdminService:
         project_id: str,
     ) -> ProjectArchiveResponse:
         """Soft-delete one project by marking it archived."""
+        return await self.archiveProject(project_id)
+
+    async def archiveProject(
+        self,
+        project_id: str,
+    ) -> ProjectArchiveResponse:
+        """Archive one project without project permission checks."""
         result = await self.project_service.setProjectArchived(
             project_uuid=project_id,
             archived=True,
+        )
+        return result.unwrap()
+
+    async def unarchiveProject(
+        self,
+        project_id: str,
+    ) -> ProjectArchiveResponse:
+        """Unarchive one project without project permission checks."""
+        result = await self.project_service.setProjectArchived(
+            project_uuid=project_id,
+            archived=False,
         )
         return result.unwrap()
 

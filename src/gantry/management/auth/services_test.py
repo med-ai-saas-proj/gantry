@@ -23,12 +23,15 @@ class TestAuthService(unittest.IsolatedAsyncioTestCase):
             return_value=Ok(
                 {
                     "org_permissions": ["organization.settings.read"],
-                    "project_permissions": [
-                        "proj-1:project.owner",
-                        "proj-2:project.settings.read",
-                    ],
+                    "project_permissions": {
+                        "proj-1": ["project.owner"],
+                        "proj-2": ["project.settings.read"],
+                    },
                 }
             )
+        )
+        self.keycloak_client.getMemberOrganizations = AsyncMock(
+            return_value=Ok([])
         )
         self.service = AuthService(
             server_url="http://localhost:8080",
@@ -98,6 +101,22 @@ class TestAuthService(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(result.status == ResultStatus.Err)
         self.assertIsInstance(result.err(), MissingOrganizationClaimError)
+
+    async def test_map_claims_falls_back_to_single_keycloak_membership(self):
+        self.keycloak_client.getMemberOrganizations.return_value = Ok(
+            [{"id": "org-from-keycloak"}]
+        )
+
+        result = await self.service._mapClaimsToAuthInfo(
+            {
+                "sub": "user-1",
+                "name": "alice",
+                "email": "alice@test",
+            }
+        )
+
+        self.assertTrue(result.status == ResultStatus.Ok)
+        self.assertEqual(result.unwrap()["org_uuid"], "org-from-keycloak")
 
     async def test_map_claims_allows_admin_without_organization_claim(self):
         admin_service = AuthService(

@@ -42,7 +42,7 @@ import unittest
 from types import SimpleNamespace
 from datetime import UTC, datetime
 from contextlib import asynccontextmanager
-from unittest.mock import Mock, AsyncMock
+from unittest.mock import Mock, AsyncMock, call
 
 from pyrusult import Ok
 
@@ -431,7 +431,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             q="alice",
         )
 
-    async def test_update_and_delete_project_delegate(self):
+    async def test_update_archive_unarchive_and_delete_project_delegate(self):
         updated = ProjectInfoResponse(
             project_uuid="project-1",
             name="Renamed Project",
@@ -443,9 +443,13 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             id="project-1",
             archived=True,
         )
+        unarchived = ProjectArchiveResponse(
+            id="project-1",
+            archived=False,
+        )
         self.project_service.updateProject = AsyncMock(return_value=Ok(updated))
         self.project_service.setProjectArchived = AsyncMock(
-            return_value=Ok(archived)
+            side_effect=[Ok(archived), Ok(unarchived), Ok(archived)]
         )
 
         update_result = await self.service.updateProject(
@@ -455,18 +459,25 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
                 description=None,
             ),
         )
+        archive_result = await self.service.archiveProject("project-1")
+        unarchive_result = await self.service.unarchiveProject("project-1")
         delete_result = await self.service.deleteProject("project-1")
 
         self.assertEqual(update_result, updated)
+        self.assertEqual(archive_result, archived)
+        self.assertEqual(unarchive_result, unarchived)
         self.assertEqual(delete_result, archived)
         self.project_service.updateProject.assert_awaited_once_with(
             project_uuid="project-1",
             name="Renamed Project",
             description=None,
         )
-        self.project_service.setProjectArchived.assert_awaited_once_with(
-            project_uuid="project-1",
-            archived=True,
+        self.project_service.setProjectArchived.assert_has_awaits(
+            [
+                call(project_uuid="project-1", archived=True),
+                call(project_uuid="project-1", archived=False),
+                call(project_uuid="project-1", archived=True),
+            ]
         )
 
     def test_list_api_key_permissions_returns_catalog(self):

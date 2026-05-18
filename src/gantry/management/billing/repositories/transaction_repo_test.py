@@ -1,50 +1,105 @@
-from gantry.db.factories import getSessionManager
 from gantry.shared.utils.uuid_utils import uuid7
 
 from ..type import AggregatePeriod
-from ..repositories.transaction_repo import (
-    TransactionRepository,
-)
+from ..models import TransactionStatus
+from .transaction_repo import TransactionRepository
 
 import unittest
+from types import SimpleNamespace
 from decimal import Decimal
 from datetime import datetime
+from unittest.mock import AsyncMock, MagicMock
 
 
-class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
-    async def test_timescaledb(self):
+class TransactionRepositoryTest(unittest.IsolatedAsyncioTestCase):
+    async def test_add_transaction_builds_pending_model_without_db(self):
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TransactionRepository()
+        transaction_uid = uuid7()
+        created_at = datetime(2026, 1, 15)
 
-        async with getSessionManager().get_session() as session:
-            repo = TransactionRepository()
-            await repo.addTransaction(
-                session=session,
-                transaction_uid=uuid7(),
-                apikey_id=1,
-                project_id=1,
-                org_id="org1",
-                amount=Decimal("10.5"),
-                details={"example": "data"},
-                created_at=datetime(2026, 1, 15),
+        tx = await repo.addTransaction(
+            session=session,
+            transaction_uid=transaction_uid,
+            apikey_id=1,
+            project_id=2,
+            org_id="org1",
+            amount=Decimal("10.5"),
+            details={"example": "data"},
+            created_at=created_at,
+        )
+
+        assert tx.uuid == transaction_uid
+        assert tx.apikey_id == 1
+        assert tx.project_id == 2
+        assert tx.organization_id == "org1"
+        assert tx.amount == Decimal("10.5")
+        assert tx.details == {"example": "data"}
+        assert tx.created_at == created_at
+        assert tx.captured_at is None
+        assert tx.status == TransactionStatus.PENDING
+        session.add.assert_called_once_with(tx)
+        session.flush.assert_awaited_once()
+
+    async def test_add_transaction_can_mark_captured_without_db(self):
+        session = MagicMock()
+        session.flush = AsyncMock()
+        repo = TransactionRepository()
+
+        tx = await repo.addTransaction(
+            session=session,
+            transaction_uid=uuid7(),
+            apikey_id=1,
+            project_id=2,
+            org_id="org1",
+            amount=Decimal("10.5"),
+            details={},
+            created_at=datetime(2026, 1, 15),
+            capture=True,
+        )
+
+        assert tx.status == TransactionStatus.CAPTURED
+        assert tx.captured_at is not None
+        session.add.assert_called_once_with(tx)
+        session.flush.assert_awaited_once()
+
+    async def test_sum_by_period_maps_execute_rows_without_db(self):
+        result = MagicMock()
+        result.all.return_value = [
+            SimpleNamespace(
+                period_bucket=datetime(2026, 1, 1),
+                transaction_count=2,
+                total_amount=Decimal("30.5"),
             )
-            await repo.addTransaction(
-                session=session,
-                transaction_uid=uuid7(),
-                apikey_id=2,
-                project_id=1,
-                org_id="org1",
-                amount=Decimal("20.0"),
-                details={"example": "data"},
-                created_at=datetime(2026, 1, 20),
-            )
-            await session.commit()
-        async with getSessionManager().get_session() as session:
-            transactions = await repo.sumByPeriodByApiKeys(
-                session=session,
-                apikey_ids=[1, 2, 3],
-                org_id="org1",
-                start_time=datetime(2026, 1, 1),
-                end_time=datetime(2026, 12, 31),
-                period=AggregatePeriod.MONTHLY,
-                period_scale=1,
-            )
-            print(transactions)
+        ]
+        session = MagicMock()
+        session.execute = AsyncMock(return_value=result)
+        repo = TransactionRepository()
+
+        reports = await repo.sumByPeriodByApiKeys(
+            session=session,
+            apikey_ids=[1, 2, 3],
+            org_id="org1",
+            start_time=datetime(2026, 1, 1),
+            end_time=datetime(2026, 12, 31),
+            period=AggregatePeriod.MONTHLY,
+            period_scale=1,
+        )
+
+        assert reports == [
+            {
+                "period_bucket": datetime(2026, 1, 1),
+                "transaction_count": 2,
+                "total_amount": Decimal("30.5"),
+            }
+        ]
+        session.execute.assert_awaited_once()
+
+    async def test_get_by_api_keys_short_circuits_empty_list_without_db(self):
+        session = MagicMock()
+        session.execute = AsyncMock()
+        repo = TransactionRepository()
+
+        assert await repo.getByApiKeys(session, [], org_id="org1") == []
+        session.execute.assert_not_called()

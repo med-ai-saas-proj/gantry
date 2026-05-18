@@ -95,7 +95,6 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNotNone(result)
         self.assertEqual(result["api_key_uuid"], "api-key-uuid")
-        self.assertEqual(result["org_id"], "org-1")
         self.assertEqual(result["organization_uuid"], "org-1")
         self.assertEqual(result["rpm_limit_organization"], 10)
         self.assertEqual(result["rpm_limit_project"], 55)
@@ -129,7 +128,8 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, cached)
         self.assertEqual(
-            cache_repo.get_keys, ["api_keys:context_record:hashed"]
+            cache_repo.get_keys,
+            [ApiKeyRepository.contextRecordCacheKey("hashed")],
         )
         session.execute.assert_not_awaited()
 
@@ -164,8 +164,32 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
         session.execute.assert_awaited_once()
         self.assertEqual(len(cache_repo.set_items), 1)
         self.assertEqual(
-            cache_repo.set_items[0][0], "api_keys:context_record:hashed"
+            cache_repo.set_items[0][0],
+            ApiKeyRepository.contextRecordCacheKey("hashed"),
         )
+
+    async def test_invalidate_context_record_cache_delegates_to_cache_repo(
+        self,
+    ):
+        cache_repo = _CacheSpy(cached={"api_key_uuid": "cached"})
+        repo = ApiKeyRepository(cache_repo)
+
+        await repo.invalidateContextRecordCache("hashed")
+
+        self.assertEqual(
+            cache_repo.invalidated_keys,
+            [ApiKeyRepository.contextRecordCacheKey("hashed")],
+        )
+        self.assertIsNone(cache_repo.cached)
+
+    async def test_invalidate_context_record_cache_ignores_empty_key(self):
+        cache_repo = _CacheSpy(cached={"api_key_uuid": "cached"})
+        repo = ApiKeyRepository(cache_repo)
+
+        await repo.invalidateContextRecordCache("")
+
+        self.assertEqual(cache_repo.invalidated_keys, [])
+        self.assertEqual(cache_repo.cached, {"api_key_uuid": "cached"})
 
     async def test_count_by_project_id_returns_scalar_count(self):
         execute_res = Mock()
@@ -194,6 +218,7 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
 
         result = await self.repo.create(
             self.session,
+            api_key_uuid=uuid4(),
             user_id="u1",
             project_id=7,
             hashed_key="hashed",

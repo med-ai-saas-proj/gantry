@@ -34,10 +34,13 @@ class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
         service.verifyApiKey = AsyncMock(
             return_value=Ok(
                 {
+                    "api_key_id": 1,
                     "api_key_uuid": "api-key-uuid",
                     "user_uuid": "u1",
+                    "project_id": 2,
                     "project_uuid": "proj-uuid",
                     "organization_uuid": "org-uuid",
+                    "hashed_key": "hashed",
                     "permissions": ["chat.read"],
                     "rpm_limit_organization": 100,
                     "rpm_limit_project": -1,
@@ -46,35 +49,27 @@ class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
+        service.rateLimit = AsyncMock(return_value=Ok(None))
         request = _make_request()
 
-        result = await dependency(request, "raw-key", service)
+        result = await dependency("raw-key", service)
 
         self.assertEqual(result["api_key_uuid"], "api-key-uuid")
         service.verifyApiKey.assert_awaited_once_with("raw-key", ["chat.read"])
-        self.assertEqual(request.headers["X-Organization-UUID"], "org-uuid")
-        self.assertEqual(request.headers["X-Project-UUID"], "proj-uuid")
-        self.assertEqual(request.headers["X-API-Key-UUID"], "api-key-uuid")
-        self.assertEqual(
-            json.loads(request.headers["X-Permissions"]), ["chat.read"]
-        )
-        self.assertEqual(request.headers["X-RPM-Limit-Organization"], "100")
-        self.assertEqual(request.headers["X-RPM-Limit-Project"], "-1")
-        self.assertEqual(request.headers["X-Spending-Limit-Organization"], "-1")
-        self.assertEqual(request.headers["X-Spending-Limit-Project"], "-1")
-        self.assertEqual(
-            request.state.api_key_info["api_key_uuid"], "api-key-uuid"
-        )
+        service.rateLimit.assert_awaited_once_with(result)
 
     async def test_get_api_key_info_sets_headers_from_parsed_info(self):
         service = Mock()
         service.parseApiKey = AsyncMock(
             return_value=Ok(
                 {
+                    "api_key_id": 1,
                     "api_key_uuid": "api-key-uuid",
                     "user_uuid": "u1",
+                    "project_id": 2,
                     "project_uuid": "proj-uuid",
                     "organization_uuid": "org-uuid",
+                    "hashed_key": "hashed",
                     "permissions": ["chat.run"],
                     "rpm_limit_organization": 50,
                     "rpm_limit_project": -1,
@@ -83,23 +78,11 @@ class TestApiKeyDependencies(unittest.IsolatedAsyncioTestCase):
                 }
             )
         )
+        service.rateLimit = AsyncMock(return_value=Ok(None))
         request = _make_request()
 
-        result = await getApiKeyInfo(request, "raw-key", service)
+        result = await getApiKeyInfo("raw-key", service)
 
         self.assertEqual(result["api_key_uuid"], "api-key-uuid")
-        self.assertEqual(request.headers["X-Organization-UUID"], "org-uuid")
-        self.assertEqual(request.headers["X-Project-UUID"], "proj-uuid")
-        self.assertEqual(request.headers["X-API-Key-UUID"], "api-key-uuid")
-        self.assertEqual(
-            json.loads(request.headers["X-Permissions"]), ["chat.run"]
-        )
-        self.assertEqual(request.headers["X-RPM-Limit-Organization"], "50")
-        self.assertEqual(request.headers["X-RPM-Limit-Project"], "-1")
-        self.assertEqual(
-            request.headers["X-Spending-Limit-Organization"], "1000"
-        )
-        self.assertEqual(request.headers["X-Spending-Limit-Project"], "500")
-        self.assertEqual(
-            request.state.api_key_info["project_uuid"], "proj-uuid"
-        )
+        service.parseApiKey.assert_awaited_once_with("raw-key")
+        service.rateLimit.assert_awaited_once_with(result)

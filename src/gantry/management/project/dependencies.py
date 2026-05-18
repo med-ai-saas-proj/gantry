@@ -57,6 +57,8 @@ async def assertProjectsRole(
 ):
     for project_uuid in project_uuids:
         archived_res = await project_service.isProjectArchived(project_uuid)
+        if archived_res.status == ResultStatus.Err:
+            archived_res.unwrap()
         if archived_res.unwrap() and not allow_archived:
             raise ProjectArchivedError()
         if OrgPermission.OWNER.value in user_info["org_permissions"]:

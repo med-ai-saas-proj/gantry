@@ -1,0 +1,425 @@
+{
+  "AdminDashboardSummaryResponse": {
+    "description": "Top-level counters for the admin dashboard home screen.",
+    "properties": {
+      "api_keys": {
+        "title": "Api Keys",
+        "type": "integer"
+      },
+      "organizations": {
+        "title": "Organizations",
+        "type": "integer"
+      },
+      "projects": {
+        "title": "Projects",
+        "type": "integer"
+      },
+      "users": {
+        "title": "Users",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "organizations",
+      "projects",
+      "api_keys",
+      "users"
+    ],
+    "title": "AdminDashboardSummaryResponse",
+    "type": "object"
+  },
+  "AdminUserProfileResponse": {
+    "description": "Admin-visible Keycloak user profile and permission summary.",
+    "properties": {
+      "email": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Email"
+      },
+      "email_verified": {
+        "title": "Email Verified",
+        "type": "boolean"
+      },
+      "enabled": {
+        "title": "Enabled",
+        "type": "boolean"
+      },
+      "first_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "First Name"
+      },
+      "id": {
+        "title": "Id",
+        "type": "string"
+      },
+      "last_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Last Name"
+      },
+      "organizations": {
+        "items": {
+          "$ref": "#/components/schemas/AdminUserOrganizationInfoResponse"
+        },
+        "title": "Organizations",
+        "type": "array"
+      },
+      "permissions": {
+        "$ref": "#/components/schemas/AdminUserPermissionSummaryResponse"
+      },
+      "username": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Username"
+      }
+    },
+    "required": [
+      "id",
+      "enabled",
+      "email_verified",
+      "organizations",
+      "permissions"
+    ],
+    "title": "AdminUserProfileResponse",
+    "type": "object"
+  },
+  "ApiKeyCreateResponse": {
+    "description": "Create response that includes the raw key once.",
+    "properties": {
+      "api_key_uuid": {
+        "title": "Api Key Uuid",
+        "type": "string"
+      },
+      "created_at": {
+        "format": "date-time",
+        "title": "Created At",
+        "type": "string"
+      },
+      "description": {
+        "title": "Description",
+        "type": "string"
+      },
+      "disabled": {
+        "title": "Disabled",
+        "type": "boolean"
+      },
+      "hint": {
+        "title": "Hint",
+        "type": "string"
+      },
+      "key": {
+        "title": "Key",
+        "type": "string"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "permissions": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Permissions",
+        "type": "array"
+      },
+      "project_uuid": {
+        "title": "Project Uuid",
+        "type": "string"
+      }
+    },
+    "required": [
+      "api_key_uuid",
+      "project_uuid",
+      "name",
+      "description",
+      "hint",
+      "created_at",
+      "permissions",
+      "disabled",
+      "key"
+    ],
+    "title": "ApiKeyCreateResponse",
+    "type": "object"
+  },
+  "ApiKeyPermissionCatalogResponse": {
+    "description": "List all permissions currently available to API keys.",
+    "properties": {
+      "results": {
+        "items": {
+          "$ref": "#/components/schemas/ApiKeyPermissionResponse"
+        },
+        "title": "Results",
+        "type": "array"
+      },
+      "total": {
+        "title": "Total",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "total",
+      "results"
+    ],
+    "title": "ApiKeyPermissionCatalogResponse",
+    "type": "object"
+  },
+  "ApiKeyResponse": {
+    "description": "Output DTO for one API key resource.",
+    "properties": {
+      "api_key_uuid": {
+        "title": "Api Key Uuid",
+        "type": "string"
+      },
+      "created_at": {
+        "format": "date-time",
+        "title": "Created At",
+        "type": "string"
+      },
+      "description": {
+        "title": "Description",
+        "type": "string"
+      },
+      "disabled": {
+        "title": "Disabled",
+        "type": "boolean"
+      },
+      "hint": {
+        "title": "Hint",
+        "type": "string"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "permissions": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Permissions",
+        "type": "array"
+      },
+      "project_uuid": {
+        "title": "Project Uuid",
+        "type": "string"
+      }
+    },
+    "required": [
+      "api_key_uuid",
+      "project_uuid",
+      "name",
+      "description",
+      "hint",
+      "created_at",
+      "permissions",
+      "disabled"
+    ],
+    "title": "ApiKeyResponse",
+    "type": "object"
+  },
+  "OrgInfoResponse": {
+    "description": "Organization metadata.",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "org_id": {
+        "title": "Org Id",
+        "type": "string"
+      },
+      "owner_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Owner Id"
+      }
+    },
+    "required": [
+      "org_id",
+      "name"
+    ],
+    "title": "OrgInfoResponse",
+    "type": "object"
+  },
+  "OrgSettingsResponse": {
+    "description": "Organization settings (flattened key-value map).",
+    "properties": {
+      "extra": {
+        "additionalProperties": true,
+        "description": "Additional settings as a flat key-value map",
+        "title": "Extra",
+        "type": "object"
+      },
+      "rate_limit": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Requests per minute. null means inherit global default.",
+        "title": "Rate Limit"
+      },
+      "spending_limit": {
+        "anyOf": [
+          {
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Monthly spending limit as a scaled integer. null means unlimited.",
+        "title": "Spending Limit"
+      }
+    },
+    "title": "OrgSettingsResponse",
+    "type": "object"
+  },
+  "PermissionCatalogResponse": {
+    "description": "All supported permissions for one permission scope.",
+    "properties": {
+      "permissions": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Permissions",
+        "type": "array"
+      }
+    },
+    "required": [
+      "permissions"
+    ],
+    "title": "PermissionCatalogResponse",
+    "type": "object"
+  },
+  "ProjectInfoResponse": {
+    "description": "Project metadata response.",
+    "properties": {
+      "archived": {
+        "title": "Archived",
+        "type": "boolean"
+      },
+      "description": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Description"
+      },
+      "name": {
+        "title": "Name",
+        "type": "string"
+      },
+      "organization_id": {
+        "title": "Organization Id",
+        "type": "string"
+      },
+      "project_uuid": {
+        "description": "Project UUID",
+        "title": "Project Uuid",
+        "type": "string"
+      }
+    },
+    "required": [
+      "project_uuid",
+      "name",
+      "organization_id",
+      "archived"
+    ],
+    "title": "ProjectInfoResponse",
+    "type": "object"
+  },
+  "ProjectPermissionCatalogResponse": {
+    "description": "All supported project permissions without storage prefix.",
+    "properties": {
+      "permissions": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Permissions",
+        "type": "array"
+      }
+    },
+    "required": [
+      "permissions"
+    ],
+    "title": "ProjectPermissionCatalogResponse",
+    "type": "object"
+  },
+  "ProjectSettingsResponse": {
+    "description": "Project settings response.",
+    "properties": {
+      "extra": {
+        "additionalProperties": true,
+        "description": "Additional settings as a flat key-value map",
+        "title": "Extra",
+        "type": "object"
+      },
+      "rate_limit": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Requests per minute. null means inherit organization/default.",
+        "title": "Rate Limit"
+      },
+      "spending_limit": {
+        "anyOf": [
+          {
+            "minimum": 0.0,
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Monthly spending limit as a scaled integer. null means unlimited.",
+        "title": "Spending Limit"
+      }
+    },
+    "title": "ProjectSettingsResponse",
+    "type": "object"
+  }
+}
