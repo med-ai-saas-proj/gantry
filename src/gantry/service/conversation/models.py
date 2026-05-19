@@ -64,7 +64,7 @@ class Conversation(
 from ag_ui.core.types import Message as AgUiMessage
 
 
-class Message(WithID, WithUUID, ConversationBaseSQLModel):
+class Message(WithID, WithClientUUID, ConversationBaseSQLModel):
     """Represents a message in a conversation."""
 
     __tablename__ = "Messages"
@@ -83,6 +83,7 @@ class Message(WithID, WithUUID, ConversationBaseSQLModel):
     @classmethod
     def parse_raw(cls, raw: dict) -> "Message":
         mess = Message(
+            uuid=raw["uuid"],
             conversation_id=raw["conversation_id"],
             payload=raw["payload"],
             timestamp=raw["timestamp"],

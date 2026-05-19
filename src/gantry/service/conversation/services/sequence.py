@@ -22,7 +22,9 @@ import re
 import json
 import uuid
 import asyncio
+from time import timezone
 from typing import Literal, Sequence, Awaitable, cast
+from datetime import UTC
 from dataclasses import asdict
 
 from pyrusult import Ok, Err, Result, ResultStatus
@@ -139,9 +141,12 @@ class SequenceConversationService(ConversationService):
             project_id=project_id,
             serialized_msgs=[
                 Message(
+                    uuid=msg.message_uid,
                     conversation_id=-1,
                     payload=msg.payload,
-                    timestamp=msg.timestamp,
+                    timestamp=msg.timestamp.astimezone(UTC).replace(
+                        tzinfo=None
+                    ),
                     extra_metadata=msg.extra_metadata,
                     run_id=msg.run_id,
                 )
@@ -296,9 +301,12 @@ class SequenceConversationService(ConversationService):
             extra_metadata=extra_metadata,
             serialized_msgs=[
                 Message(
+                    uuid=msg.message_uid,
                     conversation_id=-1,
                     payload=msg.payload,
-                    timestamp=msg.timestamp,
+                    timestamp=msg.timestamp.astimezone(UTC).replace(
+                        tzinfo=None
+                    ),
                     extra_metadata=msg.extra_metadata,
                     run_id=msg.run_id,
                 )

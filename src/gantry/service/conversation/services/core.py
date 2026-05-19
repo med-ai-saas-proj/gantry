@@ -162,7 +162,7 @@ class ConversationService:
             return
         cache_key = ConversationService._message_set_cache_key(conversation_uid)
         mappings = {
-            msg.uuid: json.dumps(asdict(msg), default=json_serializer)
+            str(msg.uuid): json.dumps(asdict(msg), default=json_serializer)
             for msg in msgs
         }
 

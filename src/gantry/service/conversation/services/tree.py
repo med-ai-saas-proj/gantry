@@ -23,6 +23,7 @@ import uuid
 import asyncio
 from hmac import new
 from typing import Literal, Sequence
+from datetime import UTC
 
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
@@ -163,9 +164,12 @@ class TreeConversationService(ConversationService):
             project_id=project_id,
             serialized_msgs=[
                 Message(
+                    uuid=msg.message_uid,
                     conversation_id=-1,
                     payload=msg.payload,
-                    timestamp=msg.timestamp,
+                    timestamp=msg.timestamp.astimezone(UTC).replace(
+                        tzinfo=None
+                    ),
                     extra_metadata=msg.extra_metadata,
                     run_id=msg.run_id,
                 )
@@ -218,11 +222,6 @@ class TreeConversationService(ConversationService):
         from_node_id: uuid.UUID | None = None,
     ) -> dict[str, str]:
         new_map = current_map.copy()
-        if from_node_id is not None:
-            if str(from_node_id) not in new_map:
-                raise ValueError(
-                    f"from_node_id {from_node_id} not found in current relationships map."
-                )
         cur_message_id = (
             str(from_node_id) if from_node_id is not None else ROOT_NODE_ID
         )
@@ -278,7 +277,7 @@ class TreeConversationService(ConversationService):
                 if metadata is None:
                     return Err(ConversationNotFoundError())
                 conversation_id = metadata["conversation_id"]
-                if metadata["conversation_type"] != ConversationType.SEQUENCE:
+                if metadata["conversation_type"] != ConversationType.TREE:
                     return Err(InvalidConversationTypeError())
                 new_tree_structure, new_active_leaf_id = (
                     self.rebuildTreeStructure(
@@ -345,9 +344,12 @@ class TreeConversationService(ConversationService):
             extra_metadata=extra_metadata,
             serialized_msgs=[
                 Message(
+                    uuid=msg.message_uid,
                     conversation_id=-1,
                     payload=msg.payload,
-                    timestamp=msg.timestamp,
+                    timestamp=msg.timestamp.astimezone(UTC).replace(
+                        tzinfo=None
+                    ),
                     extra_metadata=msg.extra_metadata,
                     run_id=msg.run_id,
                 )
