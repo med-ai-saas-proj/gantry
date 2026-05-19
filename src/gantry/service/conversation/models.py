@@ -28,8 +28,8 @@ class ConversationBaseSQLModel(BaseSQLModel):
 class ConversationType(str, enum.Enum):
     """Enum for conversation types."""
 
-    SEQUENCE = "sequence"
-    TREE = "tree"
+    SEQUENCE = "SEQUENCE"
+    TREE = "TREE"
 
 
 class Conversation(
