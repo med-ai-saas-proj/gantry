@@ -51,7 +51,6 @@ __all__ = [
     "UserAlreadyInProjectError",
     "UserNotInProjectError",
     "_DummyError",
-    "_DummyRedis",
     "_DummySessionManager",
     "OwnerRequiredForGrantError",
     "unittest",
@@ -72,15 +71,6 @@ class _DummySessionManager:
         yield self.session
 
 
-class _DummyRedis:
-    """Minimal Redis stub for project service unit tests."""
-
-    def __init__(self):
-        self.get = AsyncMock(return_value=None)
-        self.set = AsyncMock()
-        self.delete = AsyncMock()
-
-
 class _DummyError(Exception):
     """Test-only sentinel error for propagation assertions."""
 
@@ -92,15 +82,16 @@ class BaseProjectServiceTest(unittest.IsolatedAsyncioTestCase):
 
     def _make_service(self) -> ProjectService:
         self.session_manager = _DummySessionManager()
-        self.redis = _DummyRedis()
+        project_repo = Mock()
+        project_repo.getByUuid = AsyncMock()
+        project_repo.invalidateProjectCache = AsyncMock()
         service = ProjectService(
             session_manager=self.session_manager,
             logger=Mock(),
-            project_repo=Mock(),
+            project_repo=project_repo,
             membership_repo=Mock(),
             settings_repo=Mock(),
             kc_client=Mock(),
-            redis=self.redis,
         )
         service._isOrgOwner = AsyncMock(return_value=Ok(False))
         return service

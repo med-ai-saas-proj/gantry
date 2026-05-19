@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from unittest.mock import Mock, AsyncMock
 
 from pyrusult import Ok, ResultStatus
+from limits.aio import storage
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
@@ -45,6 +46,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         self.api_key_repo.updateDisabledByUuid = AsyncMock(return_value=None)
         self.api_key_repo.deleteByUuid = AsyncMock(return_value=False)
         self.api_key_repo.listDistinctPermissions = AsyncMock(return_value=[])
+        self.api_key_repo.invalidateContextRecordCache = AsyncMock()
         self.service = ApiKeyService(
             config={"key_secret": "secret", "api_key_secret_length": 8},
             logger=Mock(),
@@ -59,6 +61,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
                 ),
             ],
             session_manager=self.session_manager,
+            limits_storage=storage.MemoryStorage(),
         )
         self.service.default_org_rate_limit = 120
 

@@ -77,7 +77,6 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertEqual(res.unwrap().rate_limit, 120)
         self.assertEqual(res.unwrap().spending_limit, 6000)
         self.assertEqual(res.unwrap().extra, {"burst": True})
-        self.redis.set.assert_not_awaited()
 
     async def test_update_project_settings_flattens_extra(self):
         service = self._make_service()
@@ -109,7 +108,6 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertEqual(res.unwrap().spending_limit, 7000)
         self.assertEqual(res.unwrap().extra, {"ui.theme": "dark"})
         service.settings_repo.upsert.assert_awaited_once()
-        self.redis.set.assert_not_awaited()
 
     async def test_get_project_settings_returns_none_for_missing_limits(self):
         service = self._make_service()
@@ -135,7 +133,6 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertIsNone(res.unwrap().rate_limit)
         self.assertIsNone(res.unwrap().spending_limit)
-        self.redis.set.assert_not_awaited()
 
     async def test_update_project_settings_returns_none_for_missing_limits(
         self,
@@ -168,7 +165,6 @@ class TestProjectServiceState(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertIsNone(res.unwrap().rate_limit)
         self.assertIsNone(res.unwrap().spending_limit)
-        self.redis.set.assert_not_awaited()
 
     async def test_list_project_users_propagates_org_member_lookup_error(self):
         """Project user listing should return upstream org-member lookup errors."""
@@ -271,6 +267,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         service.project_repo.getByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid="p1",
+                organization_id="org-1",
                 is_archived=False,
             )
         )
@@ -286,6 +283,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         service.project_repo.getByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid="p1",
+                organization_id="org-1",
                 is_archived=True,
             )
         )
@@ -301,6 +299,7 @@ class TestProjectServiceState(BaseProjectServiceTest):
         service.project_repo.getByUuid = AsyncMock(
             return_value=SimpleNamespace(
                 uuid="p1",
+                organization_id="org-1",
                 is_archived=True,
             )
         )

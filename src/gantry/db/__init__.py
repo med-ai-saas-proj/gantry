@@ -16,5 +16,6 @@ from .factories import (
     getRedisCacheRepo,
     getSessionManager,
     getRedisConnectionPool,
+    getRedisTextConnectionPool,
 )
 from .repositories import Repository, CacheRepository, RedisCacheRepository

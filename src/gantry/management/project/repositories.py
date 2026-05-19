@@ -16,7 +16,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 class ProjectRepository(Repository[Project, int]):
     """Repository for Project table."""
 
-    CACHE_KEY = "project:{project_id}"
+    PROJECT_CACHE_KEY = "project:by_uuid:{project_uuid}"
+    ORG_PROJECTS_CACHE_KEY = "projects:by_org:{organization_id}"
 
     def __init__(self, cache_repo: CacheRepository):
         self.cache_repo = cache_repo
@@ -24,11 +25,34 @@ class ProjectRepository(Repository[Project, int]):
 
     @classmethod
     def getCacheKey(cls, project_uuid: UUID | str):
-        return cls.CACHE_KEY.format(
-            project_id=project_uuid
+        return cls.getProjectCacheKey(project_uuid)
+
+    @classmethod
+    def getProjectCacheKey(cls, project_uuid: UUID | str):
+        return cls.PROJECT_CACHE_KEY.format(
+            project_uuid=project_uuid
             if isinstance(project_uuid, str)
             else project_uuid.hex
         )
+
+    @classmethod
+    def getOrgProjectsCacheKey(cls, organization_id: str):
+        return cls.ORG_PROJECTS_CACHE_KEY.format(
+            organization_id=organization_id
+        )
+
+    async def invalidateProjectCache(
+        self,
+        project_uuid: UUID | str,
+        organization_id: str | None = None,
+    ) -> None:
+        await self.cache_repo.invalidateCached(
+            self.getProjectCacheKey(project_uuid)
+        )
+        if organization_id is not None:
+            await self.cache_repo.invalidateCached(
+                self.getOrgProjectsCacheKey(organization_id)
+            )
 
     async def create(
         self,
@@ -49,29 +73,37 @@ class ProjectRepository(Repository[Project, int]):
         )
         res = await session.execute(stmt)
         res = res.scalar_one()
-        await self.cache_repo.setCache(self.getCacheKey(res.uuid), res)
+        await self.cache_repo.invalidateCached(
+            self.getOrgProjectsCacheKey(organization_id)
+        )
         return res
 
     async def getByUuid(
-        self, session: AsyncSession, project_uuid: str
+        self,
+        session: AsyncSession,
+        project_uuid: str,
+        *,
+        use_cache: bool = True,
     ) -> Project | None:
         try:
             parsed = UUID(project_uuid)
         except ValueError:
             return None
 
-        async def _lamda():
+        async def _load_project():
             stmt = (
                 select(Project)
                 .select_from(Project)
                 .where(Project.uuid == parsed)
                 .limit(1)
             )
-
             return (await session.execute(stmt)).scalar_one_or_none()
 
+        if not use_cache:
+            return await _load_project()
+
         return await self.cache_repo.getCachedOrCall(
-            self.getCacheKey(parsed), _lamda
+            self.getProjectCacheKey(parsed), _load_project
         )
 
     async def updateByUuid(
@@ -94,7 +126,10 @@ class ProjectRepository(Repository[Project, int]):
         res = await session.execute(stmt)
         res = res.scalar_one_or_none()
         if res is not None:
-            await self.cache_repo.setCache(self.getCacheKey(project_uuid), res)
+            await self.invalidateProjectCache(
+                project_uuid,
+                res.organization_id,
+            )
         return res
 
     async def listByOrg(
@@ -102,7 +137,7 @@ class ProjectRepository(Repository[Project, int]):
         session: AsyncSession,
         organization_id: str,
     ) -> list[Project]:
-        async def _lambda():
+        async def _load_projects():
             stmt = (
                 select(Project)
                 .select_from(Project)
@@ -112,7 +147,7 @@ class ProjectRepository(Repository[Project, int]):
             return list((await session.execute(stmt)).scalars().all())
 
         return await self.cache_repo.getCachedOrCall(
-            self.getCacheKey(organization_id), _lambda
+            self.getOrgProjectsCacheKey(organization_id), _load_projects
         )
 
     async def listByMember(
@@ -121,25 +156,20 @@ class ProjectRepository(Repository[Project, int]):
         user_id: str,
         organization_id: str | None,
     ) -> list[Project]:
-        async def _lambda():
-            stmt = (
-                select(Project)
-                .select_from(Project)
-                .join(
-                    ProjectMember,
-                    ProjectMember.project_id == Project.id,
-                )
-                .where(ProjectMember.user_id == user_id)
-                .order_by(Project.created_at.desc())
+        stmt = (
+            select(Project)
+            .select_from(Project)
+            .join(
+                ProjectMember,
+                ProjectMember.project_id == Project.id,
             )
-            if organization_id is not None:
-                stmt.where(Project.organization_id == organization_id)
-
-            return list((await session.execute(stmt)).scalars().all())
-
-        return await self.cache_repo.getCachedOrCall(
-            self.getCacheKey(user_id), _lambda
+            .where(ProjectMember.user_id == user_id)
+            .order_by(Project.created_at.desc())
         )
+        if organization_id is not None:
+            stmt = stmt.where(Project.organization_id == organization_id)
+
+        return list((await session.execute(stmt)).scalars().all())
 
     async def countAll(self, session: AsyncSession) -> int:
         stmt = select(func.count()).select_from(Project)

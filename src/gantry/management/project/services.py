@@ -27,6 +27,11 @@ from .dtos import (
     ProjectUserListResponse,
     ProjectUserPermissionsResponse,
 )
+from .entities import (
+    KeycloakOrgPayload,
+    KeycloakUserPayload,
+    UserAttributePayload,
+)
 from .permissions import (
     PROJECT_PERMISSIONS_ATTR,
     ProjectPermission,
@@ -38,7 +43,7 @@ from .repositories import (
     ProjectSettingsRepository,
 )
 
-from typing import Any
+from typing import Any, cast
 
 from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
@@ -134,7 +139,7 @@ class ProjectService:
         orgs_res = await self.kc.getMemberOrganizations(user_id)
         if orgs_res.status == ResultStatus.Err:
             return orgs_res.into()
-        for org in orgs_res.unwrap():
+        for org in cast(list[KeycloakOrgPayload], orgs_res.unwrap()):
             if str(org.get("id", "")) == org_id:
                 return Ok(None)
         return Err(UserNotInOrganizationError())
@@ -156,7 +161,9 @@ class ProjectService:
     ) -> Result[tuple[int, str, ProjectInfoResponse], ProjectNotFoundError]:
         """Load a project row and map it into the public DTO shape."""
         async with self.session_manager.get_session() as session:
-            project = await self.project_repo.getByUuid(session, project_uuid)
+            project = await self.project_repo.getByUuid(
+                session, project_uuid, use_cache=False
+            )
             if project is None:
                 return Err(ProjectNotFoundError())
             return Ok(
@@ -199,7 +206,7 @@ class ProjectService:
 
     def _extractProjectPermissions(
         self,
-        attrs: dict[str, Any],
+        attrs: UserAttributePayload,
         project_uuid: str,
     ) -> list[str]:
         """Extract project-scoped permissions from grouped Keycloak attrs."""
@@ -208,7 +215,7 @@ class ProjectService:
         )
         return list(grouped.get(project_uuid, []))
 
-    def _extractOrgPermissions(self, attrs: dict[str, Any]) -> list[str]:
+    def _extractOrgPermissions(self, attrs: UserAttributePayload) -> list[str]:
         """Extract organization-scoped permissions from Keycloak attrs."""
         raw = attrs.get("org_permissions", [])
         if isinstance(raw, str):
@@ -610,16 +617,15 @@ class ProjectService:
             )
             if updated is None:
                 return Err(ProjectNotFoundError())
-            await session.commit()
-            return Ok(
-                ProjectInfoResponse(
-                    project_uuid=str(updated.uuid),
-                    name=updated.name,
-                    description=updated.description,
-                    organization_id=updated.organization_id,
-                    archived=updated.is_archived,
-                )
+            output = ProjectInfoResponse(
+                project_uuid=str(updated.uuid),
+                name=updated.name,
+                description=updated.description,
+                organization_id=updated.organization_id,
+                archived=updated.is_archived,
             )
+            await session.commit()
+            return Ok(output)
 
     async def getProjectSettings(
         self,
@@ -718,7 +724,7 @@ class ProjectService:
         )
         if users_res.status == ResultStatus.Err:
             return users_res.into()
-        users = users_res.unwrap()
+        users = cast(list[KeycloakUserPayload], users_res.unwrap())
 
         results = []
         for user in users:
@@ -961,7 +967,9 @@ class ProjectService:
     ]:
         """Archive or unarchive a project after validating current state."""
         async with self.session_manager.get_session() as session:
-            project = await self.project_repo.getByUuid(session, project_uuid)
+            project = await self.project_repo.getByUuid(
+                session, project_uuid, use_cache=False
+            )
             if project is None:
                 return Err(ProjectNotFoundError())
             # Archived project is immutable except owner-triggered unarchive.
@@ -974,6 +982,10 @@ class ProjectService:
                 archived=project.is_archived,
             )
             await session.commit()
+            await self.project_repo.invalidateProjectCache(
+                project.uuid,
+                project.organization_id,
+            )
             return Ok(output)
 
     async def isProjectArchived(

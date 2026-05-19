@@ -4,6 +4,7 @@ from gantry.db import AsyncSessionManager, getRedisConnectionPool
 from gantry.settings import ApiKeyPermission
 from gantry.management.project import ProjectRepository, ProjectNotFoundError
 from gantry.management.organization import getOrgSettings
+from gantry.shared.utils.uuid_utils import uuid7
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
     UnrecoverableError,
@@ -17,11 +18,15 @@ from .dtos import (
     ApiKeyPermissionCatalogResponse,
 )
 from .models import ApiKey
-from .entities import ApiKeyInfo, ApiKeyContextRecord
+from .entities import (
+    ApiKeyInfo,
+    ApiKeySnapshot,
+    ApiKeyInternalIds,
+    ApiKeyContextRecord,
+)
 from .repositories import ApiKeyRepository
 
 import hmac
-import uuid
 import asyncio
 import secrets
 from typing import Callable, Sequence, TypedDict, NotRequired
@@ -248,7 +253,7 @@ class ApiKeyService:
             }
         )
 
-    def _snapshotApiKey(self, api_key: ApiKey) -> dict[str, object]:
+    def _snapshotApiKey(self, api_key: ApiKey) -> ApiKeySnapshot:
         """Detach the fields needed outside the ORM session boundary."""
         return {
             "api_key_id": api_key.id,
@@ -265,7 +270,7 @@ class ApiKeyService:
 
     async def _getApiKeyByUuid(
         self, api_key_uuid: str
-    ) -> Result[dict[str, object], ApiKeyNotFoundError]:
+    ) -> Result[ApiKeySnapshot, ApiKeyNotFoundError]:
         async with self.session_manager.get_session() as session:
             api_key = await self.api_key_repo.getByUuid(session, api_key_uuid)
             if api_key is None:
@@ -289,7 +294,7 @@ class ApiKeyService:
             return Ok(str(project.uuid))
 
     def _toResponse(
-        self, api_key: dict[str, object], project_uuid: str
+        self, api_key: ApiKeySnapshot, project_uuid: str
     ) -> ApiKeyResponse:
         return ApiKeyResponse(
             api_key_id=int(api_key["api_key_id"]),
@@ -354,13 +359,15 @@ class ApiKeyService:
         project_id, _, normalized_project_uuid = project_res.unwrap()
 
         api_key_secret = self._createApiKeySecret()
-        formatted_key = self.api_key_format(str(uuid.uuid4()), api_key_secret)
+        api_key_uuid = uuid7()
+        formatted_key = self.api_key_format(str(api_key_uuid), api_key_secret)
         hashed_key = self._hashApiKey(formatted_key)
         hint = self.generateHint(formatted_key)
 
         async with self.session_manager.get_session() as session:
             created = await self.api_key_repo.create(
                 session,
+                api_key_uuid=api_key_uuid,
                 user_id=actor_user_id,
                 project_id=project_id,
                 hashed_key=hashed_key,
@@ -471,6 +478,9 @@ class ApiKeyService:
                 return Err(ProjectNotFoundError())
 
             await session.commit()
+            await self.api_key_repo.invalidateContextRecordCache(
+                api_key["hashed_key"]
+            )
             return Ok(
                 self._toResponse(
                     self._snapshotApiKey(updated),
@@ -495,6 +505,21 @@ class ApiKeyService:
             name=name,
             description=description,
             permissions=permissions,
+        )
+
+    async def getApiKeyInternalIds(
+        self, api_key_uuid: str
+    ) -> Result[ApiKeyInternalIds, ApiKeyNotFoundError]:
+        """Resolve internal numeric ids used by internal routers."""
+        api_key_res = await self._getApiKeyByUuid(api_key_uuid)
+        if api_key_res.status == ResultStatus.Err:
+            return api_key_res.into()
+        api_key = api_key_res.unwrap()
+        return Ok(
+            {
+                "api_key_id": int(api_key["api_key_id"]),
+                "project_id": int(api_key["project_id"]),
+            }
         )
 
     async def getApiKeysInfo(
@@ -551,6 +576,9 @@ class ApiKeyService:
                 return Err(ProjectNotFoundError())
 
             await session.commit()
+            await self.api_key_repo.invalidateContextRecordCache(
+                api_key["hashed_key"]
+            )
             return Ok(
                 self._toResponse(
                     self._snapshotApiKey(updated),
@@ -565,7 +593,7 @@ class ApiKeyService:
         api_key_res = await self._getApiKeyByUuid(api_key_uuid)
         if api_key_res.status == ResultStatus.Err:
             return api_key_res.into()
-        _ = api_key_res.unwrap()
+        api_key = api_key_res.unwrap()
 
         async with self.session_manager.get_session() as session:
             deleted = await self.api_key_repo.deleteByUuid(
@@ -574,6 +602,9 @@ class ApiKeyService:
             if not deleted:
                 return Err(ApiKeyNotFoundError())
             await session.commit()
+            await self.api_key_repo.invalidateContextRecordCache(
+                api_key["hashed_key"]
+            )
             return Ok(True)
 
     async def _resolveApiKeyContext(

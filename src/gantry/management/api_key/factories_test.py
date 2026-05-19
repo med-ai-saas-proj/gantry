@@ -1,6 +1,6 @@
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
@@ -71,4 +71,5 @@ class TestApiKeyFactories(unittest.TestCase):
             project_repo="project-repo",
             permissions=list(settings.permissions),
             session_manager="session-manager",
+            limits_storage=ANY,
         )

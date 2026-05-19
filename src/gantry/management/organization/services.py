@@ -27,6 +27,13 @@ from .dtos import (
     InvitationListResponse,
     UserPermissionsResponse,
 )
+from .entities import (
+    CreateOrgPayload,
+    KeycloakOrgPayload,
+    KeycloakUserPayload,
+    UserAttributePayload,
+    KeycloakInvitationPayload,
+)
 from .settings import getOrgSettings
 from .permissions import OrgPermission, has_permission
 from .repositories import (
@@ -34,7 +41,7 @@ from .repositories import (
     OrgDeletionRequestRepository,
 )
 
-from typing import Any
+from typing import Any, cast
 from datetime import UTC, datetime, timedelta
 
 from pyrusult import Ok, Err, Result, ResultStatus
@@ -148,7 +155,7 @@ class MultipleOrganizationMembershipError(RecoverableError):
     detail = "A user can belong to only one organization."
 
 
-def _extract_org_ids(orgs: list[dict[str, Any]]) -> set[str]:
+def _extract_org_ids(orgs: list[KeycloakOrgPayload]) -> set[str]:
     """Collect non-empty organization ids from Keycloak org payloads."""
     return {str(org.get("id", "")) for org in orgs if org.get("id")}
 
@@ -177,9 +184,12 @@ class OrgService:
 
     async def _ensureOrgExists(
         self, org_id: str
-    ) -> Result[dict[str, Any], OrgNotFoundError | KeycloakOrgError]:
+    ) -> Result[KeycloakOrgPayload, OrgNotFoundError | KeycloakOrgError]:
         """Fetch the organization from Keycloak or return the upstream error."""
-        return await self.kc.getOrg(org_id)
+        return cast(
+            Result[KeycloakOrgPayload, OrgNotFoundError | KeycloakOrgError],
+            await self.kc.getOrg(org_id),
+        )
 
     async def _ensureUserInOrg(
         self, org_id: str, user_id: str
@@ -195,7 +205,7 @@ class OrgService:
         if orgs_res.status == ResultStatus.Err:
             return orgs_res.into()
 
-        orgs = orgs_res.unwrap()
+        orgs = cast(list[KeycloakOrgPayload], orgs_res.unwrap())
         unique_org_ids = {
             str(org.get("id", "")) for org in orgs if org.get("id")
         }
@@ -206,7 +216,7 @@ class OrgService:
                 return Ok(True)
         return Err(UserNotInOrganizationError())
 
-    def _extractUserPermissions(self, attrs: dict[str, Any]) -> list[str]:
+    def _extractUserPermissions(self, attrs: UserAttributePayload) -> list[str]:
         """Normalize organization permissions from Keycloak user attributes."""
         # Keycloak user-profile validation allows org_permissions.
         legacy = attrs.get(_ORG_PERM_ATTR, [])
@@ -272,7 +282,7 @@ class OrgService:
             )
             if members_res.status == ResultStatus.Err:
                 return members_res.into()
-            members = members_res.unwrap()
+            members = cast(list[KeycloakUserPayload], members_res.unwrap())
             if not members:
                 break
 
@@ -312,7 +322,7 @@ class OrgService:
         org_res = await self.kc.getOrg(org_id)
         if org_res.status == ResultStatus.Err:
             return org_res.into()
-        org = org_res.unwrap()
+        org = cast(KeycloakOrgPayload, org_res.unwrap())
         name = str(org.get("name") or org_id)
 
         owner_id_res = await self._getOrgOwnerId(org_id)
@@ -450,7 +460,7 @@ class OrgService:
         )
         if orgs_res.status == ResultStatus.Err:
             return orgs_res.into()
-        orgs = orgs_res.unwrap()
+        orgs = cast(list[KeycloakOrgPayload], orgs_res.unwrap())
 
         return Ok(
             OrgListResponse(
@@ -480,7 +490,7 @@ class OrgService:
         | KeycloakPossibleError,
     ]:
         """Create an organization from the admin dashboard."""
-        payload: dict[str, Any] = {"name": name}
+        payload: CreateOrgPayload = {"name": name}
         if alias:
             payload["alias"] = alias
 
@@ -613,7 +623,7 @@ class OrgService:
         )
         if members_res.status == ResultStatus.Err:
             return members_res.into()
-        members = members_res.unwrap()
+        members = cast(list[KeycloakUserPayload], members_res.unwrap())
 
         count_res = await self.kc.getOrgMemberCount(org_id)
         total = count_res.unwrap_or(len(members))
@@ -662,7 +672,7 @@ class OrgService:
         inv_res = await self.kc.getInvitations(org_id)
         if inv_res.status == ResultStatus.Err:
             return inv_res.into()
-        raw_list = inv_res.unwrap()
+        raw_list = cast(list[KeycloakInvitationPayload], inv_res.unwrap())
 
         results = []
         for inv in raw_list:
@@ -686,7 +696,7 @@ class OrgService:
         inv_res = await self.kc.getInvitation(org_id, invitation_id)
         if inv_res.status == ResultStatus.Err:
             return inv_res.into()
-        inv = inv_res.unwrap()
+        inv = cast(KeycloakInvitationPayload, inv_res.unwrap())
 
         return Ok(
             InvitationResponse(

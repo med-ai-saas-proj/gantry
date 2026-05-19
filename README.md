@@ -40,7 +40,81 @@
 
 - Generate `example.env` files for `.env` files: `scripts/gen-example-env.sh`
 - Reset the database state: `scripts/reset-db.sh`. Remember to migrate and recreate the test account.
-- Smoke test admin-only routes: `./scripts/test_admin_api.sh`
+
+### How to run tests locally
+
+Most test targets are wrapped by the `Makefile`. Use `example.gantry.toml`
+for no-Docker contract tests, or `gantry.toml` if you need local secrets and a
+running development stack.
+
+```bash
+uv sync --group dev
+export GANTRY_SERVER__CONFIG_FILE=example.gantry.toml
+export PYTHONPATH=src
+
+make test-unit
+make test-api
+make test-regression
+make test-automation
+```
+
+Useful grouped targets:
+
+```bash
+make test-ci-fast   # automation + unit + API + regression
+make test-ci-full   # test-ci-fast + integration
+```
+
+Integration and backend E2E use real services and require Docker:
+
+```bash
+make test-integration
+make test-e2e-backend
+```
+
+Performance benchmarks are local-only unless you explicitly run load tests
+against a server:
+
+```bash
+make test-perf
+BASE_URL=http://localhost:8000 make test-load-k6
+BASE_URL=http://localhost:8000 make test-load-locust
+```
+
+Reports are written under `reports/`. More test-suite details are in
+[`tests/README.md`](./tests/README.md).
+
+### How to test GitHub Actions locally
+
+Install [`act`](https://github.com/nektos/act), then run one workflow/job at a
+time. The Ubuntu image below matches the workflows well enough for local CI
+smoke checks.
+
+```bash
+act workflow_dispatch \
+  -W .github/workflows/unit-test.yml \
+  -j unit \
+  --container-architecture linux/amd64 \
+  -P ubuntu-latest=catthehacker/ubuntu:act-latest
+```
+
+Common workflow commands:
+
+```bash
+act workflow_dispatch -W .github/workflows/api-test.yml -j api --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
+act workflow_dispatch -W .github/workflows/automation-test.yml -j smoke --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
+act workflow_dispatch -W .github/workflows/regression-test.yml -j regression --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
+act workflow_dispatch -W .github/workflows/integration-test.yml -j integration --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
+act workflow_dispatch -W .github/workflows/e2e-test.yml -j e2e --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
+act workflow_dispatch -W .github/workflows/performance-test.yml -j benchmark --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
+```
+
+Notes:
+
+- `act` copies the current working tree, including uncommitted changes.
+- Integration/E2E workflows need local Docker access from inside `act`.
+- Warnings from the Node action runtime, such as `punycode` deprecation, are
+  not Gantry test failures.
 
 ### Getting API keys
 

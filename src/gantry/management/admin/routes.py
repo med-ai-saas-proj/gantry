@@ -79,14 +79,9 @@ async def get_admin_dashboard_summary(
 
 
 @admin_router.get(
-    "/organization-permissions",
-    response_model=PermissionCatalogResponse,
-    summary="List organization permissions for admin UIs",
-)
-@admin_router.get(
     "/organizations/permissions",
     response_model=PermissionCatalogResponse,
-    include_in_schema=False,
+    summary="List organization permissions for admin UIs",
 )
 async def list_admin_organization_permissions(
     admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -144,14 +139,9 @@ async def get_admin_organization(
 
 
 @admin_router.get(
-    "/organization-settings/{org_id}",
-    response_model=OrgSettingsResponse,
-    summary="Get organization settings as admin",
-)
-@admin_router.get(
     "/organizations/{org_id}/settings",
     response_model=OrgSettingsResponse,
-    include_in_schema=False,
+    summary="Get organization settings as admin",
 )
 async def get_admin_organization_settings(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -164,14 +154,9 @@ async def get_admin_organization_settings(
 
 
 @admin_router.patch(
-    "/organization-settings/{org_id}",
-    response_model=OrgSettingsResponse,
-    summary="Update organization settings as admin",
-)
-@admin_router.patch(
     "/organizations/{org_id}/settings",
     response_model=OrgSettingsResponse,
-    include_in_schema=False,
+    summary="Update organization settings as admin",
 )
 async def update_admin_organization_settings(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -185,25 +170,9 @@ async def update_admin_organization_settings(
 
 
 @admin_router.get(
-    "/organization-users",
-    response_model=OrgUserListResponse,
-    summary="List organization users as admin",
-)
-async def list_admin_organization_users_by_query(
-    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
-    org_id: Annotated[str, Query(..., min_length=1, alias="org_id")],
-    pagination: Annotated[AdminPaginationQuery, Depends()],
-    admin_service: Annotated[AdminService, Depends(getAdminService)],
-) -> OrgUserListResponse:
-    """Canonical admin path for organization-user listings."""
-    del user_info
-    return await admin_service.listOrganizationUsers(org_id, pagination)
-
-
-@admin_router.get(
     "/organizations/{org_id}/users",
     response_model=OrgUserListResponse,
-    include_in_schema=False,
+    summary="List organization users as admin",
 )
 async def list_admin_organization_users(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -211,7 +180,7 @@ async def list_admin_organization_users(
     pagination: Annotated[AdminPaginationQuery, Depends()],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
 ) -> OrgUserListResponse:
-    """Backward-compatible alias for organization-user admin listings."""
+    """Canonical admin path for organization-user listings."""
     del user_info
     return await admin_service.listOrganizationUsers(org_id, pagination)
 
@@ -249,14 +218,9 @@ async def delete_admin_organization(
 
 
 @admin_router.get(
-    "/project-permissions",
-    response_model=ProjectPermissionCatalogResponse,
-    summary="List project permissions for admin UIs",
-)
-@admin_router.get(
     "/projects/permissions",
     response_model=ProjectPermissionCatalogResponse,
-    include_in_schema=False,
+    summary="List project permissions for admin UIs",
 )
 async def list_admin_project_permissions(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -315,14 +279,9 @@ async def get_admin_project(
 
 
 @admin_router.get(
-    "/project-settings/{project_id}",
-    response_model=ProjectSettingsResponse,
-    summary="Get project settings as admin",
-)
-@admin_router.get(
     "/projects/{project_id}/settings",
     response_model=ProjectSettingsResponse,
-    include_in_schema=False,
+    summary="Get project settings as admin",
 )
 async def get_admin_project_settings(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -335,14 +294,9 @@ async def get_admin_project_settings(
 
 
 @admin_router.patch(
-    "/project-settings/{project_id}",
-    response_model=ProjectSettingsResponse,
-    summary="Update project settings as admin",
-)
-@admin_router.patch(
     "/projects/{project_id}/settings",
     response_model=ProjectSettingsResponse,
-    include_in_schema=False,
+    summary="Update project settings as admin",
 )
 async def update_admin_project_settings(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -356,25 +310,9 @@ async def update_admin_project_settings(
 
 
 @admin_router.get(
-    "/project-users",
-    response_model=ProjectUserListResponse,
-    summary="List project users as admin",
-)
-async def list_admin_project_users_by_query(
-    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
-    project_id: Annotated[str, Query(..., min_length=1, alias="project_id")],
-    pagination: Annotated[AdminPaginationQuery, Depends()],
-    admin_service: Annotated[AdminService, Depends(getAdminService)],
-) -> ProjectUserListResponse:
-    """Canonical admin path for project-user listings."""
-    del user_info
-    return await admin_service.listProjectUsers(project_id, pagination)
-
-
-@admin_router.get(
     "/projects/{project_id}/users",
     response_model=ProjectUserListResponse,
-    include_in_schema=False,
+    summary="List project users as admin",
 )
 async def list_admin_project_users(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -382,7 +320,7 @@ async def list_admin_project_users(
     pagination: Annotated[AdminPaginationQuery, Depends()],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
 ) -> ProjectUserListResponse:
-    """Backward-compatible alias for project-user admin listings."""
+    """Canonical admin path for project-user listings."""
     del user_info
     return await admin_service.listProjectUsers(project_id, pagination)
 
@@ -418,15 +356,40 @@ async def delete_admin_project(
     return await admin_service.deleteProject(project_id)
 
 
-@admin_router.get(
-    "/api-key-permissions",
-    response_model=ApiKeyPermissionCatalogResponse,
-    summary="List API-key permissions for admin UIs",
+@admin_router.post(
+    "/projects/{project_id}/archive",
+    response_model=ProjectArchiveResponse,
+    summary="Archive project as admin",
 )
+async def archive_admin_project(
+    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
+    project_id: Annotated[str, Path()],
+    admin_service: Annotated[AdminService, Depends(getAdminService)],
+) -> ProjectArchiveResponse:
+    """Archive one project without project permission checks."""
+    del user_info
+    return await admin_service.archiveProject(project_id)
+
+
+@admin_router.post(
+    "/projects/{project_id}/unarchive",
+    response_model=ProjectArchiveResponse,
+    summary="Unarchive project as admin",
+)
+async def unarchive_admin_project(
+    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
+    project_id: Annotated[str, Path()],
+    admin_service: Annotated[AdminService, Depends(getAdminService)],
+) -> ProjectArchiveResponse:
+    """Unarchive one project without project permission checks."""
+    del user_info
+    return await admin_service.unarchiveProject(project_id)
+
+
 @admin_router.get(
     "/api-keys/permissions",
     response_model=ApiKeyPermissionCatalogResponse,
-    include_in_schema=False,
+    summary="List API-key permissions for admin UIs",
 )
 async def list_admin_api_key_permissions(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -530,13 +493,13 @@ async def list_admin_users(
 
 
 @admin_router.get(
-    "/user-organizations",
+    "/users/{user_id}/organizations",
     response_model=list[AdminUserOrganizationInfoResponse],
     summary="List organizations for a specific user",
 )
-async def get_user_organizations_by_query(
+async def get_user_organizations(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
-    user_id: Annotated[str, Query(..., min_length=1, alias="user_id")],
+    user_id: Annotated[str, Path()],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
 ) -> list[AdminUserOrganizationInfoResponse]:
     """Canonical admin path for user-organization lookups."""
@@ -545,14 +508,9 @@ async def get_user_organizations_by_query(
 
 
 @admin_router.get(
-    "/user-profiles/{user_id}",
-    response_model=AdminUserProfileResponse,
-    summary="Get Keycloak profile and permissions for a specific user",
-)
-@admin_router.get(
     "/users/{user_id}/profile",
     response_model=AdminUserProfileResponse,
-    include_in_schema=False,
+    summary="Get Keycloak profile and permissions for a specific user",
 )
 async def get_user_profile(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -565,14 +523,9 @@ async def get_user_profile(
 
 
 @admin_router.put(
-    "/user-permissions/{user_id}",
-    response_model=AdminUserProfileResponse,
-    summary="Replace Keycloak org/project permissions for a specific user",
-)
-@admin_router.put(
     "/users/{user_id}/permissions",
     response_model=AdminUserProfileResponse,
-    include_in_schema=False,
+    summary="Replace Keycloak org/project permissions for a specific user",
 )
 async def set_user_permissions(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -586,14 +539,9 @@ async def set_user_permissions(
 
 
 @admin_router.delete(
-    "/user-permissions/{user_id}",
-    response_model=AdminUserProfileResponse,
-    summary="Reset Keycloak org/project permissions for a specific user",
-)
-@admin_router.delete(
     "/users/{user_id}/permissions",
     response_model=AdminUserProfileResponse,
-    include_in_schema=False,
+    summary="Reset Keycloak org/project permissions for a specific user",
 )
 async def reset_user_permissions(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -603,18 +551,3 @@ async def reset_user_permissions(
     """Clear one user's org/project permission attributes in Keycloak."""
     del user_info
     return await admin_service.resetUserPermissions(user_id)
-
-
-@admin_router.get(
-    "/users/{user_id}/organizations",
-    response_model=list[AdminUserOrganizationInfoResponse],
-    include_in_schema=False,
-)
-async def get_user_organizations(
-    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
-    user_id: Annotated[str, Path()],
-    admin_service: Annotated[AdminService, Depends(getAdminService)],
-) -> list[AdminUserOrganizationInfoResponse]:
-    """Backward-compatible alias for user-organization lookups."""
-    del user_info
-    return await admin_service.getUserOrganizations(user_id)

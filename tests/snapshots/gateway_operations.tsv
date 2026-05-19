@@ -1,0 +1,10 @@
+DELETE	/{route_name}
+GET	/{route_name}
+PATCH	/{route_name}
+POST	/{route_name}
+PUT	/{route_name}
+DELETE	/{route_name}/{full_path}
+GET	/{route_name}/{full_path}
+PATCH	/{route_name}/{full_path}
+POST	/{route_name}/{full_path}
+PUT	/{route_name}/{full_path}

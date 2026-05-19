@@ -2,7 +2,7 @@
 
 from gantry.db import getRedisCacheRepo
 from gantry.keycloak import getKeycloakServiceClient
-from gantry.db.factories import getRedis, getSessionManager
+from gantry.db.factories import getSessionManager
 from gantry.shared.logging.logger import getLogger
 
 from .services import ProjectService

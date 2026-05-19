@@ -539,26 +539,29 @@ class KeycloakServiceClient:
         user_id: str,
         brief_representation: bool = True,
     ) -> Result[list[dict[str, Any]], MemberNotFoundError | KeycloakOrgError]:
-        del brief_representation
-        if self._init_error is not None:
-            return Err(self._init_error)
-        if self._admin is None:
-            return Err(KeycloakOrgError())
+        params = {"briefRepresentation": str(brief_representation).lower()}
+        response_res = await self._rawRequest(
+            "get",
+            f"{self._adminBase()}/organizations/members/{user_id}/organizations",
+            params=params,
+        )
+        if response_res.status == ResultStatus.Err:
+            return response_res.into()
 
-        try:
-            payload = await self._admin.a_get_user_organizations(user_id)
-            if isinstance(payload, list):
-                return Ok(payload)
-            return Err(KeycloakOrgError())
-        except KeycloakError as exc:
+        response = response_res.unwrap()
+        status_code = getattr(response, "status_code", 500)
+        if status_code >= 400:
             return Err(
-                self._mapKeycloakError(
-                    exc,
+                self._mapStatusError(
+                    status_code,
                     not_found_error=MemberNotFoundError(),
                 )
             )
-        except Exception as exc:
-            return Err(KeycloakOrgError(from_exception=exc))
+
+        payload = self._parseResponseJson(response)
+        if isinstance(payload, list):
+            return Ok(payload)
+        return Err(KeycloakOrgError())
 
     async def removeMember(
         self, org_id: str, user_id: str
