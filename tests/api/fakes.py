@@ -8,6 +8,7 @@ from typing import Any
 
 from pyrusult import Ok
 
+from gantry.management.billing.models import TransactionStatus
 from tests.factories import ApiKeyInfoFactory, ApiKeyPayloadFactory, OrgPayloadFactory, ProjectPayloadFactory
 
 
@@ -519,7 +520,7 @@ def transaction_payload():
         project_uuid=uuid.UUID(PROJECT_UUID),
         details={"model": "gpt"},
         captured_at=None,
-        status="PENDING",
+        status=TransactionStatus.PENDING,
     )
 
 
@@ -827,41 +828,74 @@ class FakeRagService(ConfigurableFake):
         return Ok([rag_result_payload()])
 
 
-class FakeConversationService(ConfigurableFake):
+class BaseConversationService(ConfigurableFake):
+    """Base fake conversation service with common core methods."""
     def __init__(self) -> None:
         self.calls: list[tuple[str, Any]] = []
 
-    async def createConversation(self, **kwargs):
-        self.calls.append(("createConversation", kwargs))
-        return uuid.UUID(CONVERSATION_UUID)
-
     async def getConversationMetadata(self, conversation_uid, project_id):
         self.calls.append(("getConversationMetadata", {"conversation_uid": conversation_uid, "project_id": project_id}))
-        return Ok({"conversation_uid": conversation_uid, "project_id": project_id, "extra_metadata": {"topic": "demo"}, "created_at": NOW})
+        return Ok({"conversation_id": 1, "conversation_uid": conversation_uid, "project_id": project_id, "extra_metadata": {"topic": "demo"}, "created_at": NOW})
 
-    async def updateConversationMetadata(self, **kwargs):
-        self.calls.append(("updateConversationMetadata", kwargs))
-        return Ok(True)
+    async def getConversationMessageByUuid(self, conversation_uid, project_id, message_uid):
+        self.calls.append(("getConversationMessageByUuid", {"conversation_uid": conversation_uid, "project_id": project_id, "message_uid": message_uid}))
+        return Ok(SimpleNamespace(uuid=message_uid, kind="request", seq_id=1, parts=[], model_name=None, timestamp=NOW, run_id=None))
+
+    async def getConversationMessagesByUuids(self, conversation_uid, project_id, message_uids):
+        self.calls.append(("getConversationMessagesByUuids", {"conversation_uid": conversation_uid, "project_id": project_id, "message_uids": message_uids}))
+        return [SimpleNamespace(uuid=uid, kind="request", seq_id=i, parts=[], model_name=None, timestamp=NOW, run_id=None) for i, uid in enumerate(message_uids)]
+
+    async def updateConversationMetadata(self, conversation_uid, project_id, extra_metadata):
+        self.calls.append(("updateConversationMetadata", {"conversation_uid": conversation_uid, "project_id": project_id, "extra_metadata": extra_metadata}))
+        return Ok(None)
 
     async def deleteConversation(self, conversation_uid, project_id):
         self.calls.append(("deleteConversation", {"conversation_uid": conversation_uid, "project_id": project_id}))
-        return Ok(True)
+        return Ok(None)
 
-    async def getConversationMessages(self, *args, **kwargs):
-        self.calls.append(("getConversationMessages", {"args": args, "kwargs": kwargs}))
-        return Ok([])
+    async def deleteConversationMessage(self, conversation_uid, project_id, message_uid):
+        self.calls.append(("deleteConversationMessage", {"conversation_uid": conversation_uid, "project_id": project_id, "message_uid": message_uid}))
+        return Ok(None)
 
-    async def storeConversationMessages(self, **kwargs):
-        self.calls.append(("storeConversationMessages", kwargs))
-        return Ok(True)
+    async def addConversationMessagesCache(self, conversation_uid, msgs):
+        self.calls.append(("addConversationMessagesCache", {"conversation_uid": conversation_uid, "msg_count": len(msgs)}))
+        return None
 
-    async def deleteConversationMessage(self, **kwargs):
-        self.calls.append(("deleteConversationMessage", kwargs))
-        return Ok(True)
 
-    async def getConversationMessage(self, **kwargs):
-        self.calls.append(("getConversationMessage", kwargs))
-        return Ok(SimpleNamespace(kind="request", seq_id=1, parts=[], model_name=None, timestamp=NOW, run_id=None))
+class FakeSequenceConversationService(BaseConversationService):
+    """Fake implementation of SequenceConversationService with sequence-specific methods."""
+
+    async def createConversation(self, project_id, extra_metadata, messages=None):
+        self.calls.append(("createConversation", {"project_id": project_id, "extra_metadata": extra_metadata, "msg_count": len(messages) if messages else 0}))
+        return Ok(uuid.UUID(CONVERSATION_UUID))
+
+    async def getConversationMessages(self, conversation_uid, project_id, limit=20, last_cursor=None, order_by="asc"):
+        self.calls.append(("getConversationMessages", {"conversation_uid": conversation_uid, "project_id": project_id, "limit": limit, "last_cursor": last_cursor, "order_by": order_by}))
+        return Ok([SimpleNamespace(uuid=uuid.uuid4(), kind="request", seq_id=i, parts=[], model_name=None, timestamp=NOW, run_id=None) for i in range(min(limit, 5))])
+
+    async def storeConversationMessages(self, conversation_uid, project_id, msgs):
+        self.calls.append(("storeConversationMessages", {"conversation_uid": conversation_uid, "project_id": project_id, "msg_count": len(msgs)}))
+        return Ok(None)
+
+
+class FakeTreeConversationService(BaseConversationService):
+    """Fake implementation of TreeConversationService with tree-specific methods."""
+
+    async def createConversation(self, project_id, extra_metadata, messages=None):
+        self.calls.append(("createConversation", {"project_id": project_id, "extra_metadata": extra_metadata, "msg_count": len(messages) if messages else 0}))
+        return Ok(uuid.UUID(CONVERSATION_UUID))
+
+    async def getConversationMessages(self, conversation_uid, project_id, limit=20, order_by="asc", last_cursor=None, branch_node_id=None):
+        self.calls.append(("getConversationMessages", {"conversation_uid": conversation_uid, "project_id": project_id, "limit": limit, "order_by": order_by, "last_cursor": last_cursor, "branch_node_id": branch_node_id}))
+        return Ok([SimpleNamespace(uuid=uuid.uuid4(), kind="request", seq_id=i, parts=[], model_name=None, timestamp=NOW, run_id=None) for i in range(min(limit, 5))])
+
+    async def storeConversationMessages(self, conversation_uid, project_id, msgs):
+        self.calls.append(("storeConversationMessages", {"conversation_uid": conversation_uid, "project_id": project_id, "msg_count": len(msgs)}))
+        return Ok(None)
+
+
+# Legacy alias for backward compatibility
+FakeConversationService = FakeSequenceConversationService
 
 
 class FakeGatewayDestination(SimpleNamespace):
