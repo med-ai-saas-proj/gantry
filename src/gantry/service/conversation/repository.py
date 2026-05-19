@@ -4,7 +4,6 @@ from .types import ConversationMetadata
 from .models import Message, Conversation
 
 import uuid
-from math import e
 from typing import Literal, Sequence
 
 from sqlalchemy import func, delete, select, update
