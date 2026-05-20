@@ -57,6 +57,6 @@ class RagData(WithCreateTimestamp, WithID, RagBaseSQLModel):
     )  # redundant but useful for querying without join
     lang: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    text: Mapped[str | None] = mapped_column(Text, nullable=False)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
     # placeholder for embedding column, actual type will be set dynamically
     embedding: Mapped[Sequence[float]] = mapped_column(VECTOR())

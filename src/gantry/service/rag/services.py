@@ -1,6 +1,7 @@
 from gantry.db import AsyncSessionManager
 from gantry.settings.rag import VectorOpsType
 from gantry.service.file_storage.types import FileRecord
+from gantry.service.file_storage.models import File
 from gantry.service.file_storage.services import (
     FileStorageService,
     FileNotFoundInSystemError,
@@ -18,13 +19,13 @@ from .dtos import (
 )
 from .type import (
     EmbeddingTask,
+    RagQueryRecord,
     ChunkSplitterType,
-    RagEmbeddingRecord,
 )
 from .utils import (
-    getIndexName,
     getTableName,
     get_orm_class,
+    getBm25IndexName,
     create_bm25_index,
     create_vector_index,
     create_embedding_table,
@@ -38,14 +39,26 @@ import csv
 import json
 import uuid
 import importlib
-from typing import Sequence, Awaitable, cast
+from heapq import merge
+from typing import Any, Sequence, Awaitable, TypedDict, cast
+from datetime import datetime
 
 from openai import AsyncOpenAI
 from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import func, text, delete, select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
+from prometheus_client import h
 from sqlalchemy.dialects.postgresql import insert
+
+
+class EmbeddingQueryRecord(TypedDict):
+    """TypedDict for embedding query records from database."""
+
+    file_id: int
+    text: str
+    embedding: list[float]
+    created_at: datetime
 
 
 class BucketNotFoundError(RecoverableError):
@@ -906,8 +919,11 @@ class RagService:
         filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
         top_k: int = 5,
         include_embedding: bool = False,
+        hybrid_search: bool = False,
+        hybrid_search_bm25_top_k: int = 100,
+        hybrid_search_semantic_top_k: int = 5,
     ) -> Result[
-        Sequence[RagEmbeddingRecord],
+        Sequence[RagQueryRecord],
         FileNotFoundInSystemError
         | InvalidEmbeddingDimensionError
         | InternalServiceError,
@@ -927,13 +943,53 @@ class RagService:
             )
 
         query_embedding = embedding_response.data[0].embedding
-        return await self.querySimilarByVector(
+        if not query_embedding:
+            return Err(
+                InternalServiceError(
+                    message="Received empty embedding for the query."
+                )
+            )
+
+        if not hybrid_search:
+            return await self.querySimilarByVector(
+                project_id=project_id,
+                embedding=query_embedding,
+                filters=filters,
+                top_k=top_k,
+                include_embedding=include_embedding,
+            )
+
+        async with self.session_manager.get_session() as session:
+            resolved_file_ids_res = await self._resolveFilteredFileIds(
+                session, project_id, filters
+            )
+            if resolved_file_ids_res.status == ResultStatus.Err:
+                return resolved_file_ids_res.into()
+            resolved_file_ids = resolved_file_ids_res.unwrap()
+
+        bm25_records = await self._queryBm25Search(
+            project_id=project_id,
+            query=query,
+            top_k=hybrid_search_bm25_top_k,
+            resolved_file_ids=resolved_file_ids,
+            lang=self.setting.supported_langs_list[0],
+        )
+        vector_search_result = await self._querySimilarByVector(
             project_id=project_id,
             embedding=query_embedding,
-            filters=filters,
-            top_k=top_k,
-            include_embedding=include_embedding,
+            top_k=hybrid_search_semantic_top_k,
+            resolved_file_ids=resolved_file_ids,
         )
+        if vector_search_result.status == ResultStatus.Err:
+            return vector_search_result.into()
+        vector_records = vector_search_result.unwrap()
+        # TODO rerank the combined results based on relevance to the query
+        merged_records = [*vector_records, *bm25_records]
+
+        results = await self._buildRagEmbeddingRecords(
+            merged_records, include_embedding
+        )
+        return Ok(results)
 
     async def querySimilarByTextByProjectUid(
         self,
@@ -942,8 +998,11 @@ class RagService:
         filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
         top_k: int = 5,
         include_embedding: bool = False,
+        hybrid_search: bool = False,
+        hybrid_search_bm25_top_k: int = 100,
+        hybrid_search_semantic_top_k: int = 5,
     ) -> Result[
-        Sequence[RagEmbeddingRecord],
+        Sequence[RagQueryRecord],
         FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
     ]:
         return await self._wrapProjectUUID(
@@ -953,99 +1012,60 @@ class RagService:
             filters=filters,
             top_k=top_k,
             include_embedding=include_embedding,
+            hybrid_search=hybrid_search,
+            hybrid_search_bm25_top_k=hybrid_search_bm25_top_k,
+            hybrid_search_semantic_top_k=hybrid_search_semantic_top_k,
         )
 
-    async def querySimilarByVector(
+    async def _resolveFilteredFileIds(
         self,
+        session,
         project_id: int,
-        embedding: Sequence[float],
         filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
-        top_k: int = 5,
-        include_embedding: bool = False,
-    ) -> Result[
-        Sequence[RagEmbeddingRecord],
-        FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
-    ]:
-        target_dimension = self.setting.rag_store_parameters["dimension"]
-        ops_type = self.setting.rag_store_parameters["ops_type"]
-        table_name = getTableName(self.setting.rag_store_parameters)
-        if len(embedding) != target_dimension:
-            return Err(
-                InvalidEmbeddingDimensionError(
-                    message=f"Embedding dimension {len(embedding)} does not match expected dimension {target_dimension}."
-                )
+    ) -> Result[Sequence[int] | None, FileNotFoundInSystemError]:
+        if filters is None:
+            return Ok(None)
+
+        if isinstance(filters, QueryFilterByFileUid):
+            resolved_files = await self.file_repo.getAvailableIdsByUUIDs(
+                session, filters.file_uids, project_id
             )
-
-        async with self.session_manager.get_session() as session:
-            DynamicBucket = get_orm_class(table_name, target_dimension)
-
-            if ops_type == VectorOpsType.cosine:
-                distance_expr = DynamicBucket.embedding.cosine_distance(
-                    embedding
-                )
-            elif ops_type == VectorOpsType.l2:
-                distance_expr = DynamicBucket.embedding.l2_distance(embedding)
-            elif ops_type == VectorOpsType.ip:
-                distance_expr = DynamicBucket.embedding.max_inner_product(
-                    embedding
-                )
-            else:
-                raise ValueError(f"Unsupported ops type: {ops_type}")
-
-            stmt = select(DynamicBucket)
-            resolved_file_ids: Sequence[int] | None = None
-            if isinstance(filters, QueryFilterByFileUid):
-                resolved_files = await self.file_repo.getAvailableIdsByUUIDs(
-                    session, filters.file_uids, project_id
-                )
-                missing_uids = set(filters.file_uids) - set(
-                    file_info.uuid for file_info in resolved_files
-                )
-                if missing_uids:
-                    return Err(
-                        FileNotFoundInSystemError(
-                            message=f"Some file UUIDs not found: {', '.join(str(uid) for uid in missing_uids)}"
-                        )
+            missing_uids = set(filters.file_uids) - set(
+                file_info.uuid for file_info in resolved_files
+            )
+            if missing_uids:
+                return Err(
+                    FileNotFoundInSystemError(
+                        message=f"Some file UUIDs not found: {', '.join(str(uid) for uid in missing_uids)}"
                     )
-                resolved_file_ids = [
-                    file_info.id for file_info in resolved_files
-                ]
-            elif isinstance(filters, QueryFilterByFileMetadata):
-                resolved_files = await self.file_repo.getAvailableIdsByMetadata(
-                    session, filters.file_metadata_filters, project_id
                 )
-                resolved_file_ids = [
-                    file_info.id for file_info in resolved_files
-                ]
+            return Ok([file_info.id for file_info in resolved_files])
 
-            if resolved_file_ids is not None:
-                # If filters were applied but no files matched, return empty result early to avoid unnecessary distance calculations
-                if len(resolved_file_ids) == 0:
-                    return Ok([])
-                stmt = stmt.where(DynamicBucket.file_id.in_(resolved_file_ids))
+        elif isinstance(filters, QueryFilterByFileMetadata):
+            resolved_files = await self.file_repo.getAvailableIdsByMetadata(
+                session, filters.file_metadata_filters, project_id
+            )
+            return Ok([file_info.id for file_info in resolved_files])
 
-            stmt = stmt.order_by(distance_expr).limit(top_k)
-            result = await session.execute(stmt.params(embedding=embedding))
-            records: list = []
-            for row in result.scalars().all():
-                records.append(
-                    {
-                        "file_id": row.file_id,
-                        "text": row.text,
-                        "embedding": list(row.embedding),
-                        "created_at": row.created_at,
-                    }
-                )
-            file_uids = [record["file_id"] for record in records]
+        return Ok(None)
+
+    async def _buildRagEmbeddingRecords(
+        self,
+        records: Sequence[EmbeddingQueryRecord],
+        include_embedding: bool = False,
+    ) -> list[RagQueryRecord]:
+        """Build RagEmbeddingRecord list from records and file info map."""
+        async with self.session_manager.get_session() as session:
+            file_ids = [record["file_id"] for record in records]
             file_infos = await self.file_repo.getAvailableByIds(
-                session, file_uids
+                session, file_ids
             )
             file_info_map = {
                 file_info.id: file_info for file_info in file_infos
             }
-            results: list[RagEmbeddingRecord] = []
+            results: list[RagQueryRecord] = []
             for record in records:
-                data: RagEmbeddingRecord = {
+                data: RagQueryRecord = {
                     "text": record["text"],
                     "created_at": record["created_at"],
                     "embedding": record["embedding"]
@@ -1073,7 +1093,149 @@ class RagService:
                 if include_embedding:
                     data["embedding"] = record["embedding"]
                 results.append(data)
-            return Ok(results)
+            return results
+
+    async def _queryBm25Search(
+        self,
+        project_id: int,
+        query: str,
+        top_k: int = 100,
+        resolved_file_ids: Sequence[int] | None = None,
+        lang: str = "simple",
+    ) -> Sequence[EmbeddingQueryRecord]:
+        if lang not in self.setting.supported_langs_list:
+            raise InternalServiceError(
+                message=f"Language '{lang}' is not supported. Supported languages are: {', '.join(self.setting.supported_langs_list)}."
+            )
+
+        target_dimension = self.setting.rag_store_parameters["dimension"]
+        table_name = getTableName(self.setting.rag_store_parameters)
+        idx_name = getBm25IndexName(table_name, lang)
+
+        async with self.session_manager.get_session() as session:
+            DynamicBucket = get_orm_class(table_name, target_dimension)
+
+            bm25_stmt = select(DynamicBucket).where(
+                DynamicBucket.project_id == project_id,
+                DynamicBucket.lang == lang,
+            )
+            if resolved_file_ids is not None:
+                if len(resolved_file_ids) == 0:
+                    return []
+                bm25_stmt = bm25_stmt.where(
+                    DynamicBucket.file_id.in_(resolved_file_ids)
+                )
+
+            bm25_stmt = bm25_stmt.order_by(
+                text(f"""text <@> to_bm25query(':query', '{idx_name}')""")
+            ).limit(top_k)
+
+            result = await session.execute(bm25_stmt.params(query=query))
+            records: list[EmbeddingQueryRecord] = []
+            for row in result.scalars().all():
+                records.append(
+                    {
+                        "file_id": row.file_id,
+                        "text": row.text,
+                        "embedding": list(row.embedding),
+                        "created_at": row.created_at,
+                    }
+                )
+            return records
+
+    async def querySimilarByVector(
+        self,
+        project_id: int,
+        embedding: Sequence[float],
+        filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
+        top_k: int = 5,
+        include_embedding: bool = False,
+    ) -> Result[
+        Sequence[RagQueryRecord],
+        FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
+    ]:
+        async with self.session_manager.get_session() as session:
+            # Resolve filtered file IDs
+            resolved_result = await self._resolveFilteredFileIds(
+                session, project_id, filters
+            )
+            if resolved_result.status == ResultStatus.Err:
+                return resolved_result.into()
+            resolved_file_ids = resolved_result.unwrap()
+
+        query_result = await self._querySimilarByVector(
+            project_id=project_id,
+            embedding=embedding,
+            top_k=top_k,
+            resolved_file_ids=resolved_file_ids,
+        )
+        if query_result.status == ResultStatus.Err:
+            return query_result.into()
+        records = query_result.unwrap()
+
+        results = await self._buildRagEmbeddingRecords(
+            records, include_embedding
+        )
+        return Ok(results)
+
+    async def _querySimilarByVector(
+        self,
+        project_id: int,
+        embedding: Sequence[float],
+        top_k: int = 5,
+        resolved_file_ids: Sequence[int] | None = None,
+    ) -> Result[
+        Sequence[EmbeddingQueryRecord],
+        InvalidEmbeddingDimensionError,
+    ]:
+        target_dimension = self.setting.rag_store_parameters["dimension"]
+        ops_type = self.setting.rag_store_parameters["ops_type"]
+        table_name = getTableName(self.setting.rag_store_parameters)
+        if len(embedding) != target_dimension:
+            return Err(
+                InvalidEmbeddingDimensionError(
+                    message=f"Embedding dimension {len(embedding)} does not match expected dimension {target_dimension}."
+                )
+            )
+
+        async with self.session_manager.get_session() as session:
+            DynamicBucket = get_orm_class(table_name, target_dimension)
+
+            if ops_type == VectorOpsType.cosine:
+                distance_expr = DynamicBucket.embedding.cosine_distance(
+                    embedding
+                )
+            elif ops_type == VectorOpsType.l2:
+                distance_expr = DynamicBucket.embedding.l2_distance(embedding)
+            elif ops_type == VectorOpsType.ip:
+                distance_expr = DynamicBucket.embedding.max_inner_product(
+                    embedding
+                )
+            else:
+                raise ValueError(f"Unsupported ops type: {ops_type}")
+
+            stmt = select(DynamicBucket).where(
+                DynamicBucket.project_id == project_id
+            )
+            if resolved_file_ids is not None:
+                # If filters were applied but no files matched, return empty result early to avoid unnecessary distance calculations
+                if len(resolved_file_ids) == 0:
+                    return Ok([])
+                stmt = stmt.where(DynamicBucket.file_id.in_(resolved_file_ids))
+
+            stmt = stmt.order_by(distance_expr).limit(top_k)
+            result = await session.execute(stmt)
+            records: list[EmbeddingQueryRecord] = []
+            for row in result.scalars().all():
+                records.append(
+                    {
+                        "file_id": row.file_id,
+                        "text": row.text,
+                        "embedding": list(row.embedding),
+                        "created_at": row.created_at,
+                    }
+                )
+            return Ok(records)
 
     async def _wrapProjectUUID(
         self, project_uid: uuid.UUID, async_func, **kwargs

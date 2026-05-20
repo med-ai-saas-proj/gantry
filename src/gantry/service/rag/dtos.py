@@ -58,11 +58,6 @@ class QueryRagSimilaritySearchRequest(BaseModel):
     top_k: int = Field(default=5, gt=0, le=100)
     filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None
 
-    hybrid_search: bool = Field(
-        default=False,
-        description="Whether to perform a hybrid search that combines vector similarity and BM25 text search. If true, the service will first use BM25 + semantic search to filter candidates and then rerank them using vector similarity.",
-    )
-
 
 class QueryRagQueryByTextRequest(BaseModel):
     """DTO for querying RAG embeddings by text."""
@@ -74,6 +69,18 @@ class QueryRagQueryByTextRequest(BaseModel):
     hybrid_search: bool = Field(
         default=False,
         description="Whether to perform a hybrid search that combines vector similarity and BM25 text search. If true, the service will first use BM25 + semantic search to filter candidates and then rerank them using vector similarity.",
+    )
+    hybrid_search_bm25_top_k: int = Field(
+        default=20,
+        gt=0,
+        le=1000,
+        description="When hybrid_search is true, this parameter controls the number of top candidates to retrieve using BM25 before reranking with vector similarity. A higher value may improve recall but increase latency.",
+    )
+    hybrid_search_semantic_top_k: int = Field(
+        default=100,
+        gt=0,
+        le=1000,
+        description="When hybrid_search is true, this parameter controls the number of top candidates to retrieve using semantic search before reranking with vector similarity. A higher value may improve recall but increase latency.",
     )
 
 

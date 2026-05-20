@@ -111,8 +111,9 @@ async def create_bm25_index(
         )
 
     for lang in supported_langs_list:
+        idx_name = getBm25IndexName(table_name, lang)
         sql = text(f"""
-        CREATE INDEX IF NOT EXISTS {table_name}_{lang}_idx ON "Rag"."{table_name}" USING bm25 (text)
+        CREATE INDEX IF NOT EXISTS {idx_name} ON "Rag"."{table_name}" USING bm25 (text)
             WITH (text_config='{lang}') WHERE lang = '{lang}';
         """)
         await session.execute(sql)
@@ -178,6 +179,10 @@ def getTableName(rag_store_parameters: RagParameters) -> str:
         raise ValueError(
             f"Unsupported index type: {index_params['index_type']}"
         )
+
+
+def getBm25IndexName(table_name: str, lang: str) -> str:
+    return f"{table_name}_{lang}_idx"
 
 
 def getIndexName(

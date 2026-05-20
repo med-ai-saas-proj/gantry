@@ -195,6 +195,9 @@ async def query_similar_by_text(
             body.filters,
             body.top_k,
             include_embedding,
+            body.hybrid_search,
+            body.hybrid_search_bm25_top_k,
+            body.hybrid_search_semantic_top_k,
         )
     ).unwrap()
     return [
