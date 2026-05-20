@@ -117,7 +117,10 @@ class SequenceConversationService(ConversationService):
             ),
         )
         if result is not None:
-            return [Message.parse_raw(json.loads(msg)) for msg in result]
+            cached_messages = [
+                Message.parse_raw(json.loads(msg)) for msg in result
+            ]
+            return cached_messages[:limit]
         msgs = await self._getConversationMessagesFromDB(
             conversation_id,
             limit=self.setting.cache_limit,

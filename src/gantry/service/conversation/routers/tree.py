@@ -234,6 +234,39 @@ async def delete_message_from_conversation(
 
 
 @tree_conversation_router.get(
+    "/{conversation_uid}/messages/bulk",
+    summary="Get multiple messages by UIDs from the conversation.",
+    description="Endpoint to retrieve multiple specific messages from the conversation by conversation UID and message UIDs.",
+    response_model=Sequence[Message],
+)
+async def get_messages_from_conversation(
+    conversation_uid: uuid.UUID,
+    message_uids: Annotated[Sequence[uuid.UUID], Query()],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
+    ],
+    conversation_service: Annotated[
+        TreeConversationService, Depends(getTreeConversationService)
+    ],
+):
+    res = await conversation_service.getConversationMessagesByUuids(
+        conversation_uid=conversation_uid,
+        project_id=api_key_info["project_id"],
+        message_uids=message_uids,
+    )
+    return [
+        Message(
+            message_uid=msg.uuid,
+            payload=msg.payload,
+            run_id=msg.run_id,
+            timestamp=msg.timestamp,
+            extra_metadata=msg.extra_metadata,
+        )
+        for msg in res
+    ]
+
+
+@tree_conversation_router.get(
     "/{conversation_uid}/messages/{message_uid}",
     summary="Get a specific message from the conversation.",
     description="Endpoint to retrieve a specific message from the conversation by conversation UID and message UID.",
@@ -263,39 +296,6 @@ async def get_message_from_conversation(
         timestamp=res.timestamp,
         extra_metadata=res.extra_metadata,
     )
-
-
-@tree_conversation_router.get(
-    "/{conversation_uid}/messages",
-    summary="Get a specific message from the conversation.",
-    description="Endpoint to retrieve a specific message from the conversation by conversation UID and message UID.",
-    response_model=Sequence[Message],
-)
-async def get_messages_from_conversation(
-    conversation_uid: uuid.UUID,
-    message_uids: Annotated[Sequence[uuid.UUID], Query()],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
-    ],
-    conversation_service: Annotated[
-        TreeConversationService, Depends(getTreeConversationService)
-    ],
-):
-    res = await conversation_service.getConversationMessagesByUuids(
-        conversation_uid=conversation_uid,
-        project_id=api_key_info["project_id"],
-        message_uids=message_uids,
-    )
-    return [
-        Message(
-            message_uid=msg.uuid,
-            payload=msg.payload,
-            run_id=msg.run_id,
-            timestamp=msg.timestamp,
-            extra_metadata=msg.extra_metadata,
-        )
-        for msg in res
-    ]
 
 
 conversation_router.include_router(tree_conversation_router, prefix="/tree")
