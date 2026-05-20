@@ -25,6 +25,7 @@ from .utils import (
     getIndexName,
     getTableName,
     get_orm_class,
+    create_bm25_index,
     create_vector_index,
     create_embedding_table,
 )
@@ -451,17 +452,17 @@ class RagService:
     ):
         async with self.session_manager.get_session() as session:
             table_name = getTableName(self.setting.rag_store_parameters)
-            index_name = getIndexName(
-                table_name, self.setting.rag_store_parameters
-            )
-            ops_type = self.setting.rag_store_parameters["ops_type"]
-            index_params = self.setting.rag_store_parameters["index_params"]
             dimension = self.setting.rag_store_parameters["dimension"]
             await create_embedding_table(
                 session, table_name, dimension=dimension
             )
+            await create_bm25_index(
+                session, table_name, self.setting.supported_langs_list
+            )
             await create_vector_index(
-                session, table_name, index_name, ops_type, index_params
+                session,
+                table_name,
+                rag_store_parameters=self.setting.rag_store_parameters,
             )
             await session.commit()
 
@@ -522,6 +523,7 @@ class RagService:
                     ),
                     chunk_size=task_dict["chunk_size"],
                     chunk_overlap=task_dict["chunk_overlap"],
+                    lang=task_dict.get("lang", "simple"),
                 )
             ).unwrap()
             task_dict["status"] = "completed"
@@ -598,6 +600,7 @@ class RagService:
         chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
+        lang: str = "simple",
     ) -> Result[
         None,
         BucketNotFoundError
@@ -686,6 +689,7 @@ class RagService:
                         file_id=file_info["id"],
                         text=chunk.replace("\x00", "").strip(),
                         project_id=project_id,
+                        lang=lang,
                     )
                     for chunk, embedding in zip(chunks, embeddings)
                 ]
@@ -703,7 +707,15 @@ class RagService:
         chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
-    ) -> Result[str, FileNotFoundInSystemError]:
+        lang: str = "simple",
+    ) -> Result[str, FileNotFoundInSystemError | InternalServiceError]:
+        if lang not in self.setting.supported_langs_list:
+            return Err(
+                InternalServiceError(
+                    message=f"Language '{lang}' is not supported. Supported languages are: {', '.join(self.setting.supported_langs_list)}."
+                )
+            )
+
         task_id = str(uuid.uuid4())
         async with self.session_manager.get_session() as session:
             file_info = await self.file_repo.getAvailableByUUID(
@@ -722,6 +734,7 @@ class RagService:
                 "chunk_size": chunk_size,
                 "chunk_overlap": chunk_overlap,
                 "status": "pending",
+                "lang": lang,
             }
 
         result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
@@ -744,7 +757,8 @@ class RagService:
         chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
-    ) -> Result[str, FileNotFoundInSystemError]:
+        lang: str = "simple",
+    ) -> Result[str, FileNotFoundInSystemError | InternalServiceError]:
         return await self._wrapProjectUUID(
             project_uid,
             self.addFile,
@@ -753,6 +767,7 @@ class RagService:
             chunk_splitter=chunk_splitter,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            lang=lang,
         )
 
     async def getTaskStatus(
@@ -803,12 +818,21 @@ class RagService:
         embedding: Sequence[float],
         file_uid: uuid.UUID,
         project_id: int,
+        lang: str = "simple",
     ) -> Result[
         None,
         BucketNotFoundError
         | FileNotFoundInSystemError
-        | InvalidEmbeddingDimensionError,
+        | InvalidEmbeddingDimensionError
+        | InternalServiceError,
     ]:
+        if lang not in self.setting.supported_langs_list:
+            return Err(
+                InternalServiceError(
+                    message=f"Language '{lang}' is not supported. Supported languages are: {', '.join(self.setting.supported_langs_list)}."
+                )
+            )
+
         target_dimension = self.setting.rag_store_parameters["dimension"]
         table_name = getTableName(self.setting.rag_store_parameters)
         if len(embedding) != target_dimension:
@@ -830,6 +854,7 @@ class RagService:
                 file_id=file_info.id,
                 text=text,
                 project_id=project_id,
+                lang=lang,
             )
             session.add(new_record)
             await session.flush()

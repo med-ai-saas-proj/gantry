@@ -13,6 +13,7 @@ class AddRagEmbeddingRequest(BaseModel):
     """DTO for adding an embedding to a RAG bucket."""
 
     text: str
+    lang: str = "simple"
     embedding: Sequence[float]
     file_uid: UUID
 
@@ -21,6 +22,7 @@ class AddRagFileRequest(BaseModel):
     """DTO for adding a file (with embedding) to a RAG bucket."""
 
     file_uid: UUID
+    lang: str = "simple"
     chunk_splitter: ChunkSplitterType = Field(
         default=ChunkSplitterType.recursive
     )
@@ -56,6 +58,11 @@ class QueryRagSimilaritySearchRequest(BaseModel):
     top_k: int = Field(default=5, gt=0, le=100)
     filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None
 
+    hybrid_search: bool = Field(
+        default=False,
+        description="Whether to perform a hybrid search that combines vector similarity and BM25 text search. If true, the service will first use BM25 + semantic search to filter candidates and then rerank them using vector similarity.",
+    )
+
 
 class QueryRagQueryByTextRequest(BaseModel):
     """DTO for querying RAG embeddings by text."""
@@ -63,6 +70,11 @@ class QueryRagQueryByTextRequest(BaseModel):
     query_text: str
     top_k: int = Field(default=5, gt=0, le=100)
     filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None
+
+    hybrid_search: bool = Field(
+        default=False,
+        description="Whether to perform a hybrid search that combines vector similarity and BM25 text search. If true, the service will first use BM25 + semantic search to filter candidates and then rerank them using vector similarity.",
+    )
 
 
 class EmbeddingTaskResponse(BaseModel):

@@ -81,6 +81,7 @@ async def add_file(
             body.chunk_splitter,
             body.chunk_size,
             body.chunk_overlap,
+            body.lang,
         )
     ).unwrap()
     return task_id

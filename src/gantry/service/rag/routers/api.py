@@ -42,6 +42,7 @@ async def add_embedding(
             body.embedding,
             body.file_uid,
             api_key_info["project_id"],
+            body.lang,
         )
     ).unwrap()
 
@@ -92,6 +93,7 @@ async def add_file(
             body.chunk_splitter,
             body.chunk_size,
             body.chunk_overlap,
+            body.lang,
         )
     ).unwrap()
     return task_id

@@ -55,6 +55,7 @@ class RagData(WithCreateTimestamp, WithID, RagBaseSQLModel):
         index=True,
         nullable=False,
     )  # redundant but useful for querying without join
+    lang: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     text: Mapped[str | None] = mapped_column(Text, nullable=False)
     # placeholder for embedding column, actual type will be set dynamically

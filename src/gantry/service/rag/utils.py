@@ -30,6 +30,7 @@ def get_orm_class(table_name, dimension) -> type[RagData]:
             "created_at", DateTime, nullable=False, server_default=text("NOW()")
         ),
         Column("project_id", Integer, nullable=False),
+        Column("lang", Text, nullable=True),
         schema="Rag",
         extend_existing=True,
     )
@@ -42,6 +43,38 @@ def get_orm_class(table_name, dimension) -> type[RagData]:
     return cast(type[RagData], DynamicClass)
 
 
+db_supported_langs = [
+    "simple",
+    "arabic",
+    "armenian",
+    "basque",
+    "catalan",
+    "danish",
+    "dutch",
+    "english",
+    "finnish",
+    "french",
+    "german",
+    "greek",
+    "hindi",
+    "hungarian",
+    "indonesian",
+    "irish",
+    "italian",
+    "lithuanian",
+    "nepali",
+    "norwegian",
+    "portuguese",
+    "romanian",
+    "russian",
+    "serbian",
+    "spanish",
+    "swedish",
+    "tamil",
+    "turkishyiddish",
+]
+
+
 async def create_embedding_table(
     session: AsyncSession, table_name: str, dimension: int
 ):
@@ -52,6 +85,7 @@ async def create_embedding_table(
         file_id BIGINT NOT NULL REFERENCES "FileStorage"."Files"(id) ON DELETE CASCADE,
         project_id BIGINT NOT NULL REFERENCES "Project"."Projects"(id) ON DELETE CASCADE,
         text TEXT,
+        lang TEXT default 'simple',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );""")
     await session.execute(sql)
@@ -65,13 +99,33 @@ async def create_embedding_table(
     await session.execute(sql)
 
 
+async def create_bm25_index(
+    session: AsyncSession, table_name: str, supported_langs_list: list[str]
+):
+    db_supported_langs_set = set(db_supported_langs)
+    target_langs_set = set(supported_langs_list)
+    if not target_langs_set.issubset(db_supported_langs_set):
+        unsupported_langs = target_langs_set - db_supported_langs_set
+        raise ValueError(
+            f"The following languages are not supported by the database: {', '.join(unsupported_langs)}. Supported languages are: {', '.join(db_supported_langs)}"
+        )
+
+    for lang in supported_langs_list:
+        sql = text(f"""
+        CREATE INDEX IF NOT EXISTS {table_name}_{lang}_idx ON "Rag"."{table_name}" USING bm25 (text)
+            WITH (text_config='{lang}') WHERE lang = '{lang}';
+        """)
+        await session.execute(sql)
+
+
 async def create_vector_index(
     session: AsyncSession,
     table_name: str,
-    index_name: str,
-    ops_type: VectorOpsType,
-    parms: IndexParams,
+    rag_store_parameters: RagParameters,
 ):
+    index_name = getIndexName(table_name, rag_store_parameters)
+    ops_type = rag_store_parameters["ops_type"]
+    parms = rag_store_parameters["index_params"]
     if parms["index_type"] == VectorIndexType.hnsw:
         m = parms["m"] if parms and parms.get("m") else 16
         ef_construction = (
