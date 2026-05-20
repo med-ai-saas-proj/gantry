@@ -1,6 +1,9 @@
 from gantry.db.session import AsyncSessionManager
 from gantry.shared.utils.uuid_utils import uuid7
-from gantry.shared.custom_types.error_exception import InternalServiceError
+from gantry.shared.custom_types.error_exception import (
+    InvalidValueError,
+    InternalServiceError,
+)
 
 from .core import (
     ConversationService,
@@ -18,10 +21,8 @@ from .serializer import Serializer
 from ..repository import ConversationRepository
 from ...file_storage.services import FileStorageService
 
-import re
 import uuid
 import asyncio
-from hmac import new
 from typing import Literal, Sequence
 from datetime import UTC
 
@@ -154,6 +155,7 @@ class TreeConversationService(ConversationService):
         None,
         ConversationNotFoundError
         | InvalidConversationTypeError
+        | InvalidValueError
         | InternalServiceError,
     ]:
         if len(msgs) == 0:
@@ -187,19 +189,23 @@ class TreeConversationService(ConversationService):
         new_messages: Sequence[Message],
         from_node_id: uuid.UUID | None = None,
         active_leaf_id: uuid.UUID | None = None,
-    ) -> tuple[dict[str, str], uuid.UUID]:
+    ) -> Result[tuple[dict[str, str], uuid.UUID], InvalidValueError]:
         new_structure = current_structure.copy()
         if from_node_id is not None:
             parent_id_str = str(from_node_id)
             if parent_id_str not in new_structure:
-                raise ValueError(
-                    f"from_node_id {from_node_id} not found in current tree structure."
+                return Err(
+                    InvalidValueError(
+                        message=f"from_node_id {from_node_id} not found in current tree structure."
+                    )
                 )
         elif active_leaf_id is not None:
             parent_id_str = str(active_leaf_id)
             if parent_id_str not in new_structure:
-                raise ValueError(
-                    f"active_leaf_id {active_leaf_id} not found in current tree structure."
+                return Err(
+                    InvalidValueError(
+                        message=f"active_leaf_id {active_leaf_id} not found in current tree structure."
+                    )
                 )
         else:
             parent_id_str = None
@@ -211,9 +217,7 @@ class TreeConversationService(ConversationService):
             msg_id = str(msg.uuid)
             new_structure[msg_id] = prev_message_id
             prev_message_id = msg_id
-        if prev_message_id is None:
-            raise ValueError("No messages to add to the tree structure.")
-        return new_structure, uuid.UUID(prev_message_id)
+        return Ok((new_structure, uuid.UUID(prev_message_id)))
 
     def rebuildRelationshipsMap(
         self,
@@ -246,16 +250,18 @@ class TreeConversationService(ConversationService):
         None,
         ConversationNotFoundError
         | InvalidConversationTypeError
+        | InvalidValueError
         | InternalServiceError,
     ]:
         async with self.session_manager.get_session() as session:
             if is_new_conversation:
-                new_tree_structure, new_active_leaf_id = (
-                    self.rebuildTreeStructure(
-                        current_structure={},
-                        new_messages=serialized_msgs,
-                    )
+                new_tree_res = self.rebuildTreeStructure(
+                    current_structure={},
+                    new_messages=serialized_msgs,
                 )
+                if new_tree_res.status == ResultStatus.Err:
+                    return new_tree_res.into()
+                new_tree_structure, new_active_leaf_id = new_tree_res.unwrap()
                 conversation = Conversation(
                     uuid=conversation_uid,
                     project_id=project_id,
@@ -279,16 +285,17 @@ class TreeConversationService(ConversationService):
                 conversation_id = metadata["conversation_id"]
                 if metadata["conversation_type"] != ConversationType.TREE:
                     return Err(InvalidConversationTypeError())
-                new_tree_structure, new_active_leaf_id = (
-                    self.rebuildTreeStructure(
-                        current_structure=metadata["tree_structure"]
-                        if metadata["tree_structure"] is not None
-                        else {},
-                        new_messages=serialized_msgs,
-                        from_node_id=from_node_id,
-                        active_leaf_id=metadata["active_leaf_message_id"],
-                    )
+                new_tree_res = self.rebuildTreeStructure(
+                    current_structure=metadata["tree_structure"]
+                    if metadata["tree_structure"] is not None
+                    else {},
+                    new_messages=serialized_msgs,
+                    from_node_id=from_node_id,
+                    active_leaf_id=metadata["active_leaf_message_id"],
                 )
+                if new_tree_res.status == ResultStatus.Err:
+                    return new_tree_res.into()
+                new_tree_structure, new_active_leaf_id = new_tree_res.unwrap()
                 new_relationships_map = self.rebuildRelationshipsMap(
                     current_map=metadata["relationships_map"]
                     if metadata["relationships_map"] is not None
@@ -334,6 +341,7 @@ class TreeConversationService(ConversationService):
         uuid.UUID,
         ConversationNotFoundError
         | InvalidConversationTypeError
+        | InvalidValueError
         | InternalServiceError,
     ]:
         conversation_uid = uuid7()

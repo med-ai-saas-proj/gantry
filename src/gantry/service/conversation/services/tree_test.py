@@ -5,9 +5,10 @@ from gantry.service.conversation.services.tree import (
     ROOT_NODE_ID,
     TreeConversationService,
 )
+from gantry.shared.custom_types.error_exception import InvalidValueError
 
 import unittest
-from uuid import UUID
+from uuid import UUID, uuid4
 from types import SimpleNamespace
 from typing import Any, cast
 from datetime import datetime
@@ -57,6 +58,7 @@ class TreeConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         service = self._build_service(repo, MagicMock(), session)
         messages = [
             Message(
+                uuid=uuid4(),
                 conversation_id=-1,
                 payload={"type": "text", "content": "one"},
                 timestamp=datetime(2026, 1, 15),
@@ -64,6 +66,7 @@ class TreeConversationServiceTest(unittest.IsolatedAsyncioTestCase):
                 extra_metadata=None,
             ),
             Message(
+                uuid=uuid4(),
                 conversation_id=-1,
                 payload={"type": "text", "content": "two"},
                 timestamp=datetime(2026, 1, 15),
@@ -72,11 +75,62 @@ class TreeConversationServiceTest(unittest.IsolatedAsyncioTestCase):
             ),
         ]
 
-        structure, active_leaf_id = service.rebuildTreeStructure({}, messages)
+        res = service.rebuildTreeStructure({}, messages)
+
+        assert res.status == ResultStatus.Ok
+        structure, active_leaf_id = res.unwrap()
 
         assert structure[str(messages[0].uuid)] == ROOT_NODE_ID
         assert structure[str(messages[1].uuid)] == str(messages[0].uuid)
         assert active_leaf_id == messages[1].uuid
+
+    async def test_rebuild_tree_structure_rejects_missing_from_node(self):
+        session = MagicMock()
+        repo = MagicMock(spec=ConversationRepository)
+        service = self._build_service(repo, MagicMock(), session)
+        messages = [
+            Message(
+                uuid=uuid4(),
+                conversation_id=-1,
+                payload={"type": "text", "content": "one"},
+                timestamp=datetime(2026, 1, 15),
+                run_id=None,
+                extra_metadata=None,
+            ),
+        ]
+
+        res = service.rebuildTreeStructure(
+            {},
+            messages,
+            from_node_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+        )
+
+        assert res.status == ResultStatus.Err
+        assert isinstance(res.err(), InvalidValueError)
+
+    async def test_rebuild_tree_structure_rejects_missing_active_leaf(self):
+        session = MagicMock()
+        repo = MagicMock(spec=ConversationRepository)
+        service = self._build_service(repo, MagicMock(), session)
+        messages = [
+            Message(
+                uuid=uuid4(),
+                conversation_id=-1,
+                payload={"type": "text", "content": "one"},
+                timestamp=datetime(2026, 1, 15),
+                run_id=None,
+                extra_metadata=None,
+            ),
+        ]
+
+        res = service.rebuildTreeStructure(
+            {},
+            messages,
+            active_leaf_id=UUID("123e4567-e89b-12d3-a456-426614174000"),
+        )
+
+        assert res.status == ResultStatus.Err
+        assert isinstance(res.err(), InvalidValueError)
 
     async def test_rebuild_relationships_map_builds_tree_relationships(self):
         session = MagicMock()
@@ -84,6 +138,7 @@ class TreeConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         service = self._build_service(repo, MagicMock(), session)
         messages = [
             Message(
+                uuid=uuid4(),
                 conversation_id=-1,
                 payload={"type": "text", "content": "one"},
                 timestamp=datetime(2026, 1, 15),
@@ -91,6 +146,7 @@ class TreeConversationServiceTest(unittest.IsolatedAsyncioTestCase):
                 extra_metadata=None,
             ),
             Message(
+                uuid=uuid4(),
                 conversation_id=-1,
                 payload={"type": "text", "content": "two"},
                 timestamp=datetime(2026, 1, 15),

@@ -8,6 +8,7 @@ from ..dtos import (
     Message,
     AddTreeMessageRequest,
     CreateConversationRequest,
+    GetMessagesByUuidsRequest,
     CreateConversationResponse,
     ConversationMetadataResponse,
     UpdateConversationMetadataRequest,
@@ -233,7 +234,7 @@ async def delete_message_from_conversation(
     ).unwrap()
 
 
-@tree_conversation_router.get(
+@tree_conversation_router.post(
     "/{conversation_uid}/messages/bulk",
     summary="Get multiple messages by UIDs from the conversation.",
     description="Endpoint to retrieve multiple specific messages from the conversation by conversation UID and message UIDs.",
@@ -241,7 +242,7 @@ async def delete_message_from_conversation(
 )
 async def get_messages_from_conversation(
     conversation_uid: uuid.UUID,
-    message_uids: Annotated[Sequence[uuid.UUID], Query()],
+    body: Annotated[GetMessagesByUuidsRequest, Body()],
     api_key_info: Annotated[
         ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
     ],
@@ -252,7 +253,7 @@ async def get_messages_from_conversation(
     res = await conversation_service.getConversationMessagesByUuids(
         conversation_uid=conversation_uid,
         project_id=api_key_info["project_id"],
-        message_uids=message_uids,
+        message_uids=body.message_uids,
     )
     return [
         Message(

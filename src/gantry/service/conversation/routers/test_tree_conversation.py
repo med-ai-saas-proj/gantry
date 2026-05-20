@@ -63,6 +63,46 @@ class Variables:
 variables = Variables()
 
 
+def assert_tree_message_uids(
+    messages: list[dict[str, Any]], expected_uids: list[str], context: str
+) -> None:
+    actual_uids = [msg["message_uid"] for msg in messages]
+    assert actual_uids == expected_uids, (
+        f"{context}: expected UIDs {expected_uids}, got {actual_uids}"
+    )
+
+
+def assert_tree_structure(metadata: dict[str, Any]) -> None:
+    tree_structure = metadata.get("tree_structure")
+    active_leaf_message_id = metadata.get("active_leaf_message_id")
+
+    assert isinstance(tree_structure, dict), "tree_structure should be a dict"
+    assert metadata.get("conversation_type") == "TREE", (
+        f"Expected tree conversation type, got {metadata.get('conversation_type')}"
+    )
+    assert variables.root_message_uid in tree_structure, (
+        "Root message uid should exist in tree_structure"
+    )
+    assert tree_structure[variables.root_message_uid] == str(
+        uuid.UUID(int=0)
+    ), "Root message should map to the tree sentinel root"
+    latest_branch_index = max(variables.branch_leaf_map)
+    latest_branch_leaf = variables.branch_leaf_map[latest_branch_index]
+    assert active_leaf_message_id == latest_branch_leaf, (
+        "Active leaf should match the latest modified branch leaf"
+    )
+
+    current_node = active_leaf_message_id
+    seen_nodes: list[str] = []
+    while current_node and current_node != str(uuid.UUID(int=0)):
+        seen_nodes.append(current_node)
+        current_node = tree_structure.get(current_node)
+
+    assert variables.root_message_uid in seen_nodes, (
+        "Active leaf ancestry should reach the root message"
+    )
+
+
 MESSAGE_VARIANTS: list[dict[str, Any]] = [
     {
         "role": "user",
@@ -117,18 +157,60 @@ MESSAGE_VARIANTS: list[dict[str, Any]] = [
             },
         ],
     },
+    {
+        "role": "assistant",
+        "content": [
+            {
+                "type": "text",
+                "text": "tree response with extra detail for branch coverage.",
+            },
+            {
+                "type": "text",
+                "text": "secondary block in the same assistant payload.",
+            },
+        ],
+    },
+    {
+        "role": "tool",
+        "toolCallId": "tool-branch-call-3",
+        "toolName": "analysis_tool",
+        "content": {
+            "summary": "branch analytics",
+            "scores": [0.25, 0.5, 0.75],
+            "flags": {
+                "stable": True,
+                "reviewed": False,
+            },
+        },
+    },
+    {
+        "role": "user",
+        "content": "branch text with\nmultiple\nlines",
+    },
+    {
+        "role": "assistant",
+        "content": [
+            {
+                "type": "tool-call",
+                "toolCallId": "tool-branch-call-4",
+                "toolName": "search_tool",
+                "args": {
+                    "query": "branch edge case lookup",
+                    "top_k": 3,
+                },
+            }
+        ],
+    },
 ]
 
 
 def build_message(branch: int, turn: int) -> dict[str, Any]:
     payload = MESSAGE_VARIANTS[(branch + turn) % len(MESSAGE_VARIANTS)]
+    case = (branch + turn) % 4
 
-    return {
-        "message_uid": str(uuid.uuid4()),
-        "payload": payload,
-        "run_id": f"branch-{branch}-turn-{turn}",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "extra_metadata": {
+    if case == 0:
+        run_id: str | None = f"branch-{branch}-turn-{turn}"
+        extra_metadata: dict[str, Any] | None = {
             "branch": branch,
             "turn": turn,
             "path": f"branch-{branch}/{turn}",
@@ -136,10 +218,51 @@ def build_message(branch: int, turn: int) -> dict[str, Any]:
                 "list": [1, "two", True],
                 "object": {
                     "nested": "value",
+                    "levels": [1, 2, 3],
                 },
             },
-        },
+        }
+    elif case == 1:
+        run_id = None
+        extra_metadata = {
+            "branch": branch,
+            "turn": turn,
+            "path": f"branch-{branch}/{turn}",
+            "complex_union": {
+                "list": [],
+                "object": {
+                    "nested": "value",
+                    "nullable": None,
+                },
+            },
+        }
+    elif case == 2:
+        run_id = f"branch-{branch}-turn-{turn}"
+        extra_metadata = None
+    else:
+        run_id = None
+        extra_metadata = {
+            "branch": branch,
+            "turn": turn,
+            "path": f"branch-{branch}/{turn}",
+            "complex_union": {
+                "list": ["edge", 0, False],
+                "object": {
+                    "nested": "value",
+                    "flags": {"seen": True},
+                },
+            },
+        }
+
+    message: dict[str, Any] = {
+        "message_uid": str(uuid.uuid4()),
+        "payload": payload,
+        "run_id": run_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+    message["extra_metadata"] = extra_metadata
+    return message
 
 
 async def create_conversation(client: httpx.AsyncClient):
@@ -153,6 +276,11 @@ async def create_conversation(client: httpx.AsyncClient):
             "extra_metadata": {
                 "suite": "tree-branch-load-test",
                 "test_timestamp": datetime.now(timezone.utc).isoformat(),
+                "labels": ["tree", "baseline", "dto"],
+                "flags": {
+                    "nullable": None,
+                    "enabled": True,
+                },
             },
             "messages": [root_message],
         },
@@ -193,6 +321,7 @@ async def build_branches(client: httpx.AsyncClient):
     """Build multiple branches from root and verify tree structure integrity"""
     for branch in range(TOTAL_BRANCHES):
         current_parent = variables.root_message_uid
+        assert current_parent is not None
 
         for turn in range(TURNS_PER_BRANCH):
             message = build_message(branch, turn)
@@ -235,6 +364,31 @@ async def build_branches(client: httpx.AsyncClient):
     )
 
 
+async def add_branch_with_invalid_parent(client: httpx.AsyncClient):
+    """Verify that branching from a non-existent parent is rejected."""
+    message = build_message(0, 1)
+
+    response = await client.post(
+        f"/{variables.conversation_uid}/messages",
+        headers=HEADERS,
+        json={
+            "from_message_uid": str(uuid.uuid4()),
+            "messages": [message],
+        },
+    )
+
+    try:
+        assert response.status_code in [404, 400, 422], (
+            f"Expected 404, 400, or 422, got {response.status_code}"
+        )
+        TestResults.add_pass("Invalid parent branch request was rejected")
+    except AssertionError as e:
+        TestResults.add_fail("Invalid parent branch validation", str(e))
+        raise
+
+    print(f"[INVALID PARENT BRANCH] status={response.status_code}")
+
+
 async def get_metadata(client: httpx.AsyncClient):
     """Get tree conversation metadata and verify tree structure fields"""
     response = await client.get(
@@ -254,6 +408,7 @@ async def get_metadata(client: httpx.AsyncClient):
     response.raise_for_status()
 
     metadata = response.json()
+    extra_metadata = metadata.get("extra_metadata") or {}
 
     # Verify tree-specific metadata structure
     try:
@@ -273,6 +428,11 @@ async def get_metadata(client: httpx.AsyncClient):
         for field in tree_fields:
             if field in metadata:
                 TestResults.add_pass(f"Tree metadata contains {field}")
+
+        assert_tree_structure(metadata)
+        TestResults.add_pass(
+            "Tree metadata structure and root linkage are valid"
+        )
     except AssertionError as e:
         TestResults.add_fail("Tree metadata structure validation", str(e))
         raise
@@ -313,6 +473,16 @@ async def get_branch_messages(client: httpx.AsyncClient):
         assert len(messages) > 0, "Branch should have at least one message"
         assert len(messages) <= 100, f"Limit not respected: got {len(messages)}"
 
+        expected_uids = [
+            variables.root_message_uid,
+            *variables.branch_messages[0],
+        ]
+        assert_tree_message_uids(
+            messages,
+            expected_uids[: len(messages)],
+            "Branch message ordering",
+        )
+
         # Verify branch consistency
         for msg in messages:
             assert "message_uid" in msg, "Message missing message_uid"
@@ -326,6 +496,149 @@ async def get_branch_messages(client: httpx.AsyncClient):
         raise
 
     print(f"[GET BRANCH MESSAGES] count={len(messages)}")
+
+
+async def get_branch_messages_boundary(client: httpx.AsyncClient):
+    """Exercise branch pagination with a minimal limit."""
+    branch_leaf = variables.branch_leaf_map[0]
+
+    response = await client.get(
+        f"/{variables.conversation_uid}/messages",
+        headers=HEADERS,
+        params={
+            "branch_message_uid": branch_leaf,
+            "limit": 1,
+            "order_by": "asc",
+        },
+    )
+
+    try:
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}"
+        )
+        TestResults.add_pass("Get branch boundary messages returned status 200")
+    except AssertionError as e:
+        TestResults.add_fail("Get branch boundary status code", str(e))
+        raise
+
+    response.raise_for_status()
+
+    messages = response.json()
+
+    try:
+        assert isinstance(messages, list), "Response should be a list"
+        assert len(messages) == 1, f"Expected 1 message, got {len(messages)}"
+        assert messages[0]["message_uid"] == variables.root_message_uid, (
+            "Boundary fetch should return the root message"
+        )
+        TestResults.add_pass("Get branch boundary returned a single message")
+    except AssertionError as e:
+        TestResults.add_fail("Get branch boundary validation", str(e))
+        raise
+
+    print(f"[GET BRANCH BOUNDARY] count={len(messages)}")
+
+
+async def get_branch_messages_with_cursor(client: httpx.AsyncClient):
+    """Verify cursor-based pagination on a specific branch."""
+    branch_leaf = variables.branch_leaf_map[0]
+
+    first_page_response = await client.get(
+        f"/{variables.conversation_uid}/messages",
+        headers=HEADERS,
+        params={
+            "branch_message_uid": branch_leaf,
+            "limit": 5,
+            "order_by": "asc",
+        },
+    )
+
+    try:
+        assert first_page_response.status_code == 200, (
+            f"Expected 200, got {first_page_response.status_code}"
+        )
+        TestResults.add_pass("Branch cursor first page returned status 200")
+    except AssertionError as e:
+        TestResults.add_fail("Branch cursor first page status", str(e))
+        raise
+
+    first_page_response.raise_for_status()
+    first_page_messages = first_page_response.json()
+
+    try:
+        assert isinstance(first_page_messages, list), (
+            "Response should be a list"
+        )
+        assert len(first_page_messages) == 5, (
+            f"Expected 5 messages, got {len(first_page_messages)}"
+        )
+        assert (
+            first_page_messages[0]["message_uid"] == variables.root_message_uid
+        ), "First cursor page should start with the root message"
+    except AssertionError as e:
+        TestResults.add_fail("Branch cursor first page validation", str(e))
+        raise
+
+    cursor = first_page_messages[-1]["message_uid"]
+
+    second_page_response = await client.get(
+        f"/{variables.conversation_uid}/messages",
+        headers=HEADERS,
+        params={
+            "branch_message_uid": branch_leaf,
+            "last_cursor": cursor,
+            "limit": 3,
+            "order_by": "asc",
+        },
+    )
+
+    try:
+        assert second_page_response.status_code == 200, (
+            f"Expected 200, got {second_page_response.status_code}"
+        )
+        TestResults.add_pass("Branch cursor second page returned status 200")
+    except AssertionError as e:
+        TestResults.add_fail("Branch cursor second page status", str(e))
+        raise
+
+    second_page_response.raise_for_status()
+    second_page_messages = second_page_response.json()
+
+    try:
+        assert isinstance(second_page_messages, list), (
+            "Response should be a list"
+        )
+        assert len(second_page_messages) <= 3, (
+            f"Expected at most 3 messages, got {len(second_page_messages)}"
+        )
+
+        first_page_uids = {msg["message_uid"] for msg in first_page_messages}
+        second_page_uids = {msg["message_uid"] for msg in second_page_messages}
+        assert first_page_uids.isdisjoint(second_page_uids), (
+            "Cursor pagination returned overlapping branch messages"
+        )
+
+        for msg in second_page_messages:
+            assert msg.get("extra_metadata", {}).get("branch") == 0, (
+                "Cursor page included a message from the wrong branch"
+            )
+
+        if second_page_messages:
+            assert (
+                second_page_messages[0]["message_uid"]
+                == variables.branch_messages[0][5]
+            ), "Second cursor page should continue from the cursor position"
+
+        TestResults.add_pass(
+            "Branch cursor pagination returned non-overlapping results"
+        )
+    except AssertionError as e:
+        TestResults.add_fail("Branch cursor pagination validation", str(e))
+        raise
+
+    print(
+        f"[GET BRANCH CURSOR] first={len(first_page_messages)} second={len(second_page_messages)}"
+    )
 
 
 async def get_single_message(client: httpx.AsyncClient):
@@ -370,17 +683,39 @@ async def get_single_message(client: httpx.AsyncClient):
     print(f"[GET SINGLE TREE MESSAGE] {message_uid}")
 
 
-async def get_multiple_messages(client: httpx.AsyncClient):
-    """Retrieve multiple messages from different branches by UIDs"""
-    params: list[tuple[str, str]] = []
-
-    for uid in variables.branch_messages[1][:15]:
-        params.append(("message_uids", uid))
+async def get_missing_message(client: httpx.AsyncClient):
+    """Verify a non-existent tree message returns a not-found response."""
+    message_uid = str(uuid.uuid4())
 
     response = await client.get(
+        f"/{variables.conversation_uid}/messages/{message_uid}",
+        headers=HEADERS,
+    )
+
+    try:
+        assert response.status_code in [404, 400], (
+            f"Expected 404 or 400, got {response.status_code}"
+        )
+        TestResults.add_pass(
+            "Missing tree message returned a not-found response"
+        )
+    except AssertionError as e:
+        TestResults.add_fail("Missing tree message validation", str(e))
+        raise
+
+    print(
+        f"[MISSING TREE MESSAGE] message_uid={message_uid} status={response.status_code}"
+    )
+
+
+async def get_multiple_messages(client: httpx.AsyncClient):
+    """Retrieve multiple messages from different branches by UIDs"""
+    response = await client.post(
         f"/{variables.conversation_uid}/messages/bulk",
         headers=HEADERS,
-        params=params,
+        json={
+            "message_uids": variables.branch_messages[1][:15],
+        },
     )
 
     try:
@@ -399,6 +734,9 @@ async def get_multiple_messages(client: httpx.AsyncClient):
     try:
         assert isinstance(messages, list), "Response should be a list"
         assert len(messages) == 15, f"Expected 15 messages, got {len(messages)}"
+        assert {msg["message_uid"] for msg in messages} == set(
+            variables.branch_messages[1][:15]
+        ), "Bulk tree message lookup returned unexpected message UUIDs"
         TestResults.add_pass(
             f"Get multiple tree messages returned all {len(messages)} requested messages"
         )
@@ -409,27 +747,117 @@ async def get_multiple_messages(client: httpx.AsyncClient):
     print(f"[GET MULTIPLE TREE MESSAGES] count={len(messages)}")
 
 
-async def update_metadata(client: httpx.AsyncClient):
-    """Update tree conversation metadata"""
-    response = await client.put(
-        f"/{variables.conversation_uid}/metadata",
+async def get_invalid_bulk_request(client: httpx.AsyncClient):
+    """Verify bulk lookup rejects malformed UUID input."""
+    response = await client.post(
+        f"/{variables.conversation_uid}/messages/bulk",
         headers=HEADERS,
         json={
+            "message_uids": [variables.branch_messages[1][0], "not-a-uuid"],
+        },
+    )
+
+    try:
+        assert response.status_code in [422, 400], (
+            f"Expected 422 or 400, got {response.status_code}"
+        )
+        TestResults.add_pass(
+            "Invalid tree bulk request returned status 422 or 400"
+        )
+    except AssertionError as e:
+        TestResults.add_fail("Invalid tree bulk request validation", str(e))
+        raise
+
+    print(f"[INVALID TREE BULK REQUEST] status={response.status_code}")
+
+
+async def get_invalid_order_by(client: httpx.AsyncClient):
+    """Verify invalid ordering input is rejected for tree reads."""
+    response = await client.get(
+        f"/{variables.conversation_uid}/messages",
+        headers=HEADERS,
+        params={
+            "branch_message_uid": variables.branch_leaf_map[0],
+            "limit": 5,
+            "order_by": "sideways",
+        },
+    )
+
+    try:
+        assert response.status_code in [422, 400], (
+            f"Expected 422 or 400, got {response.status_code}"
+        )
+        TestResults.add_pass("Invalid tree order_by returned status 422 or 400")
+    except AssertionError as e:
+        TestResults.add_fail("Invalid tree order_by validation", str(e))
+        raise
+
+    print(f"[INVALID TREE ORDER BY] status={response.status_code}")
+
+
+async def update_metadata(client: httpx.AsyncClient):
+    """Update tree conversation metadata"""
+    update_payloads = [
+        {
             "extra_metadata": {
                 "tree_updated": True,
                 "branch_count": TOTAL_BRANCHES,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
+                "labels": ["tree", "update", "primary"],
+                "audit": {
+                    "attempt": 1,
+                    "success": True,
+                },
             }
         },
+        {
+            "extra_metadata": {
+                "tree_updated": True,
+                "branch_count": TOTAL_BRANCHES,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "labels": [],
+                "audit": {
+                    "attempt": 2,
+                    "success": False,
+                    "notes": None,
+                },
+            }
+        },
+    ]
+
+    for update_payload in update_payloads:
+        response = await client.put(
+            f"/{variables.conversation_uid}/metadata",
+            headers=HEADERS,
+            json=update_payload,
+        )
+
+        try:
+            assert response.status_code == 204, (
+                f"Expected 204, got {response.status_code}"
+            )
+            TestResults.add_pass("Update tree metadata returned status 204")
+        except AssertionError as e:
+            TestResults.add_fail("Update metadata status code", str(e))
+            raise
+
+        response.raise_for_status()
+
+    response = await client.put(
+        f"/{variables.conversation_uid}/metadata",
+        headers=HEADERS,
+        json={"extra_metadata": {}},
     )
 
     try:
         assert response.status_code == 204, (
             f"Expected 204, got {response.status_code}"
         )
-        TestResults.add_pass("Update tree metadata returned status 204")
+        TestResults.add_pass(
+            "Update tree metadata accepted empty metadata payload"
+        )
     except AssertionError as e:
-        TestResults.add_fail("Update metadata status code", str(e))
+        TestResults.add_fail("Update tree metadata empty payload", str(e))
         raise
 
     response.raise_for_status()
@@ -516,11 +944,17 @@ async def main():
     ) as client:
         try:
             await create_conversation(client)
+            await add_branch_with_invalid_parent(client)
             await build_branches(client)
             await get_metadata(client)
             await get_branch_messages(client)
+            await get_branch_messages_boundary(client)
+            await get_branch_messages_with_cursor(client)
             await get_single_message(client)
+            await get_missing_message(client)
             await get_multiple_messages(client)
+            await get_invalid_bulk_request(client)
+            await get_invalid_order_by(client)
             await update_metadata(client)
             await delete_message(client)
             await delete_conversation(client)

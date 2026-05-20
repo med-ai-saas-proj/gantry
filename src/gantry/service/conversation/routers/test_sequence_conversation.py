@@ -113,26 +113,102 @@ MESSAGE_VARIANTS: list[dict[str, Any]] = [
             },
         ],
     },
+    {
+        "role": "user",
+        "content": "line 1\nline 2\nline 3",
+    },
+    {
+        "role": "assistant",
+        "content": [
+            {
+                "type": "text",
+                "text": "assistant response with multiple sentences and punctuation.",
+            },
+            {
+                "type": "text",
+                "text": "second block for richer payload coverage.",
+            },
+        ],
+    },
+    {
+        "role": "tool",
+        "toolCallId": "tool-call-3",
+        "toolName": "summary_tool",
+        "content": {
+            "items": [1, 2, 3],
+            "details": {
+                "status": "ok",
+                "counts": [10, 20],
+            },
+        },
+    },
+    {
+        "role": "user",
+        "content": [
+            {
+                "type": "text",
+                "text": "mixed modal input with text first",
+            },
+            {
+                "type": "image",
+                "url": "https://example.com/diagram.png",
+                "mimeType": "image/png",
+            },
+        ],
+    },
 ]
 
 
 def build_message(turn: int) -> dict[str, Any]:
     payload = MESSAGE_VARIANTS[turn % len(MESSAGE_VARIANTS)]
+    case = turn % 4
 
-    return {
-        "message_uid": str(uuid.uuid4()),
-        "payload": payload,
-        "run_id": f"run-{turn}",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "extra_metadata": {
+    if case == 0:
+        run_id: str | None = f"run-{turn}"
+        extra_metadata: dict[str, Any] | None = {
             "turn": turn,
-            "tags": ["sequence", f"turn-{turn}"],
+            "tags": ["sequence", f"turn-{turn}", "rich"],
             "nested": {
                 "valid": True,
                 "index": turn,
+                "levels": [1, 2, 3],
             },
-        },
+        }
+    elif case == 1:
+        run_id = None
+        extra_metadata = {
+            "turn": turn,
+            "tags": [],
+            "nested": {
+                "valid": False,
+                "index": turn,
+                "nullable": None,
+            },
+        }
+    elif case == 2:
+        run_id = f"run-{turn}"
+        extra_metadata = None
+    else:
+        run_id = None
+        extra_metadata = {
+            "turn": turn,
+            "tags": ["sequence", "edge"],
+            "nested": {
+                "valid": True,
+                "index": turn,
+                "details": {"depth": 2, "empty": {}},
+            },
+        }
+
+    message: dict[str, Any] = {
+        "message_uid": str(uuid.uuid4()),
+        "payload": payload,
+        "run_id": run_id,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+    message["extra_metadata"] = extra_metadata
+    return message
 
 
 async def create_conversation(client: httpx.AsyncClient):
@@ -147,6 +223,11 @@ async def create_conversation(client: httpx.AsyncClient):
                 "suite": "sequence-load-test",
                 "created_by": "httpx",
                 "test_timestamp": datetime.now(timezone.utc).isoformat(),
+                "labels": ["sequence", "baseline", "dto"],
+                "flags": {
+                    "nullable": None,
+                    "enabled": True,
+                },
             },
             "messages": initial_messages,
         },
@@ -166,6 +247,7 @@ async def create_conversation(client: httpx.AsyncClient):
 
     data = response.json()
     variables.conversation_uid = data["conversation_uid"]
+    variables.message_uids = [msg["message_uid"] for msg in initial_messages]
 
     # Verify response structure
     try:
@@ -190,28 +272,67 @@ async def create_conversation(client: httpx.AsyncClient):
 
 async def update_metadata(client: httpx.AsyncClient):
     """Update conversation metadata and verify the update"""
-    update_payload = {
-        "extra_metadata": {
-            "updated": True,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-            "version": 2,
-            "status": "in_progress",
-        }
-    }
+    update_payloads = [
+        {
+            "extra_metadata": {
+                "updated": True,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "version": 2,
+                "status": "in_progress",
+                "labels": ["sequence", "update", "primary"],
+                "audit": {
+                    "attempt": 1,
+                    "success": True,
+                },
+            }
+        },
+        {
+            "extra_metadata": {
+                "version": 3,
+                "status": "review",
+                "labels": [],
+                "audit": {
+                    "attempt": 2,
+                    "success": False,
+                    "notes": None,
+                },
+            }
+        },
+    ]
+
+    for update_payload in update_payloads:
+        response = await client.put(
+            f"/{variables.conversation_uid}/metadata",
+            headers=HEADERS,
+            json=update_payload,
+        )
+
+        try:
+            assert response.status_code == 204, (
+                f"Expected 204, got {response.status_code}"
+            )
+            TestResults.add_pass(
+                "Update metadata returned status 204 (No Content)"
+            )
+        except AssertionError as e:
+            TestResults.add_fail("Update metadata status code", str(e))
+            raise
+
+        response.raise_for_status()
 
     response = await client.put(
         f"/{variables.conversation_uid}/metadata",
         headers=HEADERS,
-        json=update_payload,
+        json={"extra_metadata": {}},
     )
 
     try:
         assert response.status_code == 204, (
             f"Expected 204, got {response.status_code}"
         )
-        TestResults.add_pass("Update metadata returned status 204 (No Content)")
+        TestResults.add_pass("Update metadata accepted empty metadata payload")
     except AssertionError as e:
-        TestResults.add_fail("Update metadata status code", str(e))
+        TestResults.add_fail("Update metadata empty payload", str(e))
         raise
 
     response.raise_for_status()
@@ -237,6 +358,7 @@ async def get_metadata(client: httpx.AsyncClient):
     response.raise_for_status()
 
     metadata = response.json()
+    extra_metadata = metadata.get("extra_metadata") or {}
 
     # Verify metadata structure
     try:
@@ -251,10 +373,8 @@ async def get_metadata(client: httpx.AsyncClient):
         )
 
         # Verify updated metadata
-        if "updated" in metadata.get("extra_metadata", {}):
-            assert metadata["extra_metadata"]["updated"] == True, (
-                "Updated flag not set"
-            )
+        if extra_metadata.get("updated") is True:
+            assert extra_metadata["updated"] == True, "Updated flag not set"
             TestResults.add_pass("Metadata update was persisted correctly")
     except AssertionError as e:
         TestResults.add_fail("Metadata structure validation", str(e))
@@ -326,6 +446,9 @@ async def get_messages(client: httpx.AsyncClient):
         assert isinstance(messages, list), "Response should be a list"
         assert len(messages) <= 25, f"Limit not respected: got {len(messages)}"
         assert len(messages) > 0, "Should return at least one message"
+        assert messages[0]["message_uid"] == variables.message_uids[0], (
+            "Ascending order should start with the first stored message"
+        )
 
         # Verify message structure
         for msg in messages:
@@ -341,6 +464,48 @@ async def get_messages(client: httpx.AsyncClient):
         raise
 
     print(f"[GET MESSAGES] fetched={len(messages)}")
+
+
+async def get_messages_boundary(client: httpx.AsyncClient):
+    """Exercise pagination boundary behavior with a minimal limit."""
+    response = await client.get(
+        f"/{variables.conversation_uid}/messages",
+        headers=HEADERS,
+        params={
+            "limit": 1,
+            "order_by": "asc",
+        },
+    )
+
+    try:
+        assert response.status_code == 200, (
+            f"Expected 200, got {response.status_code}"
+        )
+        TestResults.add_pass(
+            "Get messages boundary request returned status 200"
+        )
+    except AssertionError as e:
+        TestResults.add_fail("Get messages boundary status code", str(e))
+        raise
+
+    response.raise_for_status()
+
+    messages = response.json()
+
+    try:
+        assert isinstance(messages, list), "Response should be a list"
+        assert len(messages) == 1, f"Expected 1 message, got {len(messages)}"
+        assert messages[0]["message_uid"] == variables.message_uids[0], (
+            "Boundary fetch should return the earliest message"
+        )
+        TestResults.add_pass(
+            "Get messages boundary returned the earliest message"
+        )
+    except AssertionError as e:
+        TestResults.add_fail("Get messages boundary validation", str(e))
+        raise
+
+    print(f"[GET MESSAGES BOUNDARY] fetched={len(messages)}")
 
 
 async def get_messages_desc(client: httpx.AsyncClient):
@@ -370,6 +535,9 @@ async def get_messages_desc(client: httpx.AsyncClient):
     try:
         assert isinstance(messages, list), "Response should be a list"
         assert len(messages) <= 25, f"Limit not respected: got {len(messages)}"
+        assert messages[0]["message_uid"] == variables.message_uids[-1], (
+            "Descending order should start with the most recent message"
+        )
         TestResults.add_pass(
             f"Get messages (desc) returned {len(messages)} messages in reverse order"
         )
@@ -378,6 +546,29 @@ async def get_messages_desc(client: httpx.AsyncClient):
         raise
 
     print(f"[GET MESSAGES DESC] fetched={len(messages)}")
+
+
+async def get_invalid_order_by(client: httpx.AsyncClient):
+    """Verify invalid ordering input is rejected."""
+    response = await client.get(
+        f"/{variables.conversation_uid}/messages",
+        headers=HEADERS,
+        params={
+            "limit": 5,
+            "order_by": "sideways",
+        },
+    )
+
+    try:
+        assert response.status_code in [422, 400], (
+            f"Expected 422 or 400, got {response.status_code}"
+        )
+        TestResults.add_pass("Invalid order_by returned status 422 or 400")
+    except AssertionError as e:
+        TestResults.add_fail("Invalid order_by validation", str(e))
+        raise
+
+    print(f"[INVALID ORDER BY] status={response.status_code}")
 
 
 async def get_single_message(client: httpx.AsyncClient):
@@ -420,19 +611,39 @@ async def get_single_message(client: httpx.AsyncClient):
     print(f"[GET SINGLE MESSAGE] message_uid={message_uid}")
 
 
+async def get_missing_message(client: httpx.AsyncClient):
+    """Verify a missing message returns a not-found style response."""
+    message_uid = str(uuid.uuid4())
+
+    response = await client.get(
+        f"/{variables.conversation_uid}/messages/{message_uid}",
+        headers=HEADERS,
+    )
+
+    try:
+        assert response.status_code in [404, 400], (
+            f"Expected 404 or 400, got {response.status_code}"
+        )
+        TestResults.add_pass("Missing message returned a not-found response")
+    except AssertionError as e:
+        TestResults.add_fail("Missing message validation", str(e))
+        raise
+
+    print(
+        f"[MISSING MESSAGE] message_uid={message_uid} status={response.status_code}"
+    )
+
+
 async def get_multiple_messages(client: httpx.AsyncClient):
     """Retrieve multiple specific messages by UIDs and verify all are returned"""
     selected = variables.message_uids[:10]
 
-    params: list[tuple[str, str]] = []
-
-    for uid in selected:
-        params.append(("message_uids", uid))
-
-    response = await client.get(
+    response = await client.post(
         f"/{variables.conversation_uid}/messages/bulk",
         headers=HEADERS,
-        params=params,
+        json={
+            "message_uids": selected,
+        },
     )
 
     try:
@@ -468,6 +679,28 @@ async def get_multiple_messages(client: httpx.AsyncClient):
         raise
 
     print(f"[GET MULTIPLE MESSAGES] fetched={len(messages)}")
+
+
+async def get_invalid_bulk_request(client: httpx.AsyncClient):
+    """Verify bulk lookup rejects malformed UUID input."""
+    response = await client.post(
+        f"/{variables.conversation_uid}/messages/bulk",
+        headers=HEADERS,
+        json={
+            "message_uids": [variables.message_uids[0], "not-a-uuid"],
+        },
+    )
+
+    try:
+        assert response.status_code in [422, 400], (
+            f"Expected 422 or 400, got {response.status_code}"
+        )
+        TestResults.add_pass("Invalid bulk request returned status 422 or 400")
+    except AssertionError as e:
+        TestResults.add_fail("Invalid bulk request validation", str(e))
+        raise
+
+    print(f"[INVALID BULK REQUEST] status={response.status_code}")
 
 
 async def delete_message(client: httpx.AsyncClient):
@@ -561,9 +794,13 @@ async def main():
             await get_metadata(client)
             await append_turns(client)
             await get_messages(client)
+            await get_messages_boundary(client)
             await get_messages_desc(client)
+            await get_invalid_order_by(client)
             await get_single_message(client)
+            await get_missing_message(client)
             await get_multiple_messages(client)
+            await get_invalid_bulk_request(client)
             await delete_message(client)
             await delete_conversation(client)
         except Exception as e:

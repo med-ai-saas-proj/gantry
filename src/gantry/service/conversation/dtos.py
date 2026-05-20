@@ -26,6 +26,12 @@ class AddTreeMessageRequest(AddMessageRequest):
     from_message_uid: uuid.UUID | None = None
 
 
+class GetMessagesByUuidsRequest(BaseModel):
+    """Represents a request to retrieve multiple messages by UID."""
+
+    message_uids: Sequence[uuid.UUID]
+
+
 class CreateConversationRequest(BaseModel):
     """Represents a request to create a new conversation."""
 
