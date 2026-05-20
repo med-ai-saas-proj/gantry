@@ -1,5 +1,6 @@
 import json
 import uuid
+import random
 import asyncio
 from typing import Any
 from datetime import datetime, timezone
@@ -58,6 +59,8 @@ class Variables:
     root_message_uid: str | None = None
     branch_leaf_map: dict[int, str] = {}
     branch_messages: dict[int, list[str]] = defaultdict(list)
+    branch_switch_source_uid: str | None = None
+    message_parent_map: dict[str, str] = {}
 
 
 variables = Variables()
@@ -101,6 +104,38 @@ def assert_tree_structure(metadata: dict[str, Any]) -> None:
     assert variables.root_message_uid in seen_nodes, (
         "Active leaf ancestry should reach the root message"
     )
+
+    if variables.branch_switch_source_uid is not None:
+        assert (
+            tree_structure[active_leaf_message_id]
+            == variables.branch_switch_source_uid
+        ), "Active leaf should be linked to the selected source message"
+        assert variables.branch_switch_source_uid in seen_nodes, (
+            "Selected source message should be in the active leaf ancestry"
+        )
+
+
+def build_expected_tree_path(leaf_uid: str | None) -> list[str]:
+    if leaf_uid is None:
+        return []
+
+    path: list[str] = []
+    current_uid = leaf_uid
+    root_sentinel = str(uuid.UUID(int=0))
+
+    while current_uid != root_sentinel:
+        path.append(current_uid)
+        current_uid = variables.message_parent_map.get(current_uid)
+        if current_uid is None:
+            break
+
+    if variables.root_message_uid is not None and (
+        not path or path[-1] != variables.root_message_uid
+    ):
+        path.append(variables.root_message_uid)
+
+    path.reverse()
+    return path
 
 
 MESSAGE_VARIANTS: list[dict[str, Any]] = [
@@ -301,6 +336,9 @@ async def create_conversation(client: httpx.AsyncClient):
 
     variables.conversation_uid = data["conversation_uid"]
     variables.root_message_uid = root_message["message_uid"]
+    root_message_uid = variables.root_message_uid
+    assert root_message_uid is not None
+    variables.message_parent_map[root_message_uid] = str(uuid.UUID(int=0))
 
     try:
         assert "conversation_uid" in data, "Missing conversation_uid"
@@ -319,11 +357,12 @@ async def create_conversation(client: httpx.AsyncClient):
 
 async def build_branches(client: httpx.AsyncClient):
     """Build multiple branches from root and verify tree structure integrity"""
+    available_parent_uids = [variables.root_message_uid]
+    current_parent = variables.root_message_uid
     for branch in range(TOTAL_BRANCHES):
-        current_parent = variables.root_message_uid
-        assert current_parent is not None
-
         for turn in range(TURNS_PER_BRANCH):
+            current_parent = random.choice(available_parent_uids)
+            assert current_parent is not None
             message = build_message(branch, turn)
 
             response = await client.post(
@@ -347,13 +386,18 @@ async def build_branches(client: httpx.AsyncClient):
 
             response.raise_for_status()
 
-            current_parent = message["message_uid"]
-
             variables.branch_messages[branch].append(message["message_uid"])
+            variables.message_parent_map[message["message_uid"]] = (
+                current_parent
+            )
+            available_parent_uids.append(message["message_uid"])
 
             if turn % 10 == 0:
-                print(f"[BRANCH={branch}] appended turn={turn}")
+                print(
+                    f"[BRANCH={branch}] appended turn={turn} parent={current_parent}"
+                )
 
+        assert current_parent is not None
         variables.branch_leaf_map[branch] = current_parent
         TestResults.add_pass(
             f"Successfully built complete branch {branch} with {TURNS_PER_BRANCH} turns"
@@ -361,6 +405,56 @@ async def build_branches(client: httpx.AsyncClient):
 
     TestResults.add_pass(
         f"Successfully built all {TOTAL_BRANCHES} branches with {TURNS_PER_BRANCH} turns each"
+    )
+
+
+async def switch_branch_from_random_message(client: httpx.AsyncClient):
+    """Create a new branch from a randomly selected existing message."""
+    source_branch = random.choice(list(variables.branch_messages.keys()))
+    source_message_uid = random.choice(variables.branch_messages[source_branch])
+    source_turn = len(variables.branch_messages[source_branch])
+    switch_message = build_message(source_branch, source_turn)
+
+    response = await client.post(
+        f"/{variables.conversation_uid}/messages",
+        headers=HEADERS,
+        json={
+            "from_message_uid": source_message_uid,
+            "messages": [switch_message],
+        },
+    )
+
+    try:
+        assert response.status_code == 201, (
+            f"Expected 201, got {response.status_code}"
+        )
+        TestResults.add_pass(
+            f"Branch switch from random message {source_message_uid} returned status 201"
+        )
+    except AssertionError as e:
+        TestResults.add_fail("Branch switch status code", str(e))
+        raise
+
+    response.raise_for_status()
+
+    variables.branch_switch_source_uid = source_message_uid
+    switch_branch_index = max(variables.branch_leaf_map) + 1
+    variables.branch_messages[switch_branch_index] = [
+        switch_message["message_uid"]
+    ]
+    variables.branch_leaf_map[switch_branch_index] = switch_message[
+        "message_uid"
+    ]
+    variables.message_parent_map[switch_message["message_uid"]] = (
+        source_message_uid
+    )
+
+    TestResults.add_pass(
+        f"Tracked switched branch leaf {switch_message['message_uid']} from source {source_message_uid}"
+    )
+
+    print(
+        f"[SWITCH BRANCH] source={source_message_uid} new_leaf={switch_message['message_uid']}"
     )
 
 
@@ -444,6 +538,7 @@ async def get_metadata(client: httpx.AsyncClient):
 async def get_branch_messages(client: httpx.AsyncClient):
     """Get messages from a specific branch using branch_message_uid parameter"""
     branch_leaf = variables.branch_leaf_map[0]
+    expected_uids = build_expected_tree_path(branch_leaf)
 
     response = await client.get(
         f"/{variables.conversation_uid}/messages",
@@ -473,10 +568,6 @@ async def get_branch_messages(client: httpx.AsyncClient):
         assert len(messages) > 0, "Branch should have at least one message"
         assert len(messages) <= 100, f"Limit not respected: got {len(messages)}"
 
-        expected_uids = [
-            variables.root_message_uid,
-            *variables.branch_messages[0],
-        ]
         assert_tree_message_uids(
             messages,
             expected_uids[: len(messages)],
@@ -501,6 +592,7 @@ async def get_branch_messages(client: httpx.AsyncClient):
 async def get_branch_messages_boundary(client: httpx.AsyncClient):
     """Exercise branch pagination with a minimal limit."""
     branch_leaf = variables.branch_leaf_map[0]
+    expected_uids = build_expected_tree_path(branch_leaf)
 
     response = await client.get(
         f"/{variables.conversation_uid}/messages",
@@ -528,7 +620,7 @@ async def get_branch_messages_boundary(client: httpx.AsyncClient):
     try:
         assert isinstance(messages, list), "Response should be a list"
         assert len(messages) == 1, f"Expected 1 message, got {len(messages)}"
-        assert messages[0]["message_uid"] == variables.root_message_uid, (
+        assert messages[0]["message_uid"] == expected_uids[0], (
             "Boundary fetch should return the root message"
         )
         TestResults.add_pass("Get branch boundary returned a single message")
@@ -542,6 +634,7 @@ async def get_branch_messages_boundary(client: httpx.AsyncClient):
 async def get_branch_messages_with_cursor(client: httpx.AsyncClient):
     """Verify cursor-based pagination on a specific branch."""
     branch_leaf = variables.branch_leaf_map[0]
+    expected_uids = build_expected_tree_path(branch_leaf)
 
     first_page_response = await client.get(
         f"/{variables.conversation_uid}/messages",
@@ -572,9 +665,14 @@ async def get_branch_messages_with_cursor(client: httpx.AsyncClient):
         assert len(first_page_messages) == 5, (
             f"Expected 5 messages, got {len(first_page_messages)}"
         )
-        assert (
-            first_page_messages[0]["message_uid"] == variables.root_message_uid
-        ), "First cursor page should start with the root message"
+        assert_tree_message_uids(
+            first_page_messages,
+            expected_uids[:5],
+            "Branch cursor first page ordering",
+        )
+        assert first_page_messages[0]["message_uid"] == expected_uids[0], (
+            "First cursor page should start with the root message"
+        )
     except AssertionError as e:
         TestResults.add_fail("Branch cursor first page validation", str(e))
         raise
@@ -624,10 +722,11 @@ async def get_branch_messages_with_cursor(client: httpx.AsyncClient):
             )
 
         if second_page_messages:
-            assert (
-                second_page_messages[0]["message_uid"]
-                == variables.branch_messages[0][5]
-            ), "Second cursor page should continue from the cursor position"
+            assert_tree_message_uids(
+                second_page_messages,
+                expected_uids[5 : 5 + len(second_page_messages)],
+                "Branch cursor second page ordering",
+            )
 
         TestResults.add_pass(
             "Branch cursor pagination returned non-overlapping results"
@@ -946,6 +1045,7 @@ async def main():
             await create_conversation(client)
             await add_branch_with_invalid_parent(client)
             await build_branches(client)
+            await switch_branch_from_random_message(client)
             await get_metadata(client)
             await get_branch_messages(client)
             await get_branch_messages_boundary(client)
