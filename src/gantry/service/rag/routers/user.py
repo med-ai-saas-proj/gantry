@@ -172,6 +172,9 @@ async def query_similar_by_text(
             text=result["text"],
             embedding=list(result["embedding"]),
             created_at=result["created_at"],
+            bm25_score=result.get("bm25_score"),
+            rerank_score=result.get("rerank_score"),
+            vector_distance=result.get("vector_distance"),
         )
         for result in results
     ]

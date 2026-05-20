@@ -7,8 +7,9 @@ from gantry.settings.rag import (
 
 from .models import RagData
 
-from typing import cast
+from typing import Sequence, TypedDict, cast
 
+import httpx
 from sqlalchemy import Text, Table, Column, Integer, DateTime, text
 from sqlalchemy.orm import registry
 from pgvector.sqlalchemy import VECTOR
@@ -212,3 +213,43 @@ def getIndexName(
         raise ValueError(
             f"Unsupported index type: {index_params['index_type']}"
         )
+
+
+class RerankApiRequest(TypedDict):
+    query: str
+    documents: Sequence[str]
+    top_n: int
+
+
+class RerankApiResponseItem(TypedDict):
+    index: int
+    relevance_score: float
+
+
+class RerankApiResponse(TypedDict):
+    results: Sequence[RerankApiResponseItem]
+
+
+class Reranker:
+    def __init__(self, api_url: str):
+        self.api_url = api_url
+
+    async def rerankDocuments(
+        self, query: str, documents: Sequence[str], top_n: int
+    ) -> Sequence[RerankApiResponseItem]:
+
+        data = {
+            "query": query,
+            "documents": documents,
+            "top_n": top_n,
+            "return_documents": False,
+        }
+
+        async with httpx.AsyncClient() as client:
+            res = await client.post(
+                self.api_url.rstrip("/") + "/rerank", json=data
+            )
+            res.raise_for_status()
+            res_data = res.json()
+            return cast(Sequence[RerankApiResponseItem], res_data["results"])
+        return res["results"]

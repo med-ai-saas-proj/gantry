@@ -11,6 +11,9 @@ class RagQueryRecord(TypedDict):
     text: str
     embedding: Sequence[float]
     created_at: datetime
+    rerank_score: float | None
+    bm25_score: float | None
+    vector_distance: float | None
 
 
 class ChunkSplitterType(str, enum.Enum):

@@ -37,6 +37,9 @@ class RagQueryResponse(BaseModel):
     text: str
     embedding: list[float]
     created_at: datetime
+    vector_distance: float | None = None
+    bm25_score: float | None = None
+    rerank_score: float | None = None
 
 
 class QueryFilterByFileMetadata(BaseModel):

@@ -23,6 +23,7 @@ from .type import (
     ChunkSplitterType,
 )
 from .utils import (
+    Reranker,
     getTableName,
     get_orm_class,
     getBm25IndexName,
@@ -39,8 +40,7 @@ import csv
 import json
 import uuid
 import importlib
-from heapq import merge
-from typing import Any, Sequence, Awaitable, TypedDict, cast
+from typing import Sequence, Awaitable, TypedDict, cast
 from datetime import datetime
 
 from openai import AsyncOpenAI
@@ -48,17 +48,20 @@ from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import func, text, delete, select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
-from prometheus_client import h
 from sqlalchemy.dialects.postgresql import insert
 
 
 class EmbeddingQueryRecord(TypedDict):
     """TypedDict for embedding query records from database."""
 
+    chunk_id: int
     file_id: int
     text: str
     embedding: list[float]
     created_at: datetime
+    bm25_score: float | None
+    rerank_score: float | None
+    vector_distance: float | None
 
 
 class BucketNotFoundError(RecoverableError):
@@ -101,6 +104,7 @@ class RagService:
         openai_client: AsyncOpenAI,
         redis: Redis,
         logger: BoundLogger,
+        reranker: Reranker,
     ):
         self.session_manager = session_manager
         self.project_repo = project_repo
@@ -110,6 +114,7 @@ class RagService:
         self.openai_client = openai_client
         self.redis = redis
         self.logger = logger
+        self.reranker = reranker
 
     def _splitByCharacterWindow(
         self,
@@ -989,11 +994,38 @@ class RagService:
             return vector_search_result.into()
         vector_records = vector_search_result.unwrap()
 
-        # TODO rerank the combined results based on relevance to the query
-        merged_records = [*vector_records, *bm25_records]
+        records_map: dict[int, EmbeddingQueryRecord] = {}
+        for record in [*vector_records, *bm25_records]:
+            cid = record["chunk_id"]
+            if cid not in records_map:
+                records_map[cid] = record
+
+        merged_records = list(records_map.values())
+
+        if not merged_records:
+            return Ok([])
+
+        reranked_records = await self.reranker.rerankDocuments(
+            query=query,
+            documents=[record["text"] for record in merged_records],
+            top_n=min(top_k, len(merged_records)),
+        )
+        final_records = [
+            (merged_records[res["index"]], res["relevance_score"])
+            for res in reranked_records
+        ]
+        sorted_final_records: list[EmbeddingQueryRecord] = [
+            {
+                **record,
+                "rerank_score": relevance_score,
+            }
+            for record, relevance_score in sorted(
+                final_records, key=lambda x: x[1], reverse=True
+            )
+        ]
 
         results = await self._buildRagEmbeddingRecords(
-            merged_records, include_embedding
+            sorted_final_records, include_embedding
         )
         return Ok(results)
 
@@ -1079,6 +1111,9 @@ class RagService:
                     "embedding": record["embedding"]
                     if include_embedding
                     else [],
+                    "bm25_score": record.get("bm25_score"),
+                    "rerank_score": record.get("rerank_score"),
+                    "vector_distance": record.get("vector_distance"),
                     "file_info": {
                         "id": file_info_map[record["file_id"]].id,
                         "uid": file_info_map[record["file_id"]].uuid,
@@ -1125,7 +1160,13 @@ class RagService:
         async with self.session_manager.get_session() as session:
             DynamicBucket = get_orm_class(table_name, target_dimension)
 
-            bm25_stmt = select(DynamicBucket).where(
+            bm25_score_expr = text(
+                f"""text <@> to_bm25query(':query', '{idx_name}')"""
+            )
+
+            bm25_stmt = select(
+                DynamicBucket, bm25_score_expr.label("bm25_score")
+            ).where(
                 DynamicBucket.project_id == project_id,
                 DynamicBucket.lang == lang,
             )
@@ -1136,19 +1177,23 @@ class RagService:
                     DynamicBucket.file_id.in_(resolved_file_ids)
                 )
 
-            bm25_stmt = bm25_stmt.order_by(
-                text(f"""text <@> to_bm25query(':query', '{idx_name}')""")
-            ).limit(top_k)
+            bm25_stmt = bm25_stmt.order_by(bm25_score_expr).limit(top_k)
 
             result = await session.execute(bm25_stmt.params(query=query))
             records: list[EmbeddingQueryRecord] = []
-            for row in result.scalars().all():
+            for row in result.all():
+                orm_obj = row[0]
+                score = row.bm25_score
                 records.append(
                     {
-                        "file_id": row.file_id,
-                        "text": row.text,
-                        "embedding": list(row.embedding),
-                        "created_at": row.created_at,
+                        "chunk_id": orm_obj.chunk_id,
+                        "file_id": orm_obj.file_id,
+                        "text": orm_obj.text,
+                        "embedding": list(orm_obj.embedding),
+                        "created_at": orm_obj.created_at,
+                        "bm25_score": score,
+                        "rerank_score": None,
+                        "vector_distance": None,
                     }
                 )
             return Ok(records)
@@ -1224,9 +1269,10 @@ class RagService:
             else:
                 raise ValueError(f"Unsupported ops type: {ops_type}")
 
-            stmt = select(DynamicBucket).where(
+            stmt = select(DynamicBucket, distance_expr.label("distance")).where(
                 DynamicBucket.project_id == project_id
             )
+
             if resolved_file_ids is not None:
                 # If filters were applied but no files matched, return empty result early to avoid unnecessary distance calculations
                 if len(resolved_file_ids) == 0:
@@ -1236,13 +1282,19 @@ class RagService:
             stmt = stmt.order_by(distance_expr).limit(top_k)
             result = await session.execute(stmt)
             records: list[EmbeddingQueryRecord] = []
-            for row in result.scalars().all():
+            for row in result.all():
+                orm_obj = row[0]
+                distance = row.distance
                 records.append(
                     {
-                        "file_id": row.file_id,
-                        "text": row.text,
-                        "embedding": list(row.embedding),
-                        "created_at": row.created_at,
+                        "chunk_id": orm_obj.id,
+                        "file_id": orm_obj.file_id,
+                        "text": orm_obj.text,
+                        "embedding": list(orm_obj.embedding),
+                        "created_at": orm_obj.created_at,
+                        "bm25_score": None,
+                        "rerank_score": None,
+                        "vector_distance": distance,
                     }
                 )
             return Ok(records)
