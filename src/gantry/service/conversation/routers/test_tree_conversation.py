@@ -105,6 +105,16 @@ def assert_tree_structure(metadata: dict[str, Any]) -> None:
         "Active leaf ancestry should reach the root message"
     )
 
+    for message_uid, parent_uid in variables.message_parent_map.items():
+        if message_uid == variables.root_message_uid:
+            continue
+        assert message_uid in tree_structure, (
+            f"Tree structure missing tracked message {message_uid}"
+        )
+        assert tree_structure[message_uid] == parent_uid, (
+            f"Tree structure parent mismatch for {message_uid}: expected {parent_uid}, got {tree_structure[message_uid]}"
+        )
+
     if variables.branch_switch_source_uid is not None:
         assert (
             tree_structure[active_leaf_message_id]
