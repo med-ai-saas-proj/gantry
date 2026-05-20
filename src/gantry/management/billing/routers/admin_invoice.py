@@ -9,8 +9,8 @@ from gantry.shared.custom_types.responses.response import (
     PaginatedResponse,
 )
 
+from .router import billing_router
 from ..factories import getInvoiceService
-from .internal_router import internal_billing_router
 from ..services.invoice_service import InvoiceService
 
 from uuid import UUID
@@ -20,8 +20,8 @@ from datetime import datetime
 from fastapi import Depends
 
 
-@internal_billing_router.put(
-    "/invoices/{invoice_uid}/mark_paid",
+@billing_router.put(
+    "/admin/invoices/{invoice_uid}/mark_paid",
     tags=["admin"],
     description="Manually mark an invoice as paid. This is useful for offline payments or when payment confirmation is received outside of the normal payment flow.",
 )
@@ -35,8 +35,8 @@ async def mark_invoice_as_paid(
     ).unwrap()
 
 
-@internal_billing_router.post(
-    "/invoices/{invoice_uid}/refund",
+@billing_router.post(
+    "/admin/invoices/{invoice_uid}/refund",
     tags=["admin"],
     description="Manually mark an invoice as refunded. This is useful for issuing refunds outside of the normal flow, such as when a refund is processed directly through the payment gateway or for offline refunds.",
 )
@@ -52,9 +52,10 @@ async def mark_invoice_as_refunded(
     ).unwrap()
 
 
-@internal_billing_router.get(
-    "/invoices",
+@billing_router.get(
+    "/admin/invoices",
     description="List invoices, with filters for project_id, billing_period, payment_status, etc.",
+    tags=["admin"],
 )
 async def list_invoices(
     admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
@@ -84,9 +85,10 @@ async def list_invoices(
     )
 
 
-@internal_billing_router.get(
-    "/invoices/{invoice_uid}",
+@billing_router.get(
+    "/admin/invoices/{invoice_uid}",
     description="Get invoice details, including line items and payment status.",
+    tags=["admin"],
 )
 async def get_invoice_details(
     invoice_uid: UUID,

@@ -14,7 +14,6 @@ from .router import billing_router
 from ..factories import getCreditService
 from ..services.credit_service import CreditService
 
-import re
 from typing import Annotated
 
 from fastapi import Depends

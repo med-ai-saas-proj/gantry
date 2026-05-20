@@ -14,8 +14,8 @@ def detect_file_type(stream: BinaryIO | bytes) -> tuple[str, str | None]:
         except TypeError:
             return "application/octet-stream", None
 
-    head = stream.read(1024)
-    stream.seek(0)  # Reset stream position
+    head = stream.read(1024)  # type: ignore
+    stream.seek(0)  # type: ignore - reset stream position after reading
     try:
         kind = filetype.guess(head)
         if kind:

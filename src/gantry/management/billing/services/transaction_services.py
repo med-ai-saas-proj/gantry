@@ -1,11 +1,14 @@
 from gantry.db.factories import AsyncSessionManager
 from gantry.shared.utils.redis import redis_get_or_load
 from gantry.shared.utils.uuid_utils import uuid7
+from gantry.management.api_key.models import ApiKey
+from gantry.management.project.models import Project
 from gantry.shared.utils.scaled_amount import (
     decimal_to_scaled_int,
     scaled_int_to_decimal,
     scaled_amount_to_decimal,
 )
+from gantry.management.api_key.services import ApiKeyNotFoundError
 from gantry.management.project.repositories import ProjectSettingsRepository
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
@@ -44,7 +47,9 @@ from typing import Sequence, Awaitable, TypedDict, cast
 from decimal import Decimal
 from datetime import UTC, datetime, timedelta
 
+from docx import api
 from pyrusult import Ok, Err, Result, ResultStatus
+from sqlalchemy import select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -190,6 +195,12 @@ redis.call("SET", KEYS[2], math.max(new_org_usage, 0), "EX", ARGV[2])
 redis.call("DEL", KEYS[3])
 return 1
 """
+
+
+class ApiKeyInternalIds(TypedDict):
+    api_key_id: int
+    project_id: int
+    org_id: str
 
 
 class TransactionService:
@@ -499,11 +510,34 @@ class TransactionService:
             )
         return Ok((org_usage, project_usage))
 
+    async def _getApiKeyInternalIds(
+        self, api_key_uuid: str
+    ) -> Result[ApiKeyInternalIds, ApiKeyNotFoundError]:
+        """Get internal IDs for the given API key UUID."""
+        async with self.session_manager.get_session() as session:
+            stmt = (
+                select(ApiKey.id, ApiKey.project_id, Project.organization_id)
+                .select_from(ApiKey)
+                .join(Project, ApiKey.project_id == Project.id)
+                .where(ApiKey.uuid == api_key_uuid)
+            )
+            res = await session.execute(stmt)
+            row = res.first()
+            if not row:
+                return Err(ApiKeyNotFoundError())
+
+            api_key_id, project_id, org_id = row.t
+            return Ok(
+                ApiKeyInternalIds(
+                    api_key_id=api_key_id,
+                    project_id=project_id,
+                    org_id=org_id,
+                )
+            )
+
     async def post(
         self,
-        org_id: str,
-        project_id: int,
-        api_key_id: int,
+        api_key_uuid: UUID,
         idempotency_key: str | None,
         req: PostRequest,
     ) -> Result[
@@ -511,12 +545,21 @@ class TransactionService:
         SpendingLimitExceeded
         | InvalidValueError
         | InternalServiceError
-        | TransactionInProgress,
+        | TransactionInProgress
+        | ApiKeyNotFoundError,
     ]:
         """Reserve spending capacity before a request is processed.
 
         Returns Ok(transaction_uuid) on success.
         """
+        api_key_ids_res = await self._getApiKeyInternalIds(str(api_key_uuid))
+        if api_key_ids_res.status == ResultStatus.Err:
+            return api_key_ids_res.into()
+        internal_ids = api_key_ids_res.unwrap()
+        api_key_id = internal_ids["api_key_id"]
+        project_id = internal_ids["project_id"]
+        org_id = internal_ids["org_id"]
+
         now = datetime.now(UTC).replace(tzinfo=None)
         billing_period = get_billing_period(now)
         amount = scaled_amount_to_decimal(req.amount)
@@ -684,9 +727,6 @@ class TransactionService:
 
     async def capture(
         self,
-        org_id: str,
-        project_id: int,
-        api_key_id: int,
         transaction_uid: UUID,
         real_amount: ScaledAmount,
     ) -> Result[
@@ -719,15 +759,15 @@ class TransactionService:
                 amount = trx_.amount
                 billing_period = get_billing_period(trx_.created_at)
                 billing_period_str = billing_period.strftime("%Y-%m")
+                org_id = trx_.organization_id
+                project_id = trx_.project_id
+                api_key_id = trx_.apikey_id
         else:
             trx: _TransactionRecord = json.loads(raw)
 
-            if (
-                trx["org_id"] != org_id
-                or trx["project_id"] != project_id
-                or trx["apikey_id"] != api_key_id
-            ):
-                return Err(TransactionNotFoundOrExpiredOrCaptured())
+            org_id = trx["org_id"]
+            project_id = trx["project_id"]
+            api_key_id = trx["apikey_id"]
 
             amount = scaled_amount_to_decimal(trx["amount"])
             billing_period_str = trx["billing_period"]
@@ -842,6 +882,67 @@ class TransactionService:
                 session=session,
                 transaction_uid=transaction_uid,
                 org_id=org_id,
+            )
+            if not trx:
+                return Err(TransactionNotFound())
+            return Ok(
+                TransactionInfoResponse(
+                    transaction_uid=trx["transaction_uid"],
+                    project_uuid=trx["project_uuid"],
+                    amount=trx["amount"],
+                    details=trx["details"],
+                    date=trx["date"],
+                    captured_at=trx["captured_at"],
+                    status=trx["status"],
+                )
+            )
+
+    async def getTransactionsForAdmin(
+        self,
+        project_uuids: list[UUID] | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> tuple[Sequence[TransactionInfoResponse], int]:
+        """List transactions with optional filters (e.g. project_id, date range, etc.). Supports pagination."""
+
+        async with self.session_manager.get_session() as session:
+            (
+                transactions,
+                total,
+            ) = await self.transaction_repo.getTransactionInfoListForAdmin(
+                session=session,
+                project_uuids=project_uuids,
+                start_date=start_date,
+                end_date=end_date,
+                offset=offset,
+                limit=limit,
+            )
+            return (
+                [
+                    TransactionInfoResponse(
+                        transaction_uid=trx["transaction_uid"],
+                        project_uuid=trx["project_uuid"],
+                        amount=trx["amount"],
+                        details=trx["details"],
+                        date=trx["date"],
+                        captured_at=trx["captured_at"],
+                        status=trx["status"],
+                    )
+                    for trx in transactions
+                ],
+                total,
+            )
+
+    async def getTransactionByIdForAdmin(
+        self, transaction_uid: UUID
+    ) -> Result[TransactionInfoResponse, TransactionNotFound]:
+        """Get transaction details by transaction UUID."""
+        async with self.session_manager.get_session() as session:
+            trx = await self.transaction_repo.getTransactionInfoByUUIDForAdmin(
+                session=session,
+                transaction_uid=transaction_uid,
             )
             if not trx:
                 return Err(TransactionNotFound())

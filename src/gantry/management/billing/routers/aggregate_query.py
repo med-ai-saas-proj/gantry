@@ -53,7 +53,7 @@ async def get_aggregate_by_projects(
         ]
 
     res = (
-        await billing_service.get_aggregate_by_projects(
+        await billing_service.getAggregateByProjects(
             project_uuids=project_uids,
             org_id=user_info["org_uuid"],
             start_time=period_start,
@@ -115,7 +115,7 @@ async def get_aggregate_by_org(
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
 ) -> ListResponse[BillingAggregateReport]:
     res = (
-        await billing_service.get_aggregate_by_org(
+        await billing_service.getAggregateByOrg(
             org_id=user_info["org_uuid"],
             start_time=period_start,
             end_time=period_end,

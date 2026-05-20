@@ -5,7 +5,7 @@ from gantry.service.file_storage.services import FileStorageService
 from gantry.shared.utils.redis_auto_extend_lock import RedisAutoExtendAsyncLock
 
 from .types import FileUploadInfo
-from .services import ConversationService
+from .services.sequence import SequenceConversationWithSerializerService
 from .conversation_session import (
     ConversationSession,
 )
@@ -29,7 +29,9 @@ class ConversationManager:
         self,
         logger: BoundLogger,
         redis_client: Redis,
-        conversation_service: ConversationService,
+        conversation_service: SequenceConversationWithSerializerService[
+            ModelMessage
+        ],
         file_service: FileStorageService,
     ):
         self.logger = logger
@@ -91,16 +93,16 @@ class ConversationManager:
                 self.logger.warn("Errro yielding event", {"exception": e})
                 raise e
             finally:
-                new_message = conversation_session.new_messages
+                new_messages = conversation_session.new_messages
                 conversation_session.file_upload_queue.shutdown()
                 await file_upload_task
 
-                if new_message:
+                if new_messages:
                     await self.conversation_service.serializeAndStoreConversationMessages(
-                        conversation_id,
-                        conversation_uid,
-                        api_key_info["project_id"],
-                        new_message,
+                        is_new_conversation=conversation_id is None,
+                        conversation_uid=conversation_uid,
+                        project_id=api_key_info["project_id"],
+                        msgs=new_messages,
                     )
                 pass
 

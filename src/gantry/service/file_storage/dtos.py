@@ -46,12 +46,12 @@ class UpdateFileMetadataRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_extra_metadata(cls, v):
-        if v is not None:
-            if len(v) > MAX_METADATA_KEY:
+        if v is not None and v.extra_metadata is not None:
+            if len(v.extra_metadata) > MAX_METADATA_KEY:
                 raise ValueError(
                     f"extra_metadata can have at most {MAX_METADATA_KEY} key-value pairs."
                 )
-            for key, value in v.items():
+            for key, value in v.extra_metadata.items():
                 if len(key) > MAX_METADATA_KEY_LENGTH:
                     raise ValueError(
                         f"Metadata keys must be at most {MAX_METADATA_KEY_LENGTH} characters long."

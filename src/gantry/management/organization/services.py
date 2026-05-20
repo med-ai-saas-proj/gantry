@@ -12,6 +12,7 @@ from gantry.keycloak import (
     InvitationNotFoundError,
     UserNotInOrganizationError,
 )
+from gantry.keycloak.services import KeycloakPossibleError
 from gantry.shared.utils.scaled_amount import int_to_scaled_int
 from gantry.shared.custom_types.error_exception import RecoverableError
 
@@ -483,7 +484,10 @@ class OrgService:
         owner_id: str | None = None,
     ) -> Result[
         OrgInfoResponse,
-        KeycloakOrgError | MemberNotFoundError | OrgNotFoundError,
+        KeycloakOrgError
+        | MemberNotFoundError
+        | OrgNotFoundError
+        | KeycloakPossibleError,
     ]:
         """Create an organization from the admin dashboard."""
         payload: CreateOrgPayload = {"name": name}
@@ -660,7 +664,10 @@ class OrgService:
     # invitations
     async def getInvitations(
         self, org_id: str
-    ) -> Result[InvitationListResponse, OrgNotFoundError | KeycloakOrgError]:
+    ) -> Result[
+        InvitationListResponse,
+        OrgNotFoundError | KeycloakOrgError | KeycloakPossibleError,
+    ]:
         """List pending invitations for an organization."""
         inv_res = await self.kc.getInvitations(org_id)
         if inv_res.status == ResultStatus.Err:
@@ -681,7 +688,10 @@ class OrgService:
 
     async def getInvitation(
         self, org_id: str, invitation_id: str
-    ) -> Result[InvitationResponse, InvitationNotFoundError | KeycloakOrgError]:
+    ) -> Result[
+        InvitationResponse,
+        InvitationNotFoundError | KeycloakOrgError | KeycloakPossibleError,
+    ]:
         """Fetch one invitation and map it into the public DTO."""
         inv_res = await self.kc.getInvitation(org_id, invitation_id)
         if inv_res.status == ResultStatus.Err:
@@ -706,7 +716,8 @@ class OrgService:
         | OrgNotFoundError
         | MemberNotFoundError
         | UserAlreadyInOrganizationError
-        | UserAlreadyInAnotherOrganizationError,
+        | UserAlreadyInAnotherOrganizationError
+        | KeycloakPossibleError,
     ]:
         """Invite a user after enforcing the one-user-one-org invariant."""
         existing_user_res = await self.kc.findUserByEmail(email)
@@ -738,14 +749,18 @@ class OrgService:
 
     async def deleteInvitation(
         self, org_id: str, invitation_id: str
-    ) -> Result[bool, InvitationNotFoundError | KeycloakOrgError]:
+    ) -> Result[
+        bool, InvitationNotFoundError | KeycloakOrgError | KeycloakPossibleError
+    ]:
         """Delete an existing invitation."""
         delete_res = await self.kc.deleteInvitation(org_id, invitation_id)
         return delete_res
 
     async def resendInvitation(
         self, org_id: str, invitation_id: str
-    ) -> Result[bool, InvitationNotFoundError | KeycloakOrgError]:
+    ) -> Result[
+        bool, InvitationNotFoundError | KeycloakOrgError | KeycloakPossibleError
+    ]:
         """Resend an existing invitation via Keycloak."""
         return await self.kc.resendInvitation(org_id, invitation_id)
 

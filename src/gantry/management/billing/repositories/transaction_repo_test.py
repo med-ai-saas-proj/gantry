@@ -103,3 +103,38 @@ class TransactionRepositoryTest(unittest.IsolatedAsyncioTestCase):
 
         assert await repo.getByApiKeys(session, [], org_id="org1") == []
         session.execute.assert_not_called()
+
+    async def test_capture_transaction_returns_updated_row_without_db(self):
+        tx = SimpleNamespace(uuid=uuid7(), amount=Decimal("10.5"))
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = tx
+        session = MagicMock()
+        session.execute = AsyncMock(return_value=result)
+        repo = TransactionRepository()
+
+        captured = await repo.captureTransaction(
+            session=session,
+            transaction_uid=tx.uuid,
+            real_amount=Decimal("11.25"),
+        )
+
+        assert captured is tx
+        session.execute.assert_awaited_once()
+
+    async def test_set_transactions_expired_returns_updated_rows_without_db(
+        self,
+    ):
+        expired_tx = SimpleNamespace(uuid=uuid7())
+        result = MagicMock()
+        result.scalars.return_value.all.return_value = [expired_tx]
+        session = MagicMock()
+        session.execute = AsyncMock(return_value=result)
+        repo = TransactionRepository()
+
+        expired = await repo.setTransactionsExpired(
+            session=session,
+            expiration_time=datetime(2026, 1, 1),
+        )
+
+        assert expired == [expired_tx]
+        session.execute.assert_awaited_once()

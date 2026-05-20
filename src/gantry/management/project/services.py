@@ -248,7 +248,10 @@ class ProjectService:
         self,
         org_id: str,
         user_id: str,
-    ) -> Result[bool, MemberNotFoundError | KeycloakOrgError]:
+    ) -> Result[
+        bool,
+        MemberNotFoundError | KeycloakOrgError | UserNotInOrganizationError,
+    ]:
         """Return whether the actor is organization owner for the project org."""
         org_perms_res = await self._getOrgPermissions(org_id, user_id)
         if org_perms_res.status == ResultStatus.Err:
@@ -358,7 +361,8 @@ class ProjectService:
         | UserNotInProjectError
         | MemberNotFoundError
         | KeycloakOrgError
-        | InsufficientProjectPermissionError,
+        | InsufficientProjectPermissionError
+        | UserNotInOrganizationError,
     ]:
         """Authorize one project permission for the given user and project."""
         project_res = await self._getProjectOrErr(project_uuid)
@@ -574,7 +578,8 @@ class ProjectService:
         ProjectNotFoundError
         | MemberNotFoundError
         | KeycloakOrgError
-        | UserNotInProjectError,
+        | UserNotInProjectError
+        | UserNotInOrganizationError,
     ]:
         """Return one project if the actor can access it."""
         project_res = await self._getProjectOrErr(project_uuid)
@@ -885,7 +890,8 @@ class ProjectService:
         | MemberNotFoundError
         | KeycloakOrgError
         | OwnerRequiredForGrantError
-        | LastOwnerRemovalNotAllowedError,
+        | LastOwnerRemovalNotAllowedError
+        | UserNotInOrganizationError,
     ]:
         """Replace one member's project permissions with owner safety checks."""
         valid = {p.value for p in ProjectPermission}

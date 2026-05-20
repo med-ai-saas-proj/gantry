@@ -1,3 +1,4 @@
+from email import message
 from typing import TypedDict, NotRequired
 
 
@@ -20,3 +21,4 @@ class ProblemDetails(TypedDict):
     code: NotRequired[str]  # max_length 50
     detail: NotRequired[str]  # max_length 4096
     errors: NotRequired[list[ErrorDetail]]  # max_items 1000
+    message: NotRequired[str]  # max_length 4096

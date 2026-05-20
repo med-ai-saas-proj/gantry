@@ -16,7 +16,10 @@ from gantry.management.billing.factories import (
 )
 from gantry.management.organization.factories import getOrgService
 from gantry.management.project.factories import getProjectService
-from gantry.service.conversation.factories import getConversationService
+from gantry.service.conversation.factories import (
+    getSequenceConversationService,
+    getTreeConversationService,
+)
 from gantry.service.file_storage.factories import getFileStorageService
 from gantry.service.rag.factories import getRagService
 
@@ -27,6 +30,8 @@ from tests.api.fakes import (
     FakeBillingSourceService,
     FakeBillingTransactionService,
     FakeConversationService,
+    FakeSequenceConversationService,
+    FakeTreeConversationService,
     FakeCreditService,
     FakeFileStorageService,
     FakeGatewayService,
@@ -116,6 +121,16 @@ def fake_conversation_service() -> FakeConversationService:
 
 
 @pytest.fixture
+def fake_sequence_conversation_service() -> FakeSequenceConversationService:
+    return FakeSequenceConversationService()
+
+
+@pytest.fixture
+def fake_tree_conversation_service() -> FakeTreeConversationService:
+    return FakeTreeConversationService()
+
+
+@pytest.fixture
 def fake_gateway_service() -> FakeGatewayService:
     return FakeGatewayService()
 
@@ -187,7 +202,8 @@ def authenticated_service_api(
     fake_api_key_service,
     fake_file_storage_service,
     fake_rag_service,
-    fake_conversation_service,
+    fake_sequence_conversation_service,
+    fake_tree_conversation_service,
 ):
     service_override_dependencies[getUserInfo] = lambda: fake_user_info
     service_override_dependencies[getApiKeyInfo] = lambda: fake_api_key_info
@@ -195,13 +211,15 @@ def authenticated_service_api(
     service_override_dependencies[getApiKeyService] = lambda: fake_api_key_service
     service_override_dependencies[getFileStorageService] = lambda: fake_file_storage_service
     service_override_dependencies[getRagService] = lambda: fake_rag_service
-    service_override_dependencies[getConversationService] = lambda: fake_conversation_service
+    service_override_dependencies[getSequenceConversationService] = lambda: fake_sequence_conversation_service
+    service_override_dependencies[getTreeConversationService] = lambda: fake_tree_conversation_service
     return {
         "project": fake_project_service,
         "api_key": fake_api_key_service,
         "file_storage": fake_file_storage_service,
         "rag": fake_rag_service,
-        "conversation": fake_conversation_service,
+        "sequence_conversation": fake_sequence_conversation_service,
+        "tree_conversation": fake_tree_conversation_service,
     }
 
 

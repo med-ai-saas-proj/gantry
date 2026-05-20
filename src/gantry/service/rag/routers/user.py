@@ -1,6 +1,9 @@
-from gantry.management.auth.entities import UserInfo, UserInfoWithProjectContext
+from gantry.management.auth.entities import UserInfoWithProjectContext
 from gantry.management.project.permissions import ProjectPermission
-from gantry.management.project.dependencies import requiredProjectPermission
+from gantry.management.project.dependencies import (
+    ProjectExtractFrom,
+    requiredProjectPermission,
+)
 
 from ..dtos import (
     RagQueryResponse,
@@ -13,7 +16,6 @@ from ..services import RagService
 from ..factories import getRagService
 from ...file_storage.dtos import FileInfoResponse
 
-import uuid
 from typing import Sequence, Annotated
 
 from fastapi import Body, Query, Depends, Security, APIRouter
@@ -30,7 +32,12 @@ rag_user_router = APIRouter(tags=["rag-user"])
 async def get_files(
     user_info: Annotated[
         UserInfoWithProjectContext,
-        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
+        Security(
+            requiredProjectPermission(
+                ProjectPermission.RAG_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
+        ),
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> Sequence[FileInfoResponse]:
@@ -58,7 +65,12 @@ async def add_file(
     body: Annotated[AddRagFileRequest, Body()],
     user_info: Annotated[
         UserInfoWithProjectContext,
-        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
+        Security(
+            requiredProjectPermission(
+                ProjectPermission.RAG_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
+        ),
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> str:
@@ -83,7 +95,12 @@ async def get_task_status(
     task_id: str,
     user_info: Annotated[
         UserInfoWithProjectContext,
-        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
+        Security(
+            requiredProjectPermission(
+                ProjectPermission.RAG_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
+        ),
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> EmbeddingTaskResponse:
@@ -115,7 +132,12 @@ async def query_similar_by_text(
     body: Annotated[QueryRagQueryByTextRequest, Body()],
     user_info: Annotated[
         UserInfoWithProjectContext,
-        Security(requiredProjectPermission(ProjectPermission.RAG_MANAGE)),
+        Security(
+            requiredProjectPermission(
+                ProjectPermission.RAG_MANAGE,
+                extract_from=ProjectExtractFrom.QUERY,
+            )
+        ),
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
     include_embedding: bool = Query(

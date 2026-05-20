@@ -492,7 +492,9 @@ class RagService:
         )
         if not task:
             return
-        task_id = str(task[1])
+        task_id = (
+            task[1].decode() if isinstance(task[1], bytes) else str(task[1])
+        )
         result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
 
         task_info = await cast(
@@ -723,7 +725,7 @@ class RagService:
             }
 
         result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
-        async with self.redis.pipeline() as pipe:
+        async with self.redis.pipeline(transaction=True) as pipe:
             await cast(
                 Awaitable[None],
                 pipe.set(result_key, json.dumps(task_dict), ex=self.TASK_TTL),

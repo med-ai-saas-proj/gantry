@@ -15,7 +15,11 @@ class RecoverableError(Exception):
     _stack_frames: list[str] | None
     _from: Exception | None
 
-    def __init__(self, from_exception: Exception | None = None) -> None:
+    def __init__(
+        self,
+        from_exception: Exception | None = None,
+        message: str | None = None,
+    ) -> None:
         super().__init__(self.format())
         if getAppSettings().stage == AppStage.DEV:
             self._stack_frames = traceback.format_stack()
@@ -23,6 +27,7 @@ class RecoverableError(Exception):
             self._stack_frames = None
 
         self._from = from_exception
+        self.message = message
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -43,6 +48,8 @@ class RecoverableError(Exception):
             res.update({"code": self.code})
         if self.detail:
             res.update({"detail": self.detail})
+        if self.message:
+            res.update({"message": self.message})
         return res
 
 
@@ -50,16 +57,24 @@ class UnrecoverableError(Exception):
     detail: ClassVar[str]
     _stack_frames: list[str]
     _from: Exception | None
+    message: str | None = None
 
-    def __init__(self, from_exception: Exception | None = None):
+    def __init__(
+        self,
+        from_exception: Exception | None = None,
+        message: str | None = None,
+    ) -> None:
         super().__init__()
         self._stack_frames = traceback.format_stack()
         self._from = from_exception
+        self.message = message
 
     def format(self) -> ProblemDetails:
         res: ProblemDetails = {"status": 500, "title": "Unrecoverable Error"}
         if self.detail:
             res.update({"detail": self.detail})
+        if self.message:
+            res.update({"message": self.message})
         return res
 
 
@@ -90,12 +105,11 @@ class ExternalAPIError(RecoverableError):
     code = "external_api_error"
     detail = "An error occurred while communicating with an external API."
 
-    def __init__(self, message: str, from_exception: Exception | None = None):
-        super().__init__(from_exception)
-        self.message = message
-
 
 class InternalServiceError(UnrecoverableError):
+    status = 500
+    title = "Internal Service Error"
+    code = "internal_service_error"
     detail = "An internal service error occurred. Please contact support."
 
 
@@ -104,7 +118,3 @@ class InvalidValueError(RecoverableError):
     title = "Invalid Value"
     code = "invalid_value"
     detail = "One or more provided values are invalid."
-
-    def __init__(self, message: str, from_exception: Exception | None = None):
-        super().__init__(from_exception)
-        self.message = message

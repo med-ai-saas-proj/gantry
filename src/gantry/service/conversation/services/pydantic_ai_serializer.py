@@ -1,14 +1,9 @@
-from gantry.db.session import AsyncSessionManager
-from gantry.shared.utils.json_utils import json_serializer
-from gantry.shared.utils.uuid_utils import uuid7
-from gantry.shared.custom_types.error_exception import RecoverableError
+from gantry.service.conversation.types import SerializedSequenceContentPart
 
-from .dtos import RequestMessage, ResponseMessage
-from .types import (
+from ..types import (
     FileType,
     MessagePart,
     SerializedContent,
-    ConversationMetadata,
     SerializedContentPart,
     SerializedSequenceContentPart,
     SerializedResponseTextMessagePart,
@@ -20,22 +15,17 @@ from .types import (
     SerializedResponseBuiltInToolCallMessagePart,
     SerializedResponseBuiltInToolResultMessagePart,
 )
-from .models import (
+from ..models import (
     Message,
-    Conversation,
 )
-from .settings import ConversationSettings
-from .repository import ConversationRepository
-from ..file_storage.services import FileStorageService
+from .serializer import Serializer
+from ...file_storage.services import FileStorageService
 
-import json
 import uuid
-import asyncio
-from typing import Literal, Sequence, Awaitable, cast
+from typing import Sequence, cast
 from datetime import UTC, datetime
-from dataclasses import asdict
 
-from pyrusult import Ok, Err, Result, ResultStatus
+from pyrusult import Err
 from pydantic_ai import (
     AudioUrl,
     ImageUrl,
@@ -55,65 +45,14 @@ from pydantic_ai import (
     BuiltinToolCallPart,
     BuiltinToolReturnPart,
 )
-from redis.asyncio import Redis
 
 
-class ConversationNotFoundError(RecoverableError):
-    """Raised when a conversation is not found."""
-
-    status = 404
-    code = "conversation_not_found"
-    title = "Conversation not found"
-    detail = "The specified conversation does not exist or is not accessible with the provided API key"
-
-
-class MessageNotFoundError(RecoverableError):
-    """Raised when a message is not found."""
-
-    status = 404
-    code = "message_not_found"
-    title = "Message not found"
-    detail = "The specified message does not exist in the conversation"
-
-    async def get_message_by_seq_id(
-        self,
-        session,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-        message_seq_id: int,
-    ):
-        raise NotImplementedError
-
-
-class ConversationService:
+class PydanticAISerializer(Serializer[ModelMessage]):
     def __init__(
         self,
-        session_manager: AsyncSessionManager,
-        conversation_repo: ConversationRepository,
         file_service: FileStorageService,
-        redis_client: Redis,
-        setting: ConversationSettings,
     ) -> None:
-        """Initialize ConversationService."""
-        self.redis_client = redis_client
-        self.session_manager = session_manager
-        self.conversation_repo = conversation_repo
         self.file_service = file_service
-        self.setting = setting
-
-    async def getConversationMetadata(
-        self, conversation_uid: uuid.UUID, project_id: int
-    ) -> Result[ConversationMetadata, ConversationNotFoundError]:
-        """Get conversation metadata by its UID and project ID."""
-        async with self.session_manager.get_session() as session:
-            metadata = (
-                await self.conversation_repo.getConversationMetadataByUUID(
-                    session, conversation_uid, project_id
-                )
-            )
-            if metadata is None:
-                return Err(ConversationNotFoundError())
-            return Ok(metadata)
 
     def serializeSequenceContentPart(
         self, contents: Sequence[UserContent]
@@ -257,7 +196,7 @@ class ConversationService:
             # should not happen as we only have text and file content types, but handle just in case
             raise ValueError("Unsupported content type")
 
-    def serializeConversationMessages(
+    async def serializeConversationMessages(
         self, conversation_id: int, msg: ModelMessage
     ) -> Message:
         """Serialize a ModelMessage into a storable Message."""
@@ -303,12 +242,14 @@ class ConversationService:
                     )
             return Message(
                 conversation_id=conversation_id,
-                kind=msg.kind,
-                parts=parts,
+                payload={
+                    "parts": parts,
+                    "kind": msg.kind,
+                },
                 timestamp=msg.timestamp.astimezone(UTC).replace(tzinfo=None)
                 if msg.timestamp
                 else datetime.now(UTC).replace(tzinfo=None),
-                model_name=None,
+                extra_metadata={},
                 run_id=msg.run_id,
             )
         if msg.kind == "response":
@@ -374,11 +315,15 @@ class ConversationService:
                     )
             return Message(
                 conversation_id=conversation_id,
-                kind=msg.kind,
-                model_name=msg.model_name,
-                parts=parts,
+                payload={
+                    "parts": parts,
+                    "kind": msg.kind,
+                },
                 timestamp=msg.timestamp.astimezone(UTC).replace(tzinfo=None),
                 run_id=msg.run_id,
+                extra_metadata={
+                    "model_name": msg.model_name,
+                },
             )
         raise ValueError("Unsupported message kind")
 
@@ -386,9 +331,16 @@ class ConversationService:
         self, message: Message, project_id: int
     ) -> ModelMessage:
         """Deserialize a stored Message into a ModelMessage."""
-        if message.kind == "request":
+        payload = message.payload
+        if (
+            not isinstance(payload, dict)
+            or "kind" not in payload
+            or "parts" not in payload
+        ):
+            raise ValueError("Invalid message payload format")
+        if payload["kind"] == "request":
             parts = []
-            for part in message.parts:
+            for part in payload["parts"]:
                 if part["part_kind"] == "user-prompt":
                     part = cast(SerializedRequestUserPromptMessagePart, part)
                     content = await self.deserializePartContent(
@@ -433,9 +385,9 @@ class ConversationService:
                 timestamp=message.timestamp if message.timestamp else None,
                 run_id=message.run_id,
             )
-        if message.kind == "response":
+        if payload["kind"] == "response":
             parts = []
-            for part in message.parts:
+            for part in payload["parts"]:
                 if part["part_kind"] == "text":
                     part = cast(SerializedResponseTextMessagePart, part)
                     parts.append(
@@ -500,371 +452,10 @@ class ConversationService:
                     )
             return ModelResponse(
                 parts=parts,
-                model_name=message.model_name,
+                model_name=message.extra_metadata.get("model_name")
+                if message.extra_metadata
+                else None,
                 timestamp=message.timestamp,
                 run_id=message.run_id,
             )
         raise ValueError("Unsupported message kind")
-
-    async def getConversationMessages(
-        self,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-        limit: int = 20,
-        last_cursor: int | None = None,
-        order_by: Literal["asc", "desc"] = "asc",
-    ) -> Result[Sequence[Message], ConversationNotFoundError]:
-        async with self.session_manager.get_session() as session:
-            metadata = (
-                await self.conversation_repo.getConversationMetadataByUUID(
-                    session, conversation_uid, project_id
-                )
-            )
-            if metadata is None:
-                return Err(ConversationNotFoundError())
-        messages = await self._getConversationMessages(
-            metadata["conversation_id"],
-            conversation_uid,
-            limit=limit,
-            last_cursor=last_cursor,
-            order_by=order_by,
-        )
-        return Ok(messages)
-
-    async def _loadMessagesFromDB(
-        self,
-        conversation_id: int,
-        limit: int = 20,
-        last_cursor: int | None = None,
-        order_by: Literal["asc", "desc"] = "asc",
-    ) -> Sequence[Message]:
-        async with self.session_manager.get_session() as session:
-            msgs = await self.conversation_repo.getMessagesByConversationId(
-                session,
-                conversation_id,
-                limit=limit,
-                last_cursor=last_cursor,
-                order_by=order_by,
-            )
-            session.expunge_all()
-        return msgs
-
-    async def _getConversationMessages(
-        self,
-        conversation_id: int,
-        conversation_uid: uuid.UUID,
-        limit: int = 20,
-        last_cursor: int | None = None,
-        order_by: Literal["asc", "desc"] = "asc",
-    ) -> Sequence[Message]:
-        can_cache = (
-            last_cursor is None
-            and order_by == "desc"
-            and limit <= self.setting.cache_limit
-        )
-        if not can_cache:
-            return await self._loadMessagesFromDB(
-                conversation_id,
-                limit=limit,
-                last_cursor=last_cursor,
-                order_by=order_by,
-            )
-
-        cache_key = ConversationService._message_cache_key(conversation_uid)
-        # atomic check if cache exists and is ready, if so get from cache, otherwise get from db and update cache
-        lua_script = """
-           if redis.call('EXISTS', KEYS[1]) == 1 then
-                redis.call('EXPIRE', KEYS[1], ARGV[1])
-                return redis.call('ZREVRANGE', KEYS[1], 0, -1)
-           else
-               return nil
-           end
-           """
-        result = await cast(
-            Awaitable[list[str] | None],
-            self.redis_client.eval(
-                lua_script, 1, cache_key, self.setting.cache_ttl
-            ),
-        )
-        if result is not None:
-            return [Message.parse_raw(json.loads(msg)) for msg in result]
-        msgs = await self._loadMessagesFromDB(
-            conversation_id,
-            limit=self.setting.cache_limit,
-            last_cursor=last_cursor,
-            order_by=order_by,
-        )
-        await self._addConversationMessagesCache(conversation_uid, msgs)
-        return msgs
-
-    async def getAndDeserializeConversationMessages(
-        self,
-        conversation_id: int,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-        limit: int = 20,
-    ) -> Sequence[ModelMessage]:
-        serialized_msgs = await self._getConversationMessages(
-            conversation_id,
-            conversation_uid,
-            limit=limit,
-            order_by="desc",
-        )
-        tasks = [
-            self.deserializeConversationMessages(msg, project_id=project_id)
-            for msg in serialized_msgs
-        ]
-        msgs = await asyncio.gather(*tasks)
-        return list(reversed(msgs))
-
-    async def serializeAndStoreConversationMessages(
-        self,
-        conversation_id: int | None,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-        msgs: Sequence[ModelMessage],
-    ) -> None:
-        serialized_msgs = [
-            self.serializeConversationMessages(conversation_id=-1, msg=msg)
-            for msg in msgs
-        ]
-        await self._storeConversationMessages(
-            conversation_id, conversation_uid, project_id, serialized_msgs
-        )
-
-    async def storeConversationMessages(
-        self,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-        msgs: Sequence[RequestMessage | ResponseMessage],
-    ) -> Result[None, ConversationNotFoundError]:
-        res = await self.getConversationMetadata(conversation_uid, project_id)
-        if res.status == ResultStatus.Err:
-            return res.into()
-        metadata = res.unwrap()
-        await self._storeConversationMessages(
-            metadata["conversation_id"],
-            conversation_uid,
-            project_id,
-            [
-                Message(
-                    conversation_id=-1,
-                    kind=msg.kind,
-                    parts=cast(list[MessagePart], msg.parts),
-                    timestamp=msg.timestamp,
-                    model_name=msg.model_name
-                    if hasattr(msg, "model_name")
-                    else None,
-                    run_id=msg.run_id if hasattr(msg, "run_id") else None,
-                )
-                for msg in msgs
-            ]
-            if msgs is not None
-            else [],
-        )
-        return Ok(None)
-
-    async def _storeConversationMessages(
-        self,
-        conversation_id: int | None,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-        serialized_msgs: Sequence[Message],
-        extra_metadata: dict | None = None,
-    ):
-        is_new_conversation = conversation_id is None
-        if conversation_id is None:
-            async with self.session_manager.get_session() as session:
-                conversation = Conversation(
-                    uuid=conversation_uid,
-                    project_id=project_id,
-                    extra_metadata=extra_metadata,
-                )
-                session.add(conversation)
-                await session.flush()
-                conversation_id = conversation.id
-                await session.commit()
-
-        for msg in serialized_msgs:
-            msg.conversation_id = conversation_id
-
-        if len(serialized_msgs) > 0:
-            async with self.session_manager.get_session() as session:
-                session.add_all(serialized_msgs)
-                await session.flush()
-                await session.commit()
-            if is_new_conversation:
-                await self._addConversationMessagesCache(
-                    conversation_uid, serialized_msgs
-                )
-            else:
-                await self._tryAppendConversationMessagesCache(
-                    conversation_uid, serialized_msgs
-                )
-
-    async def _tryAppendConversationMessagesCache(
-        self, conversation_uid: uuid.UUID, msgs: Sequence[Message]
-    ):
-        cache_key = ConversationService._message_cache_key(conversation_uid)
-        # atomic check if cache exists and is ready,
-        # if so append to cache, otherwise do nothing and let next read update the cache
-        # (avoid appending to cache when cache is not loaded
-        # to prevent cache have only new messages but miss old messages)
-        append_script = """
-        -- ARGV: seq_id1, msg1, seq_id2, msg2, ..., ttl, cache_limit
-        -- check if cache exists, if not exist then return 0
-        local ttl = tonumber(ARGV[#ARGV - 1])
-        local limit = tonumber(ARGV[#ARGV])
-        if redis.call('EXISTS', KEYS[1]) then
-            for i = 1, #ARGV-2, 2 do
-                redis.call('ZADD', KEYS[1], ARGV[i], ARGV[i+1])
-            end
-            redis.call('EXPIRE', KEYS[1], ttl)
-            -- trim to cache limit
-            redis.call('ZREMRANGEBYRANK', KEYS[1], 0, -limit-1)
-            return 1
-        else
-            return 0
-        end
-        """
-        mappings: list[str | int] = []
-        for msg in msgs:
-            mappings.append(msg.seq_id)
-            mappings.append(json.dumps(asdict(msg), default=json_serializer))
-        mappings.append(self.setting.cache_ttl)
-        mappings.append(self.setting.cache_limit)
-        res = await cast(
-            Awaitable[int],
-            self.redis_client.eval(
-                append_script,
-                1,
-                cache_key,
-                *mappings,
-            ),
-        )
-
-    async def _addConversationMessagesCache(
-        self, conversation_uid: uuid.UUID, msgs: Sequence[Message]
-    ):
-        if len(msgs) == 0:
-            return
-        cache_key = ConversationService._message_cache_key(conversation_uid)
-        mappings = {
-            json.dumps(asdict(msg), default=json_serializer): msg.seq_id
-            for msg in msgs
-        }
-
-        async with self.redis_client.pipeline(
-            transaction=True,
-        ) as pipe:
-            await pipe.zadd(cache_key, mappings)
-            await pipe.zremrangebyrank(
-                cache_key, 0, -self.setting.cache_limit - 1
-            )
-            await pipe.expire(cache_key, self.setting.cache_ttl)
-            await pipe.execute()
-
-    async def createConversation(
-        self,
-        project_id: int,
-        extra_metadata: dict | None,
-        messages: Sequence[RequestMessage | ResponseMessage] | None,
-    ):
-        conversation_uid = uuid7()
-        await self._storeConversationMessages(
-            conversation_id=None,
-            conversation_uid=conversation_uid,
-            project_id=project_id,
-            extra_metadata=extra_metadata,
-            serialized_msgs=[
-                Message(
-                    conversation_id=-1,
-                    kind=msg.kind,
-                    parts=cast(list[MessagePart], msg.parts),
-                    timestamp=msg.timestamp,
-                    model_name=msg.model_name if msg.model_name else None,
-                    run_id=msg.run_id if msg.run_id else None,
-                )
-                for msg in messages
-            ]
-            if messages is not None
-            else [],
-        )
-        return conversation_uid
-
-    async def getConversationMessage(
-        self,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-        message_seq_id: int,
-    ) -> Result[Message, MessageNotFoundError]:
-        async with self.session_manager.get_session() as session:
-            msg = await self.conversation_repo.getMessageBySeqId(
-                session, conversation_uid, project_id, message_seq_id
-            )
-            if msg is None:
-                return Err(MessageNotFoundError())
-            session.expunge_all()
-            return Ok(msg)
-
-    async def deleteConversationMessage(
-        self,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-        message_seq_id: int,
-    ):
-        mess_cache_key = ConversationService._message_cache_key(
-            conversation_uid
-        )
-
-        async with self.session_manager.get_session() as session:
-            deleted = await self.conversation_repo.deleteMessageBySeqId(
-                session, conversation_uid, project_id, message_seq_id
-            )
-            if deleted is None:
-                return Err(MessageNotFoundError())
-            await session.commit()
-
-        await self.redis_client.delete(mess_cache_key)
-        return Ok(None)
-
-    async def deleteConversation(
-        self,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-    ):
-        mess_cache_key = ConversationService._message_cache_key(
-            conversation_uid
-        )
-
-        async with self.session_manager.get_session() as session:
-            deleted = await self.conversation_repo.deleteConversationByUUID(
-                session, conversation_uid, project_id
-            )
-            if deleted is None:
-                return Err(ConversationNotFoundError())
-            await session.commit()
-
-        await self.redis_client.delete(mess_cache_key)
-        return Ok(None)
-
-    @staticmethod
-    def _message_cache_key(conversation_uid: uuid.UUID) -> str:
-        return f"conversation_cache:{{{conversation_uid}}}"
-
-    async def updateConversationMetadata(
-        self,
-        conversation_uid: uuid.UUID,
-        project_id: int,
-        extra_metadata: dict | None,
-    ):
-        async with self.session_manager.get_session() as session:
-            updated = (
-                await self.conversation_repo.updateConversationMetadataByUUID(
-                    session, conversation_uid, project_id, extra_metadata
-                )
-            )
-            if updated is None:
-                return Err(ConversationNotFoundError())
-            await session.commit()
-        return Ok(None)

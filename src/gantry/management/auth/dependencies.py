@@ -103,6 +103,8 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
         auth_service: Annotated[AuthService, Depends(getAuthService)],
     ) -> UserInfo:
+        from gantry.management.project.permissions import ALL_PERMISSIONS
+
         if auth.credentials == "bypass_token":
             return UserInfo(
                 id="test_user",
@@ -110,7 +112,9 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
                 email="test_user@example.com",
                 org_uuid="test_org1",
                 org_permissions=[],
-                project_permissions={},
+                project_permissions={
+                    "00000000-0000-0000-0000-000000000000": ALL_PERMISSIONS
+                },
             )
         raise UnauthorizedError()
 

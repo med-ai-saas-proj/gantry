@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-import json
+from gantry.api_gateway.routes import (
+    filter_headers,
+    _inject_api_key_context_headers,
+)
 
-from gantry.api_gateway.routes import _inject_api_key_context_headers, filter_headers
+import json
 
 
 def _api_key_info_payload() -> dict:

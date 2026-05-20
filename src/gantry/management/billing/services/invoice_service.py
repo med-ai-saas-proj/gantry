@@ -198,7 +198,7 @@ class InvoiceService:
                         InvoiceItemInfoResponse(
                             description=line["description"],
                             amount=line["amount"],
-                            project_uid=line["project_uid"],
+                            project_uuid=line["project_uuid"],
                             project_name=line["project_name"],
                         )
                         for line in lines

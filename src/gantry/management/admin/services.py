@@ -115,9 +115,9 @@ class AdminService:
             }
         )
         if invalid_org_permissions:
-            error = InvalidAdminPermissionError()
-            error.detail = "Invalid organization permissions: " + ", ".join(
-                invalid_org_permissions
+            error = InvalidAdminPermissionError(
+                message="Invalid organization permissions: "
+                + ", ".join(invalid_org_permissions)
             )
             raise error
 
@@ -130,9 +130,9 @@ class AdminService:
             }
         )
         if invalid_project_permissions:
-            error = InvalidAdminPermissionError()
-            error.detail = "Invalid project permissions: " + ", ".join(
-                invalid_project_permissions
+            error = InvalidAdminPermissionError(
+                message="Invalid project permissions: "
+                + ", ".join(invalid_project_permissions)
             )
             raise error
 
