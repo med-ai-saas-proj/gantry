@@ -922,6 +922,7 @@ class RagService:
         hybrid_search: bool = False,
         hybrid_search_bm25_top_k: int = 100,
         hybrid_search_semantic_top_k: int = 5,
+        hybrid_search_bm25_lang: str = "simple",
     ) -> Result[
         Sequence[RagQueryRecord],
         FileNotFoundInSystemError
@@ -967,13 +968,17 @@ class RagService:
                 return resolved_file_ids_res.into()
             resolved_file_ids = resolved_file_ids_res.unwrap()
 
-        bm25_records = await self._queryBm25Search(
+        bm25_search_result = await self._queryBm25Search(
             project_id=project_id,
             query=query,
             top_k=hybrid_search_bm25_top_k,
             resolved_file_ids=resolved_file_ids,
-            lang=self.setting.supported_langs_list[0],
+            lang=hybrid_search_bm25_lang,
         )
+        if bm25_search_result.status == ResultStatus.Err:
+            return bm25_search_result.into()
+        bm25_records = bm25_search_result.unwrap()
+
         vector_search_result = await self._querySimilarByVector(
             project_id=project_id,
             embedding=query_embedding,
@@ -983,6 +988,7 @@ class RagService:
         if vector_search_result.status == ResultStatus.Err:
             return vector_search_result.into()
         vector_records = vector_search_result.unwrap()
+
         # TODO rerank the combined results based on relevance to the query
         merged_records = [*vector_records, *bm25_records]
 
@@ -1001,6 +1007,7 @@ class RagService:
         hybrid_search: bool = False,
         hybrid_search_bm25_top_k: int = 100,
         hybrid_search_semantic_top_k: int = 5,
+        hybrid_search_bm25_lang: str = "simple",
     ) -> Result[
         Sequence[RagQueryRecord],
         FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
@@ -1015,6 +1022,7 @@ class RagService:
             hybrid_search=hybrid_search,
             hybrid_search_bm25_top_k=hybrid_search_bm25_top_k,
             hybrid_search_semantic_top_k=hybrid_search_semantic_top_k,
+            hybrid_search_bm25_lang=hybrid_search_bm25_lang,
         )
 
     async def _resolveFilteredFileIds(
@@ -1102,10 +1110,12 @@ class RagService:
         top_k: int = 100,
         resolved_file_ids: Sequence[int] | None = None,
         lang: str = "simple",
-    ) -> Sequence[EmbeddingQueryRecord]:
+    ) -> Result[Sequence[EmbeddingQueryRecord], InternalServiceError]:
         if lang not in self.setting.supported_langs_list:
-            raise InternalServiceError(
-                message=f"Language '{lang}' is not supported. Supported languages are: {', '.join(self.setting.supported_langs_list)}."
+            return Err(
+                InternalServiceError(
+                    message=f"Language '{lang}' is not supported. Supported languages are: {', '.join(self.setting.supported_langs_list)}."
+                )
             )
 
         target_dimension = self.setting.rag_store_parameters["dimension"]
@@ -1121,7 +1131,7 @@ class RagService:
             )
             if resolved_file_ids is not None:
                 if len(resolved_file_ids) == 0:
-                    return []
+                    return Ok([])
                 bm25_stmt = bm25_stmt.where(
                     DynamicBucket.file_id.in_(resolved_file_ids)
                 )
@@ -1141,7 +1151,7 @@ class RagService:
                         "created_at": row.created_at,
                     }
                 )
-            return records
+            return Ok(records)
 
     async def querySimilarByVector(
         self,

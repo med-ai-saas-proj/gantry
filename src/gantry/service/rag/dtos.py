@@ -82,6 +82,10 @@ class QueryRagQueryByTextRequest(BaseModel):
         le=1000,
         description="When hybrid_search is true, this parameter controls the number of top candidates to retrieve using semantic search before reranking with vector similarity. A higher value may improve recall but increase latency.",
     )
+    hybrid_search_bm25_lang: str = Field(
+        default="simple",
+        description="When hybrid_search is true, this parameter specifies the language to use for BM25 search. This can affect tokenization and stopword removal, which in turn can impact search results. The default 'simple' option applies basic tokenization and is suitable for many languages, but you may want to specify a particular language for better results with certain languages.",
+    )
 
 
 class EmbeddingTaskResponse(BaseModel):
