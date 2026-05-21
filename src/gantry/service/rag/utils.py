@@ -7,8 +7,9 @@ from gantry.settings.rag import (
 
 from .models import RagData
 
-from typing import cast
+from typing import Sequence, TypedDict, cast
 
+import httpx
 from sqlalchemy import Text, Table, Column, Integer, DateTime, text
 from sqlalchemy.orm import registry
 from pgvector.sqlalchemy import VECTOR
@@ -30,6 +31,7 @@ def get_orm_class(table_name, dimension) -> type[RagData]:
             "created_at", DateTime, nullable=False, server_default=text("NOW()")
         ),
         Column("project_id", Integer, nullable=False),
+        Column("lang", Text, nullable=True),
         schema="Rag",
         extend_existing=True,
     )
@@ -42,6 +44,38 @@ def get_orm_class(table_name, dimension) -> type[RagData]:
     return cast(type[RagData], DynamicClass)
 
 
+db_supported_langs = [
+    "simple",
+    "arabic",
+    "armenian",
+    "basque",
+    "catalan",
+    "danish",
+    "dutch",
+    "english",
+    "finnish",
+    "french",
+    "german",
+    "greek",
+    "hindi",
+    "hungarian",
+    "indonesian",
+    "irish",
+    "italian",
+    "lithuanian",
+    "nepali",
+    "norwegian",
+    "portuguese",
+    "romanian",
+    "russian",
+    "serbian",
+    "spanish",
+    "swedish",
+    "tamil",
+    "turkishyiddish",
+]
+
+
 async def create_embedding_table(
     session: AsyncSession, table_name: str, dimension: int
 ):
@@ -52,6 +86,7 @@ async def create_embedding_table(
         file_id BIGINT NOT NULL REFERENCES "FileStorage"."Files"(id) ON DELETE CASCADE,
         project_id BIGINT NOT NULL REFERENCES "Project"."Projects"(id) ON DELETE CASCADE,
         text TEXT,
+        lang TEXT default 'simple',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );""")
     await session.execute(sql)
@@ -65,13 +100,34 @@ async def create_embedding_table(
     await session.execute(sql)
 
 
+async def create_bm25_index(
+    session: AsyncSession, table_name: str, supported_langs_list: list[str]
+):
+    db_supported_langs_set = set(db_supported_langs)
+    target_langs_set = set(supported_langs_list)
+    if not target_langs_set.issubset(db_supported_langs_set):
+        unsupported_langs = target_langs_set - db_supported_langs_set
+        raise ValueError(
+            f"The following languages are not supported by the database: {', '.join(unsupported_langs)}. Supported languages are: {', '.join(db_supported_langs)}"
+        )
+
+    for lang in supported_langs_list:
+        idx_name = getBm25IndexName(table_name, lang)
+        sql = text(f"""
+        CREATE INDEX IF NOT EXISTS {idx_name} ON "Rag"."{table_name}" USING bm25 (text)
+            WITH (text_config='{lang}') WHERE lang = '{lang}';
+        """)
+        await session.execute(sql)
+
+
 async def create_vector_index(
     session: AsyncSession,
     table_name: str,
-    index_name: str,
-    ops_type: VectorOpsType,
-    parms: IndexParams,
+    rag_store_parameters: RagParameters,
 ):
+    index_name = getIndexName(table_name, rag_store_parameters)
+    ops_type = rag_store_parameters["ops_type"]
+    parms = rag_store_parameters["index_params"]
     if parms["index_type"] == VectorIndexType.hnsw:
         m = parms["m"] if parms and parms.get("m") else 16
         ef_construction = (
@@ -126,6 +182,10 @@ def getTableName(rag_store_parameters: RagParameters) -> str:
         )
 
 
+def getBm25IndexName(table_name: str, lang: str) -> str:
+    return f"{table_name}_{lang}_idx"
+
+
 def getIndexName(
     table_name: str,
     rag_store_parameters: RagParameters,
@@ -153,3 +213,54 @@ def getIndexName(
         raise ValueError(
             f"Unsupported index type: {index_params['index_type']}"
         )
+
+
+class RerankApiRequest(TypedDict):
+    model: str
+    query: str
+    documents: Sequence[str]
+    top_n: int
+
+
+class RerankApiResponseItem(TypedDict):
+    index: int
+    relevance_score: float
+
+
+class RerankApiResponse(TypedDict):
+    results: Sequence[RerankApiResponseItem]
+
+
+class Reranker:
+    def __init__(self, model: str, api_key: str, base_url: str):
+        self.base_url = base_url
+        self.api_key = api_key
+        self.model = model
+
+    async def rerankDocuments(
+        self, query: str, documents: Sequence[str], top_n: int
+    ) -> Sequence[RerankApiResponseItem]:
+
+        data = {
+            "query": query,
+            "documents": documents,
+            "top_n": top_n,
+            "return_documents": False,
+            "model": self.model,
+        }
+
+        async with httpx.AsyncClient(timeout=1200) as client:
+            res = await client.post(
+                self.base_url.rstrip("/") + "/rerank",
+                json=data,
+                headers={"Authorization": f"Bearer {self.api_key}"},
+            )
+
+            try:
+                res.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                print(f"Server error text: {e.response.text}")
+                raise
+
+            res_data = res.json()
+            return cast(Sequence[RerankApiResponseItem], res_data["results"])

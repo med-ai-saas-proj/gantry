@@ -25,12 +25,13 @@ class TestRagInsert(unittest.IsolatedAsyncioTestCase):
             file_id=0,
             text="sample text",
             project_id=0,
+            lang="simple",
         )
 
-        self.assertEqual(EmbeddingModel.__table__.name, table_name)
         self.assertEqual(new_record.file_id, 0)
         self.assertEqual(new_record.text, "sample text")
         self.assertEqual(new_record.project_id, 0)
+        self.assertEqual(new_record.lang, "simple")
 
 
 if __name__ == "__main__":

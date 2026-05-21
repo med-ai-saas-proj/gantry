@@ -42,14 +42,36 @@ class RagSettings(BaseSettings):
         str,
         Field(description="Model to use for generating embeddings."),
     ]
-    openai_api_key: Annotated[
+    embedding_openai_api_key: Annotated[
         SecretStr,
         Field(description="OpenAI API key for RAG functionality."),
     ]
-    openai_base_url: Annotated[
+    embedding_openai_base_url: Annotated[
         HttpUrl,
         Field(description="Base URL for the OpenAI API."),
     ]
+    reranker_model: Annotated[
+        str,
+        Field(
+            description="Model to use for re-ranking RAG results. This can be the same as the embedding model or a different one optimized for ranking."
+        ),
+    ]
+    reranker_api_key: Annotated[
+        SecretStr,
+        Field(description="OpenAI API key for the re-ranker model."),
+    ]
+    reranker_base_url: Annotated[
+        HttpUrl,
+        Field(
+            description="Base URL for the OpenAI API for the re-ranker model."
+        ),
+    ]
+    supported_langs: Annotated[
+        str,
+        Field(
+            description="List of supported languages for bm25 separated by commas. For example: 'simple,english,french'.  The 'lang' field in RagData can only take values from this list."
+        ),
+    ] = "simple"  # default to 'simple' which can be used for language
 
     rag_store_dimension: Annotated[
         int,
@@ -85,6 +107,14 @@ class RagSettings(BaseSettings):
             description="Type of vector operations to use for similarity search in the RAG store."
         ),
     ] = VectorOpsType.cosine
+
+    @property
+    def supported_langs_list(self) -> list[str]:
+        return [
+            lang.strip()
+            for lang in self.supported_langs.split(",")
+            if lang.strip()
+        ]
 
     @property
     def rag_store_parameters(self) -> RagParameters:

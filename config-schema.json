@@ -445,60 +445,94 @@
     "RagSettings": {
       "additionalProperties": false,
       "properties": {
-        "openai_api_key": {
+        "embedding_model": {
+          "description": "Model to use for generating embeddings.",
+          "title": "Embedding Model",
+          "type": "string"
+        },
+        "embedding_openai_api_key": {
+          "description": "OpenAI API key for RAG functionality.",
           "format": "password",
-          "title": "Openai Api Key",
+          "title": "Embedding Openai Api Key",
           "type": "string",
           "writeOnly": true
         },
-        "openai_base_url": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Openai Base Url"
+        "embedding_openai_base_url": {
+          "description": "Base URL for the OpenAI API.",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Embedding Openai Base Url",
+          "type": "string"
         },
-        "embedding_model": {
-          "title": "Embedding Model",
+        "reranker_model": {
+          "description": "Model to use for re-ranking RAG results. This can be the same as the embedding model or a different one optimized for ranking.",
+          "title": "Reranker Model",
+          "type": "string"
+        },
+        "reranker_api_key": {
+          "description": "OpenAI API key for the re-ranker model.",
+          "format": "password",
+          "title": "Reranker Api Key",
+          "type": "string",
+          "writeOnly": true
+        },
+        "reranker_base_url": {
+          "description": "Base URL for the OpenAI API for the re-ranker model.",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Reranker Base Url",
+          "type": "string"
+        },
+        "supported_langs": {
+          "default": "simple",
+          "description": "List of supported languages for bm25 separated by commas. For example: 'simple,english,french'.  The 'lang' field in RagData can only take values from this list.",
+          "title": "Supported Langs",
           "type": "string"
         },
         "rag_store_dimension": {
           "default": 1536,
+          "description": "Dimensionality of the vector embeddings stored in the RAG store.",
           "title": "Rag Store Dimension",
           "type": "integer"
         },
         "rag_store_index_type": {
           "$ref": "#/$defs/VectorIndexType",
-          "default": "hnsw"
+          "default": "hnsw",
+          "description": "Type of vector index to use for the RAG store."
         },
         "rag_store_index_params_hnsw_m": {
           "default": 16,
+          "description": "HNSW index parameter 'm', which controls the number of bi-directional links created for each new element during index construction.",
           "title": "Rag Store Index Params Hnsw M",
           "type": "integer"
         },
         "rag_store_index_params_hnsw_ef_construction": {
           "default": 200,
+          "description": "HNSW index parameter 'ef_construction', which controls the accuracy/speed trade-off during index construction. Higher values lead to better recall but slower indexing.",
           "title": "Rag Store Index Params Hnsw Ef Construction",
           "type": "integer"
         },
         "rag_store_index_params_ivfflat_lists": {
           "default": 100,
+          "description": "IVFFlat index parameter 'lists', which determines the number of Voronoi cells (or clusters) used in the index. More lists can improve recall but may increase search time.",
           "title": "Rag Store Index Params Ivfflat Lists",
           "type": "integer"
         },
         "rag_store_ops_type": {
           "$ref": "#/$defs/VectorOpsType",
-          "default": "vector_cosine_ops"
+          "default": "vector_cosine_ops",
+          "description": "Type of vector operations to use for similarity search in the RAG store."
         }
       },
       "required": [
-        "openai_api_key",
-        "embedding_model"
+        "embedding_model",
+        "embedding_openai_api_key",
+        "embedding_openai_base_url",
+        "reranker_model",
+        "reranker_api_key",
+        "reranker_base_url"
       ],
       "title": "RagSettings",
       "type": "object"

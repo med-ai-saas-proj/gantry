@@ -42,6 +42,7 @@ async def add_embedding(
             body.embedding,
             body.file_uid,
             api_key_info["project_id"],
+            body.lang,
         )
     ).unwrap()
 
@@ -92,6 +93,7 @@ async def add_file(
             body.chunk_splitter,
             body.chunk_size,
             body.chunk_overlap,
+            body.lang,
         )
     ).unwrap()
     return task_id
@@ -164,6 +166,7 @@ async def query_similar_by_vector(
             text=result["text"],
             embedding=list(result["embedding"]),
             created_at=result["created_at"],
+            vector_distance=result.get("vector_distance"),
         )
         for result in results
     ]
@@ -193,6 +196,10 @@ async def query_similar_by_text(
             body.filters,
             body.top_k,
             include_embedding,
+            body.hybrid_search,
+            body.hybrid_search_bm25_top_k,
+            body.hybrid_search_semantic_top_k,
+            body.hybrid_search_bm25_lang,
         )
     ).unwrap()
     return [
@@ -208,6 +215,9 @@ async def query_similar_by_text(
             text=result["text"],
             embedding=list(result["embedding"]),
             created_at=result["created_at"],
+            bm25_score=result.get("bm25_score"),
+            rerank_score=result.get("rerank_score"),
+            vector_distance=result.get("vector_distance"),
         )
         for result in results
     ]

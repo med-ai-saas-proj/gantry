@@ -6,11 +6,14 @@ from typing import Literal, Sequence, TypedDict
 from datetime import datetime
 
 
-class RagEmbeddingRecord(TypedDict):
+class RagQueryRecord(TypedDict):
     file_info: FileRecord
     text: str
     embedding: Sequence[float]
     created_at: datetime
+    rerank_score: float | None
+    bm25_score: float | None
+    vector_distance: float | None
 
 
 class ChunkSplitterType(str, enum.Enum):

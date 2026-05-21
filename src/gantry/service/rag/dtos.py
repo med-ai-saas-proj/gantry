@@ -13,6 +13,7 @@ class AddRagEmbeddingRequest(BaseModel):
     """DTO for adding an embedding to a RAG bucket."""
 
     text: str
+    lang: str = "simple"
     embedding: Sequence[float]
     file_uid: UUID
 
@@ -21,6 +22,7 @@ class AddRagFileRequest(BaseModel):
     """DTO for adding a file (with embedding) to a RAG bucket."""
 
     file_uid: UUID
+    lang: str = "simple"
     chunk_splitter: ChunkSplitterType = Field(
         default=ChunkSplitterType.recursive
     )
@@ -35,6 +37,9 @@ class RagQueryResponse(BaseModel):
     text: str
     embedding: list[float]
     created_at: datetime
+    vector_distance: float | None = None
+    bm25_score: float | None = None
+    rerank_score: float | None = None
 
 
 class QueryFilterByFileMetadata(BaseModel):
@@ -63,6 +68,27 @@ class QueryRagQueryByTextRequest(BaseModel):
     query_text: str
     top_k: int = Field(default=5, gt=0, le=100)
     filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None
+
+    hybrid_search: bool = Field(
+        default=False,
+        description="Whether to perform a hybrid search that combines vector similarity and BM25 text search. If true, the service will first use BM25 + semantic search to filter candidates and then rerank them using vector similarity.",
+    )
+    hybrid_search_bm25_top_k: int = Field(
+        default=20,
+        gt=0,
+        le=1000,
+        description="When hybrid_search is true, this parameter controls the number of top candidates to retrieve using BM25 before reranking with vector similarity. A higher value may improve recall but increase latency.",
+    )
+    hybrid_search_semantic_top_k: int = Field(
+        default=100,
+        gt=0,
+        le=1000,
+        description="When hybrid_search is true, this parameter controls the number of top candidates to retrieve using semantic search before reranking with vector similarity. A higher value may improve recall but increase latency.",
+    )
+    hybrid_search_bm25_lang: str = Field(
+        default="simple",
+        description="When hybrid_search is true, this parameter specifies the language to use for BM25 search. This can affect tokenization and stopword removal, which in turn can impact search results. The default 'simple' option applies basic tokenization and is suitable for many languages, but you may want to specify a particular language for better results with certain languages.",
+    )
 
 
 class EmbeddingTaskResponse(BaseModel):

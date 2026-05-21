@@ -120,7 +120,9 @@ services:
       - full
 
   timescale_db:
-    image: timescale/timescaledb:latest-pg18
+    build:
+      context: .
+      dockerfile: Dockerfile.db
     container_name: timescale-db
     environment:
       POSTGRES_DB: gantry
@@ -131,6 +133,7 @@ services:
     volumes:
       - timescale_data:/var/lib/postgresql
     restart: unless-stopped
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb,pg_textsearch"]
     deploy:
       resources:
         limits:
