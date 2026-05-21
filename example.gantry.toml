@@ -39,9 +39,12 @@ client_id = "gantry-frontend"
 admin_client_id = "gantry-admin"
 
 [rag]
-openai_api_key = "sk-example"              #apikey
-openai_base_url = "https://api.openai.com/v1"
+embedding_openai_api_key = "sk-example"                 #apikey
+embedding_openai_base_url = "https://api.openai.com/v1"
 embedding_model = "text-embedding-3-small"
+reranker_api_key = "sk-example"                         #apikey
+reranker_base_url = "https://jina.ai/api/v1"            #apikey
+reranker_model = "text-reranking-001"                   #apikey
 
 [billing]
 stripe_secret_key = "sk_test_example_key" #apikey

@@ -916,6 +916,9 @@ class RagService:
             self.getFilesInRag,
         )
 
+    def getSupportedLanguages(self) -> Sequence[str]:
+        return self.setting.supported_langs_list
+
     async def querySimilarByText(
         self,
         project_id: int,
