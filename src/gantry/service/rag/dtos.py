@@ -18,6 +18,18 @@ class AddRagEmbeddingRequest(BaseModel):
     file_uid: UUID
 
 
+class AddTextToRagRequest(BaseModel):
+    """DTO for adding text (with embedding) to a RAG bucket without an associated file. This can be used for ad-hoc knowledge that doesn't come from a file."""
+
+    text: str | list[str]
+    lang: str = "simple"
+    chunk_splitter: ChunkSplitterType = Field(
+        default=ChunkSplitterType.recursive
+    )
+    chunk_size: int = Field(default=1000, gt=0)
+    chunk_overlap: int = Field(default=150, ge=0)
+
+
 class AddRagFileRequest(BaseModel):
     """DTO for adding a file (with embedding) to a RAG bucket."""
 
@@ -33,7 +45,7 @@ class AddRagFileRequest(BaseModel):
 class RagQueryResponse(BaseModel):
     """DTO for RAG query response."""
 
-    file_info: FileInfoResponse
+    file_info: FileInfoResponse | None
     text: str
     embedding: list[float]
     created_at: datetime
@@ -95,7 +107,9 @@ class EmbeddingTaskResponse(BaseModel):
     """DTO for RAG embedding task status response."""
 
     task_id: str
-    file_uid: UUID
+    file_uid: UUID | None
+    text: str | list[str] | None
+    type: Literal["file", "text"]
     project_uuid: UUID
     chunk_splitter: ChunkSplitterType
     chunk_size: int

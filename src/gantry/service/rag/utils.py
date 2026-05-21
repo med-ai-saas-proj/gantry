@@ -25,7 +25,8 @@ def get_orm_class(table_name, dimension) -> type[RagData]:
         mapper_registry.metadata,
         Column("id", Integer, primary_key=True),
         Column("embedding", VECTOR(dimension)),
-        Column("file_id", Integer, nullable=False),
+        Column("file_id", Integer, nullable=True),
+        Column("hash", Text, nullable=False),
         Column("text", Text, nullable=True),
         Column(
             "created_at", DateTime, nullable=False, server_default=text("NOW()")
@@ -83,7 +84,8 @@ async def create_embedding_table(
     CREATE TABLE IF NOT EXISTS "Rag"."{table_name}" (
         id BIGSERIAL PRIMARY KEY,
         embedding VECTOR({dimension}),
-        file_id BIGINT NOT NULL REFERENCES "FileStorage"."Files"(id) ON DELETE CASCADE,
+        file_id BIGINT REFERENCES "FileStorage"."Files"(id) ON DELETE CASCADE,
+        hash TEXT NOT NULL,
         project_id BIGINT NOT NULL REFERENCES "Project"."Projects"(id) ON DELETE CASCADE,
         text TEXT,
         lang TEXT default 'simple',
@@ -96,6 +98,11 @@ async def create_embedding_table(
     await session.execute(sql)
     sql = text(f"""
     CREATE INDEX IF NOT EXISTS "{table_name}_project_id_idx" ON "Rag"."{table_name}" (project_id);
+    """)
+    await session.execute(sql)
+    # Unique partial index on hash for text-only records (file_id IS NULL) per project
+    sql = text(f"""
+    CREATE UNIQUE INDEX IF NOT EXISTS "{table_name}_hash_project_unique_idx" ON "Rag"."{table_name}" (hash, project_id) WHERE file_id IS NULL;
     """)
     await session.execute(sql)
 

@@ -7,7 +7,7 @@ from datetime import datetime
 
 
 class RagQueryRecord(TypedDict):
-    file_info: FileRecord
+    file_info: FileRecord | None
     text: str
     embedding: Sequence[float]
     created_at: datetime
@@ -28,9 +28,11 @@ class ChunkSplitterType(str, enum.Enum):
 
 
 class EmbeddingTask(TypedDict):
+    type: Literal["file", "text"]
     task_id: str
-    file_id: int
-    file_uid: uuid.UUID
+    file_id: int | None
+    file_uid: uuid.UUID | None
+    text: str | list[str] | None
     project_id: int
     project_uuid: uuid.UUID
     chunk_splitter: ChunkSplitterType

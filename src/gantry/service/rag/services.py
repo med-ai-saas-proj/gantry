@@ -38,13 +38,14 @@ import re
 import csv
 import json
 import uuid
+import hashlib
 import importlib
 from typing import Sequence, Awaitable, TypedDict, cast
 from datetime import datetime
 
 from openai import AsyncOpenAI
 from pyrusult import Ok, Err, Result, ResultStatus
-from sqlalchemy import func, delete, select
+from sqlalchemy import or_, func, delete, select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 from sqlalchemy.dialects.postgresql import insert
@@ -54,7 +55,7 @@ class EmbeddingQueryRecord(TypedDict):
     """TypedDict for embedding query records from database."""
 
     chunk_id: int
-    file_id: int
+    file_id: int | None
     text: str
     embedding: list[float]
     created_at: datetime
@@ -531,18 +532,37 @@ class RagService:
                 task_id=task_id,
                 task_info=task_dict,
             )
-            (
-                await self.processEmbedding(
-                    file_uid=uuid.UUID(task_dict["file_uid"]),
-                    project_id=task_dict["project_id"],
-                    chunk_splitter=ChunkSplitterType(
-                        task_dict["chunk_splitter"]
-                    ),
-                    chunk_size=task_dict["chunk_size"],
-                    chunk_overlap=task_dict["chunk_overlap"],
-                    lang=task_dict.get("lang", "simple"),
-                )
-            ).unwrap()
+
+            # Determine if this is a text task or file task
+            task_type = task_dict.get("task_type", "file")
+
+            if task_type == "text":
+                (
+                    await self.processEmbeddingText(
+                        text=task_dict["text"],
+                        project_id=task_dict["project_id"],
+                        chunk_splitter=ChunkSplitterType(
+                            task_dict["chunk_splitter"]
+                        ),
+                        chunk_size=task_dict["chunk_size"],
+                        chunk_overlap=task_dict["chunk_overlap"],
+                        lang=task_dict.get("lang", "simple"),
+                    )
+                ).unwrap()
+            else:
+                (
+                    await self.processEmbedding(
+                        file_uid=uuid.UUID(task_dict["file_uid"]),
+                        project_id=task_dict["project_id"],
+                        chunk_splitter=ChunkSplitterType(
+                            task_dict["chunk_splitter"]
+                        ),
+                        chunk_size=task_dict["chunk_size"],
+                        chunk_overlap=task_dict["chunk_overlap"],
+                        lang=task_dict.get("lang", "simple"),
+                    )
+                ).unwrap()
+
             task_dict["status"] = "completed"
             async with self.redis.pipeline() as pipe:
                 await cast(
@@ -699,18 +719,114 @@ class RagService:
                     DynamicBucket.project_id == project_id,
                 )
             )
-            session.add_all(
-                [
+            record = []
+            for chunk, embedding in zip(chunks, embeddings):
+                cleaned = chunk.replace("\x00", "").strip()
+                h = hashlib.sha256(cleaned.encode("utf-8")).hexdigest()
+                record.append(
                     DynamicBucket(
                         embedding=embedding,
                         file_id=file_info["id"],
-                        text=chunk.replace("\x00", "").strip(),
+                        text=cleaned,
                         project_id=project_id,
                         lang=lang,
+                        hash=h,
                     )
-                    for chunk, embedding in zip(chunks, embeddings)
-                ]
+                )
+
+            if record:
+                session.add_all(record)
+            await session.flush()
+            await session.commit()
+
+        return Ok(None)
+
+    async def processEmbeddingText(
+        self,
+        text: str | list[str],
+        project_id: int,
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+        lang: str = "simple",
+    ) -> Result[
+        None,
+        BucketNotFoundError
+        | InternalServiceError
+        | InvalidEmbeddingDimensionError,
+    ]:
+        # Convert single text to list and chunk each item separately
+        text_list = [text] if isinstance(text, str) else text
+        if not text_list:
+            return Ok(None)
+
+        chunks: list[str] = []
+        for item in text_list:
+            if not item or not str(item).strip():
+                continue
+            item_chunks = self._splitContent(
+                str(item),
+                chunk_splitter,
+                chunk_size,
+                chunk_overlap,
             )
+            if item_chunks:
+                chunks.extend(item_chunks)
+
+        if not chunks:
+            return Ok(None)
+
+        embedding_response = await self.openai_client.embeddings.create(
+            model=self.setting.embedding_model,
+            input=chunks,
+        )
+        embeddings = [item.embedding for item in embedding_response.data]
+        if not embeddings:
+            return Ok(None)
+        if len(embeddings) != len(chunks):
+            return Err(
+                InternalServiceError(
+                    message="Failed to generate embeddings for all chunks."
+                )
+            )
+
+        target_dimension = self.setting.rag_store_parameters["dimension"]
+        table_name = getTableName(self.setting.rag_store_parameters)
+        for embedding in embeddings:
+            if len(embedding) != target_dimension:
+                return Err(
+                    InvalidEmbeddingDimensionError(
+                        message=f"Generated embedding dimension {len(embedding)} does not match expected dimension {target_dimension}."
+                    )
+                )
+
+        async with self.session_manager.get_session() as session:
+            DynamicBucket = get_orm_class(table_name, target_dimension)
+
+            records = []
+            for chunk, embedding in zip(chunks, embeddings):
+                cleaned = chunk.replace("\x00", "").strip()
+                h = hashlib.sha256(cleaned.encode("utf-8")).hexdigest()
+                records.append(
+                    {
+                        "embedding": embedding,
+                        "file_id": None,
+                        "text": cleaned,
+                        "project_id": project_id,
+                        "lang": lang,
+                        "hash": h,
+                    }
+                )
+
+            if records:
+                await session.execute(
+                    insert(DynamicBucket)
+                    .values(records)
+                    .on_conflict_do_nothing(
+                        index_elements=["hash", "project_id"],
+                        index_where=(DynamicBucket.file_id._is(None)),
+                    )
+                )
             await session.flush()
             await session.commit()
 
@@ -743,6 +859,7 @@ class RagService:
 
             task_dict = {
                 "task_id": task_id,
+                "task_type": "file",
                 "file_id": file_info.id,
                 "file_uid": str(file_uid),
                 "project_id": project_id,
@@ -787,6 +904,70 @@ class RagService:
             lang=lang,
         )
 
+    async def addText(
+        self,
+        text: str | list[str],
+        project_id: int,
+        project_uuid: uuid.UUID,
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+        lang: str = "simple",
+    ) -> Result[str, InternalServiceError]:
+        if lang not in self.setting.supported_langs_list:
+            return Err(
+                InternalServiceError(
+                    message=f"Language '{lang}' is not supported. Supported languages are: {', '.join(self.setting.supported_langs_list)}."
+                )
+            )
+
+        task_id = str(uuid.uuid4())
+        task_dict = {
+            "task_id": task_id,
+            "task_type": "text",
+            "text": text,
+            "project_id": project_id,
+            "project_uuid": str(project_uuid),
+            "chunk_splitter": chunk_splitter.value,
+            "chunk_size": chunk_size,
+            "chunk_overlap": chunk_overlap,
+            "status": "pending",
+            "lang": lang,
+        }
+
+        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
+        async with self.redis.pipeline(transaction=True) as pipe:
+            await cast(
+                Awaitable[None],
+                pipe.set(result_key, json.dumps(task_dict), ex=self.TASK_TTL),
+            )
+            await cast(
+                Awaitable[None], pipe.rpush(self.REDIS_TASK_QUEUE, task_id)
+            )
+            await pipe.execute()
+
+        return Ok(task_id)
+
+    async def addTextByProjectUid(
+        self,
+        text: str | list[str],
+        project_uid: uuid.UUID,
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+        lang: str = "simple",
+    ) -> Result[str, InternalServiceError]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.addText,
+            text=text,
+            project_uuid=project_uid,
+            chunk_splitter=chunk_splitter,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            lang=lang,
+        )
+
     async def getTaskStatus(
         self,
         task_id: str,
@@ -805,9 +986,15 @@ class RagService:
 
         return Ok(
             EmbeddingTask(
+                type=task_dict.get("task_type", "file"),
+                text=task_dict.get("text"),
                 task_id=task_dict["task_id"],
-                file_id=task_dict["file_id"],
-                file_uid=uuid.UUID(task_dict["file_uid"]),
+                file_id=task_dict["file_id"]
+                if task_dict.get("file_id")
+                else None,
+                file_uid=uuid.UUID(task_dict["file_uid"])
+                if task_dict.get("file_uid")
+                else None,
                 project_id=task_dict["project_id"],
                 project_uuid=uuid.UUID(task_dict["project_uuid"]),
                 chunk_splitter=ChunkSplitterType(task_dict["chunk_splitter"]),
@@ -870,6 +1057,7 @@ class RagService:
                 embedding=embedding,
                 file_id=file_info.id,
                 text=text,
+                hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
                 project_id=project_id,
                 lang=lang,
             )
@@ -1098,7 +1286,11 @@ class RagService:
     ) -> list[RagQueryRecord]:
         """Build RagEmbeddingRecord list from records and file info map."""
         async with self.session_manager.get_session() as session:
-            file_ids = [record["file_id"] for record in records]
+            file_ids = [
+                record["file_id"]
+                for record in records
+                if "file_id" in record and record["file_id"] is not None
+            ]
             file_infos = await self.file_repo.getAvailableByIds(
                 session, file_ids
             )
@@ -1107,6 +1299,27 @@ class RagService:
             }
             results: list[RagQueryRecord] = []
             for record in records:
+                if (
+                    "file_id" not in record
+                    or record["file_id"] is None
+                    or record["file_id"] not in file_info_map
+                ):
+                    data: RagQueryRecord = {
+                        "text": record["text"],
+                        "created_at": record["created_at"],
+                        "embedding": record["embedding"]
+                        if include_embedding
+                        else [],
+                        "bm25_score": record.get("bm25_score"),
+                        "rerank_score": record.get("rerank_score"),
+                        "vector_distance": record.get("vector_distance"),
+                        "file_info": None,
+                    }
+                    if include_embedding:
+                        data["embedding"] = record["embedding"]
+                    results.append(data)
+                    continue
+
                 data: RagQueryRecord = {
                     "text": record["text"],
                     "created_at": record["created_at"],
@@ -1174,10 +1387,14 @@ class RagService:
             )
             if resolved_file_ids is not None:
                 if len(resolved_file_ids) == 0:
-                    return Ok([])
-                bm25_stmt = bm25_stmt.where(
-                    DynamicBucket.file_id.in_(resolved_file_ids)
-                )
+                    bm25_stmt = bm25_stmt.where(DynamicBucket.file_id.is_(None))
+                else:
+                    bm25_stmt = bm25_stmt.where(
+                        or_(
+                            DynamicBucket.file_id.is_(None),
+                            DynamicBucket.file_id.in_(resolved_file_ids),
+                        )
+                    )
 
             bm25_stmt = bm25_stmt.order_by(bm25_score_expr).limit(top_k)
 
@@ -1276,10 +1493,15 @@ class RagService:
             )
 
             if resolved_file_ids is not None:
-                # If filters were applied but no files matched, return empty result early to avoid unnecessary distance calculations
                 if len(resolved_file_ids) == 0:
-                    return Ok([])
-                stmt = stmt.where(DynamicBucket.file_id.in_(resolved_file_ids))
+                    stmt = stmt.where(DynamicBucket.file_id.is_(None))
+                else:
+                    stmt = stmt.where(
+                        or_(
+                            DynamicBucket.file_id.is_(None),
+                            DynamicBucket.file_id.in_(resolved_file_ids),
+                        )
+                    )
 
             stmt = stmt.order_by(distance_expr).limit(top_k)
             result = await session.execute(stmt)
