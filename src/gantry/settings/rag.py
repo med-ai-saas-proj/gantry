@@ -42,13 +42,29 @@ class RagSettings(BaseSettings):
         str,
         Field(description="Model to use for generating embeddings."),
     ]
-    openai_api_key: Annotated[
+    embedding_openai_api_key: Annotated[
         SecretStr,
         Field(description="OpenAI API key for RAG functionality."),
     ]
-    openai_base_url: Annotated[
+    embedding_openai_base_url: Annotated[
         HttpUrl,
         Field(description="Base URL for the OpenAI API."),
+    ]
+    reranker_model: Annotated[
+        str,
+        Field(
+            description="Model to use for re-ranking RAG results. This can be the same as the embedding model or a different one optimized for ranking."
+        ),
+    ]
+    reranker_api_key: Annotated[
+        SecretStr,
+        Field(description="OpenAI API key for the re-ranker model."),
+    ]
+    reranker_base_url: Annotated[
+        HttpUrl,
+        Field(
+            description="Base URL for the OpenAI API for the re-ranker model."
+        ),
     ]
     supported_langs: Annotated[
         str,

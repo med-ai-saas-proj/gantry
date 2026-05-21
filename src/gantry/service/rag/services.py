@@ -1,7 +1,6 @@
 from gantry.db import AsyncSessionManager
 from gantry.settings.rag import VectorOpsType
 from gantry.service.file_storage.types import FileRecord
-from gantry.service.file_storage.models import File
 from gantry.service.file_storage.services import (
     FileStorageService,
     FileNotFoundInSystemError,
@@ -45,7 +44,7 @@ from datetime import datetime
 
 from openai import AsyncOpenAI
 from pyrusult import Ok, Err, Result, ResultStatus
-from sqlalchemy import func, text, delete, select
+from sqlalchemy import func, delete, select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 from sqlalchemy.dialects.postgresql import insert
@@ -1160,8 +1159,8 @@ class RagService:
         async with self.session_manager.get_session() as session:
             DynamicBucket = get_orm_class(table_name, target_dimension)
 
-            bm25_score_expr = text(
-                f"""text <@> to_bm25query(':query', '{idx_name}')"""
+            bm25_score_expr = DynamicBucket.text.op("<@>")(
+                func.to_bm25query(query, f""""Rag"."{idx_name}" """)
             )
 
             bm25_stmt = select(
@@ -1186,7 +1185,7 @@ class RagService:
                 score = row.bm25_score
                 records.append(
                     {
-                        "chunk_id": orm_obj.chunk_id,
+                        "chunk_id": orm_obj.id,
                         "file_id": orm_obj.file_id,
                         "text": orm_obj.text,
                         "embedding": list(orm_obj.embedding),

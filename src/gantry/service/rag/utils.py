@@ -216,6 +216,7 @@ def getIndexName(
 
 
 class RerankApiRequest(TypedDict):
+    model: str
     query: str
     documents: Sequence[str]
     top_n: int
@@ -231,8 +232,10 @@ class RerankApiResponse(TypedDict):
 
 
 class Reranker:
-    def __init__(self, api_url: str):
-        self.api_url = api_url
+    def __init__(self, model: str, api_key: str, base_url: str):
+        self.base_url = base_url
+        self.api_key = api_key
+        self.model = model
 
     async def rerankDocuments(
         self, query: str, documents: Sequence[str], top_n: int
@@ -243,13 +246,21 @@ class Reranker:
             "documents": documents,
             "top_n": top_n,
             "return_documents": False,
+            "model": self.model,
         }
 
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=1200) as client:
             res = await client.post(
-                self.api_url.rstrip("/") + "/rerank", json=data
+                self.base_url.rstrip("/") + "/rerank",
+                json=data,
+                headers={"Authorization": f"Bearer {self.api_key}"},
             )
-            res.raise_for_status()
+
+            try:
+                res.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                print(f"Server error text: {e.response.text}")
+                raise
+
             res_data = res.json()
             return cast(Sequence[RerankApiResponseItem], res_data["results"])
-        return res["results"]
