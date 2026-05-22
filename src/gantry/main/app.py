@@ -61,7 +61,7 @@ internal_app = FastAPI(
 )
 
 
-@main_app.get("/ready")
+@internal_app.get("/ready")
 async def ready():
     return Response(status_code=200)
 
@@ -155,11 +155,11 @@ if getAppSettings().stage == AppStage.DEV:
             title="Public API Reference",
         )
 
-    @internal_app.get("/internal-docs", include_in_schema=False)
+    @internal_app.get("/docs", include_in_schema=False)
     async def scalar_html2():
         return get_scalar_api_reference(
             openapi_url=(
-                internal_app.openapi_url or "/docs/internal_openapi.json"
+                internal_app.openapi_url or "/docs/openapi.json"
             ).lstrip("/"),
             title="Internal API Reference",
         )

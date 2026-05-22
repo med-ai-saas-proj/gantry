@@ -1,6 +1,23 @@
 {
   "$defs": {
+    "AiGatewaySettings": {
+      "additionalProperties": false,
+      "properties": {
+        "models": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ModelSpec"
+          },
+          "default": {},
+          "description": "Mapping `what you call the model from your application` -> Model's spec",
+          "title": "Models",
+          "type": "object"
+        }
+      },
+      "title": "AiGatewaySettings",
+      "type": "object"
+    },
     "ApiGatewayRoute": {
+      "additionalProperties": false,
       "properties": {
         "address": {
           "description": "Upstream service address for this route.",
@@ -24,6 +41,7 @@
       "type": "object"
     },
     "ApiGatewaySettings": {
+      "additionalProperties": false,
       "properties": {
         "routes": {
           "additionalProperties": {
@@ -308,6 +326,74 @@
       ],
       "title": "MetricsType",
       "type": "string"
+    },
+    "ModelSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "description": "Check pydantic provider. https://pydantic.dev/docs/ai/models/overview/",
+          "title": "Provider",
+          "type": "string"
+        },
+        "model_id": {
+          "description": "Model ID, e.g. gpt-5.2",
+          "title": "Model Id",
+          "type": "string"
+        },
+        "api_key": {
+          "anyOf": [
+            {
+              "format": "password",
+              "type": "string",
+              "writeOnly": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Should be in .env instead of toml",
+          "title": "Api Key"
+        },
+        "base_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Provider's base url",
+          "title": "Base Url"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Fallback model",
+          "title": "Fallback"
+        }
+      },
+      "required": [
+        "provider",
+        "model_id"
+      ],
+      "title": "ModelSpec",
+      "type": "object"
     },
     "ObjectStorageSettings": {
       "additionalProperties": false,
@@ -672,7 +758,11 @@
     },
     "rag": {
       "$ref": "#/$defs/RagSettings",
-      "description": "RAG config"
+      "description": "RAG config."
+    },
+    "ai_gateway": {
+      "$ref": "#/$defs/AiGatewaySettings",
+      "description": "AI gateway settings."
     }
   },
   "required": [
@@ -687,7 +777,8 @@
     "organization",
     "observability",
     "api_gateway",
-    "rag"
+    "rag",
+    "ai_gateway"
   ],
   "title": "AppSettings",
   "type": "object"

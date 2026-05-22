@@ -1,4 +1,4 @@
-from gantry.service.conversation.models import ConversationType
+from .models import ConversationType
 
 import uuid
 from typing import Sequence
