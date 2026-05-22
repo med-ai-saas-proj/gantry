@@ -33,6 +33,7 @@ class EmbeddingTask(TypedDict):
     file_id: int | None
     file_uid: uuid.UUID | None
     text: str | list[str] | None
+    metadata: dict | None
     project_id: int
     project_uuid: uuid.UUID
     chunk_splitter: ChunkSplitterType

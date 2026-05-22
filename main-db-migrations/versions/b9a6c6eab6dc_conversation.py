@@ -60,7 +60,6 @@ def upgrade() -> None:
                type_=sa.String(length=255),
                existing_nullable=False,
                schema='FileStorage')
-    op.drop_index(op.f('ProjectMembers_user_id_idx'), table_name='ProjectMembers', schema='Project')
     op.alter_column('Projects', 'organization_id',
                existing_type=sa.VARCHAR(length=255),
                type_=sa.String(length=128),
@@ -87,7 +86,6 @@ def downgrade() -> None:
                type_=sa.VARCHAR(length=255),
                existing_nullable=False,
                schema='Project')
-    op.create_index(op.f('ProjectMembers_user_id_idx'), 'ProjectMembers', ['user_id'], unique=False, schema='Project')
     op.alter_column('Files', 'mime_type',
                existing_type=sa.String(length=255),
                type_=sa.VARCHAR(length=64),

@@ -16,6 +16,7 @@ class AddRagEmbeddingRequest(BaseModel):
     lang: str = "simple"
     embedding: Sequence[float]
     file_uid: UUID
+    metadata: dict | None = None
 
 
 class AddTextToRagRequest(BaseModel):
@@ -28,6 +29,7 @@ class AddTextToRagRequest(BaseModel):
     )
     chunk_size: int = Field(default=1000, gt=0)
     chunk_overlap: int = Field(default=150, ge=0)
+    metadata: dict | None = None
 
 
 class AddRagFileRequest(BaseModel):
@@ -109,6 +111,7 @@ class EmbeddingTaskResponse(BaseModel):
     task_id: str
     file_uid: UUID | None
     text: str | list[str] | None
+    metadata: dict | None
     type: Literal["file", "text"]
     project_uuid: UUID
     chunk_splitter: ChunkSplitterType

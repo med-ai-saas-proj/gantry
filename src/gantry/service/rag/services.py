@@ -29,6 +29,7 @@ from .utils import (
     create_bm25_index,
     create_vector_index,
     create_embedding_table,
+    getHashUniqueIndexName,
 )
 from .models import RagMetadata
 from .settings import RagSettings
@@ -546,6 +547,7 @@ class RagService:
                         ),
                         chunk_size=task_dict["chunk_size"],
                         chunk_overlap=task_dict["chunk_overlap"],
+                        metadata=task_dict.get("metadata"),
                         lang=task_dict.get("lang", "simple"),
                     )
                 ).unwrap()
@@ -731,6 +733,7 @@ class RagService:
                         project_id=project_id,
                         lang=lang,
                         hash=h,
+                        chunk_metadata={"filename": file_info["filename"]},
                     )
                 )
 
@@ -748,6 +751,7 @@ class RagService:
         chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
+        metadata: dict | None = None,
         lang: str = "simple",
     ) -> Result[
         None,
@@ -815,6 +819,7 @@ class RagService:
                         "project_id": project_id,
                         "lang": lang,
                         "hash": h,
+                        "chunk_metadata": metadata,
                     }
                 )
 
@@ -823,8 +828,11 @@ class RagService:
                     insert(DynamicBucket)
                     .values(records)
                     .on_conflict_do_nothing(
-                        index_elements=["hash", "project_id"],
-                        index_where=(DynamicBucket.file_id._is(None)),
+                        index_elements=[
+                            DynamicBucket.__table__.c.hash,
+                            DynamicBucket.__table__.c.project_id,
+                        ],
+                        index_where=DynamicBucket.__table__.c.file_id.is_(None),
                     )
                 )
             await session.flush()
@@ -912,6 +920,7 @@ class RagService:
         chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
+        metadata: dict | None = None,
         lang: str = "simple",
     ) -> Result[str, InternalServiceError]:
         if lang not in self.setting.supported_langs_list:
@@ -933,6 +942,7 @@ class RagService:
             "chunk_overlap": chunk_overlap,
             "status": "pending",
             "lang": lang,
+            "metadata": metadata,
         }
 
         result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
@@ -955,6 +965,7 @@ class RagService:
         chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
+        metadata: dict | None = None,
         lang: str = "simple",
     ) -> Result[str, InternalServiceError]:
         return await self._wrapProjectUUID(
@@ -965,6 +976,7 @@ class RagService:
             chunk_splitter=chunk_splitter,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            metadata=metadata,
             lang=lang,
         )
 
@@ -986,9 +998,10 @@ class RagService:
 
         return Ok(
             EmbeddingTask(
+                task_id=task_dict["task_id"],
                 type=task_dict.get("task_type", "file"),
                 text=task_dict.get("text"),
-                task_id=task_dict["task_id"],
+                metadata=task_dict.get("metadata"),
                 file_id=task_dict["file_id"]
                 if task_dict.get("file_id")
                 else None,
@@ -1022,6 +1035,7 @@ class RagService:
         embedding: Sequence[float],
         file_uid: uuid.UUID,
         project_id: int,
+        metadata: dict | None = None,
         lang: str = "simple",
     ) -> Result[
         None,
@@ -1060,6 +1074,7 @@ class RagService:
                 hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
                 project_id=project_id,
                 lang=lang,
+                chunk_metadata=metadata,
             )
             session.add(new_record)
             await session.flush()

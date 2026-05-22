@@ -57,10 +57,7 @@ requires = ["uv_build>=0.9.11,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.workspace]
-members = [
-    "packages/pyrusult",
-    ".",
-]
+members = ["packages/pyrusult", "."]
 
 [tool.uv.sources]
 pyrusult = { workspace = true }
@@ -101,6 +98,7 @@ dev = [
     "factory-boy>=3.3.3",
     "pyjwt>=2.12.1",
     "aiohttp>=3.13.5",
+    "datasets>=3.6.0",
 ]
 
 [tool.pyrefly]

@@ -114,6 +114,7 @@ async def add_text(
             body.chunk_splitter,
             body.chunk_size,
             body.chunk_overlap,
+            body.metadata,
             body.lang,
         )
     ).unwrap()
@@ -147,14 +148,15 @@ async def get_task_status(
 
     return EmbeddingTaskResponse(
         task_id=task_result["task_id"],
+        type=task_result["type"],
+        text=task_result["text"],
+        metadata=task_result["metadata"],
         file_uid=task_result["file_uid"],
         project_uuid=task_result["project_uuid"],
         chunk_splitter=task_result["chunk_splitter"],
         chunk_size=task_result["chunk_size"],
         chunk_overlap=task_result["chunk_overlap"],
         status=task_result["status"],
-        text=task_result["text"],
-        type=task_result["type"],
     )
 
 

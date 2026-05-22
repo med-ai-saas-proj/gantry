@@ -12,6 +12,7 @@ from sqlalchemy import Text, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 from pgvector.sqlalchemy import VECTOR
 from sqlalchemy.sql.schema import ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 class RagBaseSQLModel(BaseSQLModel):
@@ -59,5 +60,6 @@ class RagData(WithCreateTimestamp, WithID, RagBaseSQLModel):
 
     text: Mapped[str] = mapped_column(Text, nullable=False)
     hash: Mapped[str] = mapped_column(Text, nullable=False)
+    chunk_metadata: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     # placeholder for embedding column, actual type will be set dynamically
     embedding: Mapped[Sequence[float]] = mapped_column(VECTOR())

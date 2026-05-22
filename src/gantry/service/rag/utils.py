@@ -14,6 +14,7 @@ from sqlalchemy import Text, Table, Column, Integer, DateTime, text
 from sqlalchemy.orm import registry
 from pgvector.sqlalchemy import VECTOR
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import JSONB
 
 
 mapper_registry = registry()
@@ -33,6 +34,7 @@ def get_orm_class(table_name, dimension) -> type[RagData]:
         ),
         Column("project_id", Integer, nullable=False),
         Column("lang", Text, nullable=True),
+        Column("chunk_metadata", JSONB, nullable=True),
         schema="Rag",
         extend_existing=True,
     )
@@ -88,6 +90,7 @@ async def create_embedding_table(
         hash TEXT NOT NULL,
         project_id BIGINT NOT NULL REFERENCES "Project"."Projects"(id) ON DELETE CASCADE,
         text TEXT,
+        chunk_metadata JSONB,
         lang TEXT default 'simple',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );""")
@@ -102,9 +105,13 @@ async def create_embedding_table(
     await session.execute(sql)
     # Unique partial index on hash for text-only records (file_id IS NULL) per project
     sql = text(f"""
-    CREATE UNIQUE INDEX IF NOT EXISTS "{table_name}_hash_project_unique_idx" ON "Rag"."{table_name}" (hash, project_id) WHERE file_id IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS "{getHashUniqueIndexName(table_name)}" ON "Rag"."{table_name}" (hash, project_id) WHERE file_id IS NULL;
     """)
     await session.execute(sql)
+
+
+def getHashUniqueIndexName(table_name: str) -> str:
+    return f"{table_name}_hash_uq"
 
 
 async def create_bm25_index(
