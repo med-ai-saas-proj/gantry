@@ -14,7 +14,7 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 @lru_cache(1)
 def getAsyncEngine():
     engine = create_async_engine(
-        getDBSettings().timescale_connection_uri.encoded_string(), echo=True
+        getDBSettings().timescale_connection_uri.encoded_string(), echo=False
     )
     SQLAlchemyInstrumentor().instrument(engine=engine.sync_engine)
     return engine

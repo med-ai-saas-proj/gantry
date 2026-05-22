@@ -46,7 +46,7 @@ from datetime import datetime
 
 from openai import AsyncOpenAI
 from pyrusult import Ok, Err, Result, ResultStatus
-from sqlalchemy import or_, func, delete, select
+from sqlalchemy import or_, cast as sqlalchemy_cast, func, delete, select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 from sqlalchemy.dialects.postgresql import insert
@@ -63,6 +63,7 @@ class EmbeddingQueryRecord(TypedDict):
     bm25_score: float | None
     rerank_score: float | None
     vector_distance: float | None
+    metadata: dict | None
 
 
 class BucketNotFoundError(RecoverableError):
@@ -566,7 +567,7 @@ class RagService:
                 ).unwrap()
 
             task_dict["status"] = "completed"
-            async with self.redis.pipeline() as pipe:
+            async with self.redis.pipeline(transaction=True) as pipe:
                 await cast(
                     Awaitable[None],
                     pipe.set(
@@ -604,7 +605,7 @@ class RagService:
                 )
                 task_dict["status"] = "failed_and_retrying"
                 task_dict["failed_reason"] = str(exc)
-                async with self.redis.pipeline() as pipe:
+                async with self.redis.pipeline(transaction=True) as pipe:
                     await cast(
                         Awaitable[None],
                         pipe.set(
@@ -1328,6 +1329,7 @@ class RagService:
                         "bm25_score": record.get("bm25_score"),
                         "rerank_score": record.get("rerank_score"),
                         "vector_distance": record.get("vector_distance"),
+                        "metadata": record.get("metadata", {}),
                         "file_info": None,
                     }
                     if include_embedding:
@@ -1362,6 +1364,7 @@ class RagService:
                             record["file_id"]
                         ].filepath,
                     },
+                    "metadata": record.get("metadata", {}),
                 }
                 if include_embedding:
                     data["embedding"] = record["embedding"]
@@ -1425,6 +1428,7 @@ class RagService:
                         "text": orm_obj.text,
                         "embedding": list(orm_obj.embedding),
                         "created_at": orm_obj.created_at,
+                        "metadata": orm_obj.chunk_metadata,
                         "bm25_score": score,
                         "rerank_score": None,
                         "vector_distance": None,
@@ -1533,6 +1537,7 @@ class RagService:
                         "created_at": orm_obj.created_at,
                         "bm25_score": None,
                         "rerank_score": None,
+                        "metadata": orm_obj.chunk_metadata,
                         "vector_distance": distance,
                     }
                 )

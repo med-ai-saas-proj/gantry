@@ -157,6 +157,7 @@ async def get_task_status(
         chunk_size=task_result["chunk_size"],
         chunk_overlap=task_result["chunk_overlap"],
         status=task_result["status"],
+        failed_reason=task_result.get("failed_reason"),
     )
 
 
@@ -206,6 +207,7 @@ async def query_similar_by_vector(
                 embedding=list(result["embedding"]),
                 created_at=result["created_at"],
                 vector_distance=result.get("vector_distance"),
+                metadata=result.get("metadata"),
             )
         )
     return res
@@ -262,6 +264,7 @@ async def query_similar_by_text(
                 bm25_score=result.get("bm25_score"),
                 rerank_score=result.get("rerank_score"),
                 vector_distance=result.get("vector_distance"),
+                metadata=result.get("metadata"),
             )
         )
     return res

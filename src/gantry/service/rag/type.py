@@ -14,6 +14,7 @@ class RagQueryRecord(TypedDict):
     rerank_score: float | None
     bm25_score: float | None
     vector_distance: float | None
+    metadata: dict | None
 
 
 class ChunkSplitterType(str, enum.Enum):

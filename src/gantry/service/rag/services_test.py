@@ -105,6 +105,7 @@ def _make_service(
             openai_client=openai_client,
             redis=redis,
             logger=logger,
+            reranker=Mock(),
         ),
         session,
         project_repo,

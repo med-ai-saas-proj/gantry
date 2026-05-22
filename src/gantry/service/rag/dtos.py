@@ -51,6 +51,7 @@ class RagQueryResponse(BaseModel):
     text: str
     embedding: list[float]
     created_at: datetime
+    metadata: dict | None = None
     vector_distance: float | None = None
     bm25_score: float | None = None
     rerank_score: float | None = None
@@ -88,13 +89,13 @@ class QueryRagQueryByTextRequest(BaseModel):
         description="Whether to perform a hybrid search that combines vector similarity and BM25 text search. If true, the service will first use BM25 + semantic search to filter candidates and then rerank them using vector similarity.",
     )
     hybrid_search_bm25_top_k: int = Field(
-        default=20,
+        default=5,
         gt=0,
         le=1000,
         description="When hybrid_search is true, this parameter controls the number of top candidates to retrieve using BM25 before reranking with vector similarity. A higher value may improve recall but increase latency.",
     )
     hybrid_search_semantic_top_k: int = Field(
-        default=100,
+        default=5,
         gt=0,
         le=1000,
         description="When hybrid_search is true, this parameter controls the number of top candidates to retrieve using semantic search before reranking with vector similarity. A higher value may improve recall but increase latency.",
@@ -117,6 +118,7 @@ class EmbeddingTaskResponse(BaseModel):
     chunk_splitter: ChunkSplitterType
     chunk_size: int
     chunk_overlap: int
+    failed_reason: str | None = None
     status: Literal[
         "pending", "completed", "failed_and_retrying", "failed_and_dropped"
     ]
