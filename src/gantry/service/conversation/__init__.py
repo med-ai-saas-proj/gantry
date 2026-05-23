@@ -1,3 +1,4 @@
+from .dtos import Message
 from .factories import (
     TreeConversationService,
     SequenceConversationService,

@@ -39,7 +39,7 @@ class RunAgentInputWithModelSettings(RunAgentInput):
 @ai_gateway_router.post(
     "/ag-ui/{model}",
     response_model=Event,
-    response_class=EventSourceResponse,
+    # response_class=EventSourceResponse,
 )
 async def ag_ui_gateway(
     api_key_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
@@ -50,8 +50,10 @@ async def ag_ui_gateway(
     run_input: Annotated[RunAgentInputWithModelSettings, Body(embed=False)],
 ):
     model_settings = run_input.model_settings or {}
-    return (
-        await ai_gateway_service.ficl(
-            model, api_key_info["project_id"], run_input, model_settings
-        )
-    ).unwrap()
+    return EventSourceResponse(
+        (
+            await ai_gateway_service.ficl(
+                model, api_key_info["project_id"], run_input, model_settings
+            )
+        ).unwrap()
+    )

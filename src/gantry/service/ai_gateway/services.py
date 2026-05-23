@@ -1,17 +1,19 @@
 from gantry.service.conversation import (
+    Message,
     TreeConversationService,
     ConversationNotFoundError,
 )
+from gantry.shared.custom_types.error_exception import RecoverableError
 
 from .settings import AiGatewaySettings
 
 from uuid import UUID
 from typing import Any, AsyncIterator
+from datetime import UTC, datetime
 
 from pyrusult import Ok, Err, Result, ResultStatus
-from ag_ui.core import RunAgentInput
-from pydantic_ai import Agent, ModelSettings
-from pydantic_ai.ag_ui import run_ag_ui
+from ag_ui.core import BaseEvent, EventType, RunAgentInput
+from pydantic_ai import Agent, ModelSettings, AgentRunResult
 from pydantic_ai.models import Model, fallback, infer_model
 from pydantic_ai.ui.ag_ui import AGUIAdapter
 from pydantic_ai.providers import Provider, infer_provider_class
@@ -23,6 +25,12 @@ def _meta_infer_provider(api_key: str | None, base_url: str | None):
         return provider_class(api_key=api_key, base_url=base_url)
 
     return _infer_provider
+
+
+class ModelNotFound(RecoverableError):
+    status = 404
+    title = "Model not found"
+    detail = "Model not found"
 
 
 class AiGatewayService:
@@ -68,12 +76,16 @@ class AiGatewayService:
         project_id: int,
         run_input: RunAgentInput,
         model_settings: ModelSettings,
-    ) -> Result[AsyncIterator[str], ConversationNotFoundError]:
+    ) -> Result[AsyncIterator[str], ConversationNotFoundError | ModelNotFound]:
+        if model not in self.agent:
+            return Err(ModelNotFound())
         # Get messages form conversation services using run_input.thread_id and run_input.parent_run_id
+
+        conversation_uuid = UUID(run_input.thread_id)
         if run_input.parent_run_id is not None:
             messages = (
                 await self.tree_conversation_service.getConversationMessages(
-                    conversation_uid=UUID(run_input.thread_id),
+                    conversation_uid=conversation_uuid,
                     project_id=project_id,
                 )
             )
@@ -84,15 +96,47 @@ class AiGatewayService:
         else:
             messages = []
 
+        adapter = AGUIAdapter(
+            self.agent[model], run_input, manage_system_prompt="client"
+        )
+
+        async def _onComplete(run_result: AgentRunResult):
+            res = (
+                await self.tree_conversation_service.storeConversationMessages(
+                    conversation_uuid,
+                    project_id,
+                    [
+                        Message(
+                            message_uid=UUID(msg.id),
+                            payload=msg,
+                            run_id=run_input.run_id,
+                            timestamp=datetime.now(),
+                        )
+                        for msg in AGUIAdapter.dump_messages(
+                            run_result.new_messages()
+                        )
+                    ],
+                )
+            )
+            if res.status == ResultStatus.Err:
+                yield BaseEvent(
+                    type=EventType.RUN_ERROR,
+                    timestamp=self.getTimestamp(),
+                    raw_event=res.value,
+                )
+
         return Ok(
-            run_ag_ui(
-                self.agent[model],
-                run_input,
-                message_history=AGUIAdapter.load_messages(
-                    [msg.payload for msg in messages]
-                ),
-                model_settings=model_settings,
-                # usage_limits={},
-                manage_system_prompt="client",
+            adapter.encode_stream(
+                adapter.run_stream(
+                    model_settings=model_settings,
+                    message_history=AGUIAdapter.load_messages(
+                        [msg.payload for msg in messages]
+                    ),
+                    on_complete=_onComplete,
+                )
             )
         )
+
+    @classmethod
+    def getTimestamp(cls):
+        return int(datetime.now(UTC).timestamp() * 1000)
