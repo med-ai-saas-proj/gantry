@@ -47,6 +47,8 @@ dependencies = [
     "pyarrow>=21.0.0",
     "limits[async-redis]>=5.8.0",
     "redis[hiredis]>=7.4.0",
+    "langchain-text-splitters>=1.1.2",
+    "beautifulsoup4>=4.14.3",
 ]
 
 [project.scripts]

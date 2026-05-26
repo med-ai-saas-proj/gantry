@@ -83,6 +83,7 @@ async def add_file(
             body.chunk_size,
             body.chunk_overlap,
             body.lang,
+            body.chunk_splitter_options,
         )
     ).unwrap()
     return task_id
@@ -116,6 +117,7 @@ async def add_text(
             body.chunk_overlap,
             body.metadata,
             body.lang,
+            body.chunk_splitter_options,
         )
     ).unwrap()
     return task_id
@@ -154,6 +156,7 @@ async def get_task_status(
         file_uid=task_result["file_uid"],
         project_uuid=task_result["project_uuid"],
         chunk_splitter=task_result["chunk_splitter"],
+        chunk_splitter_options=task_result.get("chunk_splitter_options", {}),
         chunk_size=task_result["chunk_size"],
         chunk_overlap=task_result["chunk_overlap"],
         status=task_result["status"],

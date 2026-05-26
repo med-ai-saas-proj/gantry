@@ -20,6 +20,7 @@ from .type import (
     EmbeddingTask,
     RagQueryRecord,
     ChunkSplitterType,
+    ChunkSplitterOptions,
 )
 from .utils import (
     Reranker,
@@ -41,7 +42,7 @@ import json
 import uuid
 import hashlib
 import importlib
-from typing import Sequence, Awaitable, TypedDict, cast
+from typing import Any, Sequence, Awaitable, TypedDict, cast
 from datetime import datetime
 
 from openai import AsyncOpenAI
@@ -49,6 +50,26 @@ from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import or_, cast as sqlalchemy_cast, func, delete, select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
+from langchain_text_splitters import (
+    Language,
+    NLTKTextSplitter,
+    LatexTextSplitter,
+    SpacyTextSplitter,
+    TokenTextSplitter,
+    KonlpyTextSplitter,
+    HTMLSectionSplitter,
+    MarkdownTextSplitter,
+    CharacterTextSplitter,
+    RecursiveJsonSplitter,
+    HTMLHeaderTextSplitter,
+    PythonCodeTextSplitter,
+    JSFrameworkTextSplitter,
+    MarkdownHeaderTextSplitter,
+    HTMLSemanticPreservingSplitter,
+    RecursiveCharacterTextSplitter,
+    SentenceTransformersTokenTextSplitter,
+    ExperimentalMarkdownSyntaxTextSplitter,
+)
 from sqlalchemy.dialects.postgresql import insert
 
 
@@ -117,6 +138,343 @@ class RagService:
         self.redis = redis
         self.logger = logger
         self.reranker = reranker
+
+    @staticmethod
+    def _normalizeSplitChunks(chunks: Sequence[object]) -> list[str]:
+        normalized_chunks: list[str] = []
+        for chunk in chunks:
+            if isinstance(chunk, str):
+                text = chunk.strip()
+            elif isinstance(chunk, (dict, list)):
+                text = json.dumps(chunk, ensure_ascii=False).strip()
+            else:
+                text = str(getattr(chunk, "page_content", chunk)).strip()
+            if text:
+                normalized_chunks.append(text)
+        return normalized_chunks
+
+    @staticmethod
+    def _markdownHeaderSplitters() -> list[tuple[str, str]]:
+        return [
+            ("#", "Header 1"),
+            ("##", "Header 2"),
+            ("###", "Header 3"),
+            ("####", "Header 4"),
+            ("#####", "Header 5"),
+            ("######", "Header 6"),
+        ]
+
+    @staticmethod
+    def _htmlHeaderSplitters() -> list[tuple[str, str]]:
+        return [
+            ("h1", "Header 1"),
+            ("h2", "Header 2"),
+            ("h3", "Header 3"),
+            ("h4", "Header 4"),
+            ("h5", "Header 5"),
+            ("h6", "Header 6"),
+        ]
+
+    def _splitWithLangChainSplitter(
+        self,
+        text_content: str,
+        chunk_splitter: ChunkSplitterType,
+        chunk_size: int,
+        chunk_overlap: int,
+        chunk_splitter_options: dict[str, Any] | None = None,
+    ) -> list[str]:
+        splitter_options: dict[str, Any] = dict(chunk_splitter_options or {})
+        convert_lists: bool = False
+        try:
+            splitter: Any | None = None
+            if chunk_splitter in (
+                ChunkSplitterType.simple,
+                ChunkSplitterType.character,
+                ChunkSplitterType.recursive,
+                ChunkSplitterType.token,
+                ChunkSplitterType.markdown,
+                ChunkSplitterType.latex,
+                ChunkSplitterType.html,
+                ChunkSplitterType.paragraph,
+                ChunkSplitterType.line,
+            ):
+                splitter_options.setdefault("chunk_size", chunk_size)
+                splitter_options.setdefault("chunk_overlap", chunk_overlap)
+
+                if chunk_splitter in (
+                    ChunkSplitterType.simple,
+                    ChunkSplitterType.character,
+                ):
+                    splitter = CharacterTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.recursive:
+                    splitter = RecursiveCharacterTextSplitter(
+                        **splitter_options
+                    )
+                elif chunk_splitter == ChunkSplitterType.token:
+                    splitter = TokenTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.markdown:
+                    splitter = MarkdownTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.latex:
+                    splitter = LatexTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.html:
+                    splitter_options.setdefault(
+                        "headers_to_split_on",
+                        self._htmlHeaderSplitters(),
+                    )
+                    splitter = HTMLHeaderTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.paragraph:
+                    splitter = CharacterTextSplitter(
+                        separator="\n\n",
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.line:
+                    splitter = CharacterTextSplitter(
+                        separator="\n",
+                        **splitter_options,
+                    )
+                else:
+                    raise InternalServiceError(
+                        message=f"Unsupported text splitter '{chunk_splitter}'."
+                    )
+            elif chunk_splitter in (
+                ChunkSplitterType.markdown_header,
+                ChunkSplitterType.html_header,
+                ChunkSplitterType.html_semantic_preserving,
+                ChunkSplitterType.html_section,
+                ChunkSplitterType.recursive_json,
+                ChunkSplitterType.experimental_markdown_syntax,
+                ChunkSplitterType.nltk,
+                ChunkSplitterType.spacy,
+                ChunkSplitterType.konlpy,
+                ChunkSplitterType.sentence_transformers_token,
+            ):
+                if chunk_splitter == ChunkSplitterType.markdown_header:
+                    splitter_options.setdefault(
+                        "headers_to_split_on",
+                        self._markdownHeaderSplitters(),
+                    )
+                    splitter = MarkdownHeaderTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.html_header:
+                    splitter_options.setdefault(
+                        "headers_to_split_on",
+                        self._htmlHeaderSplitters(),
+                    )
+                    splitter = HTMLHeaderTextSplitter(**splitter_options)
+                elif (
+                    chunk_splitter == ChunkSplitterType.html_semantic_preserving
+                ):
+                    splitter_options.setdefault(
+                        "headers_to_split_on",
+                        self._htmlHeaderSplitters(),
+                    )
+                    splitter_options.setdefault("max_chunk_size", chunk_size)
+                    splitter_options.setdefault("chunk_overlap", chunk_overlap)
+                    splitter = HTMLSemanticPreservingSplitter(
+                        **splitter_options
+                    )
+                elif chunk_splitter == ChunkSplitterType.html_section:
+                    splitter_options.setdefault(
+                        "headers_to_split_on",
+                        self._htmlHeaderSplitters(),
+                    )
+                    splitter = HTMLSectionSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.recursive_json:
+                    convert_lists = bool(
+                        splitter_options.pop("convert_lists", False)
+                    )
+                    splitter_options.setdefault("max_chunk_size", chunk_size)
+                    splitter = RecursiveJsonSplitter(**splitter_options)
+                elif (
+                    chunk_splitter
+                    == ChunkSplitterType.experimental_markdown_syntax
+                ):
+                    splitter = ExperimentalMarkdownSyntaxTextSplitter(
+                        **splitter_options
+                    )
+                elif chunk_splitter == ChunkSplitterType.nltk:
+                    splitter_options.setdefault("chunk_size", chunk_size)
+                    splitter_options.setdefault("chunk_overlap", chunk_overlap)
+                    splitter = NLTKTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.spacy:
+                    splitter_options.setdefault("chunk_size", chunk_size)
+                    splitter_options.setdefault("chunk_overlap", chunk_overlap)
+                    splitter = SpacyTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.konlpy:
+                    splitter_options.setdefault("chunk_size", chunk_size)
+                    splitter_options.setdefault("chunk_overlap", chunk_overlap)
+                    splitter = KonlpyTextSplitter(**splitter_options)
+                elif (
+                    chunk_splitter
+                    == ChunkSplitterType.sentence_transformers_token
+                ):
+                    splitter_options.setdefault("chunk_size", chunk_size)
+                    splitter_options.setdefault("chunk_overlap", chunk_overlap)
+                    splitter = SentenceTransformersTokenTextSplitter(
+                        **splitter_options
+                    )
+            else:
+                splitter_options.setdefault("chunk_size", chunk_size)
+                splitter_options.setdefault("chunk_overlap", chunk_overlap)
+
+                if chunk_splitter == ChunkSplitterType.code_language_c:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.C,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_cobol:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.COBOL,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_cpp:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.CPP,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_csharp:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.CSHARP,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_go:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.GO,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_haskell:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.HASKELL,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_html:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.HTML,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_java:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.JAVA,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_python:
+                    splitter = PythonCodeTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.code_language_jsx:
+                    splitter = JSFrameworkTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.code_language_js:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.JS,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_kotlin:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.KOTLIN,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_latex:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.LATEX,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_lua:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.LUA,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_markdown:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.MARKDOWN,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_perl:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.PERL,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_php:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.PHP,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_proto:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.PROTO,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_python:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.PYTHON,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_rst:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.RST,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_ruby:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.RUBY,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_rust:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.RUST,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_scala:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.SCALA,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_sol:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.SOL,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_swift:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.SWIFT,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_ts:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.TS,
+                        **splitter_options,
+                    )
+                else:
+                    raise InternalServiceError(
+                        message=f"Unsupported text splitter '{chunk_splitter}'."
+                    )
+
+            if splitter is None:
+                raise InternalServiceError(
+                    message=f"Unsupported text splitter '{chunk_splitter}'."
+                )
+            split_text = getattr(splitter, "split_text", None)
+            if split_text is None:
+                raise InternalServiceError(
+                    message=f"Text splitter '{chunk_splitter}' does not implement split_text()."
+                )
+            if chunk_splitter == ChunkSplitterType.recursive_json:
+                try:
+                    parsed_json = json.loads(text_content)
+                except json.JSONDecodeError as exc:
+                    raise InternalServiceError(
+                        message="Recursive JSON splitter requires valid JSON input."
+                    ) from exc
+                if not isinstance(parsed_json, dict):
+                    parsed_json = {"root": parsed_json}
+                json_chunks = splitter.split_json(
+                    parsed_json,
+                    convert_lists=convert_lists,
+                )
+                return self._normalizeSplitChunks(json_chunks)
+            return self._normalizeSplitChunks(split_text(text_content))
+        except TypeError as exc:
+            raise InternalServiceError(
+                message=(
+                    f"Failed to initialize text splitter '{chunk_splitter}': {exc}"
+                )
+            ) from exc
 
     def _splitByCharacterWindow(
         self,
@@ -246,50 +604,58 @@ class RagService:
         chunk_splitter: ChunkSplitterType,
         chunk_size: int,
         chunk_overlap: int,
+        chunk_splitter_options: dict[str, Any] | None = None,
     ) -> list[str]:
-        if chunk_splitter in (
-            ChunkSplitterType.simple,
-            ChunkSplitterType.character,
-        ):
-            return self._splitByCharacterWindow(
-                text_content,
-                chunk_size,
-                chunk_overlap,
-            )
-        if chunk_splitter == ChunkSplitterType.recursive:
-            return self._splitByRecursiveSeparators(
-                text_content,
-                chunk_size,
-                chunk_overlap,
-            )
-        if chunk_splitter == ChunkSplitterType.token:
-            return self._splitByTokenWindow(
-                text_content,
-                chunk_size,
-                chunk_overlap,
-            )
-        if chunk_splitter == ChunkSplitterType.markdown:
-            return self._splitByMarkdownSections(
-                text_content,
-                chunk_size,
-                chunk_overlap,
-            )
-        if chunk_splitter == ChunkSplitterType.paragraph:
-            parts = [part.strip() for part in text_content.split("\n\n")]
-            return [part for part in parts if part]
-        if chunk_splitter == ChunkSplitterType.line:
-            parts = [part.strip() for part in text_content.splitlines()]
-            return [part for part in parts if part]
-        if chunk_splitter == ChunkSplitterType.spacy:
-            return self._splitBySpaCyLikeSentences(
-                text_content,
-                chunk_size,
-                chunk_overlap,
-            )
-        return self._splitByRecursiveSeparators(
+        # if chunk_splitter in (
+        #     ChunkSplitterType.simple,
+        #     ChunkSplitterType.character,
+        # ):
+        #     return self._splitByCharacterWindow(
+        #         text_content,
+        #         chunk_size,
+        #         chunk_overlap,
+        #     )
+        # if chunk_splitter == ChunkSplitterType.recursive:
+        #     return self._splitByRecursiveSeparators(
+        #         text_content,
+        #         chunk_size,
+        #         chunk_overlap,
+        #     )
+        # if chunk_splitter == ChunkSplitterType.token:
+        #     return self._splitByTokenWindow(
+        #         text_content,
+        #         chunk_size,
+        #         chunk_overlap,
+        #     )
+        # if chunk_splitter == ChunkSplitterType.markdown:
+        #     return self._splitByMarkdownSections(
+        #         text_content,
+        #         chunk_size,
+        #         chunk_overlap,
+        #     )
+        # if chunk_splitter == ChunkSplitterType.paragraph:
+        #     parts = [part.strip() for part in text_content.split("\n\n")]
+        #     return [part for part in parts if part]
+        # if chunk_splitter == ChunkSplitterType.line:
+        #     parts = [part.strip() for part in text_content.splitlines()]
+        #     return [part for part in parts if part]
+        # if chunk_splitter == ChunkSplitterType.spacy:
+        #     return self._splitBySpaCyLikeSentences(
+        #         text_content,
+        #         chunk_size,
+        #         chunk_overlap,
+        #     )
+        # return self._splitByRecursiveSeparators(
+        #     text_content,
+        #     chunk_size,
+        #     chunk_overlap,
+        # )
+        return self._splitWithLangChainSplitter(
             text_content,
+            chunk_splitter,
             chunk_size,
             chunk_overlap,
+            chunk_splitter_options,
         )
 
     @staticmethod
@@ -550,6 +916,9 @@ class RagService:
                         chunk_overlap=task_dict["chunk_overlap"],
                         metadata=task_dict.get("metadata"),
                         lang=task_dict.get("lang", "simple"),
+                        chunk_splitter_options=task_dict.get(
+                            "chunk_splitter_options", {}
+                        ),
                     )
                 ).unwrap()
             else:
@@ -563,6 +932,9 @@ class RagService:
                         chunk_size=task_dict["chunk_size"],
                         chunk_overlap=task_dict["chunk_overlap"],
                         lang=task_dict.get("lang", "simple"),
+                        chunk_splitter_options=task_dict.get(
+                            "chunk_splitter_options", {}
+                        ),
                     )
                 ).unwrap()
 
@@ -641,6 +1013,7 @@ class RagService:
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
         lang: str = "simple",
+        chunk_splitter_options: dict[str, Any] | None = None,
     ) -> Result[
         None,
         BucketNotFoundError
@@ -667,6 +1040,7 @@ class RagService:
             chunk_splitter,
             chunk_size,
             chunk_overlap,
+            chunk_splitter_options,
         )
         if not chunks:
             return Ok(None)
@@ -754,6 +1128,7 @@ class RagService:
         chunk_overlap: int = 150,
         metadata: dict | None = None,
         lang: str = "simple",
+        chunk_splitter_options: dict[str, Any] | None = None,
     ) -> Result[
         None,
         BucketNotFoundError
@@ -774,6 +1149,7 @@ class RagService:
                 chunk_splitter,
                 chunk_size,
                 chunk_overlap,
+                chunk_splitter_options,
             )
             if item_chunks:
                 chunks.extend(item_chunks)
@@ -850,6 +1226,7 @@ class RagService:
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
         lang: str = "simple",
+        chunk_splitter_options: ChunkSplitterOptions | None = None,
     ) -> Result[str, FileNotFoundInSystemError | InternalServiceError]:
         if lang not in self.setting.supported_langs_list:
             return Err(
@@ -874,6 +1251,7 @@ class RagService:
                 "project_id": project_id,
                 "project_uuid": str(project_uuid),
                 "chunk_splitter": chunk_splitter.value,
+                "chunk_splitter_options": chunk_splitter_options or {},
                 "chunk_size": chunk_size,
                 "chunk_overlap": chunk_overlap,
                 "status": "pending",
@@ -901,6 +1279,7 @@ class RagService:
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
         lang: str = "simple",
+        chunk_splitter_options: ChunkSplitterOptions | None = None,
     ) -> Result[str, FileNotFoundInSystemError | InternalServiceError]:
         return await self._wrapProjectUUID(
             project_uid,
@@ -911,6 +1290,7 @@ class RagService:
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             lang=lang,
+            chunk_splitter_options=chunk_splitter_options,
         )
 
     async def addText(
@@ -923,6 +1303,7 @@ class RagService:
         chunk_overlap: int = 150,
         metadata: dict | None = None,
         lang: str = "simple",
+        chunk_splitter_options: ChunkSplitterOptions | None = None,
     ) -> Result[str, InternalServiceError]:
         if lang not in self.setting.supported_langs_list:
             return Err(
@@ -939,6 +1320,7 @@ class RagService:
             "project_id": project_id,
             "project_uuid": str(project_uuid),
             "chunk_splitter": chunk_splitter.value,
+            "chunk_splitter_options": chunk_splitter_options or {},
             "chunk_size": chunk_size,
             "chunk_overlap": chunk_overlap,
             "status": "pending",
@@ -968,6 +1350,7 @@ class RagService:
         chunk_overlap: int = 150,
         metadata: dict | None = None,
         lang: str = "simple",
+        chunk_splitter_options: ChunkSplitterOptions | None = None,
     ) -> Result[str, InternalServiceError]:
         return await self._wrapProjectUUID(
             project_uid,
@@ -979,6 +1362,7 @@ class RagService:
             chunk_overlap=chunk_overlap,
             metadata=metadata,
             lang=lang,
+            chunk_splitter_options=chunk_splitter_options,
         )
 
     async def getTaskStatus(
@@ -1012,6 +1396,9 @@ class RagService:
                 project_id=task_dict["project_id"],
                 project_uuid=uuid.UUID(task_dict["project_uuid"]),
                 chunk_splitter=ChunkSplitterType(task_dict["chunk_splitter"]),
+                chunk_splitter_options=task_dict.get(
+                    "chunk_splitter_options", {}
+                ),
                 chunk_size=task_dict["chunk_size"],
                 chunk_overlap=task_dict["chunk_overlap"],
                 status=task_dict["status"],

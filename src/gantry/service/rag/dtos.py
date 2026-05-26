@@ -1,9 +1,9 @@
 from gantry.service.file_storage.dtos import FileInfoResponse
 
-from .type import ChunkSplitterType
+from .type import ChunkSplitterType, ChunkSplitterOptions
 
 from uuid import UUID
-from typing import Literal, Sequence
+from typing import Any, Literal, Sequence, cast
 from datetime import datetime
 
 from pydantic import Field, BaseModel
@@ -27,6 +27,9 @@ class AddTextToRagRequest(BaseModel):
     chunk_splitter: ChunkSplitterType = Field(
         default=ChunkSplitterType.recursive
     )
+    chunk_splitter_options: ChunkSplitterOptions = Field(
+        default_factory=lambda: cast(ChunkSplitterOptions, {})
+    )
     chunk_size: int = Field(default=1000, gt=0)
     chunk_overlap: int = Field(default=150, ge=0)
     metadata: dict | None = None
@@ -39,6 +42,9 @@ class AddRagFileRequest(BaseModel):
     lang: str = "simple"
     chunk_splitter: ChunkSplitterType = Field(
         default=ChunkSplitterType.recursive
+    )
+    chunk_splitter_options: ChunkSplitterOptions = Field(
+        default_factory=lambda: cast(ChunkSplitterOptions, {})
     )
     chunk_size: int = Field(default=1000, gt=0)
     chunk_overlap: int = Field(default=150, ge=0)
@@ -116,6 +122,9 @@ class EmbeddingTaskResponse(BaseModel):
     type: Literal["file", "text"]
     project_uuid: UUID
     chunk_splitter: ChunkSplitterType
+    chunk_splitter_options: ChunkSplitterOptions = Field(
+        default_factory=lambda: cast(ChunkSplitterOptions, {})
+    )
     chunk_size: int
     chunk_overlap: int
     failed_reason: str | None = None
