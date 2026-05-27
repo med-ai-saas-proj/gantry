@@ -24,8 +24,6 @@ permissions = [
     { id = "file.delete", name = "File Delete", description = "Allow deleting files" },
     { id = "rag.read", name = "RAG Read", description = "Allow reading RAG resources" },
     { id = "rag.write", name = "RAG Write", description = "Allow writing RAG resources" },
-    { id = "objects:read", name = "Read Objects", description = "Allow reading objects" },
-    { id = "objects:write", name = "Write Objects", description = "Allow creating objects" },
 ]
 
 [keycloak]

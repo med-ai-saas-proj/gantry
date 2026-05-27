@@ -70,31 +70,28 @@ class AiGatewayService:
 
             self.agent[model_name] = Agent(model)
 
-    async def ficl(
+    async def route(
         self,
         model: str,
         project_id: int,
         run_input: RunAgentInput,
         model_settings: ModelSettings,
-    ) -> Result[AsyncIterator[str], ConversationNotFoundError | ModelNotFound]:
+    ) -> Result[AsyncIterator[str], ModelNotFound]:
         if model not in self.agent:
             return Err(ModelNotFound())
         # Get messages form conversation services using run_input.thread_id and run_input.parent_run_id
 
         conversation_uuid = UUID(run_input.thread_id)
-        if run_input.parent_run_id is not None:
-            messages = (
-                await self.tree_conversation_service.getConversationMessages(
-                    conversation_uid=conversation_uuid,
-                    project_id=project_id,
-                )
-            )
+        parent_run_id = (
+            UUID(run_input.parent_run_id) if run_input.parent_run_id else None
+        )
+        messages = await self.tree_conversation_service.getConversationMessages(
+            conversation_uid=conversation_uuid,
+            project_id=project_id,
+            branch_node_id=parent_run_id,
+        )
 
-            messages = (
-                [] if messages.status == ResultStatus.Err else messages.value
-            )
-        else:
-            messages = []
+        messages = [] if messages.status == ResultStatus.Err else messages.value
 
         adapter = AGUIAdapter(
             self.agent[model], run_input, manage_system_prompt="client"
@@ -116,6 +113,7 @@ class AiGatewayService:
                             run_result.new_messages()
                         )
                     ],
+                    from_node_id=parent_run_id,
                 )
             )
             if res.status == ResultStatus.Err:

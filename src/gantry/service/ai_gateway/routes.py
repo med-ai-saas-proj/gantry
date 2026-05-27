@@ -1,14 +1,11 @@
-from gantry.management.api_key import ApiKeyInfo, getApiKeyInfo
-
 from .services import AiGatewayService
 from .factories import getAiGatewayService
 
 from typing import Any, Literal, Annotated, TypedDict
 
-from fastapi import Body, Path, Depends, APIRouter
+from fastapi import Body, Path, Query, Depends, APIRouter
 from ag_ui.core import Event, RunAgentInput
 from fastapi.sse import EventSourceResponse
-from pydantic_ai import ModelSettings
 
 
 class ModelSettingsInput(
@@ -42,18 +39,19 @@ class RunAgentInputWithModelSettings(RunAgentInput):
     # response_class=EventSourceResponse,
 )
 async def ag_ui_gateway(
-    api_key_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
+    project_id: Annotated[int, Query()],
     ai_gateway_service: Annotated[
         AiGatewayService, Depends(getAiGatewayService)
     ],
     model: Annotated[str, Path()],
     run_input: Annotated[RunAgentInputWithModelSettings, Body(embed=False)],
 ):
+
     model_settings = run_input.model_settings or {}
     return EventSourceResponse(
         (
-            await ai_gateway_service.ficl(
-                model, api_key_info["project_id"], run_input, model_settings
+            await ai_gateway_service.route(
+                model, project_id, run_input, model_settings
             )
         ).unwrap()
     )
