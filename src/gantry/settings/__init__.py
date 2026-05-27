@@ -9,6 +9,7 @@ from .utils import TomlPathConfigSettingsSource, DotEnvPathConfigSettingsSource
 from .api_key import ApiKeysSettings, ApiKeyPermission
 from .billing import BillingSettings
 from .user_log import UserLogSettings
+from .ai_gateway import AiGatewaySettings
 from .api_gateway import ApiGatewayRoute, ApiGatewaySettings
 from .conversation import ConversationSettings
 from .file_storage import ObjectStorageSettings
@@ -123,7 +124,10 @@ class AppSettings(BaseSettings):
     ]
     rag: Annotated[
         RagSettings,
-        Field(description="RAG config"),
+        Field(description="RAG config."),
+    ]
+    ai_gateway: Annotated[
+        AiGatewaySettings, Field(description="AI gateway settings.")
     ]
 
     @classmethod
