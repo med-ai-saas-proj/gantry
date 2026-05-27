@@ -10,6 +10,7 @@ from gantry.management.api_key.dtos import (
     ApiKeyResponse,
     ApiKeyListResponse,
     ApiKeyWriteRequest,
+    ApiKeyUpdateRequest,
     ApiKeyCreateResponse,
     ApiKeyPermissionCatalogResponse,
 )
@@ -61,6 +62,7 @@ from .dtos import (
     AdminDashboardSummaryResponse,
     AdminUserPermissionUpdateRequest,
     AdminUserOrganizationInfoResponse,
+    AdminUserPermissionSummaryResponse,
 )
 from .permissions import (
     ORG_PERMISSIONS_ATTR,
@@ -174,7 +176,7 @@ class AdminService:
             attrs = {}
 
         return AdminUserProfileResponse(
-            id=str(profile["id"]),
+            user_id=str(profile["id"]),
             username=profile.get("username"),
             email=profile.get("email"),
             first_name=profile.get("firstName"),
@@ -183,7 +185,7 @@ class AdminService:
             email_verified=bool(profile.get("emailVerified", False)),
             organizations=[
                 AdminUserOrganizationInfoResponse(
-                    id=str(org["id"]),
+                    org_id=str(org["id"]),
                     name=org.get("name"),
                     alias=org.get("alias"),
                 )
@@ -196,7 +198,7 @@ class AdminService:
     def getAdminInfo(self, admin_info: AdminInfo) -> AdminUserInfoResponse:
         """Return the authenticated admin identity DTO."""
         return AdminUserInfoResponse(
-            id=admin_info["id"],
+            user_id=admin_info["id"],
             username=admin_info["username"],
             email=admin_info["email"],
         )
@@ -441,9 +443,14 @@ class AdminService:
         """Return the API-key permission catalog."""
         return self.apikey_service.getPermissionCatalog()
 
-    async def listApiKeys(self, project_id: str) -> ApiKeyListResponse:
+    async def listApiKeys(
+        self, project_id: str, disabled: bool | None = None
+    ) -> ApiKeyListResponse:
         """Return API keys for one project without permission checks."""
-        result = await self.apikey_service.getApiKeys(project_uuid=project_id)
+        result = await self.apikey_service.getApiKeys(
+            project_uuid=project_id,
+            disabled=disabled,
+        )
         return result.unwrap()
 
     async def createApiKey(
@@ -470,7 +477,7 @@ class AdminService:
     async def updateApiKey(
         self,
         api_key_uuid: str,
-        input_data: ApiKeyWriteRequest,
+        input_data: ApiKeyUpdateRequest,
     ) -> ApiKeyResponse:
         """Update one API key without project permission checks."""
         result = await self.apikey_service.updateApiKey(
@@ -478,6 +485,7 @@ class AdminService:
             name=input_data.name,
             description=input_data.description,
             permissions=input_data.permissions,
+            disabled=input_data.disabled,
         )
         return result.unwrap()
 
@@ -504,7 +512,7 @@ class AdminService:
             total=total,
             results=[
                 AdminUserListItemResponse(
-                    id=str(user.get("id") or ""),
+                    user_id=str(user.get("id") or ""),
                     username=user.get("username"),
                     email=user.get("email"),
                     first_name=user.get("firstName"),
@@ -526,7 +534,7 @@ class AdminService:
         organizations = result.unwrap()
         return [
             AdminUserOrganizationInfoResponse(
-                id=str(org["id"]),
+                org_id=str(org["id"]),
                 name=org.get("name"),
                 alias=org.get("alias"),
             )
@@ -537,6 +545,14 @@ class AdminService:
     async def getUserProfile(self, user_id: str) -> AdminUserProfileResponse:
         """Return one user's Keycloak profile and permission data."""
         return await self._buildUserProfileResponse(user_id)
+
+    async def getUserPermissions(
+        self,
+        user_id: str,
+    ) -> AdminUserPermissionSummaryResponse:
+        """Return only one user's normalized permission summary."""
+        profile = await self._buildUserProfileResponse(user_id)
+        return profile.permissions
 
     async def setUserPermissions(
         self,

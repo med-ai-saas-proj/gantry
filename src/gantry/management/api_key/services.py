@@ -398,6 +398,7 @@ class ApiKeyService:
         self,
         *,
         project_uuid: str,
+        disabled: bool | None = None,
     ) -> Result[ApiKeyListResponse, ProjectNotFoundError]:
         """List all API keys belonging to one project."""
         project_res = await self._getProjectByUuid(project_uuid)
@@ -406,9 +407,11 @@ class ApiKeyService:
         project_id, _, normalized_project_uuid = project_res.unwrap()
 
         async with self.session_manager.get_session() as session:
-            keys = await self.api_key_repo.getByProjectId(session, project_id)
+            keys = await self.api_key_repo.getByProjectId(
+                session, project_id, disabled=disabled
+            )
             total = await self.api_key_repo.countByProjectId(
-                session, project_id
+                session, project_id, disabled=disabled
             )
             snapshots = [self._snapshotApiKey(api_key) for api_key in keys]
 
@@ -446,6 +449,7 @@ class ApiKeyService:
         name: str,
         description: str,
         permissions: list[str],
+        disabled: bool | None = None,
     ) -> Result[
         ApiKeyResponse,
         InvalidPermissionError | ApiKeyNotFoundError | ProjectNotFoundError,
@@ -467,6 +471,7 @@ class ApiKeyService:
                 name=name,
                 description=description,
                 permissions=permissions,
+                disabled=disabled,
             )
             if updated is None:
                 return Err(ApiKeyNotFoundError())
@@ -495,6 +500,7 @@ class ApiKeyService:
         name: str,
         description: str,
         permissions: list[str],
+        disabled: bool | None = None,
     ) -> Result[
         ApiKeyResponse,
         InvalidPermissionError | ApiKeyNotFoundError | ProjectNotFoundError,
@@ -505,6 +511,7 @@ class ApiKeyService:
             name=name,
             description=description,
             permissions=permissions,
+            disabled=disabled,
         )
 
     async def getApiKeyInternalIds(

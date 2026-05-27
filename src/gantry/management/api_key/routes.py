@@ -12,6 +12,7 @@ from .dtos import (
     ApiKeyResponse,
     ApiKeyListResponse,
     ApiKeyWriteRequest,
+    ApiKeyUpdateRequest,
     ApiKeyCreateResponse,
     ApiKeyPermissionCatalogResponse,
 )
@@ -109,7 +110,7 @@ async def getApiKey(
 async def updateApiKey(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     api_key_uuid: Annotated[str, Path(min_length=1)],
-    input_data: Annotated[ApiKeyWriteRequest, Body()],
+    input_data: Annotated[ApiKeyUpdateRequest, Body()],
     apikey_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
 ) -> ApiKeyResponse:
@@ -128,6 +129,7 @@ async def updateApiKey(
         name=input_data.name,
         description=input_data.description,
         permissions=input_data.permissions,
+        disabled=input_data.disabled,
     )
     return result.unwrap()
 

@@ -161,7 +161,10 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         ]
 
     async def getByProjectId(
-        self, session: AsyncSession, project_id: int
+        self,
+        session: AsyncSession,
+        project_id: int,
+        disabled: bool | None = None,
     ) -> list[ApiKey]:
         stmt = (
             select(ApiKey)
@@ -169,16 +172,23 @@ class ApiKeyRepository(Repository[ApiKey, int]):
             .where(ApiKey.project_id == project_id)
             .order_by(ApiKey.created_at.desc(), ApiKey.id.desc())
         )
+        if disabled is not None:
+            stmt = stmt.where(ApiKey.disabled == disabled)
         return list(await self.selectMany(session, stmt))
 
     async def countByProjectId(
-        self, session: AsyncSession, project_id: int
+        self,
+        session: AsyncSession,
+        project_id: int,
+        disabled: bool | None = None,
     ) -> int:
         stmt = (
             select(func.count())
             .select_from(ApiKey)
             .where(ApiKey.project_id == project_id)
         )
+        if disabled is not None:
+            stmt = stmt.where(ApiKey.disabled == disabled)
         res = await session.execute(stmt)
         return int(res.scalar_one() or 0)
 
@@ -236,15 +246,19 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         name: str,
         description: str,
         permissions: list[str],
+        disabled: bool | None = None,
     ) -> ApiKey | None:
+        values = {
+            "name": name,
+            "description": description,
+            "permissions": permissions,
+        }
+        if disabled is not None:
+            values["disabled"] = disabled
         stmt = (
             update(ApiKey)
             .where(ApiKey.id == api_key_id)
-            .values(
-                name=name,
-                description=description,
-                permissions=permissions,
-            )
+            .values(**values)
             .returning(ApiKey)
         )
         res = await session.execute(stmt)
@@ -258,15 +272,19 @@ class ApiKeyRepository(Repository[ApiKey, int]):
         name: str,
         description: str,
         permissions: list[str],
+        disabled: bool | None = None,
     ) -> ApiKey | None:
+        values = {
+            "name": name,
+            "description": description,
+            "permissions": permissions,
+        }
+        if disabled is not None:
+            values["disabled"] = disabled
         stmt = (
             update(ApiKey)
             .where(ApiKey.uuid == api_key_uuid)
-            .values(
-                name=name,
-                description=description,
-                permissions=permissions,
-            )
+            .values(**values)
             .returning(ApiKey)
         )
         res = await session.execute(stmt)

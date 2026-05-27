@@ -166,9 +166,17 @@ class FakeApiKeyService(ConfigurableFake):
         self.calls.append(("getApiKeyProjectUuid", api_key_uuid))
         return Ok(PROJECT_UUID)
 
-    async def getApiKeys(self, project_uuid: str):
-        self.calls.append(("getApiKeys", project_uuid))
-        return Ok({"total": 1, "results": [api_key_payload(project_uuid=project_uuid)]})
+    async def getApiKeys(self, project_uuid: str, disabled: bool | None = None):
+        self.calls.append(
+            (
+                "getApiKeys",
+                {"project_uuid": project_uuid, "disabled": disabled},
+            )
+        )
+        payload = api_key_payload(project_uuid=project_uuid)
+        if disabled is not None:
+            payload["disabled"] = disabled
+        return Ok({"total": 1, "results": [payload]})
 
     async def createApiKey(self, **kwargs):
         self.calls.append(("createApiKey", kwargs))
@@ -186,6 +194,8 @@ class FakeApiKeyService(ConfigurableFake):
         payload["name"] = kwargs["name"]
         payload["description"] = kwargs["description"]
         payload["permissions"] = kwargs["permissions"]
+        if kwargs.get("disabled") is not None:
+            payload["disabled"] = kwargs["disabled"]
         return Ok(payload)
 
     async def setApiKeyDisabled(self, **kwargs):
@@ -277,7 +287,7 @@ class FakeAdminService(ConfigurableFake):
 
     def getAdminInfo(self, admin_info):
         self.calls.append(("getAdminInfo", admin_info))
-        return {"id": admin_info["id"], "username": admin_info["username"], "email": admin_info["email"]}
+        return {"user_id": admin_info["id"], "username": admin_info["username"], "email": admin_info["email"]}
 
     async def getDashboardSummary(self):
         self.calls.append(("getDashboardSummary", None))
@@ -381,9 +391,17 @@ class FakeAdminService(ConfigurableFake):
         self.calls.append(("listProjectUsers", {"project_id": project_id, "pagination": pagination}))
         return {"total": 1, "results": [{"id": "user-2", "username": "bob", "email": "bob@example.com"}]}
 
-    async def listApiKeys(self, project_id: str):
-        self.calls.append(("listApiKeys", project_id))
-        return {"total": 1, "results": [api_key_payload(project_uuid=project_id)]}
+    async def listApiKeys(self, project_id: str, disabled: bool | None = None):
+        self.calls.append(
+            (
+                "listApiKeys",
+                {"project_id": project_id, "disabled": disabled},
+            )
+        )
+        payload = api_key_payload(project_uuid=project_id)
+        if disabled is not None:
+            payload["disabled"] = disabled
+        return {"total": 1, "results": [payload]}
 
     async def createApiKey(self, user_info, project_id: str, input_data):
         self.calls.append(("createApiKey", {"user_info": user_info, "project_id": project_id, "input_data": input_data}))
@@ -401,6 +419,8 @@ class FakeAdminService(ConfigurableFake):
         payload["name"] = input_data.name
         payload["description"] = input_data.description
         payload["permissions"] = input_data.permissions
+        if getattr(input_data, "disabled", None) is not None:
+            payload["disabled"] = input_data.disabled
         return payload
 
     async def deleteApiKey(self, api_key_uuid: str):
@@ -409,24 +429,41 @@ class FakeAdminService(ConfigurableFake):
 
     async def listUsers(self, pagination):
         self.calls.append(("listUsers", pagination))
-        return {"total": 1, "results": [{"id": "user-1", "username": "alice", "email": "alice@example.com", "first_name": "Alice", "last_name": "Example", "enabled": True, "email_verified": True}]}
+        self.pagination = pagination
+        return {"total": 1, "results": [{"user_id": "user-1", "username": "alice", "email": "alice@example.com", "first_name": "Alice", "last_name": "Example", "enabled": True, "email_verified": True}]}
 
     async def getUserOrganizations(self, user_id: str):
         self.calls.append(("getUserOrganizations", user_id))
-        return [{"id": "org-1", "name": "Org 1", "alias": "org-1"}]
+        return [{"org_id": "org-1", "name": "Org 1", "alias": "org-1"}]
 
     async def getUserProfile(self, user_id: str):
         self.calls.append(("getUserProfile", user_id))
         return {
-            "id": user_id,
+            "user_id": user_id,
             "username": "alice",
             "email": "alice@example.com",
             "first_name": "Alice",
             "last_name": "Example",
             "enabled": True,
             "email_verified": True,
-            "organizations": [{"id": "org-1", "name": "Org 1", "alias": "org-1"}],
+            "organizations": [{"org_id": "org-1", "name": "Org 1", "alias": "org-1"}],
             "permissions": {"organization_permissions": [], "effective_organization_permissions": [], "project_permissions": []},
+        }
+
+    async def getUserPermissions(self, user_id: str):
+        self.calls.append(("getUserPermissions", user_id))
+        return {
+            "organization_permissions": ["organization.settings.read"],
+            "effective_organization_permissions": [
+                "organization.settings.read"
+            ],
+            "project_permissions": [
+                {
+                    "project_uuid": PROJECT_UUID,
+                    "permissions": ["project.settings.read"],
+                    "effective_permissions": ["project.settings.read"],
+                }
+            ],
         }
 
     async def setUserPermissions(self, user_id: str, input_data):
@@ -438,7 +475,7 @@ class FakeAdminService(ConfigurableFake):
                 "effective_organization_permissions": input_data.organization_permissions,
                 "project_permissions": [
                     {
-                        "id": item.project_id,
+                        "project_uuid": item.project_uuid,
                         "permissions": item.permissions,
                         "effective_permissions": item.permissions,
                     }
@@ -460,7 +497,7 @@ class FakeAdminService(ConfigurableFake):
 
     def _profile(self, user_id: str, permissions: dict[str, Any]) -> dict[str, Any]:
         return {
-            "id": user_id,
+            "user_id": user_id,
             "username": "alice",
             "email": "alice@example.com",
             "first_name": "Alice",
@@ -468,7 +505,7 @@ class FakeAdminService(ConfigurableFake):
             "enabled": True,
             "email_verified": True,
             "organizations": [
-                {"id": "org-1", "name": "Org 1", "alias": "org-1"}
+                {"org_id": "org-1", "name": "Org 1", "alias": "org-1"}
             ],
             "permissions": permissions,
         }

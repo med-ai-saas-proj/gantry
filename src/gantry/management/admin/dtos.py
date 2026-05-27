@@ -25,7 +25,7 @@ class AdminDashboardSummaryResponse(BaseDTO):
 class AdminUserInfoResponse(BaseDTO):
     """Authenticated admin user information."""
 
-    id: str
+    user_id: str
     username: str | None
     email: str | None
 
@@ -33,7 +33,7 @@ class AdminUserInfoResponse(BaseDTO):
 class AdminUserOrganizationInfoResponse(BaseDTO):
     """One organization membership visible to admins."""
 
-    id: str
+    org_id: str
     name: str | None = None
     alias: str | None = None
 
@@ -41,7 +41,7 @@ class AdminUserOrganizationInfoResponse(BaseDTO):
 class AdminUserListItemResponse(BaseDTO):
     """One Keycloak user in admin dashboard lists."""
 
-    id: str
+    user_id: str
     username: str | None = None
     email: str | None = None
     first_name: str | None = None
@@ -58,9 +58,9 @@ class AdminUserListResponse(BaseDTO):
 
 
 class AdminUserProjectPermissionResponse(BaseDTO):
-    """Project-scoped permissions grouped by project id."""
+    """Project-scoped permissions grouped by project UUID."""
 
-    id: str
+    project_uuid: str
     permissions: list[str]
     effective_permissions: list[str]
 
@@ -68,7 +68,7 @@ class AdminUserProjectPermissionResponse(BaseDTO):
 class AdminUserProjectPermissionUpdateRequest(BaseDTO):
     """Requested project permission slice for one project."""
 
-    project_id: str
+    project_uuid: str
     permissions: list[str]
 
 
@@ -83,7 +83,7 @@ class AdminUserPermissionSummaryResponse(BaseDTO):
 class AdminUserProfileResponse(BaseDTO):
     """Admin-visible Keycloak user profile and permission summary."""
 
-    id: str
+    user_id: str
     username: str | None = None
     email: str | None = None
     first_name: str | None = None

@@ -65,11 +65,16 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
         with patch.object(
             self.repo, "selectMany", AsyncMock(return_value=["one", "two"])
         ) as select_many:
-            result = await self.repo.getByProjectId(self.session, 7)
+            result = await self.repo.getByProjectId(
+                self.session,
+                7,
+                disabled=True,
+            )
 
         self.assertEqual(result, ["one", "two"])
         stmt = select_many.await_args.args[1]
         self.assertIn(".project_id", str(stmt))
+        self.assertIn(".disabled", str(stmt))
         self.assertIn("ORDER BY", str(stmt))
 
     async def test_get_context_by_hashed_key_builds_joined_lookup(self):
@@ -196,11 +201,16 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
         execute_res.scalar_one.return_value = 3
         self.session.execute = AsyncMock(return_value=execute_res)
 
-        result = await self.repo.countByProjectId(self.session, 7)
+        result = await self.repo.countByProjectId(
+            self.session,
+            7,
+            disabled=False,
+        )
 
         self.assertEqual(result, 3)
         stmt = self.session.execute.await_args.args[0]
         self.assertIn("count", str(stmt).lower())
+        self.assertIn(".disabled", str(stmt))
 
     async def test_count_by_project_id_coerces_null_to_zero(self):
         execute_res = Mock()
@@ -250,6 +260,7 @@ class TestApiKeyRepository(unittest.IsolatedAsyncioTestCase):
         stmt = self.session.execute.await_args.args[0]
         self.assertIn("UPDATE", str(stmt))
         self.assertIn("RETURNING", str(stmt))
+        self.assertIn("disabled", str(stmt))
 
         execute_res.scalar_one_or_none.return_value = None
         result_none = await self.repo.updateById(

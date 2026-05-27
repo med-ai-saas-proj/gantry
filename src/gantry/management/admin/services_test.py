@@ -7,6 +7,7 @@ from gantry.management.api_key.dtos import (
     ApiKeyResponse,
     ApiKeyListResponse,
     ApiKeyWriteRequest,
+    ApiKeyUpdateRequest,
     ApiKeyCreateResponse,
     ApiKeyPermissionCatalogResponse,
 )
@@ -84,7 +85,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
     def test_get_admin_info_maps_identity(self):
         result = self.service.getAdminInfo(self.user_info)
 
-        self.assertEqual(result.id, "admin-1")
+        self.assertEqual(result.user_id, "admin-1")
         self.assertEqual(result.username, "admin")
 
     def test_list_organization_permissions_returns_catalog(self):
@@ -354,7 +355,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
 
         result = await self.service.getUserProfile("user-1")
 
-        self.assertEqual(result.id, "user-1")
+        self.assertEqual(result.user_id, "user-1")
         self.assertEqual(len(result.organizations), 1)
         self.assertEqual(
             result.permissions.organization_permissions,
@@ -362,7 +363,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(result.permissions.project_permissions), 2)
         self.assertEqual(
-            result.permissions.project_permissions[0].id,
+            result.permissions.project_permissions[0].project_uuid,
             "project-a",
         )
 
@@ -531,14 +532,18 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         self.apikey_service.updateApiKey = AsyncMock(return_value=Ok(updated))
         self.apikey_service.deleteApiKey = AsyncMock(return_value=Ok(True))
 
-        list_result = await self.service.listApiKeys("project-1")
+        list_result = await self.service.listApiKeys(
+            "project-1",
+            disabled=True,
+        )
         get_result = await self.service.getApiKey("api-key-1")
         update_result = await self.service.updateApiKey(
             "api-key-1",
-            ApiKeyWriteRequest(
+            ApiKeyUpdateRequest(
                 name="Renamed Key",
                 description="",
                 permissions=["objects:write"],
+                disabled=True,
             ),
         )
         delete_result = await self.service.deleteApiKey("api-key-1")
@@ -548,7 +553,8 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(update_result, updated)
         self.assertTrue(delete_result)
         self.apikey_service.getApiKeys.assert_awaited_once_with(
-            project_uuid="project-1"
+            project_uuid="project-1",
+            disabled=True,
         )
         self.apikey_service.getApiKey.assert_awaited_once_with("api-key-1")
         self.apikey_service.updateApiKey.assert_awaited_once_with(
@@ -556,6 +562,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             name="Renamed Key",
             description="",
             permissions=["objects:write"],
+            disabled=True,
         )
         self.apikey_service.deleteApiKey.assert_awaited_once_with("api-key-1")
 
@@ -602,7 +609,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             organization_permissions=["organization.settings.read"],
             project_permissions=[
                 AdminUserProjectPermissionUpdateRequest(
-                    project_id="project-a",
+                    project_uuid="project-a",
                     permissions=["project.settings.read"],
                 )
             ],
@@ -629,7 +636,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
 
         result = await self.service.setUserPermissions("user-1", payload)
 
-        self.assertEqual(result.id, "user-1")
+        self.assertEqual(result.user_id, "user-1")
         self.kc.setUserAttributes.assert_awaited_once_with(
             "user-1",
             {
@@ -637,6 +644,37 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
                 "project_permissions": {"project-a": ["project.settings.read"]},
             },
         )
+
+    async def test_get_user_permissions_returns_only_permission_summary(self):
+        self.kc.getUserProfile = AsyncMock(
+            return_value=Ok(
+                {
+                    "id": "user-1",
+                    "username": "alice",
+                    "email": "alice@test",
+                    "enabled": True,
+                    "emailVerified": True,
+                    "attributes": {
+                        "org_permissions": ["organization.settings.read"],
+                        "project_permissions": {
+                            "project-a": ["project.settings.read"]
+                        },
+                    },
+                }
+            )
+        )
+        self.kc.getMemberOrganizations = AsyncMock(return_value=Ok([]))
+
+        result = await self.service.getUserPermissions("user-1")
+
+        self.assertEqual(
+            result.organization_permissions,
+            ["organization.settings.read"],
+        )
+        self.assertEqual(
+            result.project_permissions[0].project_uuid, "project-a"
+        )
+        self.kc.getUserProfile.assert_awaited_once_with("user-1")
 
     async def test_reset_user_permissions_clears_keycloak_attributes(self):
         self.kc.setUserAttributes = AsyncMock(return_value=Ok(True))
@@ -681,7 +719,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             organization_permissions=[],
             project_permissions=[
                 AdminUserProjectPermissionUpdateRequest(
-                    project_id="project-a",
+                    project_uuid="project-a",
                     permissions=["project.nope"],
                 )
             ],
@@ -734,5 +772,5 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         result = await self.service.getUserOrganizations("user-1")
 
         self.assertEqual(len(result), 2)
-        self.assertEqual(result[0].id, "org-1")
+        self.assertEqual(result[0].org_id, "org-1")
         self.kc.getMemberOrganizations.assert_awaited_once_with("user-1")

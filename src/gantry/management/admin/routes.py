@@ -5,6 +5,7 @@ from gantry.management.api_key.dtos import (
     ApiKeyResponse,
     ApiKeyListResponse,
     ApiKeyWriteRequest,
+    ApiKeyUpdateRequest,
     ApiKeyCreateResponse,
     ApiKeyPermissionCatalogResponse,
 )
@@ -409,10 +410,11 @@ async def list_admin_api_keys(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     project_id: Annotated[str, Query(..., min_length=1, alias="project_id")],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
+    disabled: Annotated[bool | None, Query()] = None,
 ) -> ApiKeyListResponse:
     """Return API keys for one project without project permission checks."""
     del user_info
-    return await admin_service.listApiKeys(project_id)
+    return await admin_service.listApiKeys(project_id, disabled=disabled)
 
 
 @admin_router.post(
@@ -454,7 +456,7 @@ async def get_admin_api_key(
 async def update_admin_api_key(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     api_key_uuid: Annotated[str, Path(min_length=1)],
-    input_data: Annotated[ApiKeyWriteRequest, Body()],
+    input_data: Annotated[ApiKeyUpdateRequest, Body()],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
 ) -> ApiKeyResponse:
     """Update one API key without project permission checks."""
@@ -520,6 +522,21 @@ async def get_user_profile(
     """Return one user's Keycloak profile plus normalized permission data."""
     del user_info
     return await admin_service.getUserProfile(user_id)
+
+
+@admin_router.get(
+    "/users/{user_id}/permissions",
+    response_model=AdminUserPermissionSummaryResponse,
+    summary="Get Keycloak org/project permissions for a specific user",
+)
+async def get_user_permissions(
+    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
+    user_id: Annotated[str, Path()],
+    admin_service: Annotated[AdminService, Depends(getAdminService)],
+) -> AdminUserPermissionSummaryResponse:
+    """Return one user's normalized org/project permission summary."""
+    del user_info
+    return await admin_service.getUserPermissions(user_id)
 
 
 @admin_router.put(

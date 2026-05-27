@@ -8,7 +8,10 @@ from pyrusult import Ok
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 
 from gantry.management.api_key import routes
-from gantry.management.api_key.dtos import ApiKeyWriteRequest
+from gantry.management.api_key.dtos import (
+    ApiKeyWriteRequest,
+    ApiKeyUpdateRequest,
+)
 from gantry.management.project.permissions import ProjectPermission
 
 
@@ -95,15 +98,23 @@ class TestApiKeyRoutes(unittest.IsolatedAsyncioTestCase):
             await routes.updateApiKey(
                 user_info,
                 "api-key-11",
-                ApiKeyWriteRequest(
+                ApiKeyUpdateRequest(
                     name="Key 1",
                     description="desc",
                     permissions=["chat.run"],
+                    disabled=True,
                 ),
                 apikey_service,
                 project_service,
             ),
             "updated",
+        )
+        apikey_service.updateApiKey.assert_awaited_once_with(
+            api_key_uuid="api-key-11",
+            name="Key 1",
+            description="desc",
+            permissions=["chat.run"],
+            disabled=True,
         )
         delete_res = await routes.deleteApiKey(
             user_info, "api-key-11", apikey_service, project_service
