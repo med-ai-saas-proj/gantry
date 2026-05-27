@@ -442,10 +442,11 @@ async def get_admin_api_key(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     api_key_uuid: Annotated[str, Path(min_length=1)],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
+    disabled: Annotated[bool | None, Query()] = None,
 ) -> ApiKeyResponse:
     """Return one API key without project permission checks."""
     del user_info
-    return await admin_service.getApiKey(api_key_uuid)
+    return await admin_service.getApiKey(api_key_uuid, disabled=disabled)
 
 
 @admin_router.put(

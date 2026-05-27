@@ -25,6 +25,7 @@ from gantry.management.admin.services import (
     AdminService,
     InvalidAdminPermissionError,
 )
+from gantry.management.api_key.services import ApiKeyNotFoundError
 from gantry.management.project.services import ProjectNotFoundError
 from gantry.management.organization.dtos import (
     OrgInfoResponse,
@@ -536,7 +537,10 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             "project-1",
             disabled=True,
         )
-        get_result = await self.service.getApiKey("api-key-1")
+        get_result = await self.service.getApiKey(
+            "api-key-1",
+            disabled=False,
+        )
         update_result = await self.service.updateApiKey(
             "api-key-1",
             ApiKeyUpdateRequest(
@@ -565,6 +569,28 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             disabled=True,
         )
         self.apikey_service.deleteApiKey.assert_awaited_once_with("api-key-1")
+
+    async def test_get_api_key_rejects_disabled_query_mismatch(self):
+        now = datetime.now(UTC)
+        key = ApiKeyResponse(
+            api_key_id=11,
+            api_key_uuid="api-key-1",
+            project_id=7,
+            project_uuid="project-1",
+            name="Key",
+            description="desc",
+            hint="sk_x...abcd",
+            created_at=now,
+            permissions=["objects:read"],
+            disabled=False,
+        )
+        self.apikey_service.getApiKey = AsyncMock(return_value=Ok(key))
+
+        with self.assertRaises(ApiKeyNotFoundError):
+            await self.service.getApiKey(
+                "api-key-1",
+                disabled=True,
+            )
 
     async def test_create_api_key_passes_actor_identity(self):
         now = datetime.now(UTC)

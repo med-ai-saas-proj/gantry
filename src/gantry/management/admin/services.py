@@ -26,7 +26,10 @@ from gantry.management.project.dtos import (
     ProjectPermissionCatalogResponse,
 )
 from gantry.management.auth.entities import AdminInfo
-from gantry.management.api_key.services import ApiKeyService
+from gantry.management.api_key.services import (
+    ApiKeyService,
+    ApiKeyNotFoundError,
+)
 from gantry.management.project.services import (
     ProjectService,
     ProjectNotFoundError,
@@ -469,10 +472,17 @@ class AdminService:
         )
         return result.unwrap()
 
-    async def getApiKey(self, api_key_uuid: str) -> ApiKeyResponse:
+    async def getApiKey(
+        self,
+        api_key_uuid: str,
+        disabled: bool | None = None,
+    ) -> ApiKeyResponse:
         """Return one API key without project permission checks."""
         result = await self.apikey_service.getApiKey(api_key_uuid)
-        return result.unwrap()
+        api_key = result.unwrap()
+        if disabled is not None and api_key.disabled != disabled:
+            raise ApiKeyNotFoundError()
+        return api_key
 
     async def updateApiKey(
         self,

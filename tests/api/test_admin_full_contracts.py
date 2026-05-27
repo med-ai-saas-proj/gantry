@@ -160,9 +160,17 @@ async def test_admin_api_key_routes(api_client, authenticated_api) -> None:
     assert created.json()["key"].startswith("sk_")
     assert authenticated_api["admin"].calls[-1][1]["user_info"]["id"] == "admin-1"
 
-    detail = await api_client.get("/v1/admin/api-keys/api-key-1", headers=AUTH)
+    detail = await api_client.get(
+        "/v1/admin/api-keys/api-key-1",
+        headers=AUTH,
+        params={"disabled": "false"},
+    )
     assert detail.status_code == 200
     assert detail.json()["api_key_uuid"] == "api-key-1"
+    assert authenticated_api["admin"].calls[-1][1] == {
+        "api_key_uuid": "api-key-1",
+        "disabled": False,
+    }
 
     updated = await api_client.put(
         "/v1/admin/api-keys/api-key-1",

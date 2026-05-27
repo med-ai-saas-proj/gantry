@@ -409,9 +409,21 @@ class FakeAdminService(ConfigurableFake):
         payload["key"] = "sk_api-key-1.secret"
         return payload
 
-    async def getApiKey(self, api_key_uuid: str):
-        self.calls.append(("getApiKey", api_key_uuid))
-        return api_key_payload(api_key_uuid=api_key_uuid)
+    async def getApiKey(
+        self,
+        api_key_uuid: str,
+        disabled: bool | None = None,
+    ):
+        self.calls.append(
+            (
+                "getApiKey",
+                {"api_key_uuid": api_key_uuid, "disabled": disabled},
+            )
+        )
+        payload = api_key_payload(api_key_uuid=api_key_uuid)
+        if disabled is not None:
+            payload["disabled"] = disabled
+        return payload
 
     async def updateApiKey(self, api_key_uuid: str, input_data):
         self.calls.append(("updateApiKey", {"api_key_uuid": api_key_uuid, "input_data": input_data}))

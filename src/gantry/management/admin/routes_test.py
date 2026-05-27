@@ -139,6 +139,35 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         admin_service.deleteApiKey.assert_awaited_once_with(123)
 
+    async def test_get_admin_api_key_passes_disabled_query_to_service(self):
+        admin_service = Mock()
+        expected = routes.ApiKeyResponse(
+            api_key_id=11,
+            api_key_uuid="api-key-1",
+            project_id=7,
+            project_uuid="project-1",
+            name="Key",
+            description="",
+            hint="sk_x...abcd",
+            created_at=datetime.now(UTC),
+            permissions=["objects:read"],
+            disabled=False,
+        )
+        admin_service.getApiKey = AsyncMock(return_value=expected)
+
+        result = await routes.get_admin_api_key(
+            ADMIN_INFO,
+            "api-key-1",
+            admin_service,
+            disabled=True,
+        )
+
+        self.assertEqual(result, expected)
+        admin_service.getApiKey.assert_awaited_once_with(
+            "api-key-1",
+            disabled=True,
+        )
+
     async def test_get_user_profile_delegates_to_admin_service(self):
         admin_service = Mock()
         expected = routes.AdminUserProfileResponse(
