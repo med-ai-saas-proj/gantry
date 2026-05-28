@@ -1,7 +1,6 @@
 from gantry.service.conversation import (
     Message,
     TreeConversationService,
-    ConversationNotFoundError,
 )
 from gantry.shared.custom_types.error_exception import RecoverableError
 
@@ -11,9 +10,11 @@ from uuid import UUID
 from typing import Any, AsyncIterator
 from datetime import UTC, datetime
 
+from pydantic import TypeAdapter
 from pyrusult import Ok, Err, Result, ResultStatus
 from ag_ui.core import BaseEvent, EventType, RunAgentInput
 from pydantic_ai import Agent, ModelSettings, AgentRunResult
+from ag_ui.core.types import Message as AGUIMessage
 from pydantic_ai.models import Model, fallback, infer_model
 from pydantic_ai.ui.ag_ui import AGUIAdapter
 from pydantic_ai.providers import Provider, infer_provider_class
@@ -99,6 +100,15 @@ class AiGatewayService:
         else:
             messages = messages.value
 
+        dict_to_obj = TypeAdapter(AGUIMessage).validate_python
+        messages = [dict_to_obj(msg.payload) for msg in messages]
+
+        for msg in messages:
+            print(
+                f"Message from conversation service: {msg}, obj type: {type(msg)}"
+            )
+        run_input.messages = messages + run_input.messages
+
         adapter = AGUIAdapter(
             self.agent[model], run_input, manage_system_prompt="client"
         )
@@ -133,9 +143,6 @@ class AiGatewayService:
             adapter.encode_stream(
                 adapter.run_stream(
                     model_settings=model_settings,
-                    message_history=AGUIAdapter.load_messages(
-                        [msg.payload for msg in messages]
-                    ),
                     on_complete=_onComplete,
                 )
             )
