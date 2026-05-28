@@ -337,6 +337,7 @@ class TreeConversationService(ConversationService):
         project_id: int,
         extra_metadata: dict | None,
         messages: Sequence[RequestMessage] | None,
+        conversation_uid: uuid.UUID | None = None,
     ) -> Result[
         uuid.UUID,
         ConversationNotFoundError
@@ -344,7 +345,7 @@ class TreeConversationService(ConversationService):
         | InvalidValueError
         | InternalServiceError,
     ]:
-        conversation_uid = uuid7()
+        conversation_uid = conversation_uid or uuid7()
         res = await self._storeConversationMessagesWithCache(
             is_new_conversation=True,
             conversation_uid=conversation_uid,

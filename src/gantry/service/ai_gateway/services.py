@@ -91,7 +91,13 @@ class AiGatewayService:
             branch_node_id=parent_run_id,
         )
 
-        messages = [] if messages.status == ResultStatus.Err else messages.value
+        if messages.status == ResultStatus.Err:
+            messages = []
+            await self.tree_conversation_service.createConversation(
+                project_id, {}, None, conversation_uuid
+            )
+        else:
+            messages = messages.value
 
         adapter = AGUIAdapter(
             self.agent[model], run_input, manage_system_prompt="client"
