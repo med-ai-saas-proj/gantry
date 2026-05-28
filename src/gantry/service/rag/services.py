@@ -20,6 +20,7 @@ from .type import (
     EmbeddingTask,
     RagQueryRecord,
     ChunkSplitterType,
+    ChunkSplitterOptions,
 )
 from .utils import (
     Reranker,
@@ -29,6 +30,7 @@ from .utils import (
     create_bm25_index,
     create_vector_index,
     create_embedding_table,
+    getHashUniqueIndexName,
 )
 from .models import RagMetadata
 from .settings import RagSettings
@@ -38,15 +40,36 @@ import re
 import csv
 import json
 import uuid
+import hashlib
 import importlib
-from typing import Sequence, Awaitable, TypedDict, cast
+from typing import Any, Sequence, Awaitable, TypedDict, cast
 from datetime import datetime
 
 from openai import AsyncOpenAI
 from pyrusult import Ok, Err, Result, ResultStatus
-from sqlalchemy import func, delete, select
+from sqlalchemy import or_, cast as sqlalchemy_cast, func, delete, select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
+from langchain_text_splitters import (
+    Language,
+    NLTKTextSplitter,
+    LatexTextSplitter,
+    SpacyTextSplitter,
+    TokenTextSplitter,
+    KonlpyTextSplitter,
+    HTMLSectionSplitter,
+    MarkdownTextSplitter,
+    CharacterTextSplitter,
+    RecursiveJsonSplitter,
+    HTMLHeaderTextSplitter,
+    PythonCodeTextSplitter,
+    JSFrameworkTextSplitter,
+    MarkdownHeaderTextSplitter,
+    HTMLSemanticPreservingSplitter,
+    RecursiveCharacterTextSplitter,
+    SentenceTransformersTokenTextSplitter,
+    ExperimentalMarkdownSyntaxTextSplitter,
+)
 from sqlalchemy.dialects.postgresql import insert
 
 
@@ -54,13 +77,14 @@ class EmbeddingQueryRecord(TypedDict):
     """TypedDict for embedding query records from database."""
 
     chunk_id: int
-    file_id: int
+    file_id: int | None
     text: str
     embedding: list[float]
     created_at: datetime
     bm25_score: float | None
     rerank_score: float | None
     vector_distance: float | None
+    metadata: dict | None
 
 
 class BucketNotFoundError(RecoverableError):
@@ -114,6 +138,343 @@ class RagService:
         self.redis = redis
         self.logger = logger
         self.reranker = reranker
+
+    @staticmethod
+    def _normalizeSplitChunks(chunks: Sequence[object]) -> list[str]:
+        normalized_chunks: list[str] = []
+        for chunk in chunks:
+            if isinstance(chunk, str):
+                text = chunk.strip()
+            elif isinstance(chunk, (dict, list)):
+                text = json.dumps(chunk, ensure_ascii=False).strip()
+            else:
+                text = str(getattr(chunk, "page_content", chunk)).strip()
+            if text:
+                normalized_chunks.append(text)
+        return normalized_chunks
+
+    @staticmethod
+    def _markdownHeaderSplitters() -> list[tuple[str, str]]:
+        return [
+            ("#", "Header 1"),
+            ("##", "Header 2"),
+            ("###", "Header 3"),
+            ("####", "Header 4"),
+            ("#####", "Header 5"),
+            ("######", "Header 6"),
+        ]
+
+    @staticmethod
+    def _htmlHeaderSplitters() -> list[tuple[str, str]]:
+        return [
+            ("h1", "Header 1"),
+            ("h2", "Header 2"),
+            ("h3", "Header 3"),
+            ("h4", "Header 4"),
+            ("h5", "Header 5"),
+            ("h6", "Header 6"),
+        ]
+
+    def _splitWithLangChainSplitter(
+        self,
+        text_content: str,
+        chunk_splitter: ChunkSplitterType,
+        chunk_size: int,
+        chunk_overlap: int,
+        chunk_splitter_options: dict[str, Any] | None = None,
+    ) -> list[str]:
+        splitter_options: dict[str, Any] = dict(chunk_splitter_options or {})
+        convert_lists: bool = False
+        try:
+            splitter: Any | None = None
+            if chunk_splitter in (
+                ChunkSplitterType.simple,
+                ChunkSplitterType.character,
+                ChunkSplitterType.recursive,
+                ChunkSplitterType.token,
+                ChunkSplitterType.markdown,
+                ChunkSplitterType.latex,
+                ChunkSplitterType.html,
+                ChunkSplitterType.paragraph,
+                ChunkSplitterType.line,
+            ):
+                splitter_options.setdefault("chunk_size", chunk_size)
+                splitter_options.setdefault("chunk_overlap", chunk_overlap)
+
+                if chunk_splitter in (
+                    ChunkSplitterType.simple,
+                    ChunkSplitterType.character,
+                ):
+                    splitter = CharacterTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.recursive:
+                    splitter = RecursiveCharacterTextSplitter(
+                        **splitter_options
+                    )
+                elif chunk_splitter == ChunkSplitterType.token:
+                    splitter = TokenTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.markdown:
+                    splitter = MarkdownTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.latex:
+                    splitter = LatexTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.html:
+                    splitter_options.setdefault(
+                        "headers_to_split_on",
+                        self._htmlHeaderSplitters(),
+                    )
+                    splitter = HTMLHeaderTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.paragraph:
+                    splitter = CharacterTextSplitter(
+                        separator="\n\n",
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.line:
+                    splitter = CharacterTextSplitter(
+                        separator="\n",
+                        **splitter_options,
+                    )
+                else:
+                    raise InternalServiceError(
+                        message=f"Unsupported text splitter '{chunk_splitter}'."
+                    )
+            elif chunk_splitter in (
+                ChunkSplitterType.markdown_header,
+                ChunkSplitterType.html_header,
+                ChunkSplitterType.html_semantic_preserving,
+                ChunkSplitterType.html_section,
+                ChunkSplitterType.recursive_json,
+                ChunkSplitterType.experimental_markdown_syntax,
+                ChunkSplitterType.nltk,
+                ChunkSplitterType.spacy,
+                ChunkSplitterType.konlpy,
+                ChunkSplitterType.sentence_transformers_token,
+            ):
+                if chunk_splitter == ChunkSplitterType.markdown_header:
+                    splitter_options.setdefault(
+                        "headers_to_split_on",
+                        self._markdownHeaderSplitters(),
+                    )
+                    splitter = MarkdownHeaderTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.html_header:
+                    splitter_options.setdefault(
+                        "headers_to_split_on",
+                        self._htmlHeaderSplitters(),
+                    )
+                    splitter = HTMLHeaderTextSplitter(**splitter_options)
+                elif (
+                    chunk_splitter == ChunkSplitterType.html_semantic_preserving
+                ):
+                    splitter_options.setdefault(
+                        "headers_to_split_on",
+                        self._htmlHeaderSplitters(),
+                    )
+                    splitter_options.setdefault("max_chunk_size", chunk_size)
+                    splitter_options.setdefault("chunk_overlap", chunk_overlap)
+                    splitter = HTMLSemanticPreservingSplitter(
+                        **splitter_options
+                    )
+                elif chunk_splitter == ChunkSplitterType.html_section:
+                    splitter_options.setdefault(
+                        "headers_to_split_on",
+                        self._htmlHeaderSplitters(),
+                    )
+                    splitter = HTMLSectionSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.recursive_json:
+                    convert_lists = bool(
+                        splitter_options.pop("convert_lists", False)
+                    )
+                    splitter_options.setdefault("max_chunk_size", chunk_size)
+                    splitter = RecursiveJsonSplitter(**splitter_options)
+                elif (
+                    chunk_splitter
+                    == ChunkSplitterType.experimental_markdown_syntax
+                ):
+                    splitter = ExperimentalMarkdownSyntaxTextSplitter(
+                        **splitter_options
+                    )
+                elif chunk_splitter == ChunkSplitterType.nltk:
+                    splitter_options.setdefault("chunk_size", chunk_size)
+                    splitter_options.setdefault("chunk_overlap", chunk_overlap)
+                    splitter = NLTKTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.spacy:
+                    splitter_options.setdefault("chunk_size", chunk_size)
+                    splitter_options.setdefault("chunk_overlap", chunk_overlap)
+                    splitter = SpacyTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.konlpy:
+                    splitter_options.setdefault("chunk_size", chunk_size)
+                    splitter_options.setdefault("chunk_overlap", chunk_overlap)
+                    splitter = KonlpyTextSplitter(**splitter_options)
+                elif (
+                    chunk_splitter
+                    == ChunkSplitterType.sentence_transformers_token
+                ):
+                    splitter_options.setdefault("chunk_size", chunk_size)
+                    splitter_options.setdefault("chunk_overlap", chunk_overlap)
+                    splitter = SentenceTransformersTokenTextSplitter(
+                        **splitter_options
+                    )
+            else:
+                splitter_options.setdefault("chunk_size", chunk_size)
+                splitter_options.setdefault("chunk_overlap", chunk_overlap)
+
+                if chunk_splitter == ChunkSplitterType.code_language_c:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.C,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_cobol:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.COBOL,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_cpp:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.CPP,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_csharp:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.CSHARP,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_go:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.GO,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_haskell:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.HASKELL,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_html:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.HTML,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_java:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.JAVA,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_python:
+                    splitter = PythonCodeTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.code_language_jsx:
+                    splitter = JSFrameworkTextSplitter(**splitter_options)
+                elif chunk_splitter == ChunkSplitterType.code_language_js:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.JS,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_kotlin:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.KOTLIN,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_latex:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.LATEX,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_lua:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.LUA,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_markdown:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.MARKDOWN,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_perl:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.PERL,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_php:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.PHP,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_proto:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.PROTO,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_python:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.PYTHON,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_rst:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.RST,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_ruby:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.RUBY,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_rust:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.RUST,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_scala:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.SCALA,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_sol:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.SOL,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_swift:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.SWIFT,
+                        **splitter_options,
+                    )
+                elif chunk_splitter == ChunkSplitterType.code_language_ts:
+                    splitter = RecursiveCharacterTextSplitter.from_language(
+                        Language.TS,
+                        **splitter_options,
+                    )
+                else:
+                    raise InternalServiceError(
+                        message=f"Unsupported text splitter '{chunk_splitter}'."
+                    )
+
+            if splitter is None:
+                raise InternalServiceError(
+                    message=f"Unsupported text splitter '{chunk_splitter}'."
+                )
+            split_text = getattr(splitter, "split_text", None)
+            if split_text is None:
+                raise InternalServiceError(
+                    message=f"Text splitter '{chunk_splitter}' does not implement split_text()."
+                )
+            if chunk_splitter == ChunkSplitterType.recursive_json:
+                try:
+                    parsed_json = json.loads(text_content)
+                except json.JSONDecodeError as exc:
+                    raise InternalServiceError(
+                        message="Recursive JSON splitter requires valid JSON input."
+                    ) from exc
+                if not isinstance(parsed_json, dict):
+                    parsed_json = {"root": parsed_json}
+                json_chunks = splitter.split_json(
+                    parsed_json,
+                    convert_lists=convert_lists,
+                )
+                return self._normalizeSplitChunks(json_chunks)
+            return self._normalizeSplitChunks(split_text(text_content))
+        except TypeError as exc:
+            raise InternalServiceError(
+                message=(
+                    f"Failed to initialize text splitter '{chunk_splitter}': {exc}"
+                )
+            ) from exc
 
     def _splitByCharacterWindow(
         self,
@@ -243,50 +604,58 @@ class RagService:
         chunk_splitter: ChunkSplitterType,
         chunk_size: int,
         chunk_overlap: int,
+        chunk_splitter_options: dict[str, Any] | None = None,
     ) -> list[str]:
-        if chunk_splitter in (
-            ChunkSplitterType.simple,
-            ChunkSplitterType.character,
-        ):
-            return self._splitByCharacterWindow(
-                text_content,
-                chunk_size,
-                chunk_overlap,
-            )
-        if chunk_splitter == ChunkSplitterType.recursive:
-            return self._splitByRecursiveSeparators(
-                text_content,
-                chunk_size,
-                chunk_overlap,
-            )
-        if chunk_splitter == ChunkSplitterType.token:
-            return self._splitByTokenWindow(
-                text_content,
-                chunk_size,
-                chunk_overlap,
-            )
-        if chunk_splitter == ChunkSplitterType.markdown:
-            return self._splitByMarkdownSections(
-                text_content,
-                chunk_size,
-                chunk_overlap,
-            )
-        if chunk_splitter == ChunkSplitterType.paragraph:
-            parts = [part.strip() for part in text_content.split("\n\n")]
-            return [part for part in parts if part]
-        if chunk_splitter == ChunkSplitterType.line:
-            parts = [part.strip() for part in text_content.splitlines()]
-            return [part for part in parts if part]
-        if chunk_splitter == ChunkSplitterType.spacy:
-            return self._splitBySpaCyLikeSentences(
-                text_content,
-                chunk_size,
-                chunk_overlap,
-            )
-        return self._splitByRecursiveSeparators(
+        # if chunk_splitter in (
+        #     ChunkSplitterType.simple,
+        #     ChunkSplitterType.character,
+        # ):
+        #     return self._splitByCharacterWindow(
+        #         text_content,
+        #         chunk_size,
+        #         chunk_overlap,
+        #     )
+        # if chunk_splitter == ChunkSplitterType.recursive:
+        #     return self._splitByRecursiveSeparators(
+        #         text_content,
+        #         chunk_size,
+        #         chunk_overlap,
+        #     )
+        # if chunk_splitter == ChunkSplitterType.token:
+        #     return self._splitByTokenWindow(
+        #         text_content,
+        #         chunk_size,
+        #         chunk_overlap,
+        #     )
+        # if chunk_splitter == ChunkSplitterType.markdown:
+        #     return self._splitByMarkdownSections(
+        #         text_content,
+        #         chunk_size,
+        #         chunk_overlap,
+        #     )
+        # if chunk_splitter == ChunkSplitterType.paragraph:
+        #     parts = [part.strip() for part in text_content.split("\n\n")]
+        #     return [part for part in parts if part]
+        # if chunk_splitter == ChunkSplitterType.line:
+        #     parts = [part.strip() for part in text_content.splitlines()]
+        #     return [part for part in parts if part]
+        # if chunk_splitter == ChunkSplitterType.spacy:
+        #     return self._splitBySpaCyLikeSentences(
+        #         text_content,
+        #         chunk_size,
+        #         chunk_overlap,
+        #     )
+        # return self._splitByRecursiveSeparators(
+        #     text_content,
+        #     chunk_size,
+        #     chunk_overlap,
+        # )
+        return self._splitWithLangChainSplitter(
             text_content,
+            chunk_splitter,
             chunk_size,
             chunk_overlap,
+            chunk_splitter_options,
         )
 
     @staticmethod
@@ -531,20 +900,46 @@ class RagService:
                 task_id=task_id,
                 task_info=task_dict,
             )
-            (
-                await self.processEmbedding(
-                    file_uid=uuid.UUID(task_dict["file_uid"]),
-                    project_id=task_dict["project_id"],
-                    chunk_splitter=ChunkSplitterType(
-                        task_dict["chunk_splitter"]
-                    ),
-                    chunk_size=task_dict["chunk_size"],
-                    chunk_overlap=task_dict["chunk_overlap"],
-                    lang=task_dict.get("lang", "simple"),
-                )
-            ).unwrap()
+
+            # Determine if this is a text task or file task
+            task_type = task_dict.get("task_type", "file")
+
+            if task_type == "text":
+                (
+                    await self.processEmbeddingText(
+                        text=task_dict["text"],
+                        project_id=task_dict["project_id"],
+                        chunk_splitter=ChunkSplitterType(
+                            task_dict["chunk_splitter"]
+                        ),
+                        chunk_size=task_dict["chunk_size"],
+                        chunk_overlap=task_dict["chunk_overlap"],
+                        metadata=task_dict.get("metadata"),
+                        lang=task_dict.get("lang", "simple"),
+                        chunk_splitter_options=task_dict.get(
+                            "chunk_splitter_options", {}
+                        ),
+                    )
+                ).unwrap()
+            else:
+                (
+                    await self.processEmbedding(
+                        file_uid=uuid.UUID(task_dict["file_uid"]),
+                        project_id=task_dict["project_id"],
+                        chunk_splitter=ChunkSplitterType(
+                            task_dict["chunk_splitter"]
+                        ),
+                        chunk_size=task_dict["chunk_size"],
+                        chunk_overlap=task_dict["chunk_overlap"],
+                        lang=task_dict.get("lang", "simple"),
+                        chunk_splitter_options=task_dict.get(
+                            "chunk_splitter_options", {}
+                        ),
+                    )
+                ).unwrap()
+
             task_dict["status"] = "completed"
-            async with self.redis.pipeline() as pipe:
+            async with self.redis.pipeline(transaction=True) as pipe:
                 await cast(
                     Awaitable[None],
                     pipe.set(
@@ -582,7 +977,7 @@ class RagService:
                 )
                 task_dict["status"] = "failed_and_retrying"
                 task_dict["failed_reason"] = str(exc)
-                async with self.redis.pipeline() as pipe:
+                async with self.redis.pipeline(transaction=True) as pipe:
                     await cast(
                         Awaitable[None],
                         pipe.set(
@@ -618,6 +1013,7 @@ class RagService:
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
         lang: str = "simple",
+        chunk_splitter_options: dict[str, Any] | None = None,
     ) -> Result[
         None,
         BucketNotFoundError
@@ -644,6 +1040,7 @@ class RagService:
             chunk_splitter,
             chunk_size,
             chunk_overlap,
+            chunk_splitter_options,
         )
         if not chunks:
             return Ok(None)
@@ -699,18 +1096,122 @@ class RagService:
                     DynamicBucket.project_id == project_id,
                 )
             )
-            session.add_all(
-                [
+            record = []
+            for chunk, embedding in zip(chunks, embeddings):
+                cleaned = chunk.replace("\x00", "").strip()
+                h = hashlib.sha256(cleaned.encode("utf-8")).hexdigest()
+                record.append(
                     DynamicBucket(
                         embedding=embedding,
                         file_id=file_info["id"],
-                        text=chunk.replace("\x00", "").strip(),
+                        text=cleaned,
                         project_id=project_id,
                         lang=lang,
+                        hash=h,
+                        chunk_metadata={"filename": file_info["filename"]},
                     )
-                    for chunk, embedding in zip(chunks, embeddings)
-                ]
+                )
+
+            if record:
+                session.add_all(record)
+            await session.flush()
+            await session.commit()
+
+        return Ok(None)
+
+    async def processEmbeddingText(
+        self,
+        text: str | list[str],
+        project_id: int,
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+        metadata: dict | None = None,
+        lang: str = "simple",
+        chunk_splitter_options: dict[str, Any] | None = None,
+    ) -> Result[
+        None,
+        BucketNotFoundError
+        | InternalServiceError
+        | InvalidEmbeddingDimensionError,
+    ]:
+        # Convert single text to list and chunk each item separately
+        text_list = [text] if isinstance(text, str) else text
+        if not text_list:
+            return Ok(None)
+
+        chunks: list[str] = []
+        for item in text_list:
+            if not item or not str(item).strip():
+                continue
+            item_chunks = self._splitContent(
+                str(item),
+                chunk_splitter,
+                chunk_size,
+                chunk_overlap,
+                chunk_splitter_options,
             )
+            if item_chunks:
+                chunks.extend(item_chunks)
+
+        if not chunks:
+            return Ok(None)
+
+        embedding_response = await self.openai_client.embeddings.create(
+            model=self.setting.embedding_model,
+            input=chunks,
+        )
+        embeddings = [item.embedding for item in embedding_response.data]
+        if not embeddings:
+            return Ok(None)
+        if len(embeddings) != len(chunks):
+            return Err(
+                InternalServiceError(
+                    message="Failed to generate embeddings for all chunks."
+                )
+            )
+
+        target_dimension = self.setting.rag_store_parameters["dimension"]
+        table_name = getTableName(self.setting.rag_store_parameters)
+        for embedding in embeddings:
+            if len(embedding) != target_dimension:
+                return Err(
+                    InvalidEmbeddingDimensionError(
+                        message=f"Generated embedding dimension {len(embedding)} does not match expected dimension {target_dimension}."
+                    )
+                )
+
+        async with self.session_manager.get_session() as session:
+            DynamicBucket = get_orm_class(table_name, target_dimension)
+
+            records = []
+            for chunk, embedding in zip(chunks, embeddings):
+                cleaned = chunk.replace("\x00", "").strip()
+                h = hashlib.sha256(cleaned.encode("utf-8")).hexdigest()
+                records.append(
+                    {
+                        "embedding": embedding,
+                        "file_id": None,
+                        "text": cleaned,
+                        "project_id": project_id,
+                        "lang": lang,
+                        "hash": h,
+                        "chunk_metadata": metadata,
+                    }
+                )
+
+            if records:
+                await session.execute(
+                    insert(DynamicBucket)
+                    .values(records)
+                    .on_conflict_do_nothing(
+                        index_elements=[
+                            DynamicBucket.__table__.c.hash,
+                            DynamicBucket.__table__.c.project_id,
+                        ],
+                        index_where=DynamicBucket.__table__.c.file_id.is_(None),
+                    )
+                )
             await session.flush()
             await session.commit()
 
@@ -725,6 +1226,7 @@ class RagService:
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
         lang: str = "simple",
+        chunk_splitter_options: ChunkSplitterOptions | None = None,
     ) -> Result[str, FileNotFoundInSystemError | InternalServiceError]:
         if lang not in self.setting.supported_langs_list:
             return Err(
@@ -743,11 +1245,13 @@ class RagService:
 
             task_dict = {
                 "task_id": task_id,
+                "task_type": "file",
                 "file_id": file_info.id,
                 "file_uid": str(file_uid),
                 "project_id": project_id,
                 "project_uuid": str(project_uuid),
                 "chunk_splitter": chunk_splitter.value,
+                "chunk_splitter_options": chunk_splitter_options or {},
                 "chunk_size": chunk_size,
                 "chunk_overlap": chunk_overlap,
                 "status": "pending",
@@ -775,6 +1279,7 @@ class RagService:
         chunk_size: int = 1000,
         chunk_overlap: int = 150,
         lang: str = "simple",
+        chunk_splitter_options: ChunkSplitterOptions | None = None,
     ) -> Result[str, FileNotFoundInSystemError | InternalServiceError]:
         return await self._wrapProjectUUID(
             project_uid,
@@ -785,6 +1290,79 @@ class RagService:
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             lang=lang,
+            chunk_splitter_options=chunk_splitter_options,
+        )
+
+    async def addText(
+        self,
+        text: str | list[str],
+        project_id: int,
+        project_uuid: uuid.UUID,
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+        metadata: dict | None = None,
+        lang: str = "simple",
+        chunk_splitter_options: ChunkSplitterOptions | None = None,
+    ) -> Result[str, InternalServiceError]:
+        if lang not in self.setting.supported_langs_list:
+            return Err(
+                InternalServiceError(
+                    message=f"Language '{lang}' is not supported. Supported languages are: {', '.join(self.setting.supported_langs_list)}."
+                )
+            )
+
+        task_id = str(uuid.uuid4())
+        task_dict = {
+            "task_id": task_id,
+            "task_type": "text",
+            "text": text,
+            "project_id": project_id,
+            "project_uuid": str(project_uuid),
+            "chunk_splitter": chunk_splitter.value,
+            "chunk_splitter_options": chunk_splitter_options or {},
+            "chunk_size": chunk_size,
+            "chunk_overlap": chunk_overlap,
+            "status": "pending",
+            "lang": lang,
+            "metadata": metadata,
+        }
+
+        result_key = self.REDIS_TASK_RESULT.format(task_id=task_id)
+        async with self.redis.pipeline(transaction=True) as pipe:
+            await cast(
+                Awaitable[None],
+                pipe.set(result_key, json.dumps(task_dict), ex=self.TASK_TTL),
+            )
+            await cast(
+                Awaitable[None], pipe.rpush(self.REDIS_TASK_QUEUE, task_id)
+            )
+            await pipe.execute()
+
+        return Ok(task_id)
+
+    async def addTextByProjectUid(
+        self,
+        text: str | list[str],
+        project_uid: uuid.UUID,
+        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
+        chunk_size: int = 1000,
+        chunk_overlap: int = 150,
+        metadata: dict | None = None,
+        lang: str = "simple",
+        chunk_splitter_options: ChunkSplitterOptions | None = None,
+    ) -> Result[str, InternalServiceError]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.addText,
+            text=text,
+            project_uuid=project_uid,
+            chunk_splitter=chunk_splitter,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            metadata=metadata,
+            lang=lang,
+            chunk_splitter_options=chunk_splitter_options,
         )
 
     async def getTaskStatus(
@@ -806,11 +1384,21 @@ class RagService:
         return Ok(
             EmbeddingTask(
                 task_id=task_dict["task_id"],
-                file_id=task_dict["file_id"],
-                file_uid=uuid.UUID(task_dict["file_uid"]),
+                type=task_dict.get("task_type", "file"),
+                text=task_dict.get("text"),
+                metadata=task_dict.get("metadata"),
+                file_id=task_dict["file_id"]
+                if task_dict.get("file_id")
+                else None,
+                file_uid=uuid.UUID(task_dict["file_uid"])
+                if task_dict.get("file_uid")
+                else None,
                 project_id=task_dict["project_id"],
                 project_uuid=uuid.UUID(task_dict["project_uuid"]),
                 chunk_splitter=ChunkSplitterType(task_dict["chunk_splitter"]),
+                chunk_splitter_options=task_dict.get(
+                    "chunk_splitter_options", {}
+                ),
                 chunk_size=task_dict["chunk_size"],
                 chunk_overlap=task_dict["chunk_overlap"],
                 status=task_dict["status"],
@@ -835,6 +1423,7 @@ class RagService:
         embedding: Sequence[float],
         file_uid: uuid.UUID,
         project_id: int,
+        metadata: dict | None = None,
         lang: str = "simple",
     ) -> Result[
         None,
@@ -870,8 +1459,10 @@ class RagService:
                 embedding=embedding,
                 file_id=file_info.id,
                 text=text,
+                hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
                 project_id=project_id,
                 lang=lang,
+                chunk_metadata=metadata,
             )
             session.add(new_record)
             await session.flush()
@@ -1098,7 +1689,11 @@ class RagService:
     ) -> list[RagQueryRecord]:
         """Build RagEmbeddingRecord list from records and file info map."""
         async with self.session_manager.get_session() as session:
-            file_ids = [record["file_id"] for record in records]
+            file_ids = [
+                record["file_id"]
+                for record in records
+                if "file_id" in record and record["file_id"] is not None
+            ]
             file_infos = await self.file_repo.getAvailableByIds(
                 session, file_ids
             )
@@ -1107,6 +1702,28 @@ class RagService:
             }
             results: list[RagQueryRecord] = []
             for record in records:
+                if (
+                    "file_id" not in record
+                    or record["file_id"] is None
+                    or record["file_id"] not in file_info_map
+                ):
+                    data: RagQueryRecord = {
+                        "text": record["text"],
+                        "created_at": record["created_at"],
+                        "embedding": record["embedding"]
+                        if include_embedding
+                        else [],
+                        "bm25_score": record.get("bm25_score"),
+                        "rerank_score": record.get("rerank_score"),
+                        "vector_distance": record.get("vector_distance"),
+                        "metadata": record.get("metadata", {}),
+                        "file_info": None,
+                    }
+                    if include_embedding:
+                        data["embedding"] = record["embedding"]
+                    results.append(data)
+                    continue
+
                 data: RagQueryRecord = {
                     "text": record["text"],
                     "created_at": record["created_at"],
@@ -1134,6 +1751,7 @@ class RagService:
                             record["file_id"]
                         ].filepath,
                     },
+                    "metadata": record.get("metadata", {}),
                 }
                 if include_embedding:
                     data["embedding"] = record["embedding"]
@@ -1174,10 +1792,14 @@ class RagService:
             )
             if resolved_file_ids is not None:
                 if len(resolved_file_ids) == 0:
-                    return Ok([])
-                bm25_stmt = bm25_stmt.where(
-                    DynamicBucket.file_id.in_(resolved_file_ids)
-                )
+                    bm25_stmt = bm25_stmt.where(DynamicBucket.file_id.is_(None))
+                else:
+                    bm25_stmt = bm25_stmt.where(
+                        or_(
+                            DynamicBucket.file_id.is_(None),
+                            DynamicBucket.file_id.in_(resolved_file_ids),
+                        )
+                    )
 
             bm25_stmt = bm25_stmt.order_by(bm25_score_expr).limit(top_k)
 
@@ -1193,6 +1815,7 @@ class RagService:
                         "text": orm_obj.text,
                         "embedding": list(orm_obj.embedding),
                         "created_at": orm_obj.created_at,
+                        "metadata": orm_obj.chunk_metadata,
                         "bm25_score": score,
                         "rerank_score": None,
                         "vector_distance": None,
@@ -1276,10 +1899,15 @@ class RagService:
             )
 
             if resolved_file_ids is not None:
-                # If filters were applied but no files matched, return empty result early to avoid unnecessary distance calculations
                 if len(resolved_file_ids) == 0:
-                    return Ok([])
-                stmt = stmt.where(DynamicBucket.file_id.in_(resolved_file_ids))
+                    stmt = stmt.where(DynamicBucket.file_id.is_(None))
+                else:
+                    stmt = stmt.where(
+                        or_(
+                            DynamicBucket.file_id.is_(None),
+                            DynamicBucket.file_id.in_(resolved_file_ids),
+                        )
+                    )
 
             stmt = stmt.order_by(distance_expr).limit(top_k)
             result = await session.execute(stmt)
@@ -1296,6 +1924,7 @@ class RagService:
                         "created_at": orm_obj.created_at,
                         "bm25_score": None,
                         "rerank_score": None,
+                        "metadata": orm_obj.chunk_metadata,
                         "vector_distance": distance,
                     }
                 )

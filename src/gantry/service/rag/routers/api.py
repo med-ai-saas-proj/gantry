@@ -4,6 +4,7 @@ from gantry.service.file_storage.dtos import FileInfoResponse
 from ..dtos import (
     RagQueryResponse,
     AddRagFileRequest,
+    AddTextToRagRequest,
     EmbeddingTaskResponse,
     AddRagEmbeddingRequest,
     QueryRagQueryByTextRequest,
@@ -42,6 +43,7 @@ async def add_embedding(
             body.embedding,
             body.file_uid,
             api_key_info["project_id"],
+            body.metadata,
             body.lang,
         )
     ).unwrap()
@@ -94,6 +96,36 @@ async def add_file(
             body.chunk_size,
             body.chunk_overlap,
             body.lang,
+            body.chunk_splitter_options,
+        )
+    ).unwrap()
+    return task_id
+
+
+@rag_service_router.post(
+    "/text",
+    summary="Add text to a RAG.",
+    description="Endpoint to add new text (without an associated file) to a RAG. The text will be chunked and embedded asynchronously.",
+    status_code=201,
+)
+async def add_text(
+    body: Annotated[AddTextToRagRequest, Body()],
+    api_key_info: Annotated[
+        ApiKeyInfo, Security(requiredPermissions(["rag.write"]))
+    ],
+    rag_service: Annotated[RagService, Depends(getRagService)],
+) -> str:
+    task_id = (
+        await rag_service.addText(
+            body.text,
+            api_key_info["project_id"],
+            uuid.UUID(api_key_info["project_uuid"]),
+            body.chunk_splitter,
+            body.chunk_size,
+            body.chunk_overlap,
+            body.metadata,
+            body.lang,
+            body.chunk_splitter_options,
         )
     ).unwrap()
     return task_id
@@ -118,12 +150,17 @@ async def get_task_status(
 
     return EmbeddingTaskResponse(
         task_id=task_result["task_id"],
+        type=task_result["type"],
+        text=task_result["text"],
+        metadata=task_result["metadata"],
         file_uid=task_result["file_uid"],
         project_uuid=task_result["project_uuid"],
         chunk_splitter=task_result["chunk_splitter"],
+        chunk_splitter_options=task_result.get("chunk_splitter_options", {}),
         chunk_size=task_result["chunk_size"],
         chunk_overlap=task_result["chunk_overlap"],
         status=task_result["status"],
+        failed_reason=task_result.get("failed_reason"),
     )
 
 
@@ -153,23 +190,30 @@ async def query_similar_by_vector(
             include_embedding,
         )
     ).unwrap()
-    return [
-        RagQueryResponse(
-            file_info=FileInfoResponse(
-                id=str(result["file_info"]["uid"]),
-                filename=result["file_info"]["filename"],
-                mime_type=result["file_info"]["mime_type"],
-                size=result["file_info"]["size"],
-                created_at=result["file_info"]["created_at"],
-                extra_metadata=result["file_info"]["extra_metadata"],
-            ),
-            text=result["text"],
-            embedding=list(result["embedding"]),
-            created_at=result["created_at"],
-            vector_distance=result.get("vector_distance"),
+
+    res = []
+    for result in results:
+        file_info = result.get("file_info")
+        res.append(
+            RagQueryResponse(
+                file_info=FileInfoResponse(
+                    id=str(file_info["uid"]),
+                    filename=file_info["filename"],
+                    mime_type=file_info["mime_type"],
+                    size=file_info["size"],
+                    created_at=file_info["created_at"],
+                    extra_metadata=file_info["extra_metadata"],
+                )
+                if file_info
+                else None,
+                text=result["text"],
+                embedding=list(result["embedding"]),
+                created_at=result["created_at"],
+                vector_distance=result.get("vector_distance"),
+                metadata=result.get("metadata"),
+            )
         )
-        for result in results
-    ]
+    return res
 
 
 @rag_service_router.post(
@@ -202,25 +246,31 @@ async def query_similar_by_text(
             body.hybrid_search_bm25_lang,
         )
     ).unwrap()
-    return [
-        RagQueryResponse(
-            file_info=FileInfoResponse(
-                id=str(result["file_info"]["uid"]),
-                filename=result["file_info"]["filename"],
-                mime_type=result["file_info"]["mime_type"],
-                size=result["file_info"]["size"],
-                created_at=result["file_info"]["created_at"],
-                extra_metadata=result["file_info"]["extra_metadata"],
-            ),
-            text=result["text"],
-            embedding=list(result["embedding"]),
-            created_at=result["created_at"],
-            bm25_score=result.get("bm25_score"),
-            rerank_score=result.get("rerank_score"),
-            vector_distance=result.get("vector_distance"),
+    res = []
+    for result in results:
+        file_info = result.get("file_info")
+        res.append(
+            RagQueryResponse(
+                file_info=FileInfoResponse(
+                    id=str(file_info["uid"]),
+                    filename=file_info["filename"],
+                    mime_type=file_info["mime_type"],
+                    size=file_info["size"],
+                    created_at=file_info["created_at"],
+                    extra_metadata=file_info["extra_metadata"],
+                )
+                if file_info
+                else None,
+                text=result["text"],
+                embedding=list(result["embedding"]),
+                created_at=result["created_at"],
+                bm25_score=result.get("bm25_score"),
+                rerank_score=result.get("rerank_score"),
+                vector_distance=result.get("vector_distance"),
+                metadata=result.get("metadata"),
+            )
         )
-        for result in results
-    ]
+    return res
 
 
 rag_router.include_router(rag_service_router, prefix="/service")
