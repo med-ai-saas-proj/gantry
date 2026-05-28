@@ -6,11 +6,17 @@ from pydantic import Field
 
 
 class ApiKeyWriteRequest(BaseDTO):
-    """Input DTO for creating or updating an API key."""
+    """Input DTO for creating an API key."""
 
     name: str = Field(min_length=1, max_length=1024)
     description: str = Field(default="", max_length=4096)
     permissions: list[str] = Field(default_factory=list)
+
+
+class ApiKeyUpdateRequest(ApiKeyWriteRequest):
+    """Input DTO for updating an API key."""
+
+    disabled: bool | None = Field(default=None)
 
 
 class ApiKeyResponse(BaseDTO):

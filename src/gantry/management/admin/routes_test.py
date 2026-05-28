@@ -46,7 +46,7 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
     async def test_get_admin_me_delegates_to_admin_service(self):
         admin_service = Mock()
         expected = routes.AdminUserInfoResponse(
-            id="admin-1",
+            user_id="admin-1",
             username="admin",
             email="admin@test",
         )
@@ -139,10 +139,39 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         admin_service.deleteApiKey.assert_awaited_once_with(123)
 
+    async def test_get_admin_api_key_passes_disabled_query_to_service(self):
+        admin_service = Mock()
+        expected = routes.ApiKeyResponse(
+            api_key_id=11,
+            api_key_uuid="api-key-1",
+            project_id=7,
+            project_uuid="project-1",
+            name="Key",
+            description="",
+            hint="sk_x...abcd",
+            created_at=datetime.now(UTC),
+            permissions=["objects:read"],
+            disabled=False,
+        )
+        admin_service.getApiKey = AsyncMock(return_value=expected)
+
+        result = await routes.get_admin_api_key(
+            ADMIN_INFO,
+            "api-key-1",
+            admin_service,
+            disabled=True,
+        )
+
+        self.assertEqual(result, expected)
+        admin_service.getApiKey.assert_awaited_once_with(
+            "api-key-1",
+            disabled=True,
+        )
+
     async def test_get_user_profile_delegates_to_admin_service(self):
         admin_service = Mock()
         expected = routes.AdminUserProfileResponse(
-            id="user-1",
+            user_id="user-1",
             username="alice",
             email="alice@test",
             first_name="Alice",
@@ -167,6 +196,24 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, expected)
         admin_service.getUserProfile.assert_awaited_once_with("user-1")
 
+    async def test_get_user_permissions_delegates_to_admin_service(self):
+        admin_service = Mock()
+        expected = routes.AdminUserPermissionSummaryResponse(
+            organization_permissions=["organization.settings.read"],
+            effective_organization_permissions=["organization.settings.read"],
+            project_permissions=[],
+        )
+        admin_service.getUserPermissions = AsyncMock(return_value=expected)
+
+        result = await routes.get_user_permissions(
+            ADMIN_INFO,
+            "user-1",
+            admin_service,
+        )
+
+        self.assertEqual(result, expected)
+        admin_service.getUserPermissions.assert_awaited_once_with("user-1")
+
     async def test_set_user_permissions_delegates_to_admin_service(self):
         admin_service = Mock()
         payload = routes.AdminUserPermissionUpdateRequest(
@@ -174,7 +221,7 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             project_permissions=[],
         )
         expected = routes.AdminUserProfileResponse(
-            id="user-1",
+            user_id="user-1",
             username="alice",
             email="alice@test",
             first_name=None,
@@ -242,6 +289,43 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             payload,
         )
 
+    async def test_admin_api_key_routes_pass_disabled_filter_and_update_field(
+        self,
+    ):
+        admin_service = Mock()
+        update_payload = routes.ApiKeyUpdateRequest(
+            name="Key",
+            description="",
+            permissions=["objects:read"],
+            disabled=True,
+        )
+        admin_service.listApiKeys = AsyncMock(return_value="listed")
+        admin_service.updateApiKey = AsyncMock(return_value="updated")
+
+        list_result = await routes.list_admin_api_keys(
+            ADMIN_INFO,
+            "project-1",
+            admin_service,
+            disabled=True,
+        )
+        update_result = await routes.update_admin_api_key(
+            ADMIN_INFO,
+            "api-key-1",
+            update_payload,
+            admin_service,
+        )
+
+        self.assertEqual(list_result, "listed")
+        self.assertEqual(update_result, "updated")
+        admin_service.listApiKeys.assert_awaited_once_with(
+            "project-1",
+            disabled=True,
+        )
+        admin_service.updateApiKey.assert_awaited_once_with(
+            "api-key-1",
+            update_payload,
+        )
+
     async def test_alias_routes_delegate_to_same_admin_service_methods(self):
         admin_service = Mock()
         pagination = routes.AdminPaginationQuery(limit=10, offset=0, q=None)
@@ -249,7 +333,7 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         projects = routes.ProjectUserListResponse(total=0, results=[])
         orgs = []
         profile = routes.AdminUserProfileResponse(
-            id="user-1",
+            user_id="user-1",
             username="alice",
             email="alice@test",
             first_name=None,
@@ -271,6 +355,9 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         admin_service.listProjectUsers = AsyncMock(return_value=projects)
         admin_service.getUserOrganizations = AsyncMock(return_value=orgs)
         admin_service.getUserProfile = AsyncMock(return_value=profile)
+        admin_service.getUserPermissions = AsyncMock(
+            return_value=profile.permissions
+        )
         admin_service.setUserPermissions = AsyncMock(return_value=profile)
         admin_service.resetUserPermissions = AsyncMock(return_value=profile)
 
@@ -292,6 +379,11 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             admin_service,
         )
         await routes.get_user_profile(
+            ADMIN_INFO,
+            "user-1",
+            admin_service,
+        )
+        await routes.get_user_permissions(
             ADMIN_INFO,
             "user-1",
             admin_service,
@@ -318,6 +410,7 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         )
         admin_service.getUserOrganizations.assert_awaited_once_with("user-1")
         admin_service.getUserProfile.assert_awaited_once_with("user-1")
+        admin_service.getUserPermissions.assert_awaited_once_with("user-1")
         admin_service.setUserPermissions.assert_awaited_once_with(
             "user-1",
             payload,

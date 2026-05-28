@@ -145,7 +145,7 @@ async def test_admin_permission_change_response_can_drive_user_project_read(
         json={
             "organization_permissions": ["organization.settings.read"],
             "project_permissions": [
-                {"project_id": PROJECT_UUID, "permissions": ["project.settings.read"]}
+                {"project_uuid": PROJECT_UUID, "permissions": ["project.settings.read"]}
             ],
         },
     )
@@ -153,7 +153,7 @@ async def test_admin_permission_change_response_can_drive_user_project_read(
     project_permissions = permission_update.json()["permissions"]["project_permissions"]
     assert project_permissions == [
         {
-            "id": PROJECT_UUID,
+            "project_uuid": PROJECT_UUID,
             "permissions": ["project.settings.read"],
             "effective_permissions": ["project.settings.read"],
         }

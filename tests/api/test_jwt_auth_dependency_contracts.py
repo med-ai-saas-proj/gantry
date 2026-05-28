@@ -123,7 +123,7 @@ async def test_admin_route_requires_admin_realm_role_from_forged_jwt(
 
     assert normal_response.status_code == 403
     assert admin_response.status_code == 200
-    assert admin_response.json()["id"] == "admin-user"
+    assert admin_response.json()["user_id"] == "admin-user"
     assert [call[0] for call in auth_service.calls] == [
         "verifyTokenAdmin",
         "verifyTokenAdmin",

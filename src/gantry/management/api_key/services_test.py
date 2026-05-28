@@ -158,12 +158,25 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
         self.api_key_repo.getByProjectId = AsyncMock(return_value=[api_key])
         self.api_key_repo.countByProjectId = AsyncMock(return_value=1)
 
-        result = await self.service.getApiKeys(project_uuid="proj-1")
+        result = await self.service.getApiKeys(
+            project_uuid="proj-1",
+            disabled=True,
+        )
 
         self.assertEqual(result.status, ResultStatus.Ok)
         self.assertEqual(result.unwrap().total, 1)
         self.assertEqual(result.unwrap().results[0].api_key_uuid, "api-key-11")
         self.assertEqual(result.unwrap().results[0].project_uuid, "proj-1")
+        self.api_key_repo.getByProjectId.assert_awaited_once_with(
+            self.session_manager.session,
+            7,
+            disabled=True,
+        )
+        self.api_key_repo.countByProjectId.assert_awaited_once_with(
+            self.session_manager.session,
+            7,
+            disabled=True,
+        )
 
     async def test_get_api_keys_returns_project_not_found(self):
         self.project_repo.getByUuid = AsyncMock(return_value=None)
@@ -270,7 +283,7 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             hint="hint",
             created_at=self.created_at,
             permissions=["chat.read"],
-            disabled=False,
+            disabled=True,
         )
         project = SimpleNamespace(id=7, organization_id="org-1", uuid="proj-1")
         self.api_key_repo.getByUuid = AsyncMock(return_value=current)
@@ -282,10 +295,20 @@ class TestApiKeyService(unittest.IsolatedAsyncioTestCase):
             name="updated",
             description="desc",
             permissions=["chat.read"],
+            disabled=True,
         )
 
         self.assertEqual(result.status, ResultStatus.Ok)
         self.assertEqual(result.unwrap().permissions, ["chat.read"])
+        self.assertTrue(result.unwrap().disabled)
+        self.api_key_repo.updateById.assert_awaited_once_with(
+            self.session_manager.session,
+            11,
+            name="updated",
+            description="desc",
+            permissions=["chat.read"],
+            disabled=True,
+        )
         self.session_manager.session.commit.assert_awaited_once()
 
     async def test_update_api_key_returns_not_found_when_update_loses_row(self):

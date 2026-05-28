@@ -140,10 +140,15 @@ async def test_admin_api_key_routes(api_client, authenticated_api) -> None:
     listed = await api_client.get(
         "/v1/admin/api-keys",
         headers=AUTH,
-        params={"project_id": PROJECT_UUID},
+        params={"project_id": PROJECT_UUID, "disabled": "true"},
     )
     assert listed.status_code == 200
     assert listed.json()["results"][0]["project_uuid"] == PROJECT_UUID
+    assert listed.json()["results"][0]["disabled"] is True
+    assert authenticated_api["admin"].calls[-1][1] == {
+        "project_id": PROJECT_UUID,
+        "disabled": True,
+    }
 
     created = await api_client.post(
         "/v1/admin/api-keys",
@@ -155,17 +160,31 @@ async def test_admin_api_key_routes(api_client, authenticated_api) -> None:
     assert created.json()["key"].startswith("sk_")
     assert authenticated_api["admin"].calls[-1][1]["user_info"]["id"] == "admin-1"
 
-    detail = await api_client.get("/v1/admin/api-keys/api-key-1", headers=AUTH)
+    detail = await api_client.get(
+        "/v1/admin/api-keys/api-key-1",
+        headers=AUTH,
+        params={"disabled": "false"},
+    )
     assert detail.status_code == 200
     assert detail.json()["api_key_uuid"] == "api-key-1"
+    assert authenticated_api["admin"].calls[-1][1] == {
+        "api_key_uuid": "api-key-1",
+        "disabled": False,
+    }
 
     updated = await api_client.put(
         "/v1/admin/api-keys/api-key-1",
         headers=AUTH,
-        json={"name": "Updated Key", "description": "updated", "permissions": ["chat.read"]},
+        json={
+            "name": "Updated Key",
+            "description": "updated",
+            "permissions": ["chat.read"],
+            "disabled": True,
+        },
     )
     assert updated.status_code == 200
     assert updated.json()["name"] == "Updated Key"
+    assert updated.json()["disabled"] is True
 
     deleted = await api_client.delete("/v1/admin/api-keys/api-key-1", headers=AUTH)
     assert deleted.status_code == 200
@@ -182,8 +201,15 @@ async def test_admin_user_profile_permission_and_organization_routes(api_client,
     profile = await api_client.get("/v1/admin/users/user-1/profile", headers=AUTH)
     assert profile.status_code == 200
 
+    permissions = await api_client.get(
+        "/v1/admin/users/user-1/permissions",
+        headers=AUTH,
+    )
+    assert permissions.status_code == 200
+    assert permissions.json()["project_permissions"][0]["project_uuid"] == PROJECT_UUID
+
     project_permissions = [
-        {"project_id": PROJECT_UUID, "permissions": ["project.settings.read"]}
+        {"project_uuid": PROJECT_UUID, "permissions": ["project.settings.read"]}
     ]
     updated = await api_client.put(
         "/v1/admin/users/user-1/permissions",
@@ -194,7 +220,7 @@ async def test_admin_user_profile_permission_and_organization_routes(api_client,
         },
     )
     assert updated.status_code == 200
-    assert updated.json()["permissions"]["project_permissions"][0]["id"] == PROJECT_UUID
+    assert updated.json()["permissions"]["project_permissions"][0]["project_uuid"] == PROJECT_UUID
 
     reset = await api_client.delete("/v1/admin/users/user-1/permissions", headers=AUTH)
     assert reset.status_code == 200

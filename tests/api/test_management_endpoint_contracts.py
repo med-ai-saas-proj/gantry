@@ -206,7 +206,7 @@ async def test_api_key_lifecycle_contract(api_client, authenticated_api) -> None
 async def test_admin_dashboard_users_and_permission_write_contract(api_client, authenticated_api) -> None:
     me = await api_client.get("/v1/admin/me", headers=AUTH)
     assert me.status_code == 200
-    assert me.json()["id"] == "admin-1"
+    assert me.json()["user_id"] == "admin-1"
 
     summary = await api_client.get("/v1/admin/dashboard/summary", headers=AUTH)
     assert summary.status_code == 200

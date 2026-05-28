@@ -42,7 +42,7 @@ def build_project_permission_summary(
     )
     return [
         AdminUserProjectPermissionResponse(
-            id=project_uuid,
+            project_uuid=project_uuid,
             permissions=sorted(permissions),
             effective_permissions=sorted(
                 get_effective_project_permissions(sorted(permissions))
@@ -73,5 +73,5 @@ def flatten_project_permission_updates(
 ) -> dict[str, list[str]]:
     """Encode grouped project permissions into the persisted map format."""
     return serialize_project_permission_map(
-        {item.project_id: item.permissions for item in project_permissions}
+        {item.project_uuid: item.permissions for item in project_permissions}
     )

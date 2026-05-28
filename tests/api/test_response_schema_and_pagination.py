@@ -19,7 +19,7 @@ class FakeAdminService:
             "total": 1,
             "results": [
                 {
-                    "id": "user-1",
+                    "user_id": "user-1",
                     "username": "alice",
                     "email": "alice@example.com",
                     "first_name": "Alice",
@@ -47,7 +47,7 @@ async def test_admin_user_list_status_schema_and_pagination(
 
     assert response.status_code == 200
     results = assert_paginated(response.json())
-    assert results[0]["id"] == "user-1"
+    assert results[0]["user_id"] == "user-1"
     assert fake_service.pagination.limit == 5
     assert fake_service.pagination.offset == 10
     assert fake_service.pagination.q == "alice"
