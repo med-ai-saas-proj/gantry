@@ -270,42 +270,72 @@ def generate_answer(
     retrieved_chunks: list[dict[str, Any]],
 ) -> str:
     context_lines: list[str] = []
+
     for index, chunk in enumerate(retrieved_chunks, start=1):
-        chunk_text = str(chunk.get("text", ""))
-        metadata = chunk.get("metadata")
-        doc_id = None
-        if isinstance(metadata, dict):
-            doc_id = metadata.get("doc_id")
-        file_label = str(doc_id) if doc_id else f"chunk-{index}"
-        context_lines.append(f"[{file_label}]\n{chunk_text}")
+        chunk_text = str(chunk.get("text", "")).strip()
+
+        metadata = chunk.get("metadata") or {}
+        doc_id = metadata.get("doc_id")
+
+        source_id = str(doc_id) if doc_id else f"chunk-{index}"
+
+        context_lines.append(f"SOURCE: [{source_id}]\n{chunk_text}")
 
     context = (
-        "\n\n".join(context_lines)
-        if context_lines
-        else "No context was retrieved."
+        "\n\n".join(context_lines) if context_lines else "NO_RETRIEVED_CONTEXT"
     )
+
+    system_prompt = """
+You are an enterprise RAG assistant.
+
+Your task:
+- Answer the user's question ONLY using the provided context.
+- Do NOT use external knowledge.
+- Do NOT guess or infer unsupported facts.
+- If the answer cannot be fully determined from the context, explicitly say so.
+- Prefer concise, factual answers.
+- Cite supporting sources using square brackets like [doc_id].
+- Only cite sources actually used.
+- If multiple sources support a statement, cite all relevant sources.
+- Never fabricate citations.
+- Mustn't call any tools or APIs, only use the provided context.
+
+Output requirements:
+- Produce only the final answer.
+- Do not explain your reasoning process.
+"""
+
+    user_prompt = f"""
+QUESTION:
+{question}
+
+CONTEXT:
+{context}
+"""
+
     response = answer_client.chat.completions.create(
         model=model,
         temperature=0,
-        max_tokens=512,
+        tools=[],
+        tool_choice="none",
         messages=[
             {
                 "role": "system",
-                "content": (
-                    "You answer questions using only the provided enterprise context. "
-                    "If the context does not contain the answer, say that clearly. "
-                    "Cite the relevant document id or chunk label in square brackets when possible."
-                ),
+                "content": system_prompt.strip(),
             },
             {
                 "role": "user",
-                "content": f"QUESTION:\n{question}\n\nCONTEXT:\n{context}",
+                "content": user_prompt.strip(),
             },
         ],
     )
+
     content = response.choices[0].message.content
+
     if content is None:
         raise RuntimeError("The answer model returned an empty response.")
+
+    print(f"Generated answer: {content.strip()}")
     return content.strip()
 
 
@@ -317,48 +347,113 @@ def judge_answer(
     answer: str,
     retrieved_doc_ids: list[str],
 ) -> dict[str, Any]:
+
+    system_prompt = """
+You are a strict RAG evaluation judge.
+
+Evaluate the assistant answer against:
+1. the gold answer
+2. required answer facts
+3. retrieved documents
+
+Evaluation criteria:
+
+CORRECTNESS (boolean)
+- true:
+  - the answer is factually correct
+  - no major hallucinations
+  - no contradictions to the gold answer
+- false:
+  - contains incorrect claims
+  - contradicts the gold answer
+  - major hallucinations
+  - misses the core answer
+
+COMPLETENESS (0.0 - 1.0)
+Measures how fully the assistant covered the expected answer facts.
+Guidelines:
+- 1.0 = all major facts covered
+- 0.7 = most important facts covered
+- 0.5 = partial answer
+- 0.2 = minimal useful information
+- 0.0 = completely missing answer
+
+RECALL (0.0 - 1.0)
+Measures whether the retrieved documents contained the necessary information.
+This evaluates retrieval quality, NOT answer quality.
+Use:
+- expected_doc_ids
+- retrieved_doc_ids
+
+Guidelines:
+- 1.0 = all required documents retrieved
+- 0.5 = some required documents retrieved
+- 0.0 = no required documents retrieved
+
+Important:
+- Penalize hallucinated information.
+- Penalize unsupported claims.
+- The assistant should not receive high completeness if key facts are missing.
+- Be strict and consistent.
+- Mustn't call any tools or APIs, only use the provided context.
+
+Return ONLY valid JSON.
+
+Required schema:
+{
+  "correctness": boolean,
+  "completeness": number,
+  "recall": number,
+  "reason": string
+}
+"""
+
+    user_payload = {
+        "question_id": question["question_id"],
+        "question": question["question"],
+        "gold_answer": question["gold_answer"],
+        "answer_facts": question["answer_facts"],
+        "assistant_answer": answer,
+        "expected_doc_ids": question["expected_doc_ids"],
+        "retrieved_doc_ids": retrieved_doc_ids,
+    }
+
     response = judge_client.chat.completions.create(
         model=model,
         temperature=0,
-        max_tokens=512,
+        response_format={"type": "json_object"},
+        tools=[],
+        tool_choice="none",
         messages=[
             {
                 "role": "system",
-                "content": (
-                    "You are a strict evaluation judge for WixQA. "
-                    "Compare the assistant answer against the gold answer and answer facts. "
-                    "Return only JSON with keys correctness, completeness, and reason. "
-                    "correctness must be a boolean and completeness must be a number between 0 and 1."
-                ),
+                "content": system_prompt.strip(),
             },
             {
                 "role": "user",
-                "content": json.dumps(
-                    {
-                        "question_id": question["question_id"],
-                        "question": question["question"],
-                        "gold_answer": question["gold_answer"],
-                        "answer_facts": question["answer_facts"],
-                        "assistant_answer": answer,
-                        "expected_doc_ids": question["expected_doc_ids"],
-                        "retrieved_doc_ids": retrieved_doc_ids,
-                    },
-                    ensure_ascii=False,
-                ),
+                "content": json.dumps(user_payload, ensure_ascii=False),
             },
         ],
     )
+
     content = response.choices[0].message.content
+
     if content is None:
         raise RuntimeError("The judge model returned an empty response.")
 
     parsed = extract_json_object(content)
-    correctness = bool(parsed.get("correctness", parsed.get("correct", False)))
+    print(
+        f"Judge evaluation: {json.dumps(parsed, indent=2, ensure_ascii=False)}"
+    )
+
+    correctness = bool(parsed.get("correctness", False))
     completeness = float(parsed.get("completeness", 0.0))
+    recall = float(parsed.get("recall", 0.0))
     reason = str(parsed.get("reason", ""))
     return {
         "correctness": correctness,
         "completeness": max(0.0, min(1.0, completeness)),
+        "recall": max(0.0, min(1.0, recall)),
         "reason": reason,
     }
 
@@ -500,6 +595,9 @@ def run_queries_with_llm(
     average_completeness = sum(
         float(item["judgement"]["completeness"]) for item in results
     ) / len(results)
+    average_llm_judge_recall = sum(
+        float(item["judgement"]["recall"]) for item in results
+    ) / len(results)
 
     not_none_results = [
         item for item in results if item.get("retrieved_doc_recall") is not None
@@ -516,6 +614,7 @@ def run_queries_with_llm(
         "questions_processed": len(results),
         "average_correctness": average_correctness,
         "average_completeness": average_completeness,
+        "average_llm_judge_recall": average_llm_judge_recall,
         "average_retrieved_doc_recall": average_retrieved_doc_recall,
         "results": results,
         "average_latency_seconds": average_latency_seconds,

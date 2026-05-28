@@ -12,7 +12,7 @@ import asyncio
 
 
 BUILD_RAG_DOCUMENT_BATCH_SIZE: int = 15
-BUILD_RAG_CHUNK_SIZE: int = 2000000
+BUILD_RAG_CHUNK_SIZE: int = 2000
 BUILD_CHUNK_OVERLAP: int = 150
 
 BUILD_TASK_TIMEOUT_SECONDS: int = 1800
@@ -46,7 +46,7 @@ async def main(argv: list[str] | None = None) -> int:
         document_batch_size=BUILD_RAG_DOCUMENT_BATCH_SIZE,
         chunk_size=BUILD_RAG_CHUNK_SIZE,
         chunk_overlap=BUILD_CHUNK_OVERLAP,
-        chunk_splitter="simple",
+        chunk_splitter="recursive",
     )
     return 0
 
