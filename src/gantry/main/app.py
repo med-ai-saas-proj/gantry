@@ -6,6 +6,7 @@ from gantry.shared.utils import request_id_utils
 from gantry.otel.settings import getOtelSettings
 from gantry.shared.consts import common_const
 from gantry.management.billing import internal_billing_router
+from gantry.service.ai_gateway import ai_gateway_router
 from gantry.shared.logging.logger import getLogger
 from gantry.settings.observability import MetricsType
 from gantry.shared.dtos.error_output import (
@@ -121,6 +122,7 @@ main_app.mount("/gateway", gateway_app, "gateway")
 # main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
 
 internal_app.include_router(internal_billing_router)
+internal_app.include_router(ai_gateway_router)
 
 if getOtelSettings().metrics == MetricsType.prometheus:
     from prometheus_client import make_asgi_app
