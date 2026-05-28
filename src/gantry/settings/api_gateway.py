@@ -1,12 +1,11 @@
-from __future__ import annotations
-
 from typing import Annotated
 from datetime import timedelta
 
-from pydantic import Field, BaseModel
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
-class ApiGatewayRoute(BaseModel):
+class ApiGatewayRoute(BaseSettings):
     address: Annotated[
         str,
         Field(
@@ -39,7 +38,7 @@ class ApiGatewayRoute(BaseModel):
     # ] = None
 
 
-class ApiGatewaySettings(BaseModel):
+class ApiGatewaySettings(BaseSettings):
     routes: Annotated[
         dict[str, ApiGatewayRoute],
         Field(description="Route definitions keyed by route name."),

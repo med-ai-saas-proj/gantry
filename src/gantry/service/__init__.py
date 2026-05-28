@@ -3,6 +3,7 @@ from gantry.shared.consts.common_const import APP_NAME
 from gantry.shared.custom_types.error_exception import ProblemDetails
 
 from .rag import rag_router
+from .ai_gateway import ai_gateway_router
 from .conversation import conversation_router
 from .file_storage import file_storage_router
 
@@ -43,6 +44,7 @@ v1_router = APIRouter(prefix="/v1", tags=["service"], include_in_schema=True)
 v1_router.include_router(rag_router)
 v1_router.include_router(file_storage_router)
 v1_router.include_router(conversation_router)
+v1_router.include_router(ai_gateway_router)
 
 # api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)
 # api_router.include_router(v1_router)

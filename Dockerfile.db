@@ -2,6 +2,7 @@ FROM timescale/timescaledb:latest-pg18
 
 USER root
 
+
 # build and install pg_textsearch
 RUN apk add --no-cache --virtual .build-deps \
     git \
