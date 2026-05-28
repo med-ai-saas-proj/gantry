@@ -54,6 +54,7 @@ class _SessionManager:
 def _make_rag_settings():
     settings = Mock(spec=RagSettings)
     settings.embedding_model = "text-embedding-3-small"
+    settings.supported_langs_list = ["simple"]
     settings.rag_store_parameters = {
         "dimension": 1536,
         "index_params": {
@@ -136,11 +137,16 @@ class TestRagService(unittest.IsolatedAsyncioTestCase):
                 "gantry.service.rag.services.create_vector_index",
                 new=AsyncMock(),
             ) as mock_create_index,
+            patch(
+                "gantry.service.rag.services.create_bm25_index",
+                new=AsyncMock(),
+            ) as mock_create_bm25_index,
         ):
             await service.createBucket()
 
             mock_create_table.assert_awaited_once()
             mock_create_index.assert_awaited_once()
+            mock_create_bm25_index.assert_awaited_once()
             session.commit.assert_awaited_once()
 
     async def test_add_file_returns_task_id_when_file_exists(self):

@@ -82,6 +82,8 @@ db_supported_langs = [
 async def create_embedding_table(
     session: AsyncSession, table_name: str, dimension: int
 ):
+    sql = text("CREATE EXTENSION IF NOT EXISTS vector;")
+    await session.execute(sql)
     sql = text(f"""
     CREATE TABLE IF NOT EXISTS "Rag"."{table_name}" (
         id BIGSERIAL PRIMARY KEY,
@@ -94,6 +96,42 @@ async def create_embedding_table(
         lang TEXT default 'simple',
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );""")
+    await session.execute(sql)
+    sql = text(f"""
+    ALTER TABLE "Rag"."{table_name}" ADD COLUMN IF NOT EXISTS file_id BIGINT REFERENCES "FileStorage"."Files"(id) ON DELETE CASCADE;
+    """)
+    await session.execute(sql)
+    sql = text(f"""
+    ALTER TABLE "Rag"."{table_name}" ADD COLUMN IF NOT EXISTS hash TEXT;
+    """)
+    await session.execute(sql)
+    sql = text(f"""
+    ALTER TABLE "Rag"."{table_name}" ADD COLUMN IF NOT EXISTS project_id BIGINT REFERENCES "Project"."Projects"(id) ON DELETE CASCADE;
+    """)
+    await session.execute(sql)
+    sql = text(f"""
+    ALTER TABLE "Rag"."{table_name}" ADD COLUMN IF NOT EXISTS text TEXT;
+    """)
+    await session.execute(sql)
+    sql = text(f"""
+    ALTER TABLE "Rag"."{table_name}" ADD COLUMN IF NOT EXISTS chunk_metadata JSONB;
+    """)
+    await session.execute(sql)
+    sql = text(f"""
+    ALTER TABLE "Rag"."{table_name}" ADD COLUMN IF NOT EXISTS lang TEXT DEFAULT 'simple';
+    """)
+    await session.execute(sql)
+    sql = text(f"""
+    ALTER TABLE "Rag"."{table_name}" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW();
+    """)
+    await session.execute(sql)
+    sql = text(f"""
+    UPDATE "Rag"."{table_name}" SET hash = md5(COALESCE(text, '') || ':' || id::text) WHERE hash IS NULL;
+    """)
+    await session.execute(sql)
+    sql = text(f"""
+    ALTER TABLE "Rag"."{table_name}" ALTER COLUMN hash SET NOT NULL;
+    """)
     await session.execute(sql)
     sql = text(f"""
     CREATE INDEX IF NOT EXISTS "{table_name}_file_id_idx" ON "Rag"."{table_name}" (file_id);
@@ -117,6 +155,8 @@ def getHashUniqueIndexName(table_name: str) -> str:
 async def create_bm25_index(
     session: AsyncSession, table_name: str, supported_langs_list: list[str]
 ):
+    sql = text("CREATE EXTENSION IF NOT EXISTS pg_textsearch;")
+    await session.execute(sql)
     db_supported_langs_set = set(db_supported_langs)
     target_langs_set = set(supported_langs_list)
     if not target_langs_set.issubset(db_supported_langs_set):

@@ -22,28 +22,64 @@ jobs:
       - run: uv sync --group dev
       - name: Choose E2E host port
         run: |
-          PORT="$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')"
-          echo "E2E_HOST_PORT=${PORT}" >> "${GITHUB_ENV}"
-          echo "E2E_BASE_URL=http://localhost:${PORT}" >> "${GITHUB_ENV}"
+          python - <<'PY' >> "${GITHUB_ENV}"
+          import socket
+
+          names = [
+              "E2E_HOST_PORT",
+              "E2E_POSTGRES_HOST_PORT",
+              "E2E_REDIS_HOST_PORT",
+              "E2E_KEYCLOAK_HOST_PORT",
+              "E2E_MAILPIT_HTTP_HOST_PORT",
+              "E2E_MAILPIT_SMTP_HOST_PORT",
+              "E2E_MINIO_API_HOST_PORT",
+              "E2E_MINIO_CONSOLE_HOST_PORT",
+          ]
+          sockets = []
+          ports = {}
+          for name in names:
+              sock = socket.socket()
+              sock.bind(("", 0))
+              ports[name] = sock.getsockname()[1]
+              sockets.append(sock)
+          for name, port in ports.items():
+              print(f"{name}={port}")
+          print(f"E2E_BASE_URL=http://localhost:{ports['E2E_HOST_PORT']}")
+          print(f"KEYCLOAK_URL=http://localhost:{ports['E2E_KEYCLOAK_HOST_PORT']}")
+          print(f"MAILPIT_API_URL=http://localhost:{ports['E2E_MAILPIT_HTTP_HOST_PORT']}")
+          print(f"MINIO_URL=http://localhost:{ports['E2E_MINIO_API_HOST_PORT']}")
+          print("E2E_FORCE_COMPOSE=1")
+          for sock in sockets:
+              sock.close()
+          PY
+      - name: Use existing local E2E stack under act
+        if: ${{ env.ACT == 'true' }}
+        run: |
+          echo "E2E_SKIP_COMPOSE=1" >> "${GITHUB_ENV}"
+          echo "E2E_FORCE_COMPOSE=0" >> "${GITHUB_ENV}"
+          echo "E2E_BASE_URL=http://localhost:8000" >> "${GITHUB_ENV}"
+          echo "KEYCLOAK_URL=http://localhost:8080" >> "${GITHUB_ENV}"
+          echo "MAILPIT_API_URL=http://localhost:8025" >> "${GITHUB_ENV}"
+          echo "MINIO_URL=http://localhost:9000" >> "${GITHUB_ENV}"
       - name: Run backend-first full-stack E2E tests
         env:
           GANTRY_SERVER__CONFIG_FILE: example.gantry.toml
           PYTHONPATH: src
         run: make test-e2e-backend
-      - name: Collect compose logs
-        if: ${{ always() }}
-        run: |
-          mkdir -p reports/e2e
-          docker compose -f compose.yaml -f docker/docker-compose.e2e.yml logs --no-color > reports/e2e/compose.log || true
-      - name: Collect Mailpit messages
-        if: ${{ always() }}
-        run: |
-          mkdir -p reports/e2e
-          curl -fsS http://localhost:8025/api/v1/messages > reports/e2e/mailpit-messages.json || true
-      - name: Upload E2E artifacts
-        if: ${{ always() && env.ACT != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-e2e-artifacts
-          path: reports/e2e
-          if-no-files-found: ignore
+      # - name: Collect compose logs
+      #   if: ${{ always() }}
+      #   run: |
+      #     mkdir -p reports/e2e
+      #     docker compose -f compose.yaml -f docker/docker-compose.e2e.yml logs --no-color > reports/e2e/compose.log || true
+      # - name: Collect Mailpit messages
+      #   if: ${{ always() }}
+      #   run: |
+      #     mkdir -p reports/e2e
+      #     curl -fsS http://localhost:8025/api/v1/messages > reports/e2e/mailpit-messages.json || true
+      # - name: Upload E2E artifacts
+      #   if: ${{ always() && env.ACT != 'true' }}
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: backend-e2e-artifacts
+      #     path: reports/e2e
+      #     if-no-files-found: ignore

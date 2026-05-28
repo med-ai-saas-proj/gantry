@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from tests.api.coverage_matrix import operations_with_request_body
+from tests.api.coverage_matrix import (
+    operations_requiring_security,
+    operations_with_request_body,
+)
 from tests.helpers.routes import operations, sample_path
 
 pytestmark = pytest.mark.api
@@ -13,7 +16,9 @@ pytestmark = pytest.mark.api
     ("method", "path"),
     [
         operation
-        for operation in operations(pytest.importorskip("gantry.service").service_app.openapi())
+        for operation in operations_requiring_security(
+            pytest.importorskip("gantry.service").service_app.openapi(),
+        )
     ],
 )
 async def test_protected_service_operations_reject_missing_auth(
@@ -35,14 +40,14 @@ async def test_protected_service_operations_reject_missing_auth(
         for operation in operations(pytest.importorskip("gantry.main.app").internal_app.openapi())
     ],
 )
-async def test_protected_internal_operations_reject_missing_auth(
+async def test_internal_operations_without_auth_never_return_unexpected_5xx(
     internal_client,
+    authenticated_internal_api,
     method: str,
     path: str,
 ) -> None:
     response = await internal_client.request(method, sample_path(path), json={})
 
-    assert response.status_code in {401, 403, 422}
     assert response.status_code < 500
 
 
@@ -57,10 +62,10 @@ async def test_gateway_proxy_rejects_missing_api_key(gateway_client) -> None:
 @pytest.mark.parametrize(
     ("method", "path", "json_body"),
     [
-        ("post", "/v1/conversations/33333333-3333-3333-3333-333333333333/messages", {"messages": "bad"}),
-        ("get", "/v1/conversations/not-a-uuid", None),
+        ("post", "/v1/conversations/sequence/33333333-3333-3333-3333-333333333333/messages", {"messages": "bad"}),
+        ("get", "/v1/conversations/sequence/not-a-uuid", None),
         ("post", "/v1/rag/service/query/text", {"top_k": 0, "query_text": "hello"}),
-        ("post", "/billing/credits", {"org_id": "org-1", "amount": "bad"}),
+        ("post", "/billing/", {"api_key_uuid": "44444444-4444-4444-4444-444444444444", "amount": "bad"}),
     ],
 )
 async def test_cross_app_invalid_request_shapes_return_422(

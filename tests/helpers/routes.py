@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-
 HTTP_METHODS = {"get", "post", "put", "patch", "delete"}
 
 SAMPLE_VALUES = {
@@ -38,19 +36,3 @@ def sample_path(path: str) -> str:
     for name, value in SAMPLE_VALUES.items():
         sampled = sampled.replace("{" + name + "}", value)
     return sampled
-
-
-def operation_lines(openapi: dict) -> list[str]:
-    return [f"{method}\t{path}" for method, path in operations(openapi)]
-
-
-def assert_operation_grouped(
-    app_name: str,
-    openapi: dict,
-    groups: dict[str, Iterable[str]],
-) -> None:
-    missing: list[str] = []
-    for method, path in operations(openapi):
-        if not any(path.startswith(prefix) for prefixes in groups.values() for prefix in prefixes):
-            missing.append(f"{app_name}:{method} {path}")
-    assert not missing, "operations missing test group: " + ", ".join(missing)

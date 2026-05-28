@@ -98,6 +98,14 @@ def test_slow_workflows_are_not_pr_gates(repo_root) -> None:
         assert "workflow_dispatch:" in content
 
 
+def test_performance_workflow_keeps_load_smoke_manual_only(repo_root) -> None:
+    content = _workflow(repo_root, WORKFLOW_FILES["performance"])
+
+    assert "benchmark:" in content
+    assert "load-smoke:" in content
+    assert "inputs.run_load_smoke == 'true'" in content
+
+
 @pytest.mark.parametrize("name", WORKFLOW_FILES.values())
 def test_workflows_have_timeout_and_concurrency(repo_root, name: str) -> None:
     content = _workflow(repo_root, name)
@@ -125,30 +133,20 @@ def test_workflows_call_expected_make_targets(repo_root, name: str, target: str)
     assert target in content
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        "unit-test.yml",
-        "api-test.yml",
-        "integration-test.yml",
-        "regression-test.yml",
-        "e2e-test.yml",
-        "performance-test.yml",
-        "automation-test.yml",
-    ],
-)
-def test_workflows_upload_reports_or_artifacts(repo_root, name: str) -> None:
+@pytest.mark.parametrize("name", WORKFLOW_FILES.values())
+def test_test_workflows_do_not_upload_artifacts_on_free_ci(repo_root, name: str) -> None:
     content = _workflow(repo_root, name)
 
-    assert "actions/upload-artifact@v4" in content
-    assert "if-no-files-found: ignore" in content
+    assert "actions/upload-artifact" not in content
+    assert "Upload " not in content
 
 
-def test_api_workflow_runs_route_inventory_contract(repo_root) -> None:
+def test_api_workflow_runs_behavior_contract_suite(repo_root) -> None:
     content = _workflow(repo_root, "api-test.yml")
 
     assert "make test-api" in content
-    assert (repo_root / "tests/api/test_all_app_route_inventory_contracts.py").exists()
+    assert (repo_root / "tests/api/test_all_route_security_and_validation.py").exists()
+    assert (repo_root / "tests/api/test_domain_error_contracts.py").exists()
 
 
 def test_workflow_files_are_tracked_as_yaml(repo_root) -> None:

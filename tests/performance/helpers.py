@@ -21,7 +21,6 @@ from gantry.shared.utils.scaled_amount import (
     int_to_scaled_int,
     scaled_int_to_decimal,
 )
-from tests.helpers.routes import sample_path
 
 
 ORG_ID = "org-benchmark"
@@ -90,7 +89,3 @@ def scaled_amount_roundtrip() -> tuple[int, int, Decimal]:
         decimal_to_scaled_int(Decimal("12.34567891"), 8),
         scaled_int_to_decimal(1234567891, 8),
     )
-
-
-def sample_management_paths(paths: list[str]) -> list[str]:
-    return [sample_path(path) for path in paths]

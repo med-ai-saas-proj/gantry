@@ -35,8 +35,3 @@ def assert_paginated(payload: dict[str, Any]) -> list[dict[str, Any]]:
     assert isinstance(payload["results"], list)
     return payload["results"]
 
-
-def assert_openapi_operation(paths: dict[str, Any], path: str, method: str) -> dict[str, Any]:
-    assert path in paths, f"missing OpenAPI path: {path}"
-    assert method.lower() in paths[path], f"missing {method.upper()} {path}"
-    return paths[path][method.lower()]

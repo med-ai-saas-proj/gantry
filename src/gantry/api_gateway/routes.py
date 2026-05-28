@@ -1,5 +1,6 @@
 from gantry.settings import AppStage, getAppSettings
 from gantry.management.api_key import ApiKeyInfo, getApiKeyInfo
+from gantry.shared.health import setup_health_routes
 
 from .service import ApiGatewayService
 from .settings import getApiGatewaySettings
@@ -17,6 +18,7 @@ from starlette.background import BackgroundTask
 
 gateway_app = FastAPI(debug=getAppSettings().stage == AppStage.DEV)
 
+setup_health_routes(gateway_app)
 
 HOP_BY_HOP_HEADERS = {
     "connection",

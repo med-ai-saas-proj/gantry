@@ -1,6 +1,7 @@
 from gantry.settings import AppStage, getAppSettings
 from gantry.shared.consts.common_const import APP_NAME
 from gantry.shared.custom_types.error_exception import ProblemDetails
+from gantry.shared.health import setup_health_routes
 
 from .rag import rag_router
 from .conversation import conversation_router
@@ -38,6 +39,8 @@ service_app.add_middleware(
     # allow_headers=["Content-Type", "X-Api-Key"],
     allow_headers=["*"],
 )
+
+setup_health_routes(service_app)
 
 v1_router = APIRouter(prefix="/v1", tags=["service"], include_in_schema=True)
 v1_router.include_router(rag_router)

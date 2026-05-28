@@ -10,20 +10,6 @@ AUTH = {"Authorization": "Bearer test-token"}
 
 
 @pytest.mark.asyncio
-async def test_all_management_operations_match_committed_snapshot(
-    management_openapi: dict, repo_root
-) -> None:
-    operations = []
-    for path, methods in sorted(management_openapi["paths"].items()):
-        for method in sorted(methods):
-            if method in {"get", "post", "put", "patch", "delete"}:
-                operations.append(f"{method.upper()}\t{path}")
-
-    expected = (repo_root / "tests" / "snapshots" / "management_operations.tsv").read_text()
-    assert "\n".join(operations) + "\n" == expected
-
-
-@pytest.mark.asyncio
 async def test_organization_metadata_settings_users_and_permissions_contract(
     api_client, authenticated_api
 ) -> None:

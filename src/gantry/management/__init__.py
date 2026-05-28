@@ -1,6 +1,7 @@
 from gantry.settings import AppStage, getAppSettings
 from gantry.shared.consts.common_const import APP_NAME
 from gantry.shared.custom_types.error_exception import ProblemDetails
+from gantry.shared.health import setup_health_routes
 
 from .admin import admin_router
 from .api_key import apikey_router
@@ -41,6 +42,8 @@ management_app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
+
+setup_health_routes(management_app)
 
 v1_router = APIRouter(prefix="/v1", tags=["v1"], include_in_schema=True)
 v1_router.include_router(admin_router)

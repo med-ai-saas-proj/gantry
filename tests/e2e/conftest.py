@@ -22,6 +22,7 @@ FRONTEND_CLIENT_ID = os.environ.get("E2E_FRONTEND_CLIENT_ID", "gantry-frontend")
 ADMIN_CLIENT_ID = os.environ.get("E2E_ADMIN_CLIENT_ID", "gantry-admin")
 KEYCLOAK_ADMIN_USERNAME = os.environ.get("KEYCLOAK_ADMIN_USERNAME", "admin")
 KEYCLOAK_ADMIN_PASSWORD = os.environ.get("KEYCLOAK_ADMIN_PASSWORD", "admin")
+MINIO_URL = os.environ.get("MINIO_URL", "http://localhost:9000")
 
 
 @dataclass(frozen=True)
@@ -143,7 +144,7 @@ class BackendE2EClient:
         assert response.status_code == 200, response.text
         for user in response.json().get("results", []):
             if user.get("username") == username:
-                return user["id"]
+                return user.get("user_id") or user["id"]
         raise AssertionError(f"Could not find seeded user {username!r}: {response.text}")
 
     def create_project(self, *, name_prefix: str = "e2e-backend") -> dict:
@@ -219,6 +220,7 @@ def _existing_infra_ready() -> bool:
         and _container_running("redis")
         and _container_running("keycloak")
         and _container_running("mailpit")
+        and _container_running("minio")
     )
 
 
@@ -275,12 +277,16 @@ def _dump_compose_diagnostics() -> None:
 
 
 def _compose_up() -> list[str]:
-    infra_was_ready = _existing_infra_ready()
+    infra_was_ready = (
+        os.environ.get("E2E_FORCE_COMPOSE") != "1"
+        and _existing_infra_ready()
+    )
     services = ["gantry"] if infra_was_ready else [
         "timescale_db",
         "redis",
         "keycloak",
         "mailpit",
+        "minio",
         "gantry",
     ]
     try:
@@ -304,6 +310,7 @@ def _compose_up() -> list[str]:
             env.setdefault("E2E_GANTRY_DB_HOST", gateway)
             env.setdefault("E2E_GANTRY_REDIS_HOST", gateway)
             env.setdefault("E2E_GANTRY_KEYCLOAK_URL", f"http://{gateway}:8080/")
+            env.setdefault("E2E_GANTRY_S3_ENDPOINT_URL", f"http://{gateway}:9000")
         subprocess.run(
             up_command,
             cwd=REPO_ROOT,
@@ -311,7 +318,9 @@ def _compose_up() -> list[str]:
             check=True,
         )
     except subprocess.CalledProcessError:
-        if _existing_infra_ready() and _http_status_ready(f"{BASE_URL}/ready"):
+        if _existing_infra_ready() and _http_status_ready(
+            f"{BASE_URL}/management/v1/organizations/permissions"
+        ):
             return []
         raise
     return ["gantry"] if infra_was_ready else services
@@ -357,9 +366,9 @@ def full_stack() -> Iterator[dict[str, str]]:
         started_services = _compose_up()
 
     _wait_for_http_status(f"{KEYCLOAK_URL}/realms/{REALM}/.well-known/openid-configuration")
-    _wait_for_http_status(f"{BASE_URL}/ready")
     _wait_for_http_status(f"{BASE_URL}/management/v1/organizations/permissions")
     _wait_for_http_status(f"{MAILPIT_API_URL.rstrip('/')}/api/v1/messages")
+    _wait_for_http_status(f"{MINIO_URL.rstrip('/')}/minio/health/live")
 
     yield {
         "base_url": BASE_URL.rstrip("/"),
@@ -479,7 +488,7 @@ def _find_seeded_user_id(
     assert response.status_code == 200, response.text
     for user in response.json().get("results", []):
         if user.get("username") == SEEDED_USER_USERNAME:
-            return user["id"]
+            return user.get("user_id") or user["id"]
     raise AssertionError(f"Could not find seeded user {SEEDED_USER_USERNAME!r}: {response.text}")
 
 

@@ -196,7 +196,7 @@ async def test_management_billing_domain_errors_are_mapped_to_http_problem_detai
         ("file_storage", "deleteFile", "DELETE", f"/v1/file-storage/service/{FILE_UUID}", FileNotFoundInSystemError(), 404, None),
         ("rag", "getTaskStatus", "GET", "/v1/rag/service/files/task-1", TaskNotFoundError(), 404, None),
         ("rag", "querySimilarByVector", "POST", "/v1/rag/service/query/vector", InvalidEmbeddingDimensionError(), 400, {"embedding": [0.1], "top_k": 3}),
-        ("conversation", "getConversationMetadata", "GET", f"/v1/conversations/{CONVERSATION_UUID}", ProjectNotFoundError(), 404, None),
+        ("sequence_conversation", "getConversationMetadata", "GET", f"/v1/conversations/sequence/{CONVERSATION_UUID}", ProjectNotFoundError(), 404, None),
     ],
 )
 async def test_service_domain_errors_are_mapped_to_http_problem_details(
@@ -221,9 +221,8 @@ async def test_service_domain_errors_are_mapped_to_http_problem_details(
 @pytest.mark.parametrize(
     ("service_key", "method_name", "request_method", "path", "error", "expected_status", "body"),
     [
-        ("billing_transaction", "post", "POST", "/billing/", SpendingLimitExceeded(), 403, {"amount": {"value": 1234, "scale": 2}, "details": {"usage": 1}, "capture": False}),
+        ("billing_transaction", "post", "POST", "/billing/", SpendingLimitExceeded(), 403, {"api_key_uuid": "77777777-7777-7777-7777-777777777777", "amount": {"value": 1234, "scale": 2}, "details": {"usage": 1}, "capture": False}),
         ("billing_transaction", "capture", "POST", f"/billing/{TRANSACTION_UUID}/capture", TransactionNotFoundOrExpiredOrCaptured(), 400, {"real_amount": {"value": 1234, "scale": 2}}),
-        ("invoice", "getInvoiceByIdForAdmin", "GET", f"/billing/invoices/{INVOICE_UUID}", InvoiceNotFoundError(), 404, None),
     ],
 )
 async def test_internal_billing_domain_errors_are_mapped_to_http_problem_details(

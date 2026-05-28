@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from uuid import UUID
+
 from tests.api.fakes import FILE_UUID, PROJECT_UUID
 
 pytestmark = pytest.mark.api
@@ -36,19 +38,28 @@ async def test_api_key_file_storage_lifecycle_routes_delegate_project_id(service
 
 
 @pytest.mark.asyncio
-async def test_user_file_storage_routes_currently_require_project_uuid_path_context(service_client, authenticated_service_api) -> None:
-    responses = [
-        await service_client.get("/v1/file-storage/user/", headers=AUTH, params={"project_uuid": PROJECT_UUID}),
-        await service_client.get(f"/v1/file-storage/user/{FILE_UUID}", headers=AUTH, params={"project_uuid": PROJECT_UUID}),
-        await service_client.post(
-            "/v1/file-storage/user/",
-            headers=AUTH,
-            files={"file": ("report.txt", b"hello", "text/plain")},
-            params={"project_uuid": PROJECT_UUID},
-        ),
-    ]
+async def test_user_file_storage_routes_delegate_project_uuid_query_context(service_client, authenticated_service_api) -> None:
+    listed = await service_client.get(
+        "/v1/file-storage/user/",
+        headers=AUTH,
+        params={"project_uuid": PROJECT_UUID},
+    )
+    detail_without_path_context = await service_client.get(
+        f"/v1/file-storage/user/{FILE_UUID}",
+        headers=AUTH,
+        params={"project_uuid": PROJECT_UUID},
+    )
+    uploaded = await service_client.post(
+        "/v1/file-storage/user/",
+        headers=AUTH,
+        files={"file": ("report.txt", b"hello", "text/plain")},
+        params={"project_uuid": PROJECT_UUID},
+    )
 
-    assert {response.status_code for response in responses} == {400}
+    assert listed.status_code == 200
+    assert detail_without_path_context.status_code == 400
+    assert uploaded.status_code == 201
+    assert ("listFilesInProjectByUUID", UUID(PROJECT_UUID)) in authenticated_service_api["file_storage"].calls
 
 
 @pytest.mark.asyncio

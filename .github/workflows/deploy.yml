@@ -1,0 +1,107 @@
+name: Deploy Full Server
+
+on:
+  push:
+    branches:
+      - prod
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to deploy. Defaults to the workflow ref.
+        required: false
+        type: string
+      skip_build_cache:
+        description: Build Docker image without cache.
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: deploy-full-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Blue-green deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Deploy to VM via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script_stop: true
+          command_timeout: 30m
+          script: |
+            set -euo pipefail
+
+            REPO_DIR="${HOME}/repo"
+            CERT_DIR="${HOME}/gantry-certs"
+            DEPLOY_REF="${{ github.event.inputs.ref || github.ref_name }}"
+
+            mkdir -p -m 0700 "$HOME/.ssh"
+            ssh-keyscan github.com >> "$HOME/.ssh/known_hosts"
+
+            cat > "$HOME/.ssh/schema_repo_read_ssh_key" <<'SCHEMA_KEY_EOF'
+            ${{ secrets.SCHEMA_REPO_READ_SSH_KEY }}
+            SCHEMA_KEY_EOF
+            chmod 600 "$HOME/.ssh/schema_repo_read_ssh_key"
+
+            cat > "$HOME/.ssh/deployment_key" <<'DEPLOY_KEY_EOF'
+            ${{ secrets.API_HUB_DEPLOY_KEY }}
+            DEPLOY_KEY_EOF
+            chmod 600 "$HOME/.ssh/deployment_key"
+
+            if [ -d "$REPO_DIR/.git" ]; then
+              ssh-agent bash -c "ssh-add '$HOME/.ssh/deployment_key'; cd '$REPO_DIR' && git fetch --prune origin && git checkout '$DEPLOY_REF' && git pull --ff-only origin '$DEPLOY_REF'"
+            else
+              rm -rf "$REPO_DIR"
+              ssh-agent bash -c "ssh-add '$HOME/.ssh/deployment_key'; git clone --branch '$DEPLOY_REF' git@github.com:${{ github.repository }}.git '$REPO_DIR'"
+            fi
+
+            cd "$REPO_DIR"
+
+            rm -f prod.gantry.toml
+            cat > prod.gantry.toml <<'PROD_CONFIG_EOF'
+            ${{ secrets.ENV_FILE }}
+            PROD_CONFIG_EOF
+            chmod 600 prod.gantry.toml 2>/dev/null || true
+
+            mkdir -p "$CERT_DIR"
+            chmod 700 "$CERT_DIR"
+            if [ -n "${{ secrets.TLS_CERT_B64 }}" ]; then
+              printf '%s' "${{ secrets.TLS_CERT_B64 }}" | base64 -d > "$CERT_DIR/tls.crt"
+            else
+              cat > "$CERT_DIR/tls.crt" <<'CERT_EOF'
+            ${{ secrets.TLS_CERT_PEM }}
+            CERT_EOF
+            fi
+            if [ -n "${{ secrets.TLS_KEY_B64 }}" ]; then
+              printf '%s' "${{ secrets.TLS_KEY_B64 }}" | base64 -d > "$CERT_DIR/tls.key"
+            else
+              cat > "$CERT_DIR/tls.key" <<'KEY_EOF'
+            ${{ secrets.TLS_KEY_PEM }}
+            KEY_EOF
+            fi
+            if [ -n "${{ secrets.TLS_CA_CERT_B64 }}" ]; then
+              printf '%s' "${{ secrets.TLS_CA_CERT_B64 }}" | base64 -d > "$CERT_DIR/ca.crt"
+            else
+              cat > "$CERT_DIR/ca.crt" <<'CA_EOF'
+            ${{ secrets.TLS_CA_CERT_PEM }}
+            CA_EOF
+            fi
+            grep -q '[^[:space:]]' "$CERT_DIR/tls.crt" 2>/dev/null || rm -f "$CERT_DIR/tls.crt"
+            grep -q '[^[:space:]]' "$CERT_DIR/tls.key" 2>/dev/null || rm -f "$CERT_DIR/tls.key"
+            grep -q '[^[:space:]]' "$CERT_DIR/ca.crt" 2>/dev/null || rm -f "$CERT_DIR/ca.crt"
+            find "$CERT_DIR" -type f -exec chmod 600 {} \;
+
+            GANTRY_IMAGE="gantry:${{ github.sha }}" \
+            GANTRY_CONFIG_FILE="prod.gantry.toml" \
+            GANTRY_CERT_DIR="$CERT_DIR" \
+            GANTRY_DEPLOY_DOMAIN="${{ secrets.DEPLOY_DOMAIN }}" \
+            GANTRY_BUILD_NO_CACHE="${{ github.event.inputs.skip_build_cache == 'true' && '1' || '0' }}" \
+            GANTRY_SCHEMA_REPO_SSH_KEY_PATH="$HOME/.ssh/schema_repo_read_ssh_key" \
+              bash deploy/blue_green_deploy.sh

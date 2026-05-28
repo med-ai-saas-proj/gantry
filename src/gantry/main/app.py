@@ -5,6 +5,7 @@ from gantry.api_gateway import gateway_app
 from gantry.shared.utils import request_id_utils
 from gantry.otel.settings import getOtelSettings
 from gantry.shared.consts import common_const
+from gantry.shared.health import health_response, setup_health_routes
 from gantry.management.billing import internal_billing_router
 from gantry.service.ai_gateway import ai_gateway_router
 from gantry.shared.logging.logger import getLogger
@@ -53,6 +54,8 @@ main_app = FastAPI(
     },
 )
 
+setup_health_routes(main_app)
+
 internal_app = FastAPI(
     title=common_const.APP_NAME,
     openapi_url="/docs/internal_openapi.json"
@@ -65,6 +68,14 @@ internal_app = FastAPI(
 @internal_app.get("/ready")
 async def ready():
     return Response(status_code=200)
+
+
+internal_app.add_api_route(
+    "/health",
+    health_response,
+    methods=["GET"],
+    include_in_schema=False,
+)
 
 
 async def global_middleware(

@@ -45,7 +45,7 @@ async def test_api_key_rag_embedding_file_task_and_query_routes(service_client, 
 
 
 @pytest.mark.asyncio
-async def test_user_rag_routes_currently_require_project_uuid_path_context(service_client, authenticated_service_api) -> None:
+async def test_user_rag_routes_delegate_project_uuid_query_context(service_client, authenticated_service_api) -> None:
     responses = [
         await service_client.get("/v1/rag/user/files", headers=AUTH, params={"project_uuid": PROJECT_UUID}),
         await service_client.post(
@@ -57,7 +57,8 @@ async def test_user_rag_routes_currently_require_project_uuid_path_context(servi
         await service_client.get("/v1/rag/user/files/task-1", headers=AUTH, params={"project_uuid": PROJECT_UUID}),
     ]
 
-    assert {response.status_code for response in responses} == {400}
+    assert [response.status_code for response in responses] == [200, 201, 200]
+    assert responses[2].json()["project_uuid"] == PROJECT_UUID
 
 
 @pytest.mark.asyncio

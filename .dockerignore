@@ -1,14 +1,42 @@
-# Byte-compiled / optimized / DLL files
-*__pycache__*
-.idea
-.vscode
+# Git / editor state
+.git/
+.gitignore
+.idea/
+.vscode/
 !.vscode/launch.json
 
-# MacOS
-.DS_Store
-
-# Environments
-.env*
-*.yml
-
+# Python cache / local environments
+*__pycache__*
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
 .venv/
+
+# Local and generated outputs
+.env*
+*.env
+*.pem
+*.key
+*.crt
+certs/
+deploy/runtime/
+deploy/staging.local.env
+reports/
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Test-only assets are not needed in the production image
+tests/
+**/*_test.py
+
+# Compose / local orchestration files are not runtime inputs
+*.yml
+*.yaml
+
+# OS files
+.DS_Store

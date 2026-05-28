@@ -57,7 +57,7 @@ def test_admin_permission_update_affects_user_project_permissions(backend_e2e) -
         json={
             "organization_permissions": ["organization.owner"],
             "project_permissions": [
-                {"project_id": project_uuid, "permissions": ["project.settings.read", "apikey.read"]}
+                {"project_uuid": project_uuid, "permissions": ["project.settings.read", "apikey.read"]}
             ],
         },
     )
@@ -69,7 +69,10 @@ def test_admin_permission_update_affects_user_project_permissions(backend_e2e) -
     assert response.status_code == 200, response.text
     summary = response.json()["permissions"]
     assert "organization.owner" in summary["organization_permissions"]
-    assert any(item["id"] == project_uuid for item in summary["project_permissions"])
+    assert any(
+        (item.get("project_uuid") or item.get("id")) == project_uuid
+        for item in summary["project_permissions"]
+    )
     assert permissions.status_code in {200, 401, 403, 404}, permissions.text
     assert permissions.status_code < 500
 
@@ -92,7 +95,7 @@ def test_api_key_lifecycle_by_uuid_and_disabled_key_rejection(backend_e2e) -> No
     )
     service_call_before_delete = backend_e2e.request(
         "POST",
-        "/service/v1/conversations/",
+        "/service/v1/conversations/sequence/",
         headers={"X-Api-Key": raw_key},
         json={"extra_metadata": {"source": "backend-e2e"}, "messages": None},
     )
@@ -109,7 +112,7 @@ def test_api_key_lifecycle_by_uuid_and_disabled_key_rejection(backend_e2e) -> No
     deleted = backend_e2e.admin_request("DELETE", f"/management/v1/admin/api-keys/{api_key_uuid}")
     rejected = backend_e2e.request(
         "POST",
-        "/service/v1/conversations/",
+        "/service/v1/conversations/sequence/",
         headers={"X-Api-Key": raw_key},
         json={"extra_metadata": {"source": "backend-e2e"}, "messages": None},
     )

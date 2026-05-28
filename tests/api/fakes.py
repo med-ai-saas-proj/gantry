@@ -9,6 +9,7 @@ from typing import Any
 from pyrusult import Ok
 
 from gantry.management.billing.models import TransactionStatus
+from gantry.service.conversation.models import ConversationType
 from tests.factories import ApiKeyInfoFactory, ApiKeyPayloadFactory, OrgPayloadFactory, ProjectPayloadFactory
 
 
@@ -635,8 +636,28 @@ class FakeBillingAggregateQueryService(ConfigurableFake):
             }
         ])
 
+    async def getAggregateByProjects(self, **kwargs):
+        self.calls.append(("getAggregateByProjects", kwargs))
+        return Ok([
+            {
+                "period_bucket": NOW,
+                "transaction_count": 2,
+                "total_amount": Decimal("12.34"),
+            }
+        ])
+
     async def get_aggregate_by_org(self, **kwargs):
         self.calls.append(("get_aggregate_by_org", kwargs))
+        return Ok([
+            {
+                "period_bucket": NOW,
+                "transaction_count": 5,
+                "total_amount": Decimal("99.99"),
+            }
+        ])
+
+    async def getAggregateByOrg(self, **kwargs):
+        self.calls.append(("getAggregateByOrg", kwargs))
         return Ok([
             {
                 "period_bucket": NOW,
@@ -858,11 +879,11 @@ class FakeRagService(ConfigurableFake):
 
     async def getTaskStatus(self, task_id: str, project_id: int):
         self.calls.append(("getTaskStatus", {"task_id": task_id, "project_id": project_id}))
-        return Ok({"task_id": task_id, "file_uid": uuid.UUID(FILE_UUID), "project_uuid": uuid.UUID(PROJECT_UUID), "chunk_splitter": "recursive", "chunk_size": 1000, "chunk_overlap": 150, "status": "completed"})
+        return Ok({"task_id": task_id, "type": "file", "text": None, "metadata": None, "file_uid": uuid.UUID(FILE_UUID), "project_uuid": uuid.UUID(PROJECT_UUID), "chunk_splitter": "recursive", "chunk_splitter_options": {}, "chunk_size": 1000, "chunk_overlap": 150, "status": "completed"})
 
     async def getTaskStatusByProjectUid(self, task_id: str, project_uuid: str):
         self.calls.append(("getTaskStatusByProjectUid", {"task_id": task_id, "project_uuid": project_uuid}))
-        return Ok({"task_id": task_id, "file_uid": uuid.UUID(FILE_UUID), "project_uuid": uuid.UUID(project_uuid), "chunk_splitter": "recursive", "chunk_size": 1000, "chunk_overlap": 150, "status": "completed"})
+        return Ok({"task_id": task_id, "type": "file", "text": None, "metadata": None, "file_uid": uuid.UUID(FILE_UUID), "project_uuid": project_uuid, "chunk_splitter": "recursive", "chunk_splitter_options": {}, "chunk_size": 1000, "chunk_overlap": 150, "status": "completed"})
 
     async def querySimilarByVector(self, *args):
         self.calls.append(("querySimilarByVector", args))
@@ -884,15 +905,15 @@ class BaseConversationService(ConfigurableFake):
 
     async def getConversationMetadata(self, conversation_uid, project_id):
         self.calls.append(("getConversationMetadata", {"conversation_uid": conversation_uid, "project_id": project_id}))
-        return Ok({"conversation_id": 1, "conversation_uid": conversation_uid, "project_id": project_id, "extra_metadata": {"topic": "demo"}, "created_at": NOW})
+        return Ok({"conversation_id": 1, "conversation_uid": conversation_uid, "project_id": project_id, "extra_metadata": {"topic": "demo"}, "created_at": NOW, "tree_structure": None, "active_leaf_message_id": None, "conversation_type": ConversationType.SEQUENCE, "relationships_map": None})
 
     async def getConversationMessageByUuid(self, conversation_uid, project_id, message_uid):
         self.calls.append(("getConversationMessageByUuid", {"conversation_uid": conversation_uid, "project_id": project_id, "message_uid": message_uid}))
-        return Ok(SimpleNamespace(uuid=message_uid, kind="request", seq_id=1, parts=[], model_name=None, timestamp=NOW, run_id=None))
+        return Ok(SimpleNamespace(uuid=message_uid, payload={"role": "user", "content": "hello"}, timestamp=NOW, run_id=None, extra_metadata=None))
 
     async def getConversationMessagesByUuids(self, conversation_uid, project_id, message_uids):
         self.calls.append(("getConversationMessagesByUuids", {"conversation_uid": conversation_uid, "project_id": project_id, "message_uids": message_uids}))
-        return [SimpleNamespace(uuid=uid, kind="request", seq_id=i, parts=[], model_name=None, timestamp=NOW, run_id=None) for i, uid in enumerate(message_uids)]
+        return [SimpleNamespace(uuid=uid, payload={"role": "user", "content": f"message-{i}"}, timestamp=NOW, run_id=None, extra_metadata=None) for i, uid in enumerate(message_uids)]
 
     async def updateConversationMetadata(self, conversation_uid, project_id, extra_metadata):
         self.calls.append(("updateConversationMetadata", {"conversation_uid": conversation_uid, "project_id": project_id, "extra_metadata": extra_metadata}))
@@ -920,7 +941,7 @@ class FakeSequenceConversationService(BaseConversationService):
 
     async def getConversationMessages(self, conversation_uid, project_id, limit=20, last_cursor=None, order_by="asc"):
         self.calls.append(("getConversationMessages", {"conversation_uid": conversation_uid, "project_id": project_id, "limit": limit, "last_cursor": last_cursor, "order_by": order_by}))
-        return Ok([SimpleNamespace(uuid=uuid.uuid4(), kind="request", seq_id=i, parts=[], model_name=None, timestamp=NOW, run_id=None) for i in range(min(limit, 5))])
+        return Ok([SimpleNamespace(uuid=uuid.uuid4(), payload={"role": "user", "content": f"message-{i}"}, timestamp=NOW, run_id=None, extra_metadata=None) for i in range(min(limit, 5))])
 
     async def storeConversationMessages(self, conversation_uid, project_id, msgs):
         self.calls.append(("storeConversationMessages", {"conversation_uid": conversation_uid, "project_id": project_id, "msg_count": len(msgs)}))
@@ -936,7 +957,7 @@ class FakeTreeConversationService(BaseConversationService):
 
     async def getConversationMessages(self, conversation_uid, project_id, limit=20, order_by="asc", last_cursor=None, branch_node_id=None):
         self.calls.append(("getConversationMessages", {"conversation_uid": conversation_uid, "project_id": project_id, "limit": limit, "order_by": order_by, "last_cursor": last_cursor, "branch_node_id": branch_node_id}))
-        return Ok([SimpleNamespace(uuid=uuid.uuid4(), kind="request", seq_id=i, parts=[], model_name=None, timestamp=NOW, run_id=None) for i in range(min(limit, 5))])
+        return Ok([SimpleNamespace(uuid=uuid.uuid4(), payload={"role": "user", "content": f"message-{i}"}, timestamp=NOW, run_id=None, extra_metadata=None) for i in range(min(limit, 5))])
 
     async def storeConversationMessages(self, conversation_uid, project_id, msgs):
         self.calls.append(("storeConversationMessages", {"conversation_uid": conversation_uid, "project_id": project_id, "msg_count": len(msgs)}))
@@ -963,3 +984,17 @@ class FakeGatewayService(ConfigurableFake):
     def checkPermission(self, permissions, destination):
         self.calls.append(("checkPermission", {"permissions": permissions, "destination": destination}))
         return Ok(True)
+
+
+class FakeAiGatewayService(ConfigurableFake):
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, Any]] = []
+
+    async def route(self, model, project_id, run_input, model_settings):
+        self.calls.append(("route", {"model": model, "project_id": project_id}))
+
+        async def _events():
+            if False:
+                yield ""
+
+        return Ok(_events())

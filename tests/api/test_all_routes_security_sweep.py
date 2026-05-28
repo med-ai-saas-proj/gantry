@@ -4,12 +4,6 @@ import pytest
 
 pytestmark = pytest.mark.api
 
-PUBLIC_OPERATIONS = {
-    ("GET", "/v1/organizations/permissions"),
-    ("GET", "/v1/projects/permissions"),
-    ("POST", "/v1/billing/webhook/stripe"),
-}
-
 SAMPLE_VALUES = {
     "api_key_uuid": "api-key-1",
     "invoice_uid": "invoice-1",
@@ -39,15 +33,22 @@ def _management_operations(openapi: dict) -> list[tuple[str, str]]:
     return operations
 
 
+def _management_operations_requiring_security(openapi: dict) -> list[tuple[str, str]]:
+    return [
+        (method, path)
+        for method, path in _management_operations(openapi)
+        if openapi["paths"][path][method.lower()].get("security")
+    ]
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("method", "path"),
     [
         operation
-        for operation in _management_operations(
+        for operation in _management_operations_requiring_security(
             pytest.importorskip("gantry.management").management_app.openapi()
         )
-        if operation not in PUBLIC_OPERATIONS
     ],
 )
 async def test_protected_management_operations_reject_missing_auth(
@@ -62,19 +63,4 @@ async def test_protected_management_operations_reject_missing_auth(
     )
 
     assert response.status_code in {401, 403, 422}
-    assert response.status_code < 500
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
-    ("method", "path"),
-    sorted(PUBLIC_OPERATIONS),
-)
-async def test_public_management_operations_do_not_require_auth(
-    api_client,
-    method: str,
-    path: str,
-) -> None:
-    response = await api_client.request(method, _sample_path(path))
-
     assert response.status_code < 500

@@ -1,13 +1,49 @@
-FROM python:3.13
+# syntax=docker/dockerfile:1.7
+
+FROM python:3.13.5-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.10.4 /uv /uvx /bin/
 
 WORKDIR /app
 
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=never
+
+COPY .python-version pyproject.toml uv.lock README.md ./
+COPY packages/pyrusult/pyproject.toml packages/pyrusult/uv.lock packages/pyrusult/README.md packages/pyrusult/
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-workspace
+
 COPY . .
-RUN uv sync --frozen
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+FROM python:3.13.5-slim AS runtime
+
+ARG BUILD_DATE=unknown
+ARG VCS_REF=unknown
+
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+LABEL org.opencontainers.image.title="gantry" \
+      org.opencontainers.image.description="Gantry API service" \
+      org.opencontainers.image.created="$BUILD_DATE" \
+      org.opencontainers.image.revision="$VCS_REF"
+
+RUN groupadd --system gantry \
+    && useradd --system --gid gantry --home-dir /app --shell /usr/sbin/nologin gantry
+
+WORKDIR /app
+
+COPY --from=builder --chown=gantry:gantry /app /app
+
+USER gantry
 
 EXPOSE 8000
 
-ENTRYPOINT [ "uv", "run", "gantry" ]
-CMD [ "server", "--config-file", "example.gantry.toml" ]
+ENTRYPOINT ["gantry"]
+CMD ["server", "--config-file", "example.gantry.toml"]

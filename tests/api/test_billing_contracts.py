@@ -35,8 +35,8 @@ async def test_billing_aggregate_routes_delegate_org_and_project_context(api_cli
     assert project.status_code == 200
     assert org.json()["data"][0]["transaction_count"] == 5
     assert project.json()["data"][0]["transaction_count"] == 2
-    assert authenticated_api["billing_aggregate"].calls[-2][0] == "get_aggregate_by_org"
-    assert authenticated_api["billing_aggregate"].calls[-1][0] == "get_aggregate_by_projects"
+    assert authenticated_api["billing_aggregate"].calls[-2][0] == "getAggregateByOrg"
+    assert authenticated_api["billing_aggregate"].calls[-1][0] == "getAggregateByProjects"
 
 
 @pytest.mark.asyncio
@@ -87,7 +87,7 @@ async def test_billing_credit_invoice_and_transaction_contract(api_client, authe
     )
     invoice = await api_client.get(f"/v1/billing/invoices/{INVOICE_UUID}", headers=AUTH)
     payment = await api_client.post(f"/v1/billing/invoices/{INVOICE_UUID}/pay", headers=AUTH)
-    transaction_list_validation = await api_client.get(
+    transaction_list = await api_client.get(
         "/v1/billing/transactions",
         headers=AUTH,
         params={"project_uuids": PROJECT_UUID, "limit": 9, "offset": 4},
@@ -102,10 +102,8 @@ async def test_billing_credit_invoice_and_transaction_contract(api_client, authe
     assert invoices.json()["limit"] == 5
     assert invoice.json()["data"]["line_items"][0]["project_uuid"] == PROJECT_UUID
     assert payment.json()["data"]["hosted_invoice_url"] == "https://billing.example/pay"
-    # Current route dependency requires project_uuid from a path even though
-    # this endpoint has no path parameter. Keep this covered as a validation
-    # contract until the API behavior changes deliberately.
-    assert transaction_list_validation.status_code in {400, 422}
+    assert transaction_list.status_code == 200
+    assert transaction_list.json()["limit"] == 9
     assert transaction.json()["data"]["transaction_uid"] == TRANSACTION_UUID
 
 
