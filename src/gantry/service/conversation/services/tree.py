@@ -168,7 +168,9 @@ class TreeConversationService(ConversationService):
                 Message(
                     uuid=msg.message_uid,
                     conversation_id=-1,
-                    payload=msg.payload,
+                    payload=msg.payload
+                    if isinstance(msg.payload, dict)
+                    else msg.payload.model_dump(),
                     timestamp=msg.timestamp.astimezone(UTC).replace(
                         tzinfo=None
                     ),
@@ -201,7 +203,10 @@ class TreeConversationService(ConversationService):
                 )
         elif active_leaf_id is not None:
             parent_id_str = str(active_leaf_id)
-            if parent_id_str not in new_structure:
+            if (
+                parent_id_str not in new_structure
+                and parent_id_str != ROOT_NODE_ID
+            ):
                 return Err(
                     InvalidValueError(
                         message=f"active_leaf_id {active_leaf_id} not found in current tree structure."
@@ -355,7 +360,9 @@ class TreeConversationService(ConversationService):
                 Message(
                     uuid=msg.message_uid,
                     conversation_id=-1,
-                    payload=msg.payload,
+                    payload=msg.payload
+                    if isinstance(msg.payload, dict)
+                    else msg.payload.model_dump(),
                     timestamp=msg.timestamp.astimezone(UTC).replace(
                         tzinfo=None
                     ),

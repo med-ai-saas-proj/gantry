@@ -146,7 +146,9 @@ class SequenceConversationService(ConversationService):
                 Message(
                     uuid=msg.message_uid,
                     conversation_id=-1,
-                    payload=msg.payload,
+                    payload=msg.payload
+                    if isinstance(msg.payload, dict)
+                    else msg.payload.model_dump(),
                     timestamp=msg.timestamp.astimezone(UTC).replace(
                         tzinfo=None
                     ),
@@ -306,7 +308,9 @@ class SequenceConversationService(ConversationService):
                 Message(
                     uuid=msg.message_uid,
                     conversation_id=-1,
-                    payload=msg.payload,
+                    payload=msg.payload
+                    if isinstance(msg.payload, dict)
+                    else msg.payload.model_dump(),
                     timestamp=msg.timestamp.astimezone(UTC).replace(
                         tzinfo=None
                     ),
