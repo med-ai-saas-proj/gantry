@@ -60,7 +60,7 @@ async def _create_billing_subject(org_id: str):
     internal_ids = (
         await api_key_service.getApiKeyInternalIds(created_key.api_key_uuid)
     ).unwrap()
-    return project_id, project_uuid, internal_ids["api_key_id"]
+    return project_id, project_uuid, created_key.api_key_uuid
 
 
 @pytest.mark.asyncio
@@ -133,16 +133,15 @@ async def test_billing_transaction_post_capture_and_read_path_uses_real_db_and_r
     assert integration_stack.timescale_asyncpg_uri
     assert integration_stack.redis_url
     org_id = "integration-billing-transaction-org"
-    project_id, project_uuid, api_key_id = await _create_billing_subject(org_id)
+    project_id, project_uuid, api_key_uuid = await _create_billing_subject(org_id)
     service = getBillingTransactionService()
 
     with freeze_time("2026-05-12T10:00:00Z"):
         post_res = await service.post(
-            org_id=org_id,
-            project_id=project_id,
-            api_key_id=api_key_id,
+            api_key_uuid=api_key_uuid,
             idempotency_key="integration-billing-post",
             req=PostRequest(
+                api_key_uuid=api_key_uuid,
                 amount={"value": 150, "scale": 2},
                 details={"model": "integration-test"},
                 capture=False,
@@ -153,9 +152,6 @@ async def test_billing_transaction_post_capture_and_read_path_uses_real_db_and_r
     transaction_uuid = post_res.unwrap()
 
     capture_res = await service.capture(
-        org_id=org_id,
-        project_id=project_id,
-        api_key_id=api_key_id,
         transaction_uid=transaction_uuid,
         real_amount={"value": 125, "scale": 2},
     )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass
@@ -18,10 +19,15 @@ from testcontainers.redis import RedisContainer
 from tests.settings import REPO_ROOT, REALM
 
 
+DEFAULT_TIMESCALE_IMAGE = "gantry-integration-db:latest"
 TIMESCALE_IMAGE = os.getenv(
     "GANTRY_INTEGRATION_TIMESCALE_IMAGE",
-    "timescale/timescaledb:latest-pg18",
+    DEFAULT_TIMESCALE_IMAGE,
 )
+BUILD_DEFAULT_TIMESCALE_IMAGE = os.getenv(
+    "GANTRY_INTEGRATION_BUILD_TIMESCALE_IMAGE",
+    "1",
+).lower() in {"1", "true", "yes"}
 REDIS_IMAGE = os.getenv("GANTRY_INTEGRATION_REDIS_IMAGE", "redis:8-alpine")
 KEYCLOAK_IMAGE = os.getenv(
     "GANTRY_INTEGRATION_KEYCLOAK_IMAGE",
@@ -95,6 +101,39 @@ def _require_docker() -> None:
         pytest.skip(f"Docker is required for integration tests: {exc}")
 
 
+def _ensure_timescale_image() -> None:
+    """Build the test DB image that contains Gantry-required extensions."""
+    if TIMESCALE_IMAGE != DEFAULT_TIMESCALE_IMAGE or not BUILD_DEFAULT_TIMESCALE_IMAGE:
+        return
+
+    import docker
+
+    client = docker.from_env()
+    try:
+        client.images.get(TIMESCALE_IMAGE)
+        return
+    except docker.errors.ImageNotFound:
+        pass
+
+    try:
+        image, logs = client.images.build(
+            path=str(REPO_ROOT),
+            dockerfile="Dockerfile.db",
+            tag=TIMESCALE_IMAGE,
+            rm=True,
+        )
+        for entry in logs:
+            message = entry.get("stream") or entry.get("status")
+            if message:
+                print(message.rstrip(), file=sys.stderr)
+        if TIMESCALE_IMAGE not in image.tags:
+            image.tag(TIMESCALE_IMAGE)
+    except Exception as exc:
+        if os.getenv("CI"):
+            raise
+        pytest.skip(f"Could not build integration DB image: {exc}")
+
+
 def _clear_gantry_caches() -> None:
     from gantry.settings import AppSettings
     from gantry.db import factories as db_factories
@@ -140,12 +179,16 @@ def _clear_gantry_caches() -> None:
 @pytest.fixture(scope="session")
 def timescale_container() -> Iterator[PostgresContainer]:
     _require_docker()
+    _ensure_timescale_image()
     container = PostgresContainer(
         TIMESCALE_IMAGE,
         username="gantry",
         password="123456",
         dbname="gantry",
         driver="asyncpg",
+    )
+    container.with_command(
+        "postgres -c shared_preload_libraries=timescaledb,pg_textsearch"
     )
     with container:
         yield container

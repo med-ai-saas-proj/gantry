@@ -84,7 +84,7 @@ async def test_management_api_auth_and_admin_story_uses_real_keycloak(
     )
     assert admin_me.status_code == 200, admin_me.text
     admin_payload = admin_me.json()
-    assert admin_payload["id"]
+    assert admin_payload["user_id"]
     assert admin_payload["email"] == "admin-user@gantry.com"
 
     dashboard = await management_api_client.get(

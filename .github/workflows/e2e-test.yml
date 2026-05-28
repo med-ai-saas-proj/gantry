@@ -66,20 +66,3 @@ jobs:
           GANTRY_SERVER__CONFIG_FILE: example.gantry.toml
           PYTHONPATH: src
         run: make test-e2e-backend
-      # - name: Collect compose logs
-      #   if: ${{ always() }}
-      #   run: |
-      #     mkdir -p reports/e2e
-      #     docker compose -f compose.yaml -f docker/docker-compose.e2e.yml logs --no-color > reports/e2e/compose.log || true
-      # - name: Collect Mailpit messages
-      #   if: ${{ always() }}
-      #   run: |
-      #     mkdir -p reports/e2e
-      #     curl -fsS http://localhost:8025/api/v1/messages > reports/e2e/mailpit-messages.json || true
-      # - name: Upload E2E artifacts
-      #   if: ${{ always() && env.ACT != 'true' }}
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: backend-e2e-artifacts
-      #     path: reports/e2e
-      #     if-no-files-found: ignore
