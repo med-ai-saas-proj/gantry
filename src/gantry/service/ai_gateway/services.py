@@ -1,11 +1,18 @@
+from gantry.db.session import AsyncSessionManager
 from gantry.service.conversation import (
     Message,
     TreeConversationService,
 )
-from gantry.shared.custom_types.error_exception import RecoverableError
+from gantry.management.project.repositories import ProjectRepository
+from gantry.shared.custom_types.error_exception import (
+    RecoverableError,
+    InternalServiceError,
+)
 
 from .settings import AiGatewaySettings
 
+import uuid
+from pdb import run
 from uuid import UUID
 from typing import Any, AsyncIterator
 from datetime import UTC, datetime
@@ -39,9 +46,13 @@ class AiGatewayService:
         self,
         settings: AiGatewaySettings,
         tree_conversation_service: TreeConversationService,
+        session_manager: AsyncSessionManager,
+        project_repo: ProjectRepository,
     ) -> None:
         self.settings = settings
         self.tree_conversation_service = tree_conversation_service
+        self.session_manager = session_manager
+        self.project_repo = project_repo
         self.agent: dict[str, Agent] = {}
         models: dict[str, Model] = {}
         for model_name, specs in settings.models.items():
@@ -100,14 +111,25 @@ class AiGatewayService:
         else:
             messages = messages.value
 
-        dict_to_obj = TypeAdapter(AGUIMessage).validate_python
-        messages = [dict_to_obj(msg.payload) for msg in messages]
+        # for msg in messages:
+        #     print(
+        #         f"Message from conversation service: {msg}, run_id: {msg.run_id}"
+        #     )
 
-        for msg in messages:
-            print(
-                f"Message from conversation service: {msg}, obj type: {type(msg)}"
-            )
-        run_input.messages = messages + run_input.messages
+        run_input.parent_run_id = (
+            str(messages[-1].run_id)
+            if messages and messages[-1].run_id and not parent_run_id
+            else run_input.parent_run_id
+        )
+
+        dict_to_obj = TypeAdapter(AGUIMessage).validate_python
+        aguiMessages = [dict_to_obj(msg.payload) for msg in messages]
+
+        # for msg in aguiMessages:
+        #     print(
+        #         f"Message from conversation service: {msg}, obj type: {type(msg)}"
+        #     )
+        run_input.messages = aguiMessages + run_input.messages
 
         adapter = AGUIAdapter(
             self.agent[model], run_input, manage_system_prompt="client"
@@ -151,3 +173,32 @@ class AiGatewayService:
     @classmethod
     def getTimestamp(cls):
         return int(datetime.now(UTC).timestamp() * 1000)
+
+    async def routeWithProjectUUID(
+        self,
+        model: str,
+        project_uid: uuid.UUID,
+        run_input: RunAgentInput,
+        model_settings: ModelSettings,
+    ) -> Result[AsyncIterator[str], ModelNotFound]:
+        return await self._wrapProjectUUID(
+            project_uid,
+            self.route,
+            model=model,
+            run_input=run_input,
+            model_settings=model_settings,
+        )
+
+    async def _wrapProjectUUID(
+        self, project_uid: uuid.UUID, async_func, **kwargs
+    ):
+        async with self.session_manager.get_session() as session:
+            project = await self.project_repo.getByUuid(
+                session, str(project_uid)
+            )
+            if not project:
+                raise InternalServiceError(
+                    message=f"Project with UUID {project_uid} not found."
+                )
+            project_id = project.id
+        return await async_func(project_id=project_id, **kwargs)

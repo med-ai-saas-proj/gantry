@@ -2,6 +2,7 @@ from gantry.service import service_app
 from gantry.settings import AppStage, getAppSettings
 from gantry.management import management_app
 from gantry.api_gateway import gateway_app
+from gantry.service.rag import rag_internal_router
 from gantry.shared.utils import request_id_utils
 from gantry.otel.settings import getOtelSettings
 from gantry.shared.consts import common_const
@@ -123,7 +124,7 @@ main_app.mount("/gateway", gateway_app, "gateway")
 
 internal_app.include_router(internal_billing_router)
 internal_app.include_router(ai_gateway_router)
-
+internal_app.include_router(rag_internal_router)
 if getOtelSettings().metrics == MetricsType.prometheus:
     from prometheus_client import make_asgi_app
 

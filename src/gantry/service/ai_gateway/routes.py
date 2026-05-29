@@ -1,6 +1,7 @@
 from .services import AiGatewayService
 from .factories import getAiGatewayService
 
+from uuid import UUID
 from typing import Any, Literal, Annotated, TypedDict
 
 from fastapi import Body, Path, Query, Depends, APIRouter
@@ -39,7 +40,7 @@ class RunAgentInputWithModelSettings(RunAgentInput):
     # response_class=EventSourceResponse,
 )
 async def ag_ui_gateway(
-    project_id: Annotated[int, Query()],
+    project_id: Annotated[UUID, Query()],
     ai_gateway_service: Annotated[
         AiGatewayService, Depends(getAiGatewayService)
     ],
@@ -50,7 +51,7 @@ async def ag_ui_gateway(
     model_settings = run_input.model_settings or {}
     return EventSourceResponse(
         (
-            await ai_gateway_service.route(
+            await ai_gateway_service.routeWithProjectUUID(
                 model, project_id, run_input, model_settings
             )
         ).unwrap()
