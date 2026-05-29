@@ -134,6 +134,42 @@ class AiGatewayService:
                     SystemMessage(id=str(uuid.uuid4()), content=prompt)
                 )
 
+        if run_input.forwarded_props and isinstance(
+            run_input.forwarded_props, dict
+        ):
+            key_of_system_prompt = {
+                "system_prompt",
+                "SystemPrompt",
+                "system_prompts",
+                "SystemPrompts",
+                "system_message",
+                "SystemMessage",
+                "system_messages",
+                "SystemMessages",
+                "system_instruction",
+                "SystemInstruction",
+                "system_instructions",
+                "SystemInstructions",
+            }
+            key_of_system_prompt = map(str.lower, key_of_system_prompt)
+
+            for key in run_input.forwarded_props:
+                if key.lower() in key_of_system_prompt:
+                    value = run_input.forwarded_props[key]
+                    if isinstance(value, str):
+                        system_messages.append(
+                            SystemMessage(id=str(uuid.uuid4()), content=value)
+                        )
+                    elif isinstance(value, list):
+                        for v in value:
+                            if isinstance(v, str):
+                                system_messages.append(
+                                    SystemMessage(
+                                        id=str(uuid.uuid4()), content=v
+                                    )
+                                )
+                    break
+
         # for msg in messages:
         #     print(
         #         f"Message from conversation service: {msg}, run_id: {msg.run_id}"
@@ -148,18 +184,20 @@ class AiGatewayService:
         )
 
         dict_to_obj = TypeAdapter(AGUIMessage).validate_python
-        aguiMessages = [dict_to_obj(msg.payload) for msg in messages_history]
+        aguiMessagesHistory = [
+            dict_to_obj(msg.payload) for msg in messages_history
+        ]
 
-        for msg in aguiMessages:
-            print(
-                f"Message from conversation service: {msg}, obj type: {type(msg)}"
-            )
+        # for msg in aguiMessages:
+        #     print(
+        #         f"Message from conversation service: {msg}, obj type: {type(msg)}"
+        #     )
 
         system_messages_tokens = system_messages_tokens = sum(
             self.count_tokens(msg) for msg in system_messages
         )
         run_input.messages = system_messages + self.trimMessageContent(
-            aguiMessages + input_message,
+            aguiMessagesHistory + input_message,
             max_turns=max_turns,
             context_window=self.settings.models[model].context_window
             - system_messages_tokens,
@@ -170,6 +208,11 @@ class AiGatewayService:
             )
             + reserved_tokens,
         )
+
+        # for msg in run_input.messages:
+        #     print(
+        #         f"Final Message for model input: {msg}, obj type: {type(msg)}"
+        #     )
 
         adapter = AGUIAdapter(
             self.agent[model], run_input, manage_system_prompt="client"

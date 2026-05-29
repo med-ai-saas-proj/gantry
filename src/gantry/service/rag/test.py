@@ -6,8 +6,6 @@ from gantry.service.rag.utils import getTableName, get_orm_class
 import unittest
 from hashlib import sha256
 
-from prometheus_client import h
-
 
 class TestRagInsert(unittest.IsolatedAsyncioTestCase):
     async def test_get_orm_class(self):
