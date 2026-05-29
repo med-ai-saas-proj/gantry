@@ -21,6 +21,12 @@ class ModelSpec(BaseSettings):
     fallback: Annotated[
         list[str] | None, Field(description="Fallback model")
     ] = None
+    context_window: Annotated[
+        int,
+        Field(
+            description="Model's context window. Used for AGUI message trimming."
+        ),
+    ]
 
 
 class AiGatewaySettings(BaseSettings):

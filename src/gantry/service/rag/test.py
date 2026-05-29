@@ -4,6 +4,9 @@ from gantry.settings.rag import VectorOpsType, VectorIndexType
 from gantry.service.rag.utils import getTableName, get_orm_class
 
 import unittest
+from hashlib import sha256
+
+from prometheus_client import h
 
 
 class TestRagInsert(unittest.IsolatedAsyncioTestCase):
@@ -26,6 +29,8 @@ class TestRagInsert(unittest.IsolatedAsyncioTestCase):
             text="sample text",
             project_id=0,
             lang="simple",
+            chunk_metadata={"key": "value"},
+            hash=sha256("sample text".encode()).hexdigest(),
         )
 
         self.assertEqual(new_record.file_id, 0)
