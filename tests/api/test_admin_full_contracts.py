@@ -222,6 +222,38 @@ async def test_admin_user_profile_permission_and_organization_routes(api_client,
     assert updated.status_code == 200
     assert updated.json()["permissions"]["project_permissions"][0]["project_uuid"] == PROJECT_UUID
 
+    scoped_org = await api_client.put(
+        "/v1/admin/organizations/org-1/users/user-1/permissions",
+        headers=AUTH,
+        json={"permissions": ["organization.settings.write"]},
+    )
+    assert scoped_org.status_code == 200
+    assert scoped_org.json()["permissions"]["organization_permissions"] == [
+        "organization.settings.write"
+    ]
+    assert authenticated_api["admin"].calls[-1][1] == {
+        "user_id": "user-1",
+        "org_id": "org-1",
+        "permissions": ["organization.settings.write"],
+    }
+
+    scoped_project = await api_client.put(
+        f"/v1/admin/projects/{PROJECT_UUID}/users/user-1/permissions",
+        headers=AUTH,
+        json={"permissions": ["project.settings.write"]},
+    )
+    assert scoped_project.status_code == 200
+    assert scoped_project.json()["permissions"]["project_permissions"][0] == {
+        "project_uuid": PROJECT_UUID,
+        "permissions": ["project.settings.write"],
+        "effective_permissions": ["project.settings.write"],
+    }
+    assert authenticated_api["admin"].calls[-1][1] == {
+        "user_id": "user-1",
+        "project_id": PROJECT_UUID,
+        "permissions": ["project.settings.write"],
+    }
+
     reset = await api_client.delete("/v1/admin/users/user-1/permissions", headers=AUTH)
     assert reset.status_code == 200
     assert reset.json()["permissions"]["project_permissions"] == []

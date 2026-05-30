@@ -671,6 +671,146 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             },
         )
 
+    async def test_set_user_organization_permissions_preserves_projects(self):
+        self.kc.setUserAttributes = AsyncMock(return_value=Ok(True))
+        self.kc.getUserProfile = AsyncMock(
+            side_effect=[
+                Ok(
+                    {
+                        "id": "user-1",
+                        "username": "alice",
+                        "email": "alice@test",
+                        "enabled": True,
+                        "emailVerified": True,
+                        "attributes": {
+                            "org_permissions": ["organization.settings.read"],
+                            "project_permissions": {
+                                "project-a": ["project.settings.read"]
+                            },
+                        },
+                    }
+                ),
+                Ok(
+                    {
+                        "id": "user-1",
+                        "username": "alice",
+                        "email": "alice@test",
+                        "enabled": True,
+                        "emailVerified": True,
+                        "attributes": {
+                            "org_permissions": ["organization.settings.write"],
+                            "project_permissions": {
+                                "project-a": ["project.settings.read"]
+                            },
+                        },
+                    }
+                ),
+            ]
+        )
+        self.kc.getMemberOrganizations = AsyncMock(return_value=Ok([]))
+
+        result = await self.service.setUserOrganizationPermissions(
+            "user-1",
+            "org-1",
+            ["organization.settings.write"],
+        )
+
+        self.assertEqual(
+            result.permissions.organization_permissions,
+            ["organization.settings.write"],
+        )
+        self.kc.setUserAttributes.assert_awaited_once_with(
+            "user-1",
+            {
+                "org_permissions": ["organization.settings.write"],
+                "project_permissions": {"project-a": ["project.settings.read"]},
+            },
+        )
+
+    async def test_set_user_project_permissions_preserves_org_and_other_projects(
+        self,
+    ):
+        self.kc.setUserAttributes = AsyncMock(return_value=Ok(True))
+        self.kc.getUserProfile = AsyncMock(
+            side_effect=[
+                Ok(
+                    {
+                        "id": "user-1",
+                        "username": "alice",
+                        "email": "alice@test",
+                        "enabled": True,
+                        "emailVerified": True,
+                        "attributes": {
+                            "org_permissions": ["organization.settings.read"],
+                            "project_permissions": {
+                                "project-a": ["project.settings.read"],
+                                "project-b": ["project.settings.read"],
+                            },
+                        },
+                    }
+                ),
+                Ok(
+                    {
+                        "id": "user-1",
+                        "username": "alice",
+                        "email": "alice@test",
+                        "enabled": True,
+                        "emailVerified": True,
+                        "attributes": {
+                            "org_permissions": ["organization.settings.read"],
+                            "project_permissions": {
+                                "project-a": ["project.settings.read"],
+                                "project-b": ["project.settings.write"],
+                            },
+                        },
+                    }
+                ),
+            ]
+        )
+        self.kc.getMemberOrganizations = AsyncMock(return_value=Ok([]))
+
+        result = await self.service.setUserProjectPermissions(
+            "user-1",
+            "project-b",
+            ["project.settings.write"],
+        )
+
+        project_permissions = {
+            item.project_uuid: item.permissions
+            for item in result.permissions.project_permissions
+        }
+        self.assertEqual(
+            project_permissions["project-b"],
+            ["project.settings.write"],
+        )
+        self.kc.setUserAttributes.assert_awaited_once_with(
+            "user-1",
+            {
+                "org_permissions": ["organization.settings.read"],
+                "project_permissions": {
+                    "project-a": ["project.settings.read"],
+                    "project-b": ["project.settings.write"],
+                },
+            },
+        )
+
+    async def test_set_scoped_user_permissions_rejects_invalid_permissions(
+        self,
+    ):
+        with self.assertRaises(InvalidAdminPermissionError):
+            await self.service.setUserOrganizationPermissions(
+                "user-1",
+                "org-1",
+                ["organization.nope"],
+            )
+
+        with self.assertRaises(InvalidAdminPermissionError):
+            await self.service.setUserProjectPermissions(
+                "user-1",
+                "project-a",
+                ["project.nope"],
+            )
+
     async def test_get_user_permissions_returns_only_permission_summary(self):
         self.kc.getUserProfile = AsyncMock(
             return_value=Ok(

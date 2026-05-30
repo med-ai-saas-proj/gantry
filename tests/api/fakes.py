@@ -497,6 +497,70 @@ class FakeAdminService(ConfigurableFake):
             },
         )
 
+    async def setUserOrganizationPermissions(
+        self,
+        user_id: str,
+        org_id: str,
+        permissions: list[str],
+    ):
+        self.calls.append(
+            (
+                "setUserOrganizationPermissions",
+                {
+                    "user_id": user_id,
+                    "org_id": org_id,
+                    "permissions": permissions,
+                },
+            )
+        )
+        return self._profile(
+            user_id,
+            {
+                "organization_permissions": permissions,
+                "effective_organization_permissions": permissions,
+                "project_permissions": [
+                    {
+                        "project_uuid": PROJECT_UUID,
+                        "permissions": ["project.settings.read"],
+                        "effective_permissions": ["project.settings.read"],
+                    }
+                ],
+            },
+        )
+
+    async def setUserProjectPermissions(
+        self,
+        user_id: str,
+        project_id: str,
+        permissions: list[str],
+    ):
+        self.calls.append(
+            (
+                "setUserProjectPermissions",
+                {
+                    "user_id": user_id,
+                    "project_id": project_id,
+                    "permissions": permissions,
+                },
+            )
+        )
+        return self._profile(
+            user_id,
+            {
+                "organization_permissions": ["organization.settings.read"],
+                "effective_organization_permissions": [
+                    "organization.settings.read"
+                ],
+                "project_permissions": [
+                    {
+                        "project_uuid": project_id,
+                        "permissions": permissions,
+                        "effective_permissions": permissions,
+                    }
+                ],
+            },
+        )
+
     async def resetUserPermissions(self, user_id: str):
         self.calls.append(("resetUserPermissions", user_id))
         return self._profile(

@@ -26,8 +26,16 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/admin/api-keys/permissions", paths)
         self.assertIn("/admin/organizations/{org_id}/settings", paths)
         self.assertIn("/admin/organizations/{org_id}/users", paths)
+        self.assertIn(
+            "/admin/organizations/{org_id}/users/{user_id}/permissions",
+            paths,
+        )
         self.assertIn("/admin/projects/{project_id}/settings", paths)
         self.assertIn("/admin/projects/{project_id}/users", paths)
+        self.assertIn(
+            "/admin/projects/{project_id}/users/{user_id}/permissions",
+            paths,
+        )
         self.assertIn("/admin/users/{user_id}/organizations", paths)
         self.assertIn("/admin/users/{user_id}/profile", paths)
         self.assertIn("/admin/users/{user_id}/permissions", paths)
@@ -250,6 +258,94 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         admin_service.setUserPermissions.assert_awaited_once_with(
             "user-1",
             payload,
+        )
+
+    async def test_set_admin_organization_user_permissions_delegates_scope(
+        self,
+    ):
+        admin_service = Mock()
+        payload = routes.UserPermissionsRequest(
+            permissions=["organization.settings.read"],
+        )
+        expected = routes.AdminUserProfileResponse(
+            user_id="user-1",
+            username="alice",
+            email="alice@test",
+            first_name=None,
+            last_name=None,
+            enabled=True,
+            email_verified=True,
+            organizations=[],
+            permissions=routes.AdminUserPermissionSummaryResponse(
+                organization_permissions=["organization.settings.read"],
+                effective_organization_permissions=[
+                    "organization.settings.read"
+                ],
+                project_permissions=[],
+            ),
+        )
+        admin_service.setUserOrganizationPermissions = AsyncMock(
+            return_value=expected
+        )
+
+        result = await routes.set_admin_organization_user_permissions(
+            ADMIN_INFO,
+            "org-1",
+            "user-1",
+            payload,
+            admin_service,
+        )
+
+        self.assertEqual(result, expected)
+        admin_service.setUserOrganizationPermissions.assert_awaited_once_with(
+            "user-1",
+            "org-1",
+            ["organization.settings.read"],
+        )
+
+    async def test_set_admin_project_user_permissions_delegates_scope(self):
+        admin_service = Mock()
+        payload = routes.ProjectUserPermissionsRequest(
+            permissions=["project.settings.write"],
+        )
+        expected = routes.AdminUserProfileResponse(
+            user_id="user-1",
+            username="alice",
+            email="alice@test",
+            first_name=None,
+            last_name=None,
+            enabled=True,
+            email_verified=True,
+            organizations=[],
+            permissions=routes.AdminUserPermissionSummaryResponse(
+                organization_permissions=[],
+                effective_organization_permissions=[],
+                project_permissions=[
+                    {
+                        "project_uuid": "project-1",
+                        "permissions": ["project.settings.write"],
+                        "effective_permissions": ["project.settings.write"],
+                    }
+                ],
+            ),
+        )
+        admin_service.setUserProjectPermissions = AsyncMock(
+            return_value=expected
+        )
+
+        result = await routes.set_admin_project_user_permissions(
+            ADMIN_INFO,
+            "project-1",
+            "user-1",
+            payload,
+            admin_service,
+        )
+
+        self.assertEqual(result, expected)
+        admin_service.setUserProjectPermissions.assert_awaited_once_with(
+            "user-1",
+            "project-1",
+            ["project.settings.write"],
         )
 
     async def test_create_admin_api_key_passes_admin_identity_to_service(self):
