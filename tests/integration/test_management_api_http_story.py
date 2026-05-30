@@ -216,3 +216,194 @@ async def test_management_project_and_api_key_flow_crosses_auth_db_and_cache(
 
     deleted_parse = await getApiKeyService().parseApiKey(raw_key)
     assert deleted_parse.status == ResultStatus.Err
+
+
+@pytest.mark.asyncio
+async def test_admin_scoped_permission_routes_update_keycloak_without_clobbering_other_scopes(
+    management_api_client: httpx.AsyncClient,
+    migrated_management_storage,
+    real_user_token: str,
+    real_admin_token: str,
+) -> None:
+    _ = migrated_management_storage
+    admin_headers = bearer(real_admin_token)
+    org_id = await _organization_id_from_token(real_user_token)
+    suffix = uuid4().hex[:10]
+
+    users = await management_api_client.get(
+        "/management/v1/admin/users",
+        params={"q": "gantry-test-user"},
+        headers=admin_headers,
+    )
+    assert users.status_code == 200, users.text
+    user_id = next(
+        item["user_id"]
+        for item in users.json()["results"]
+        if item.get("username") == "gantry-test-user"
+    )
+
+    create_project = await management_api_client.post(
+        "/management/v1/admin/projects",
+        params={"org_id": org_id},
+        headers=admin_headers,
+        json={
+            "name": f"Integration Scoped Permission {suffix}",
+            "description": "Created for admin scoped permission route coverage",
+        },
+    )
+    assert create_project.status_code == 201, create_project.text
+    project_uuid = create_project.json()["project_uuid"]
+
+    org_update = await management_api_client.put(
+        f"/management/v1/admin/organizations/{org_id}/users/{user_id}/permissions",
+        headers=admin_headers,
+        json={"permissions": ["organization.owner"]},
+    )
+    assert org_update.status_code == 200, org_update.text
+    org_summary = org_update.json()["permissions"]
+    assert org_summary["organization_permissions"] == ["organization.owner"]
+
+    project_update = await management_api_client.put(
+        f"/management/v1/admin/projects/{project_uuid}/users/{user_id}/permissions",
+        headers=admin_headers,
+        json={"permissions": ["project.settings.read", "apikey.read"]},
+    )
+    assert project_update.status_code == 200, project_update.text
+    project_summary = project_update.json()["permissions"]
+    assert project_summary["organization_permissions"] == ["organization.owner"]
+    assert any(
+        item["project_uuid"] == project_uuid
+        and set(item["permissions"]) == {"project.settings.read", "apikey.read"}
+        for item in project_summary["project_permissions"]
+    )
+
+    fetched = await management_api_client.get(
+        f"/management/v1/admin/users/{user_id}/permissions",
+        headers=admin_headers,
+    )
+    assert fetched.status_code == 200, fetched.text
+    fetched_summary = fetched.json()
+    assert fetched_summary["organization_permissions"] == ["organization.owner"]
+    assert any(
+        item["project_uuid"] == project_uuid
+        for item in fetched_summary["project_permissions"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_admin_project_api_key_and_user_profile_flow_uses_real_keycloak_db_and_cache(
+    management_api_client: httpx.AsyncClient,
+    migrated_management_storage,
+    real_user_token: str,
+    real_admin_token: str,
+) -> None:
+    _ = migrated_management_storage
+    admin_headers = bearer(real_admin_token)
+    org_id = await _organization_id_from_token(real_user_token)
+    suffix = uuid4().hex[:10]
+
+    users = await management_api_client.get(
+        "/management/v1/admin/users",
+        params={"q": "gantry-test-user"},
+        headers=admin_headers,
+    )
+    assert users.status_code == 200, users.text
+    user_id = next(
+        item["user_id"]
+        for item in users.json()["results"]
+        if item.get("username") == "gantry-test-user"
+    )
+
+    profile = await management_api_client.get(
+        f"/management/v1/admin/users/{user_id}/profile",
+        headers=admin_headers,
+    )
+    organizations = await management_api_client.get(
+        f"/management/v1/admin/users/{user_id}/organizations",
+        headers=admin_headers,
+    )
+    permissions = await management_api_client.get(
+        f"/management/v1/admin/users/{user_id}/permissions",
+        headers=admin_headers,
+    )
+    org_users = await management_api_client.get(
+        f"/management/v1/admin/organizations/{org_id}/users",
+        headers=admin_headers,
+    )
+
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["user_id"] == user_id
+    assert organizations.status_code == 200, organizations.text
+    assert any(item["org_id"] == org_id for item in organizations.json())
+    assert permissions.status_code == 200, permissions.text
+    assert "organization_permissions" in permissions.json()
+    assert org_users.status_code == 200, org_users.text
+
+    create_project = await management_api_client.post(
+        "/management/v1/admin/projects",
+        params={"org_id": org_id},
+        headers=admin_headers,
+        json={
+            "name": f"Integration Admin API Key {suffix}",
+            "description": "Created by admin integration flow",
+        },
+    )
+    assert create_project.status_code == 201, create_project.text
+    project_uuid = create_project.json()["project_uuid"]
+
+    project_users = await management_api_client.get(
+        f"/management/v1/admin/projects/{project_uuid}/users",
+        headers=admin_headers,
+    )
+    assert project_users.status_code == 200, project_users.text
+
+    create_key = await management_api_client.post(
+        "/management/v1/admin/api-keys",
+        params={"project_id": project_uuid},
+        headers=admin_headers,
+        json={
+            "name": f"admin-integration-key-{suffix}",
+            "description": "Created through admin integration story",
+            "permissions": ["chat.read", "conversation.read"],
+        },
+    )
+    assert create_key.status_code == 201, create_key.text
+    api_key_uuid = create_key.json()["api_key_uuid"]
+
+    update_disabled = await management_api_client.put(
+        f"/management/v1/admin/api-keys/{api_key_uuid}",
+        headers=admin_headers,
+        json={
+            "name": f"admin-integration-key-{suffix}-disabled",
+            "description": "disabled through admin integration story",
+            "permissions": ["chat.read"],
+            "disabled": True,
+        },
+    )
+    assert update_disabled.status_code == 200, update_disabled.text
+    assert update_disabled.json()["disabled"] is True
+
+    list_disabled = await management_api_client.get(
+        "/management/v1/admin/api-keys",
+        params={"project_id": project_uuid, "disabled": True},
+        headers=admin_headers,
+    )
+    get_disabled = await management_api_client.get(
+        f"/management/v1/admin/api-keys/{api_key_uuid}",
+        params={"disabled": True},
+        headers=admin_headers,
+    )
+    assert list_disabled.status_code == 200, list_disabled.text
+    assert any(
+        item["api_key_uuid"] == api_key_uuid and item["disabled"] is True
+        for item in list_disabled.json()["results"]
+    )
+    assert get_disabled.status_code == 200, get_disabled.text
+    assert get_disabled.json()["api_key_uuid"] == api_key_uuid
+    assert get_disabled.json()["disabled"] is True
+
+    delete_key = await management_api_client.delete(
+        f"/management/v1/admin/api-keys/{api_key_uuid}",
+        headers=admin_headers,
+    )
+    assert delete_key.status_code == 200, delete_key.text

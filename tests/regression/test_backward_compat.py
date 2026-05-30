@@ -26,6 +26,25 @@ REQUIRED_PUBLIC_SCHEMA_FIELDS = {
         "api_keys",
         "users",
     },
+    "AdminUserPermissionSummaryResponse": {
+        "organization_permissions",
+        "effective_organization_permissions",
+        "project_permissions",
+    },
+    "AdminUserProjectPermissionResponse": {
+        "project_uuid",
+        "permissions",
+        "effective_permissions",
+    },
+    "AdminUserProfileResponse": {
+        "user_id",
+        "username",
+        "email",
+        "enabled",
+        "email_verified",
+        "organizations",
+        "permissions",
+    },
 }
 
 
@@ -43,3 +62,21 @@ def test_public_management_dto_fields_are_backward_compatible(
     }
 
     assert not any(removed.values()), removed
+
+
+def test_admin_permission_dtos_use_explicit_project_uuid_not_ambiguous_id(
+    management_openapi: dict,
+) -> None:
+    project_permission_fields = schema_properties(
+        management_openapi,
+        "AdminUserProjectPermissionResponse",
+    )
+    project_permission_update_fields = schema_properties(
+        management_openapi,
+        "AdminUserProjectPermissionUpdateRequest",
+    )
+
+    assert "project_uuid" in project_permission_fields
+    assert "project_uuid" in project_permission_update_fields
+    assert "id" not in project_permission_fields
+    assert "id" not in project_permission_update_fields

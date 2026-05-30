@@ -56,6 +56,13 @@ def serialized_permission_payload(projects: int = 100) -> dict[str, list[str]]:
     }
 
 
+def admin_permission_attributes(projects: int = 100) -> dict[str, object]:
+    return {
+        "org_permissions": ["organization.settings.read", "organization.users.read"],
+        "project_permissions": serialized_permission_payload(projects),
+    }
+
+
 def gateway_headers_payload() -> dict[str, str]:
     return {
         "Connection": "keep-alive",

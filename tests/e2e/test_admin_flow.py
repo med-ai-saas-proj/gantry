@@ -45,3 +45,24 @@ def test_organization_settings_can_be_updated_without_5xx(backend_e2e) -> None:
     assert response.status_code == 200, response.text
     assert response.json()["rate_limit"] == 1200
     assert response.json()["extra"].get("e2e.backend") == "true"
+
+
+def test_user_owned_organization_delete_request_can_be_cancelled(backend_e2e) -> None:
+    org_id = backend_e2e.context.org_id
+
+    delete_request = backend_e2e.user_request(
+        "DELETE",
+        f"/management/v1/organizations/{org_id}",
+    )
+    cancel = backend_e2e.user_request(
+        "POST",
+        f"/management/v1/organizations/{org_id}/deletion/cancel",
+    )
+
+    assert delete_request.status_code in {202, 401, 403}, delete_request.text
+    assert delete_request.status_code < 500
+    assert cancel.status_code in {200, 401, 403, 404}, cancel.text
+    assert cancel.status_code < 500
+    if delete_request.status_code == 202:
+        assert cancel.status_code == 200, cancel.text
+        assert cancel.json() == {"id": org_id, "cancelled": True}

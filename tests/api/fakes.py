@@ -710,6 +710,16 @@ class FakeBillingAggregateQueryService(ConfigurableFake):
             }
         ])
 
+    async def getAggregateByProjectsForAdmin(self, **kwargs):
+        self.calls.append(("getAggregateByProjectsForAdmin", kwargs))
+        return Ok([
+            {
+                "period_bucket": NOW,
+                "transaction_count": 3,
+                "total_amount": Decimal("33.33"),
+            }
+        ])
+
     async def get_aggregate_by_org(self, **kwargs):
         self.calls.append(("get_aggregate_by_org", kwargs))
         return Ok([
@@ -838,6 +848,14 @@ class FakeBillingTransactionService(ConfigurableFake):
         self.calls.append(("getTransactionById", kwargs))
         return Ok(transaction_payload())
 
+    async def getTransactionsForAdmin(self, **kwargs):
+        self.calls.append(("getTransactionsForAdmin", kwargs))
+        return ([transaction_payload()], 1)
+
+    async def getTransactionByIdForAdmin(self, **kwargs):
+        self.calls.append(("getTransactionByIdForAdmin", kwargs))
+        return Ok(transaction_payload())
+
     async def post(self, **kwargs):
         self.calls.append(("post", kwargs))
         return Ok(uuid.UUID(TRANSACTION_UUID))
@@ -920,6 +938,10 @@ class FakeFileStorageService(ConfigurableFake):
 class FakeRagService(ConfigurableFake):
     def __init__(self) -> None:
         self.calls: list[tuple[str, Any]] = []
+
+    def getSupportedLanguages(self):
+        self.calls.append(("getSupportedLanguages", None))
+        return ["english", "simple"]
 
     async def addEmbedding(self, *args):
         self.calls.append(("addEmbedding", args))

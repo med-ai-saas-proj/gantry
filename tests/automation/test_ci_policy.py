@@ -27,6 +27,13 @@ def _workflow_path(repo_root, name: str) -> Path:
     return repo_root / ".github" / "workflows" / name
 
 
+def _make_target_body(makefile: str, target: str) -> str:
+    pattern = rf"^{re.escape(target)}:\n(?P<body>(?:\t.*\n|[ \t]*\n)*)"
+    match = re.search(pattern, makefile, flags=re.MULTILINE)
+    assert match, f"Missing Makefile target {target}"
+    return match.group("body")
+
+
 def test_makefile_exposes_all_layered_test_targets(repo_root) -> None:
     makefile = (repo_root / "Makefile").read_text()
     required_targets = {
@@ -64,6 +71,26 @@ def test_automation_target_is_smoke_policy_not_full_suite(repo_root) -> None:
     assert "--alluredir=reports/allure" in makefile
     assert "--cov-report=xml:reports/automation/coverage.xml" in makefile
     assert "AUTOMATION_COVERAGE_FAIL_UNDER ?= 0" in makefile
+
+
+@pytest.mark.parametrize("target", ["test-api", "test-regression", "test-automation", "test-perf"])
+def test_fast_or_no_docker_targets_do_not_start_external_services(repo_root, target: str) -> None:
+    makefile = (repo_root / "Makefile").read_text()
+    body = _make_target_body(makefile, target)
+
+    assert "docker compose" not in body
+    assert "testcontainers" not in body.lower()
+    assert "make test-integration" not in body
+    assert "make test-e2e" not in body
+
+
+def test_regression_fuzz_installs_fakes_before_calling_generated_cases(repo_root) -> None:
+    fuzz_test = (repo_root / "tests/regression/test_openapi_fuzz.py").read_text()
+
+    assert "_install_fake_dependencies" in fuzz_test
+    assert "respx.mock" in fuzz_test
+    assert "localhost:6379" not in fuzz_test
+    assert "localhost:5432" not in fuzz_test
 
 
 @pytest.mark.parametrize("name", ["unit", "api", "regression", "automation"])
