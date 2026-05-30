@@ -86,7 +86,7 @@ logs = "disabled"
 prometheus_port = 9000
 
 [ai_gateway.models]
-test0 = { provider = "groq", model_id = "openai/gpt-oss-120b", fallback = [
+test0 = { provider = "groq", model_id = "openai/gpt-oss-120b", context_window = 128000, fallback = [
     "test1",
 ] }
-test1 = { provider = "groq", model_id = "openai/gpt-oss-20b" }
+test1 = { provider = "groq", model_id = "openai/gpt-oss-20b", context_window = 128000 }

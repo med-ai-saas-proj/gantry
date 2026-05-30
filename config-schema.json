@@ -386,11 +386,17 @@
           "default": null,
           "description": "Fallback model",
           "title": "Fallback"
+        },
+        "context_window": {
+          "description": "Model's context window. Used for AGUI message trimming.",
+          "title": "Context Window",
+          "type": "integer"
         }
       },
       "required": [
         "provider",
-        "model_id"
+        "model_id",
+        "context_window"
       ],
       "title": "ModelSpec",
       "type": "object"
