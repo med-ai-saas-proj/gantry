@@ -88,7 +88,7 @@ async def getApiKeyInfo(
                 "project_id": 0,
                 "project_uuid": str(uuid.UUID(int=0)),
                 "organization_uuid": "test_org1",
-                "permissions": ["chat:customer", "chat:doctor"],
+                "permissions": ["demo"],
                 "rpm_limit_organization": 1000000,
                 "rpm_limit_project": 1000000,
                 "spending_limit_organization": 1000000,
