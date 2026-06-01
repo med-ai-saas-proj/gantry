@@ -338,3 +338,6 @@ class AiGatewayService:
                 )
             project_id = project.id
         return await async_func(project_id=project_id, **kwargs)
+
+    def getModels(self) -> list[str]:
+        return list(self.agent.keys())

@@ -2,7 +2,7 @@ from .services import AiGatewayService
 from .factories import getAiGatewayService
 
 from uuid import UUID
-from typing import Any, Literal, Annotated, TypedDict
+from typing import Literal, Annotated, TypedDict
 
 from fastapi import Body, Path, Query, Depends, APIRouter
 from ag_ui.core import Event, RunAgentInput
@@ -28,6 +28,7 @@ class ModelSettingsInput(
 
 
 ai_gateway_router = APIRouter(prefix="/ai-gateway", tags=["ai-gateway"])
+ai_gateway_public_router = APIRouter(prefix="/ai-gateway", tags=["ai-gateway"])
 
 
 class RunAgentInputWithModelSettings(RunAgentInput):
@@ -35,6 +36,15 @@ class RunAgentInputWithModelSettings(RunAgentInput):
     system_prompt: str | list[str] | None = None
     max_turns: int | None = None
     reserved_tokens: int | None = None
+
+
+@ai_gateway_public_router.get("/models")
+async def get_models(
+    ai_gateway_service: Annotated[
+        AiGatewayService, Depends(getAiGatewayService)
+    ],
+) -> list[str]:
+    return ai_gateway_service.getModels()
 
 
 @ai_gateway_router.post(

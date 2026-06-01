@@ -13,10 +13,18 @@ import httpx
 from fastapi import Path, Depends, FastAPI, Request
 from fastapi.responses import StreamingResponse
 from starlette.background import BackgroundTask
+from fastapi.middleware.cors import CORSMiddleware
 
 
 gateway_app = FastAPI(debug=getAppSettings().stage == AppStage.DEV)
 
+gateway_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 HOP_BY_HOP_HEADERS = {
     "connection",
