@@ -133,7 +133,8 @@ services:
     volumes:
       - timescale_data:/var/lib/postgresql
     restart: unless-stopped
-    command: ["postgres", "-c", "shared_preload_libraries=timescaledb,pg_textsearch"]
+    command:
+      ["postgres", "-c", "shared_preload_libraries=timescaledb,pg_textsearch"]
     deploy:
       resources:
         limits:
@@ -212,11 +213,13 @@ services:
       - |
         sleep 10 &&
         echo 'Migrating' &&
-        uv run gantry server --config-file example.gantry.toml migrate &&
+        uv run gantry server --config-file gantry.toml migrate &&
         echo 'Running server' &&
-        uv run gantry server --config-file example.gantry.toml
+        uv run gantry server --config-file gantry.toml
     profiles:
       - frontend-dev
+    volumes:
+      - ./gantry.toml:/app/gantry.toml:ro
 
 volumes:
   timescale_data:
