@@ -47,7 +47,6 @@ from typing import Sequence, Awaitable, TypedDict, cast
 from decimal import Decimal
 from datetime import UTC, datetime, timedelta
 
-from docx import api
 from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import select
 from redis.asyncio import Redis
