@@ -16,11 +16,18 @@ import uuid
 from uuid import UUID
 from typing import Any, AsyncIterator
 from datetime import UTC, datetime
+from dataclasses import asdict
 
 import tiktoken
 from pydantic import TypeAdapter
 from pyrusult import Ok, Err, Result, ResultStatus
-from ag_ui.core import BaseEvent, EventType, RunAgentInput, SystemMessage
+from ag_ui.core import (
+    CustomEvent,
+    RunAgentInput,
+    RunErrorEvent,
+    SystemMessage,
+    MessagesSnapshotEvent,
+)
 from pydantic_ai import Agent, ModelSettings, AgentRunResult
 from ag_ui.core.types import Message as AGUIMessage
 from pydantic_ai.models import Model, fallback, infer_model
@@ -219,6 +226,7 @@ class AiGatewayService:
         )
 
         async def _onComplete(run_result: AgentRunResult):
+            new_messages = AGUIAdapter.dump_messages(run_result.new_messages())
             res = (
                 await self.tree_conversation_service.storeConversationMessages(
                     conversation_uuid,
@@ -239,19 +247,27 @@ class AiGatewayService:
                             run_id=run_input.run_id,
                             timestamp=datetime.now(),
                         )
-                        for msg in AGUIAdapter.dump_messages(
-                            run_result.new_messages()
-                        )
+                        for msg in new_messages
                     ],
                     from_node_id=parent_run_id,
                 )
             )
             if res.status == ResultStatus.Err:
-                yield BaseEvent(
-                    type=EventType.RUN_ERROR,
+                yield RunErrorEvent(
                     timestamp=self.getTimestamp(),
-                    raw_event=res.value,
+                    message=res.value.detail
+                    or "Failed to store conversation messages",
                 )
+
+            yield MessagesSnapshotEvent(
+                timestamp=self.getTimestamp(), messages=new_messages
+            )
+
+            yield CustomEvent(
+                timestamp=self.getTimestamp(),
+                name="model_usage",
+                value={"model": model, "usage": asdict(run_result.usage())},
+            )
 
         return Ok(
             adapter.encode_stream(

@@ -537,7 +537,6 @@ class TransactionService:
 
     async def post(
         self,
-        api_key_uuid: UUID,
         idempotency_key: str | None,
         req: PostRequest,
     ) -> Result[
@@ -552,6 +551,7 @@ class TransactionService:
 
         Returns Ok(transaction_uuid) on success.
         """
+        api_key_uuid = req.api_key_uuid
         api_key_ids_res = await self._getApiKeyInternalIds(str(api_key_uuid))
         if api_key_ids_res.status == ResultStatus.Err:
             return api_key_ids_res.into()
