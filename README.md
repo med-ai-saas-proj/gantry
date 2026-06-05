@@ -1,175 +1,101 @@
-# Gantry
+# 🏥 Hướng Dẫn Setup Chatbot Y Tế RAG System
 
-## Dev notes
+## 📋 Yêu Cầu Hệ Thống
 
-### Pre-commit
+- UV
+- Docker & Docker Compose
 
-- Pls install the pre commit hooks to ensure code quality
-- To install run: `uv run pre-commit install`
+## 🚀 Hướng Dẫn Setup
 
-### Formatting
-
-- Run `./scripts/tidy.sh` to format and sort imports. THIS IS VERY IMPORTANT!!!
-
-### How to run alembic
-- `GANTRY_SERVER__CONFIG_FILE=example.gantry.toml uv run alembic`
-
-### How to quickly run the server (For development and testing) 
-
-1. Check out [Getting API key](#getting-api-keys)
-1. Copy [`example.gantry.toml`](./example.gantry.toml) to `gantry.toml` then find all the `#apikey` and put yours in.
-1. Start the server and other services: `docker compose --profile frontend-dev up`
-<!--1. Start DBs and other services: `docker compose up`
-1. Install dependency: `uv sync --dev --frozen`
-1. Migrate DB: `uv run gantry server -f gantry.toml migrate`
-1. Start server: `uv run gantry server -f gantry.toml`-->
-
-**NOTES**:
-- logins:
-  - keycloak admin: `admin` | `admin`
-  - app's test user: `gantry-test-user` | `password` 
-  - app's admin user: `gantry-admin-user` | `password`
-  - rustfs: `rustfs-access-key` | `rustfs-secret-key`
-- dasboards:
-  - Grafana: <localhost:3001>
-  - Mailpit (Check sent mail): <localhost:8025>
-  - Keycloak (Auth server): <localhost:8080>
-  - Rustfs (S3 storage): <localhost:9001>
-
-### Some useful scripts
-
-- Generate `example.env` files for `.env` files: `scripts/gen-example-env.sh`
-- Reset the database state: `scripts/reset-db.sh`. Remember to migrate and recreate the test account.
-
-### How to run tests locally
-
-Most test targets are wrapped by the `Makefile`. Use `example.gantry.toml`
-for no-Docker contract tests, or `gantry.toml` if you need local secrets and a
-running development stack.
+### 1. Khởi động Docker PostgreSQL với pg-vector
 
 ```bash
-uv sync --group dev
-export GANTRY_SERVER__CONFIG_FILE=example.gantry.toml
-export PYTHONPATH=src
-
-make test-unit
-make test-api
-make test-regression
-make test-automation
+docker compose -f compose.dev.yaml up
 ```
 
-Useful grouped targets:
+### 2. Cấu hình Database
+
+#### 2.1. Kết nối Database với DBeaver (hoặc pgAdmin/psql)
+
+**Thông tin kết nối:**
+
+- Host: `localhost`
+- Port: `5432`
+- Database: `tailm`
+- Username: `internet_crawler`
+- Password: `123456`
+
+**Với DBeaver:**
+
+1. New Database Connection → PostgreSQL
+2. Nhập thông tin connection ở trên
+3. Test Connection → Finish
+
+**Với psql command line:**
 
 ```bash
-make test-ci-fast   # automation + unit + API + regression
-make test-ci-full   # test-ci-fast + integration
+psql postgresql://internet_crawler:123456@localhost:5432/tailm
 ```
 
-Integration and backend E2E use real services and require Docker:
+#### 2.2. Tạo Schema và Migration
 
 ```bash
-make test-integration
-make test-e2e-backend
+UV_ENV_FILE=.env uv run alembic upgrade head
 ```
 
-Performance benchmarks are local-only unless you explicitly run load tests
-against a server:
+### 3. Setup Python Environment
 
 ```bash
-make test-perf
-BASE_URL=http://localhost:8000 make test-load-k6
-BASE_URL=http://localhost:8000 make test-load-locust
+uv sync --frozen
 ```
-
-Reports are written under `reports/`. More test-suite details are in
-[`tests/README.md`](./tests/README.md).
-
-### How to test GitHub Actions locally
-
-Install [`act`](https://github.com/nektos/act), then run one workflow/job at a
-time. The Ubuntu image below matches the workflows well enough for local CI
-smoke checks.
 
 ```bash
-act workflow_dispatch \
-  -W .github/workflows/unit-test.yml \
-  -j unit \
-  --container-architecture linux/amd64 \
-  -P ubuntu-latest=catthehacker/ubuntu:act-latest
+./scripts/dev.sh
 ```
 
-Common workflow commands:
+### 4. Import Postman Collection
+
+1. Mở Postman
+2. Import file `postman_collection.json`
+3. Set variable `base_url` = `http://localhost:8000`
+
+## 📊 Architecture
+
+```
+Browser (chatbot.html)
+    ↓ HTTP POST
+FastAPI Server (server.py)
+    ↓
+ChatbotService (RAG Pipeline)
+    ↓
+PostgreSQL + pgvector (Vector Search)
+    ↓
+Gemini API (LLM Generation)
+```
+
+## 🚨 Troubleshooting
+
+**Lỗi PostgreSQL Connection:**
 
 ```bash
-act workflow_dispatch -W .github/workflows/api-test.yml -j api --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
-act workflow_dispatch -W .github/workflows/automation-test.yml -j smoke --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
-act workflow_dispatch -W .github/workflows/regression-test.yml -j regression --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
-act workflow_dispatch -W .github/workflows/integration-test.yml -j integration --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
-act workflow_dispatch -W .github/workflows/e2e-test.yml -j e2e --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
-act workflow_dispatch -W .github/workflows/performance-test.yml -j benchmark --container-architecture linux/amd64 -P ubuntu-latest=catthehacker/ubuntu:act-latest
+# Kiểm tra Docker container
+docker ps
+
+# Restart PostgreSQL
+docker compose -f compose.dev.yaml restart db
+
+# Xem logs
+docker compose -f compose.dev.yaml logs db
 ```
 
-Notes:
+**Lỗi pgvector extension:**
 
-- `act` copies the current working tree, including uncommitted changes.
-- Integration/E2E workflows need local Docker access from inside `act`.
-- Warnings from the Node action runtime, such as `punycode` deprecation, are
-  not Gantry test failures.
+```sql
+-- Connect vào PostgreSQL và chạy
+CREATE EXTENSION IF NOT EXISTS vector;
+```
 
-### Getting API keys
+**Lỗi CORS:**
 
-#### LLM
-
-1. Go to <https://groq.com/> and get a free API key, this is `GROQ_API_KEY`
-
-## Keycloak config
-
-Gantry needs 3 clients: 1 for the frontend (`gantry-frontend`), 1 for admin users (`gantry-admin`), and 1 service client for the backend (`gantry-backend`). You also need to config emails for sending invitation email. Here's the setup you need to go through.
-
-1. Create clients:
-    1. Go to `Clients > Create client` and uses the following config: 
-        - Client id: `gantry-frontend`
-        - PKCE: S256
-        - Client authentication: off
-        - Authentication flow: Standard flow
-        - Put your frontend's URLs in Access Settings
-      
-    1. Create another client with the following config:
-        - Client id: `gantry-admin`
-        - PKCE: S256
-        - Client authentication: off
-        - Authentication flow: Standard flow
-        - Assign the realm role `ADMIN` to users who should access admin-only endpoints
-    1. Create another client with the following config:
-        - Client id: `gantry-backend`
-        - Client authentication: On
-        - Authentication flow: Service account roles
-    
-    1. After creating the `gantry-backend` client to the following:
-        1. Go to `credentials tab` and copy the client secret
-        1. Go to `Service account roles > service-account-gantry-backend > Role mapping`
-        1. Assign the following client roles:
-            - manage-users
-            - view-users
-            - view-clients
-            - manage-realm
-1. Enable Organization feature: Go to `realm settings > general` and enable organization
-1. Put user's organization and permission in JWT:
-    1. Go to `realm settings > user profile` to create 2 attributes
-        1. org_permissions:
-            - name: org_permissions
-            - multivalued: Yes
-            - Who can edit?: Admin
-            - Who can view?: Admin
-        1. project_permissions
-            - name: project_permissions
-            - multivalued: Yes
-            - Who can edit?: Admin
-            - Who can view?: Admin
-    1. Go to `Client scopes`
-    1. Click on organization
-    1. Change type to `Default`
-    1. Go to `Mappers` tab and change the following settings:
-        - Claim JSON type: JSON
-        - Add organization attributes: On
-        - Add organization id: On
+- Đảm bảo server chạy trên `localhost:8000`
+- Kiểm tra CORS settings trong FastAPI

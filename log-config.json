@@ -1,0 +1,8 @@
+{
+    "version": 1,
+    "formatters": {
+        "default": {
+            "fmt": "%(asctime)s [%(name)s] %(levelprefix)s %(message)s"
+        }
+    }
+}

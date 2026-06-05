@@ -4,9 +4,6 @@
 .vscode
 !.vscode/launch.json
 
-# MacOS
-.DS_Store
-
 # Environments
 .env*
 *.yml
