@@ -2,10 +2,39 @@
 *__pycache__*
 .idea
 .vscode
+.zed
 !.vscode/launch.json
 
+# MacOS
+.DS_Store
+
+
 # Environments
-*.env*
+.env*
+prod.env
 *.yml
+!.github/workflows/*.yml
+!docker/*.yml
+!docker/**/*.yml
+!deploy/*.yml
 
 .venv/
+
+.husky/_
+
+node_modules/
+
+gantry.toml
+
+frontend/
+
+docs/
+
+test-results/
+
+# Deployment runtime state
+/deploy/runtime/*
+!/deploy/runtime/.gitkeep
+
+reports/
+temp/

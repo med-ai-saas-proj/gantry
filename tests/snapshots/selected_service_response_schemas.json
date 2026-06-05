@@ -1,0 +1,285 @@
+{
+  "ConversationMetadataResponse": {
+    "description": "Represents the metadata of a conversation.",
+    "properties": {
+      "conversation_uid": {
+        "format": "uuid",
+        "title": "Conversation Uid",
+        "type": "string"
+      },
+      "created_at": {
+        "format": "date-time",
+        "title": "Created At",
+        "type": "string"
+      },
+      "extra_metadata": {
+        "anyOf": [
+          {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Extra Metadata"
+      },
+      "project_id": {
+        "title": "Project Id",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "conversation_uid",
+      "project_id",
+      "created_at"
+    ],
+    "title": "ConversationMetadataResponse",
+    "type": "object"
+  },
+  "CreateConversationResponse": {
+    "description": "Represents a response after creating a new conversation.",
+    "properties": {
+      "conversation_uid": {
+        "format": "uuid",
+        "title": "Conversation Uid",
+        "type": "string"
+      }
+    },
+    "required": [
+      "conversation_uid"
+    ],
+    "title": "CreateConversationResponse",
+    "type": "object"
+  },
+  "EmbeddingTaskResponse": {
+    "description": "DTO for RAG embedding task status response.",
+    "properties": {
+      "chunk_overlap": {
+        "title": "Chunk Overlap",
+        "type": "integer"
+      },
+      "chunk_size": {
+        "title": "Chunk Size",
+        "type": "integer"
+      },
+      "chunk_splitter": {
+        "$ref": "#/components/schemas/ChunkSplitterType"
+      },
+      "file_uid": {
+        "format": "uuid",
+        "title": "File Uid",
+        "type": "string"
+      },
+      "project_uuid": {
+        "format": "uuid",
+        "title": "Project Uuid",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "pending",
+          "completed",
+          "failed_and_retrying",
+          "failed_and_dropped"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "task_id": {
+        "title": "Task Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "task_id",
+      "file_uid",
+      "project_uuid",
+      "chunk_splitter",
+      "chunk_size",
+      "chunk_overlap",
+      "status"
+    ],
+    "title": "EmbeddingTaskResponse",
+    "type": "object"
+  },
+  "FileInfoResponse": {
+    "description": "DTO for file info response.",
+    "properties": {
+      "created_at": {
+        "format": "date-time",
+        "title": "Created At",
+        "type": "string"
+      },
+      "extra_metadata": {
+        "anyOf": [
+          {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Extra Metadata"
+      },
+      "filename": {
+        "title": "Filename",
+        "type": "string"
+      },
+      "id": {
+        "title": "Id",
+        "type": "string"
+      },
+      "mime_type": {
+        "title": "Mime Type",
+        "type": "string"
+      },
+      "size": {
+        "title": "Size",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "filename",
+      "mime_type",
+      "size",
+      "created_at",
+      "extra_metadata"
+    ],
+    "title": "FileInfoResponse",
+    "type": "object"
+  },
+  "FilePresignedURLResponse": {
+    "description": "DTO for file presigned URL response.",
+    "properties": {
+      "url": {
+        "title": "Url",
+        "type": "string"
+      }
+    },
+    "required": [
+      "url"
+    ],
+    "title": "FilePresignedURLResponse",
+    "type": "object"
+  },
+  "FileUploadResponse": {
+    "description": "DTO for file upload response.",
+    "properties": {
+      "file_id": {
+        "title": "File Id",
+        "type": "string"
+      }
+    },
+    "required": [
+      "file_id"
+    ],
+    "title": "FileUploadResponse",
+    "type": "object"
+  },
+  "RagQueryResponse": {
+    "description": "DTO for RAG query response.",
+    "properties": {
+      "created_at": {
+        "format": "date-time",
+        "title": "Created At",
+        "type": "string"
+      },
+      "embedding": {
+        "items": {
+          "type": "number"
+        },
+        "title": "Embedding",
+        "type": "array"
+      },
+      "file_info": {
+        "$ref": "#/components/schemas/FileInfoResponse"
+      },
+      "text": {
+        "title": "Text",
+        "type": "string"
+      }
+    },
+    "required": [
+      "file_info",
+      "text",
+      "embedding",
+      "created_at"
+    ],
+    "title": "RagQueryResponse",
+    "type": "object"
+  },
+  "ResponseMessageResponse": {
+    "properties": {
+      "kind": {
+        "const": "response",
+        "title": "Kind",
+        "type": "string"
+      },
+      "message_seq_id": {
+        "title": "Message Seq Id",
+        "type": "integer"
+      },
+      "model_name": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Model Name"
+      },
+      "parts": {
+        "items": {
+          "anyOf": [
+            {
+              "$ref": "#/components/schemas/SerializedResponseTextMessagePart"
+            },
+            {
+              "$ref": "#/components/schemas/SerializedResponseThinkingMessagePart"
+            },
+            {
+              "$ref": "#/components/schemas/SerializedResponseToolCallMessagePart"
+            },
+            {
+              "$ref": "#/components/schemas/SerializedResponseBuiltInToolCallMessagePart"
+            },
+            {
+              "$ref": "#/components/schemas/SerializedResponseBuiltInToolResultMessagePart"
+            }
+          ]
+        },
+        "title": "Parts",
+        "type": "array"
+      },
+      "run_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Run Id"
+      },
+      "timestamp": {
+        "format": "date-time",
+        "title": "Timestamp",
+        "type": "string"
+      }
+    },
+    "required": [
+      "kind",
+      "parts",
+      "timestamp",
+      "message_seq_id"
+    ],
+    "title": "ResponseMessageResponse",
+    "type": "object"
+  }
+}

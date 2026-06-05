@@ -1,0 +1,35 @@
+name: API Tests
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+concurrency:
+  group: api-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv python install 3.13.5
+      - run: uv sync --group dev
+      - name: Run API contract tests
+        env:
+          GANTRY_SERVER__CONFIG_FILE: example.gantry.toml
+          PYTHONPATH: src
+          COVERAGE_FAIL_UNDER: "80"
+        run: make test-api
+      - name: Upload API reports
+        if: ${{ always() && env.ACT != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-reports
+          path: reports/api
+          if-no-files-found: ignore

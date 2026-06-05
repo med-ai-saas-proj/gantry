@@ -1,0 +1,24 @@
+FROM timescale/timescaledb:latest-pg18
+
+USER root
+
+
+# build and install pg_textsearch
+RUN apk add --no-cache --virtual .build-deps \
+    git \
+    make \
+    gcc \
+    clang19 \
+    llvm19 \
+    musl-dev \
+    jq \
+    pkgconfig && \
+    cd /tmp && \
+    git clone https://github.com/timescale/pg_textsearch && \
+    cd pg_textsearch && \
+    make && \
+    make install && \
+    rm -rf /tmp/pg_textsearch && \
+    apk del --no-cache .build-deps;
+
+USER postgres
