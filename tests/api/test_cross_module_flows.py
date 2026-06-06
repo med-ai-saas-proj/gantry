@@ -468,7 +468,7 @@ async def test_internal_usage_capture_is_visible_to_management_billing_and_logs(
         "billing_transaction"
     ].calls[:2]
     assert post_call[0] == "post"
-    assert str(post_call[1]["api_key_uuid"]) == (
+    assert str(post_call[1]["req"].api_key_uuid) == (
         "77777777-7777-7777-7777-777777777777"
     )
     assert post_call[1]["idempotency_key"] == "idem-cross"

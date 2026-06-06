@@ -45,7 +45,11 @@ async def test_internal_usage_transaction_routes_delegate_to_billing_service(
     assert captured.status_code == 200
     assert captured.json() is True
     assert authenticated_internal_api["billing_transaction"].calls[0][0] == "post"
-    assert str(authenticated_internal_api["billing_transaction"].calls[0][1]["api_key_uuid"]) == API_KEY_UUID
+    assert str(
+        authenticated_internal_api["billing_transaction"].calls[0][1][
+            "req"
+        ].api_key_uuid
+    ) == API_KEY_UUID
 
 
 @pytest.mark.asyncio
