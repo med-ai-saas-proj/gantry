@@ -29,7 +29,7 @@ dependencies = [
     "opentelemetry-instrumentation-botocore>=0.60b1",
     "filetype>=1.2.0",
     "boto3>=1.40.61",
-    "pydantic-ai>=1.70.0",
+    "pydantic-ai-slim[openai,vertexai,google,xai,groq,anthropic,mistral,cohere,bedrock,huggingface,cli,mcp,fastmcp,ag-ui,retries,ui,spec]>=1.70.0",
     "python-keycloak>=5.3.1",
     "uvloop>=0.22.1; sys_platform == 'linux'",
     "sqlalchemy-timescaledb>=0.4.1",
@@ -55,7 +55,7 @@ dependencies = [
 gantry = "gantry.__main__:main"
 
 [build-system]
-requires = ["uv_build>=0.9.11,<0.10.0"]
+requires = ["uv_build>=0.9.11,<0.12"]
 build-backend = "uv_build"
 
 [tool.uv.workspace]

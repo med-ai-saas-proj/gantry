@@ -47,7 +47,6 @@ from typing import Sequence, Awaitable, TypedDict, cast
 from decimal import Decimal
 from datetime import UTC, datetime, timedelta
 
-from docx import api
 from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import select
 from redis.asyncio import Redis
@@ -537,7 +536,6 @@ class TransactionService:
 
     async def post(
         self,
-        api_key_uuid: UUID,
         idempotency_key: str | None,
         req: PostRequest,
     ) -> Result[
@@ -552,6 +550,7 @@ class TransactionService:
 
         Returns Ok(transaction_uuid) on success.
         """
+        api_key_uuid = req.api_key_uuid
         api_key_ids_res = await self._getApiKeyInternalIds(str(api_key_uuid))
         if api_key_ids_res.status == ResultStatus.Err:
             return api_key_ids_res.into()

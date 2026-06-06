@@ -22,7 +22,6 @@ async def post(
 ) -> UUID:
     return (
         await billing_service.post(
-            api_key_uuid=body.api_key_uuid,
             idempotency_key=idempotency_key,
             req=body,
         )

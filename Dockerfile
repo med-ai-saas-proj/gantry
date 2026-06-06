@@ -46,4 +46,4 @@ USER gantry
 EXPOSE 8000
 
 ENTRYPOINT ["gantry"]
-CMD ["server", "--config-file", "example.gantry.toml"]
+CMD ["server", "--config-file", "gantry.toml"]

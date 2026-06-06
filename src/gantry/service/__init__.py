@@ -6,6 +6,7 @@ from gantry.shared.health import setup_health_routes
 from .rag import rag_router
 from .conversation import conversation_router
 from .file_storage import file_storage_router
+from .ai_gateway.routes import ai_gateway_public_router
 
 from fastapi import FastAPI, APIRouter
 from scalar_fastapi import get_scalar_api_reference
@@ -46,6 +47,7 @@ v1_router = APIRouter(prefix="/v1", tags=["service"], include_in_schema=True)
 v1_router.include_router(rag_router)
 v1_router.include_router(file_storage_router)
 v1_router.include_router(conversation_router)
+v1_router.include_router(ai_gateway_public_router)
 # v1_router.include_router(ai_gateway_router)
 
 # api_router = APIRouter(prefix="/api", tags=["api"], include_in_schema=True)

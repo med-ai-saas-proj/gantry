@@ -73,6 +73,28 @@ async def getApiKeyInfo(
     api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
 ) -> ApiKeyInfo:
     """Dependency to get API key info without permission checks."""
+    from gantry.settings import AppStage, getAppSettings
+
+    import uuid
+
+    app_settings = getAppSettings()
+    if app_settings.stage == AppStage.DEV and enable_mock_auth:
+        if api_key == "bypass_key":
+            return {
+                "api_key_id": 0,
+                "api_key_uuid": str(uuid.UUID(int=0)),
+                "user_uuid": "test_user",
+                "hashed_key": "bypass_hashed_key",
+                "project_id": 0,
+                "project_uuid": str(uuid.UUID(int=0)),
+                "organization_uuid": "test_org1",
+                "permissions": ["demo"],
+                "rpm_limit_organization": 1000000,
+                "rpm_limit_project": 1000000,
+                "spending_limit_organization": 1000000,
+                "spending_limit_project": 1000000,
+            }
+
     user_info = await api_key_service.parseApiKey(api_key)
     api_key_info = user_info.unwrap()
     (await api_key_service.rateLimit(api_key_info)).unwrap()

@@ -70,13 +70,6 @@ invite_redirect_uri = "http://localhost:3000"
 deletion_cancel_window_days = 30
 deletion_worker_interval_seconds = 60
 
-[api_gateway]
-routes = { "get_objects" = { "address" = "https://api.restful-api.dev/objects", required_perms = [
-    "objects:read",
-] }, "create_object" = { "address" = "https://api.restful-api.dev/objects", required_perms = [
-    "object_write",
-] } }
-
 [observability]
 exporter_otlp_endpoint = "http://localhost:4317/"
 exporter_otlp_protocol = "grpc"
@@ -86,7 +79,18 @@ logs = "disabled"
 prometheus_port = 9000
 
 [ai_gateway.models]
-test0 = { provider = "groq", model_id = "openai/gpt-oss-120b", fallback = [
-    "test1",
+"gpt-oss-120b" = { provider = "groq", model_id = "openai/gpt-oss-120b", context_window = 128000, api_key = "gsk_", fallback = [
+    "gpt-oss-20b",
 ] }
-test1 = { provider = "groq", model_id = "openai/gpt-oss-20b" }
+"gpt-oss-20b" = { provider = "groq", model_id = "openai/gpt-oss-20b", context_window = 128000, api_key = "gsk_" }
+
+[api_gateway]
+routes = { "chat" = { "address" = "http://localhost:3000/chat/", required_perms = [
+    "demo",
+] } }
+
+# routes = { "get_objects" = { "address" = "https://api.restful-api.dev/objects", required_perms = [
+#     "objects:read",
+# ] }, "create_object" = { "address" = "https://api.restful-api.dev/objects", required_perms = [
+#     "object:write",
+# ] } }

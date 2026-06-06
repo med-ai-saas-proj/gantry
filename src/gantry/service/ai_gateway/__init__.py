@@ -1,1 +1,1 @@
-from .routes import ai_gateway_router
+from .routes import ai_gateway_router, ai_gateway_public_router
