@@ -138,7 +138,6 @@ async def test_billing_transaction_post_capture_and_read_path_uses_real_db_and_r
 
     with freeze_time("2026-05-12T10:00:00Z"):
         post_res = await service.post(
-            api_key_uuid=api_key_uuid,
             idempotency_key="integration-billing-post",
             req=PostRequest(
                 api_key_uuid=api_key_uuid,
