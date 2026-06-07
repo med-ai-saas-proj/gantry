@@ -66,6 +66,13 @@ services:
     # expose consistently, so backend E2E runs gantry on the compose bridge.
     network_mode: !reset null
     container_name: !reset null
+    command:
+      - |
+        sleep 10 &&
+        echo 'Migrating' &&
+        gantry server --config-file example.gantry.toml migrate &&
+        echo 'Running server' &&
+        exec gantry server --config-file example.gantry.toml
     environment:
       GANTRY_SERVER__HOST: "0.0.0.0"
       GANTRY_SERVER__DB__TIMESCALE_CONNECTION_URI: "postgresql+asyncpg://gantry:123456@${E2E_GANTRY_DB_HOST:-timescale_db}:5432/gantry"
@@ -73,6 +80,8 @@ services:
       GANTRY_SERVER__DB__REDIS_CONNECTION_URI: "redis://${E2E_GANTRY_REDIS_HOST:-redis}:6379/0"
       GANTRY_SERVER__KEYCLOAK__SERVER_URL: "${E2E_GANTRY_KEYCLOAK_URL:-http://keycloak:8080/}"
       GANTRY_SERVER__FILE_STORAGE__S3_ENDPOINT_URL: "${E2E_GANTRY_S3_ENDPOINT_URL:-http://minio:9000}"
+    volumes: !override
+      - ./example.gantry.toml:/app/example.gantry.toml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
