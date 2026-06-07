@@ -263,11 +263,12 @@ async def list_admin_project_permissions(
 async def list_admin_projects(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     org_id: Annotated[str, Query(..., min_length=1, alias="org_id")],
+    pagination: Annotated[AdminPaginationQuery, Depends()],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
 ) -> ProjectListResponse:
     """Return projects for one organization without project membership checks."""
     del user_info
-    return await admin_service.listProjects(org_id)
+    return await admin_service.listProjects(org_id, pagination)
 
 
 @admin_router.post(

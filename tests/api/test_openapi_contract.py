@@ -53,6 +53,19 @@ def test_user_organization_search_query_is_documented(
     assert "alias" in description
 
 
+def test_admin_project_list_pagination_query_is_documented(
+    management_openapi: dict,
+) -> None:
+    operation = management_openapi["paths"]["/v1/admin/projects"]["get"]
+    query_params = {
+        parameter["name"]: parameter
+        for parameter in operation.get("parameters", [])
+        if parameter.get("in") == "query"
+    }
+
+    assert {"org_id", "limit", "offset", "q"} <= set(query_params)
+
+
 @pytest.mark.parametrize(
     "fixture_name",
     ["service_openapi", "gateway_openapi", "internal_openapi"],

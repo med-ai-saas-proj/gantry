@@ -269,7 +269,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             {"id": "org-1", "name": "New Org", "alias": "old"},
         )
 
-    async def test_list_projects_checks_org_and_maps_rows(self):
+    async def test_list_projects_checks_org_maps_and_paginates_rows(self):
         self.kc.getOrg = AsyncMock(return_value=Ok({"id": "org-1"}))
         self.project_repo.listByOrg = AsyncMock(
             return_value=[
@@ -279,17 +279,27 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
                     description="desc",
                     organization_id="org-1",
                     is_archived=False,
-                )
+                ),
+                SimpleNamespace(
+                    uuid="project-2",
+                    name="Project 2",
+                    description="second",
+                    organization_id="org-1",
+                    is_archived=False,
+                ),
             ]
         )
+        pagination = AdminPaginationQuery(limit=1, offset=1, q="Project")
 
-        result = await self.service.listProjects("org-1")
+        result = await self.service.listProjects("org-1", pagination)
 
-        self.assertEqual(result.total, 1)
-        self.assertEqual(result.results[0].project_uuid, "project-1")
+        self.assertEqual(result.total, 2)
+        self.assertEqual(len(result.results), 1)
+        self.assertEqual(result.results[0].project_uuid, "project-2")
         self.project_repo.listByOrg.assert_awaited_once_with(
             self.session_manager.session,
             "org-1",
+            q="Project",
         )
 
     async def test_create_project_commits_and_maps_row(self):

@@ -76,9 +76,18 @@ async def test_admin_project_routes(api_client, authenticated_api) -> None:
     permissions = await api_client.get("/v1/admin/projects/permissions", headers=AUTH)
     assert permissions.status_code == 200
 
-    listed = await api_client.get("/v1/admin/projects", headers=AUTH, params={"org_id": "org-1"})
+    listed = await api_client.get(
+        "/v1/admin/projects",
+        headers=AUTH,
+        params={"org_id": "org-1", "limit": 4, "offset": 1, "q": "project"},
+    )
     assert listed.status_code == 200
     assert listed.json()["results"][0]["project_uuid"] == PROJECT_UUID
+    assert authenticated_api["admin"].calls[-1][1]["org_id"] == "org-1"
+    project_pagination = authenticated_api["admin"].calls[-1][1]["pagination"]
+    assert project_pagination.limit == 4
+    assert project_pagination.offset == 1
+    assert project_pagination.q == "project"
 
     created = await api_client.post(
         "/v1/admin/projects",

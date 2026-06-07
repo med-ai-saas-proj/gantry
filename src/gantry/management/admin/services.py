@@ -349,17 +349,29 @@ class AdminService:
             permissions=ALL_PROJECT_PERMISSIONS
         )
 
-    async def listProjects(self, org_id: str) -> ProjectListResponse:
-        """Return every project in one organization for admin access."""
+    async def listProjects(
+        self,
+        org_id: str,
+        pagination: AdminPaginationQuery,
+    ) -> ProjectListResponse:
+        """Return one page of projects in an organization for admin access."""
         org_res = await self.kc.getOrg(org_id)
         org_res.unwrap()
 
         async with self.session_manager.get_session() as session:
-            projects = await self.project_repo.listByOrg(session, org_id)
+            projects = await self.project_repo.listByOrg(
+                session,
+                org_id,
+                q=pagination.q,
+            )
+            paged_projects = projects[
+                pagination.offset : pagination.offset + pagination.limit
+            ]
             return ProjectListResponse(
                 total=len(projects),
                 results=[
-                    self._toProjectInfoResponse(project) for project in projects
+                    self._toProjectInfoResponse(project)
+                    for project in paged_projects
                 ],
             )
 

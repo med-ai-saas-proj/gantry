@@ -83,6 +83,29 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, expected)
         admin_service.getDashboardSummary.assert_awaited_once_with()
 
+    async def test_list_admin_projects_passes_pagination_to_service(self):
+        admin_service = Mock()
+        pagination = routes.AdminPaginationQuery(
+            limit=5,
+            offset=10,
+            q="clinic",
+        )
+        expected = routes.ProjectListResponse(total=0, results=[])
+        admin_service.listProjects = AsyncMock(return_value=expected)
+
+        result = await routes.list_admin_projects(
+            ADMIN_INFO,
+            "org-1",
+            pagination,
+            admin_service,
+        )
+
+        self.assertEqual(result, expected)
+        admin_service.listProjects.assert_awaited_once_with(
+            "org-1",
+            pagination,
+        )
+
     async def test_list_admin_organizations_delegates_to_admin_service(self):
         admin_service = Mock()
         pagination = routes.AdminPaginationQuery(limit=10, offset=5, q="org")

@@ -365,8 +365,13 @@ class FakeAdminService(ConfigurableFake):
         self.calls.append(("listOrganizationUsers", {"org_id": org_id, "pagination": pagination}))
         return {"total": 1, "results": [{"id": "user-1", "username": "alice", "email": "alice@example.com"}]}
 
-    async def listProjects(self, org_id: str):
-        self.calls.append(("listProjects", org_id))
+    async def listProjects(self, org_id: str, pagination):
+        self.calls.append(
+            (
+                "listProjects",
+                {"org_id": org_id, "pagination": pagination},
+            )
+        )
         return {"total": 1, "results": [project_payload()]}
 
     async def createProject(self, org_id: str, input_data):
