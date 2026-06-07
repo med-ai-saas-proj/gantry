@@ -160,6 +160,21 @@ def _extract_org_ids(orgs: list[KeycloakOrgPayload]) -> set[str]:
     return {str(org.get("id", "")) for org in orgs if org.get("id")}
 
 
+def _matches_org_query(org: KeycloakOrgPayload, q: str | None) -> bool:
+    """Return true when an organization matches a user-supplied search term."""
+    if not q:
+        return True
+    query = q.casefold()
+    fields = (
+        org.get("id"),
+        org.get("name"),
+        org.get("alias"),
+    )
+    return any(
+        query in str(value).casefold() for value in fields if value is not None
+    )
+
+
 class OrgService:
     """Coordinate organization business rules across Keycloak and storage."""
 
@@ -473,6 +488,41 @@ class OrgService:
                     )
                     for org in orgs
                     if org.get("id")
+                ],
+            )
+        )
+
+    async def listUserOrgs(
+        self,
+        user_id: str,
+        limit: int = 20,
+        offset: int = 0,
+        q: str | None = None,
+    ) -> Result[
+        OrgListResponse,
+        MemberNotFoundError | KeycloakOrgError,
+    ]:
+        """List organizations the current user belongs to, with local search."""
+        orgs_res = await self.kc.getMemberOrganizations(user_id)
+        if orgs_res.status == ResultStatus.Err:
+            return orgs_res.into()
+
+        orgs = [
+            org
+            for org in cast(list[KeycloakOrgPayload], orgs_res.unwrap())
+            if org.get("id") and _matches_org_query(org, q)
+        ]
+        page = orgs[offset : offset + limit]
+        return Ok(
+            OrgListResponse(
+                total=len(orgs),
+                results=[
+                    OrgInfoResponse(
+                        org_id=str(org.get("id") or ""),
+                        name=str(org.get("name") or org.get("alias") or ""),
+                        owner_id=None,
+                    )
+                    for org in page
                 ],
             )
         )

@@ -53,11 +53,13 @@ async def get_projects(
         result = await project_service.listOrgProjects(
             actor_user_id=user_info["id"],
             organization_id=query.organization,
+            q=query.q,
         )
         return result.unwrap()
 
     result = await project_service.listUserProjects(
         actor_user_id=user_info["id"],
+        q=query.q,
     )
     return result.unwrap()
 

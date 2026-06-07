@@ -16,6 +16,27 @@ from pyrusult import Ok
 
 
 class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
+    async def test_list_current_user_orgs_route(self):
+        service = Mock()
+        orgs = SimpleNamespace(total=1, results=[])
+        service.listUserOrgs = AsyncMock(return_value=Ok(orgs))
+
+        user_info = {"id": "u1", "roles": []}
+        self.assertEqual(
+            await routes.list_user_orgs(
+                user_info,
+                service,
+                PaginatedQuery(limit=10, offset=5, q="clinic"),
+            ),
+            orgs,
+        )
+        service.listUserOrgs.assert_awaited_once_with(
+            user_id="u1",
+            limit=10,
+            offset=5,
+            q="clinic",
+        )
+
     async def test_metadata_and_settings_routes(self):
         service = Mock()
         info = SimpleNamespace(org_id="org-1", name="Org", owner_id="u1")

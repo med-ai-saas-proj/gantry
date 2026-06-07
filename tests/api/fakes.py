@@ -218,6 +218,26 @@ class FakeOrgService(ConfigurableFake):
         self.calls.append(("getOrgInfo", org_id))
         return Ok(org_payload(org_id))
 
+    async def listUserOrgs(
+        self,
+        user_id: str,
+        limit: int,
+        offset: int,
+        q: str | None,
+    ):
+        self.calls.append(
+            (
+                "listUserOrgs",
+                {
+                    "user_id": user_id,
+                    "limit": limit,
+                    "offset": offset,
+                    "q": q,
+                },
+            )
+        )
+        return Ok({"total": 1, "results": [org_payload()]})
+
     async def updateOrgInfo(self, **kwargs):
         self.calls.append(("updateOrgInfo", kwargs))
         payload = org_payload(kwargs["org_id"])

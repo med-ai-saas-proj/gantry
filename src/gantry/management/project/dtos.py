@@ -12,6 +12,7 @@ class ProjectListQuery(BaseDTO):
         None,
         description="Organization id. If provided, returns org-wide projects.",
     )
+    q: str | None = Field(None, description="Optional project search text")
 
 
 class PaginationQuery(BaseDTO):

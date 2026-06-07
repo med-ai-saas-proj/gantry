@@ -13,6 +13,18 @@ AUTH = {"Authorization": "Bearer test-token"}
 async def test_organization_metadata_settings_users_and_permissions_contract(
     api_client, authenticated_api
 ) -> None:
+    orgs = await api_client.get(
+        "/v1/organizations",
+        headers=AUTH,
+        params={"limit": 10, "offset": 5, "q": "Org"},
+    )
+    assert orgs.status_code == 200
+    assert_paginated(orgs.json())
+    assert authenticated_api["org"].calls[-1] == (
+        "listUserOrgs",
+        {"user_id": "user-1", "limit": 10, "offset": 5, "q": "Org"},
+    )
+
     info = await api_client.get("/v1/organizations/org-1", headers=AUTH)
     assert info.status_code == 200
     assert info.json()["org_id"] == "org-1"
@@ -96,6 +108,20 @@ async def test_project_lifecycle_settings_members_permissions_and_state_contract
 
     org_listed = await api_client.get("/v1/projects", headers=AUTH, params={"organization": "org-1"})
     assert org_listed.status_code == 200
+    searched = await api_client.get(
+        "/v1/projects",
+        headers=AUTH,
+        params={"organization": "org-1", "q": "Project"},
+    )
+    assert searched.status_code == 200
+    assert authenticated_api["project"].calls[-1] == (
+        "listOrgProjects",
+        {
+            "actor_user_id": "user-1",
+            "organization_id": "org-1",
+            "q": "Project",
+        },
+    )
 
     created = await api_client.post(
         "/v1/projects",

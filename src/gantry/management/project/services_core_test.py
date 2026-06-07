@@ -511,7 +511,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
 
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap(), "joined-projects")
-        service.listUserProjects.assert_awaited_once_with("u1", "org-1")
+        service.listUserProjects.assert_awaited_once_with("u1", "org-1", q=None)
 
     async def test_has_org_wide_permission_true_and_false(self):
         """Org-wide permission check should respect membership permissions."""

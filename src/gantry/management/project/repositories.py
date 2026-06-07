@@ -8,7 +8,7 @@ from .models import Project, ProjectMember, ProjectSettings
 
 from uuid import UUID
 
-from sqlalchemy import func, delete, insert, select, update
+from sqlalchemy import or_, func, delete, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -136,6 +136,7 @@ class ProjectRepository(Repository[Project, int]):
         self,
         session: AsyncSession,
         organization_id: str,
+        q: str | None = None,
     ) -> list[Project]:
         async def _load_projects():
             stmt = (
@@ -144,7 +145,11 @@ class ProjectRepository(Repository[Project, int]):
                 .where(Project.organization_id == organization_id)
                 .order_by(Project.created_at.desc())
             )
+            stmt = self._applySearch(stmt, q)
             return list((await session.execute(stmt)).scalars().all())
+
+        if q and q.strip():
+            return await _load_projects()
 
         return await self.cache_repo.getCachedOrCall(
             self.getOrgProjectsCacheKey(organization_id), _load_projects
@@ -155,6 +160,7 @@ class ProjectRepository(Repository[Project, int]):
         session: AsyncSession,
         user_id: str,
         organization_id: str | None,
+        q: str | None = None,
     ) -> list[Project]:
         stmt = (
             select(Project)
@@ -168,8 +174,22 @@ class ProjectRepository(Repository[Project, int]):
         )
         if organization_id is not None:
             stmt = stmt.where(Project.organization_id == organization_id)
+        stmt = self._applySearch(stmt, q)
 
         return list((await session.execute(stmt)).scalars().all())
+
+    @staticmethod
+    def _applySearch(stmt, q: str | None):
+        search = q.strip() if q else ""
+        if not search:
+            return stmt
+        pattern = f"%{search}%"
+        return stmt.where(
+            or_(
+                Project.name.ilike(pattern),
+                Project.description.ilike(pattern),
+            )
+        )
 
     async def countAll(self, session: AsyncSession) -> int:
         stmt = select(func.count()).select_from(Project)

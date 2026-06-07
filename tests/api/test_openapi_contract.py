@@ -36,6 +36,23 @@ def test_all_management_operations_define_success_responses(
                 )
 
 
+def test_user_organization_search_query_is_documented(
+    management_openapi: dict,
+) -> None:
+    operation = management_openapi["paths"]["/v1/organizations"]["get"]
+    query_params = {
+        parameter["name"]: parameter
+        for parameter in operation.get("parameters", [])
+        if parameter.get("in") == "query"
+    }
+
+    assert "q" in query_params
+    description = query_params["q"].get("description", "")
+    assert "organization id" in description
+    assert "name" in description
+    assert "alias" in description
+
+
 @pytest.mark.parametrize(
     "fixture_name",
     ["service_openapi", "gateway_openapi", "internal_openapi"],
