@@ -75,7 +75,12 @@ async def test_user_route_accepts_forged_jwt_through_auth_dependency(
     assert auth_service.calls[0][0] == "verifyToken"
     assert fake_project_service.calls[-1] == (
         "listUserProjects",
-        {"actor_user_id": "jwt-user", "q": None},
+        {
+            "actor_user_id": "jwt-user",
+            "q": None,
+            "limit": 20,
+            "offset": 0,
+        },
     )
 
 

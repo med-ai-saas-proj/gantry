@@ -66,6 +66,19 @@ def test_admin_project_list_pagination_query_is_documented(
     assert {"org_id", "limit", "offset", "q"} <= set(query_params)
 
 
+def test_user_project_list_pagination_query_is_documented(
+    management_openapi: dict,
+) -> None:
+    operation = management_openapi["paths"]["/v1/projects"]["get"]
+    query_params = {
+        parameter["name"]: parameter
+        for parameter in operation.get("parameters", [])
+        if parameter.get("in") == "query"
+    }
+
+    assert {"organization", "limit", "offset", "q"} <= set(query_params)
+
+
 @pytest.mark.parametrize(
     "fixture_name",
     ["service_openapi", "gateway_openapi", "internal_openapi"],

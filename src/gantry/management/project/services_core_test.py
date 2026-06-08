@@ -441,7 +441,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Err)
 
     async def test_list_user_projects_success(self):
-        """List user projects should map repository rows to DTO."""
+        """List user projects should map and paginate repository rows."""
         # Arrange
         service = self._make_service()
         service.project_repo.listByMember = AsyncMock(
@@ -452,17 +452,25 @@ class TestProjectServiceCore(BaseProjectServiceTest):
                     description="d1",
                     organization_id="org-1",
                     is_archived=False,
-                )
+                ),
+                SimpleNamespace(
+                    uuid="p2",
+                    name="P2",
+                    description="d2",
+                    organization_id="org-1",
+                    is_archived=False,
+                ),
             ]
         )
 
         # Act
-        res = await service.listUserProjects("u1", None)
+        res = await service.listUserProjects("u1", None, limit=1, offset=1)
 
         # Assert
         self.assertTrue(res.status == ResultStatus.Ok)
-        self.assertEqual(res.unwrap().total, 1)
-        self.assertEqual(res.unwrap().results[0].name, "P1")
+        self.assertEqual(res.unwrap().total, 2)
+        self.assertEqual(len(res.unwrap().results), 1)
+        self.assertEqual(res.unwrap().results[0].name, "P2")
 
     async def test_list_user_projects_with_org_filter_checks_membership(self):
         """Org-scoped project listing should validate org membership first."""
@@ -511,7 +519,13 @@ class TestProjectServiceCore(BaseProjectServiceTest):
 
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap(), "joined-projects")
-        service.listUserProjects.assert_awaited_once_with("u1", "org-1", q=None)
+        service.listUserProjects.assert_awaited_once_with(
+            "u1",
+            "org-1",
+            q=None,
+            limit=20,
+            offset=0,
+        )
 
     async def test_has_org_wide_permission_true_and_false(self):
         """Org-wide permission check should respect membership permissions."""
@@ -594,7 +608,7 @@ class TestProjectServiceCore(BaseProjectServiceTest):
         )
 
     async def test_list_org_projects_success(self):
-        """Org project list should return DTO rows from the repository."""
+        """Org project list should return a paginated DTO list."""
         # Arrange
         service = self._make_service()
         service.project_repo.listByOrg = AsyncMock(
@@ -605,16 +619,36 @@ class TestProjectServiceCore(BaseProjectServiceTest):
                     description=None,
                     organization_id="org-1",
                     is_archived=False,
-                )
+                ),
+                SimpleNamespace(
+                    uuid="p2",
+                    name="P2",
+                    description=None,
+                    organization_id="org-1",
+                    is_archived=False,
+                ),
             ]
         )
 
         # Act
-        res = await service.listOrgProjects("u1", "org-1")
+        res = await service.listOrgProjects(
+            "u1",
+            "org-1",
+            limit=1,
+            offset=1,
+            q="Project",
+        )
 
         # Assert
         self.assertTrue(res.status == ResultStatus.Ok)
-        self.assertEqual(res.unwrap().total, 1)
+        self.assertEqual(res.unwrap().total, 2)
+        self.assertEqual(len(res.unwrap().results), 1)
+        self.assertEqual(res.unwrap().results[0].project_uuid, "p2")
+        service.project_repo.listByOrg.assert_awaited_once_with(
+            self.session_manager.session,
+            "org-1",
+            q="Project",
+        )
 
     async def test_get_project_returns_project_for_org_owner(self):
         """Organization owner should read any project in the same org."""

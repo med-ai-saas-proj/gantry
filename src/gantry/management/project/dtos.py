@@ -12,6 +12,8 @@ class ProjectListQuery(BaseDTO):
         None,
         description="Organization id. If provided, returns org-wide projects.",
     )
+    limit: int = Field(20, ge=1, le=100)
+    offset: int = Field(0, ge=0)
     q: str | None = Field(None, description="Optional project search text")
 
 

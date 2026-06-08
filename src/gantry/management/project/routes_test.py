@@ -62,22 +62,31 @@ class TestProjectRoutes(unittest.IsolatedAsyncioTestCase):
         )
         await routes.get_projects(
             user_info,
-            ProjectListQuery(organization="org-1", q="search"),
+            ProjectListQuery(
+                organization="org-1",
+                q="search",
+                limit=5,
+                offset=10,
+            ),
             service,
         )
         service.listOrgProjects.assert_any_await(
             actor_user_id="u1",
             organization_id="org-1",
             q="search",
+            limit=5,
+            offset=10,
         )
         await routes.get_projects(
             user_info,
-            ProjectListQuery(q="joined"),
+            ProjectListQuery(q="joined", limit=7, offset=14),
             service,
         )
         service.listUserProjects.assert_any_await(
             actor_user_id="u1",
             q="joined",
+            limit=7,
+            offset=14,
         )
         self.assertEqual(
             await routes.create_project(

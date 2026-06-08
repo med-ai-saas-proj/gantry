@@ -102,16 +102,38 @@ async def test_organization_invitation_and_delete_contract(api_client, authentic
 async def test_project_lifecycle_settings_members_permissions_and_state_contract(
     api_client, authenticated_api
 ) -> None:
-    listed = await api_client.get("/v1/projects", headers=AUTH)
+    listed = await api_client.get(
+        "/v1/projects",
+        headers=AUTH,
+        params={"limit": 4, "offset": 1, "q": "joined"},
+    )
     assert listed.status_code == 200
     assert_paginated(listed.json())
+    assert authenticated_api["project"].calls[-1] == (
+        "listUserProjects",
+        {
+            "actor_user_id": "user-1",
+            "q": "joined",
+            "limit": 4,
+            "offset": 1,
+        },
+    )
 
-    org_listed = await api_client.get("/v1/projects", headers=AUTH, params={"organization": "org-1"})
+    org_listed = await api_client.get(
+        "/v1/projects",
+        headers=AUTH,
+        params={"organization": "org-1"},
+    )
     assert org_listed.status_code == 200
     searched = await api_client.get(
         "/v1/projects",
         headers=AUTH,
-        params={"organization": "org-1", "q": "Project"},
+        params={
+            "organization": "org-1",
+            "q": "Project",
+            "limit": 5,
+            "offset": 2,
+        },
     )
     assert searched.status_code == 200
     assert authenticated_api["project"].calls[-1] == (
@@ -120,6 +142,8 @@ async def test_project_lifecycle_settings_members_permissions_and_state_contract
             "actor_user_id": "user-1",
             "organization_id": "org-1",
             "q": "Project",
+            "limit": 5,
+            "offset": 2,
         },
     )
 
