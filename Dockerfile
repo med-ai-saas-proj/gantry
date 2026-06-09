@@ -1,14 +1,14 @@
 # syntax=docker/dockerfile:1.7
 
-FROM python:3.13.5-slim AS builder
+FROM alpine:3.23 AS builder
 
-COPY --from=ghcr.io/astral-sh/uv:0.10.4 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.19 /uv /uvx /bin/
 
 WORKDIR /app
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    UV_PYTHON_DOWNLOADS=never
+    UV_PYTHON_INSTALL_DIR=/app/.python
 
 COPY .python-version pyproject.toml uv.lock README.md ./
 COPY packages/pyrusult/pyproject.toml packages/pyrusult/uv.lock packages/pyrusult/README.md packages/pyrusult/
@@ -20,13 +20,12 @@ COPY . .
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
-FROM python:3.13.5-slim AS runtime
+FROM alpine:3.23
 
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 
 ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
 LABEL org.opencontainers.image.title="gantry" \
@@ -34,8 +33,8 @@ LABEL org.opencontainers.image.title="gantry" \
       org.opencontainers.image.created="$BUILD_DATE" \
       org.opencontainers.image.revision="$VCS_REF"
 
-RUN groupadd --system gantry \
-    && useradd --system --gid gantry --home-dir /app --shell /usr/sbin/nologin gantry
+RUN addgroup -S gantry \
+    && adduser -S -G gantry -h /app -s /sbin/nologin gantry
 
 WORKDIR /app
 
@@ -45,5 +44,4 @@ USER gantry
 
 EXPOSE 8000
 
-ENTRYPOINT ["gantry"]
-CMD ["server", "--config-file", "gantry.toml"]
+ENTRYPOINT ["/app/.venv/bin/python", "-m", "gantry"]
