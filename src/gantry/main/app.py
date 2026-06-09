@@ -28,7 +28,6 @@ import traceback
 
 from fastapi import FastAPI, Request, Response
 from pydantic import ValidationError
-from scalar_fastapi import get_scalar_api_reference
 from sqlalchemy.orm import configure_mappers
 from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
@@ -159,6 +158,7 @@ for app in apps:
 
 
 if getAppSettings().stage == AppStage.DEV:
+    from scalar_fastapi import get_scalar_api_reference
 
     @main_app.get("/docs", include_in_schema=False)
     async def scalar_html():

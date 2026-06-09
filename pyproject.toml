@@ -49,7 +49,6 @@ dependencies = [
     "redis[hiredis]>=7.4.0",
     "langchain-text-splitters>=1.1.2",
     "beautifulsoup4>=4.14.3",
-    "scalar-fastapi>=1.8.1",
 ]
 
 [project.scripts]
@@ -101,6 +100,7 @@ dev = [
     "pyjwt>=2.12.1",
     "aiohttp>=3.13.5",
     "datasets>=3.6.0",
+    "scalar-fastapi>=1.8.1",
 ]
 
 [tool.pyrefly]

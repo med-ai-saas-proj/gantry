@@ -1,7 +1,7 @@
 from gantry.settings import AppStage, getAppSettings
+from gantry.shared.health import setup_health_routes
 from gantry.shared.consts.common_const import APP_NAME
 from gantry.shared.custom_types.error_exception import ProblemDetails
-from gantry.shared.health import setup_health_routes
 
 from .admin import admin_router
 from .api_key import apikey_router
@@ -11,7 +11,6 @@ from .project import project_router
 from .organization import org_router
 
 from fastapi import FastAPI, APIRouter
-from scalar_fastapi import get_scalar_api_reference
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -61,6 +60,7 @@ v1_router.include_router(logging_router)
 management_app.include_router(v1_router)
 
 if app_setting.stage == AppStage.DEV:
+    from scalar_fastapi import get_scalar_api_reference
 
     @management_app.get("/docs", include_in_schema=False)
     async def scalar_html():
