@@ -15,7 +15,19 @@ class PaginatedQuery(BaseDTO):
     offset: int = Field(0, ge=0, description="Number of items to skip")
     q: str | None = Field(
         None,
-        description="Search query forwarded to Keycloak",
+        description="Optional search text",
+    )
+
+
+class OrgListQuery(PaginatedQuery):
+    """Query parameters for listing organizations visible to the user."""
+
+    q: str | None = Field(
+        None,
+        description=(
+            "Optional organization search text. Matches organization id, "
+            "name, or alias within the current user's memberships."
+        ),
     )
 
 

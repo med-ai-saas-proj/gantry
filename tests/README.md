@@ -9,7 +9,7 @@ The `tests/` folder is organized by Gantry behavior and user-story responsibilit
 | Unit | `src/**/**/*_test.py`, `packages/**/test.py` | `pytest`, mocks/fakes | Service/repository/factory/permission logic | PR into `dev` |
 | API contract | `tests/api/` | `pytest`, `httpx.AsyncClient`, ASGI transport, dependency overrides, `respx` | Management HTTP contracts and route interactions without real services | PR into `dev` |
 | Integration | `tests/integration/` | Testcontainers, real storage/cache/identity/email providers | Real Gantry stories: identity, invitation delivery, persistence/cache | workflow_dispatch, push/PR into `main` for infra/storage/identity/integration changes |
-| Regression | `tests/regression/` | `pytest-snapshot`, `deepdiff`, `schemathesis` | Stable public contracts and compatibility | PR into `dev` |
+| Regression | `tests/regression/` | `deepdiff`, `schemathesis` | Backward compatibility and unexpected `5xx` fuzz checks | PR into `dev` |
 | Performance | `tests/performance/` | `pytest-benchmark`, `locust`, `k6` | Hot-path benchmarks and load smoke entrypoints | manual/nightly |
 | E2E | `tests/e2e/` | Playwright `APIRequestContext`, Docker Compose | Backend-first full stack journeys | manual/nightly |
 | Automation | `tests/automation/` | `pytest-cov`, `allure-pytest` | Deploy smoke and report artifacts | manual/nightly |
@@ -87,10 +87,10 @@ Notes:
 
 - Coverage is risk-based, not brute-force full matrix.
 - Unit tests own domain edge cases: not found, conflict, invalid permission, unauthorized actor, archived project, missing org/project context.
-- API tests own route-layer HTTP contracts: OpenAPI presence, all-route missing-auth sweep, status codes, validation `422`, pagination forwarding, response shape, admin aliases, and cross-module orchestration.
+- API tests own route-layer HTTP contracts: exercised endpoint behavior, all-route missing-auth/no-5xx sweep, status codes, validation `422`, pagination forwarding, response shape, admin aliases, and cross-module orchestration.
 - `make test-api` enforces `COVERAGE_FAIL_UNDER=80` against route/app entry modules via `tests/api/coverage.ini`; domain service coverage remains owned by unit tests.
 - Integration tests own Gantry user stories backed by Testcontainers: management identity token/profile/admin role, invitation email delivery, migration/schema contracts, cache hit/miss/delete behavior, API-key auth, and billing usage/cache flows.
-- Regression tests own public compatibility: path snapshots, operation contract snapshots, selected response schemas, permission catalogs, hidden aliases, removed ambiguous ID paths.
+- Regression tests own public compatibility and resilience: removed ambiguous ID paths stay removed, selected public DTO fields stay compatible, and Schemathesis fuzzing catches unexpected `5xx`.
 - E2E uses backend-first full-stack HTTP journeys through Playwright APIRequestContext.
 - Performance/E2E are intentionally separated from PR gates to reduce flake and runtime.
 

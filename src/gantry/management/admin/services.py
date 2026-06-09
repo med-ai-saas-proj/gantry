@@ -66,6 +66,7 @@ from .dtos import (
     AdminUserPermissionUpdateRequest,
     AdminUserOrganizationInfoResponse,
     AdminUserPermissionSummaryResponse,
+    AdminUserProjectPermissionUpdateRequest,
 )
 from .permissions import (
     ORG_PERMISSIONS_ATTR,
@@ -138,6 +139,27 @@ class AdminService:
             error = InvalidAdminPermissionError(
                 message="Invalid project permissions: "
                 + ", ".join(invalid_project_permissions)
+            )
+            raise error
+
+    @staticmethod
+    def _raiseInvalidPermissions(
+        scope: str,
+        permissions: list[str],
+        allowed_permissions: list[str],
+    ) -> None:
+        """Fail fast for one permission scope before loading user profile."""
+        invalid_permissions = sorted(
+            {
+                permission
+                for permission in permissions
+                if permission not in allowed_permissions
+            }
+        )
+        if invalid_permissions:
+            error = InvalidAdminPermissionError(
+                message=f"Invalid {scope} permissions: "
+                + ", ".join(invalid_permissions)
             )
             raise error
 
@@ -327,17 +349,29 @@ class AdminService:
             permissions=ALL_PROJECT_PERMISSIONS
         )
 
-    async def listProjects(self, org_id: str) -> ProjectListResponse:
-        """Return every project in one organization for admin access."""
+    async def listProjects(
+        self,
+        org_id: str,
+        pagination: AdminPaginationQuery,
+    ) -> ProjectListResponse:
+        """Return one page of projects in an organization for admin access."""
         org_res = await self.kc.getOrg(org_id)
         org_res.unwrap()
 
         async with self.session_manager.get_session() as session:
-            projects = await self.project_repo.listByOrg(session, org_id)
+            projects = await self.project_repo.listByOrg(
+                session,
+                org_id,
+                q=pagination.q,
+            )
+            paged_projects = projects[
+                pagination.offset : pagination.offset + pagination.limit
+            ]
             return ProjectListResponse(
                 total=len(projects),
                 results=[
-                    self._toProjectInfoResponse(project) for project in projects
+                    self._toProjectInfoResponse(project)
+                    for project in paged_projects
                 ],
             )
 
@@ -563,6 +597,73 @@ class AdminService:
         """Return only one user's normalized permission summary."""
         profile = await self._buildUserProfileResponse(user_id)
         return profile.permissions
+
+    @staticmethod
+    def _projectPermissionUpdatesFromSummary(
+        summary: AdminUserPermissionSummaryResponse,
+    ) -> list[AdminUserProjectPermissionUpdateRequest]:
+        """Convert profile summary back into the write DTO shape."""
+        return [
+            AdminUserProjectPermissionUpdateRequest(
+                project_uuid=item.project_uuid,
+                permissions=item.permissions,
+            )
+            for item in summary.project_permissions
+        ]
+
+    async def setUserOrganizationPermissions(
+        self,
+        user_id: str,
+        org_id: str,
+        permissions: list[str],
+    ) -> AdminUserProfileResponse:
+        """Replace organization permissions while preserving project permissions."""
+        del org_id
+        self._raiseInvalidPermissions(
+            "organization",
+            permissions,
+            ALL_ORG_PERMISSIONS,
+        )
+        profile = await self._buildUserProfileResponse(user_id)
+        payload = AdminUserPermissionUpdateRequest(
+            organization_permissions=permissions,
+            project_permissions=self._projectPermissionUpdatesFromSummary(
+                profile.permissions
+            ),
+        )
+        return await self.setUserPermissions(user_id, payload)
+
+    async def setUserProjectPermissions(
+        self,
+        user_id: str,
+        project_id: str,
+        permissions: list[str],
+    ) -> AdminUserProfileResponse:
+        """Replace one project's permissions while preserving every other scope."""
+        self._raiseInvalidPermissions(
+            "project",
+            permissions,
+            ALL_PROJECT_PERMISSIONS,
+        )
+        profile = await self._buildUserProfileResponse(user_id)
+        project_permissions = [
+            item
+            for item in self._projectPermissionUpdatesFromSummary(
+                profile.permissions
+            )
+            if item.project_uuid != project_id
+        ]
+        project_permissions.append(
+            AdminUserProjectPermissionUpdateRequest(
+                project_uuid=project_id,
+                permissions=permissions,
+            )
+        )
+        payload = AdminUserPermissionUpdateRequest(
+            organization_permissions=profile.permissions.organization_permissions,
+            project_permissions=project_permissions,
+        )
+        return await self.setUserPermissions(user_id, payload)
 
     async def setUserPermissions(
         self,

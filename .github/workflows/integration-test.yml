@@ -52,10 +52,3 @@ jobs:
           GANTRY_SERVER__CONFIG_FILE: gantry.toml
           TESTCONTAINERS_RYUK_DISABLED: "false"
         run: make test-integration
-      - name: Upload integration reports
-        if: ${{ always() && env.ACT != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: integration-test-reports
-          path: reports/integration
-          if-no-files-found: ignore

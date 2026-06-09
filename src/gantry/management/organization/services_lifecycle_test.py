@@ -51,6 +51,36 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         self.assertTrue(res.status == ResultStatus.Err)
         self.assertIsInstance(res.err(), DeletionAlreadyRequestedError)
 
+    async def test_list_user_orgs_filters_and_paginates_member_orgs(self):
+        """User org search should stay scoped to the user's memberships."""
+        # Arrange
+        service = self._make_service()
+        service.kc.getMemberOrganizations = AsyncMock(
+            return_value=Ok(
+                [
+                    {"id": "org-1", "name": "Cardiology", "alias": "heart"},
+                    {"id": "org-2", "name": "Dental", "alias": "clinic"},
+                    {"id": "org-3", "name": "Clinic Ops", "alias": "ops"},
+                ]
+            )
+        )
+
+        # Act
+        res = await service.listUserOrgs(
+            user_id="user-1",
+            limit=1,
+            offset=1,
+            q="clinic",
+        )
+
+        # Assert
+        self.assertTrue(res.status == ResultStatus.Ok)
+        payload = res.unwrap()
+        self.assertEqual(payload.total, 2)
+        self.assertEqual(len(payload.results), 1)
+        self.assertEqual(payload.results[0].org_id, "org-3")
+        service.kc.getMemberOrganizations.assert_awaited_once_with("user-1")
+
     async def test_request_delete_org_success(self):
         """Deletion request should return timestamps and commit."""
         # Arrange

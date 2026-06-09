@@ -25,10 +25,3 @@ jobs:
           GANTRY_SERVER__CONFIG_FILE: example.gantry.toml
           PYTHONPATH: src
         run: make test-unit
-      - name: Upload unit reports
-        if: ${{ always() && env.ACT != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-reports
-          path: reports/unit
-          if-no-files-found: ignore

@@ -27,6 +27,13 @@ def _workflow_path(repo_root, name: str) -> Path:
     return repo_root / ".github" / "workflows" / name
 
 
+def _make_target_body(makefile: str, target: str) -> str:
+    pattern = rf"^{re.escape(target)}:\n(?P<body>(?:\t.*\n|[ \t]*\n)*)"
+    match = re.search(pattern, makefile, flags=re.MULTILINE)
+    assert match, f"Missing Makefile target {target}"
+    return match.group("body")
+
+
 def test_makefile_exposes_all_layered_test_targets(repo_root) -> None:
     makefile = (repo_root / "Makefile").read_text()
     required_targets = {
@@ -66,6 +73,26 @@ def test_automation_target_is_smoke_policy_not_full_suite(repo_root) -> None:
     assert "AUTOMATION_COVERAGE_FAIL_UNDER ?= 0" in makefile
 
 
+@pytest.mark.parametrize("target", ["test-api", "test-regression", "test-automation", "test-perf"])
+def test_fast_or_no_docker_targets_do_not_start_external_services(repo_root, target: str) -> None:
+    makefile = (repo_root / "Makefile").read_text()
+    body = _make_target_body(makefile, target)
+
+    assert "docker compose" not in body
+    assert "testcontainers" not in body.lower()
+    assert "make test-integration" not in body
+    assert "make test-e2e" not in body
+
+
+def test_regression_fuzz_installs_fakes_before_calling_generated_cases(repo_root) -> None:
+    fuzz_test = (repo_root / "tests/regression/test_openapi_fuzz.py").read_text()
+
+    assert "_install_fake_dependencies" in fuzz_test
+    assert "respx.mock" in fuzz_test
+    assert "localhost:6379" not in fuzz_test
+    assert "localhost:5432" not in fuzz_test
+
+
 @pytest.mark.parametrize("name", ["unit", "api", "regression", "automation"])
 def test_fast_pr_gate_workflows_target_dev(repo_root, name: str) -> None:
     content = _workflow(repo_root, WORKFLOW_FILES[name])
@@ -98,6 +125,14 @@ def test_slow_workflows_are_not_pr_gates(repo_root) -> None:
         assert "workflow_dispatch:" in content
 
 
+def test_performance_workflow_keeps_load_smoke_manual_only(repo_root) -> None:
+    content = _workflow(repo_root, WORKFLOW_FILES["performance"])
+
+    assert "benchmark:" in content
+    assert "load-smoke:" in content
+    assert "inputs.run_load_smoke == 'true'" in content
+
+
 @pytest.mark.parametrize("name", WORKFLOW_FILES.values())
 def test_workflows_have_timeout_and_concurrency(repo_root, name: str) -> None:
     content = _workflow(repo_root, name)
@@ -125,30 +160,20 @@ def test_workflows_call_expected_make_targets(repo_root, name: str, target: str)
     assert target in content
 
 
-@pytest.mark.parametrize(
-    "name",
-    [
-        "unit-test.yml",
-        "api-test.yml",
-        "integration-test.yml",
-        "regression-test.yml",
-        "e2e-test.yml",
-        "performance-test.yml",
-        "automation-test.yml",
-    ],
-)
-def test_workflows_upload_reports_or_artifacts(repo_root, name: str) -> None:
+@pytest.mark.parametrize("name", WORKFLOW_FILES.values())
+def test_test_workflows_do_not_upload_artifacts_on_free_ci(repo_root, name: str) -> None:
     content = _workflow(repo_root, name)
 
-    assert "actions/upload-artifact@v4" in content
-    assert "if-no-files-found: ignore" in content
+    assert "actions/upload-artifact" not in content
+    assert "Upload " not in content
 
 
-def test_api_workflow_runs_route_inventory_contract(repo_root) -> None:
+def test_api_workflow_runs_behavior_contract_suite(repo_root) -> None:
     content = _workflow(repo_root, "api-test.yml")
 
     assert "make test-api" in content
-    assert (repo_root / "tests/api/test_all_app_route_inventory_contracts.py").exists()
+    assert (repo_root / "tests/api/test_all_route_security_and_validation.py").exists()
+    assert (repo_root / "tests/api/test_domain_error_contracts.py").exists()
 
 
 def test_workflow_files_are_tracked_as_yaml(repo_root) -> None:

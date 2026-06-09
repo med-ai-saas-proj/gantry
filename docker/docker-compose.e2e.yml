@@ -1,5 +1,8 @@
 services:
   timescale_db:
+    container_name: !reset null
+    ports: !override
+      - "${E2E_POSTGRES_HOST_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U gantry -d gantry"]
       interval: 5s
@@ -7,23 +10,78 @@ services:
       retries: 30
 
   redis:
+    container_name: !reset null
+    ports: !override
+      - "${E2E_REDIS_HOST_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
       retries: 30
 
+  keycloak:
+    container_name: !reset null
+    ports: !override
+      - "${E2E_KEYCLOAK_HOST_PORT:-8080}:8080"
+
+  mailpit:
+    container_name: !reset null
+    ports: !override
+      - "${E2E_MAILPIT_HTTP_HOST_PORT:-8025}:8025"
+      - "${E2E_MAILPIT_SMTP_HOST_PORT:-1025}:1025"
+
+  minio:
+    image: minio/minio:latest
+    container_name: !reset null
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: rustfs-access-key
+      MINIO_ROOT_PASSWORD: rustfs-secret-key
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    ports:
+      - "${E2E_MINIO_API_HOST_PORT:-9000}:9000"
+      - "${E2E_MINIO_CONSOLE_HOST_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+
+  minio_init:
+    image: minio/mc:latest
+    container_name: !reset null
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        mc alias set local http://minio:9000 rustfs-access-key rustfs-secret-key &&
+        mc mb --ignore-existing local/private-files
+
   gantry:
     # E2E needs the API reachable from the host. The base compose uses
     # host networking for local development, which Docker Desktop does not
     # expose consistently, so backend E2E runs gantry on the compose bridge.
     network_mode: !reset null
+    container_name: !reset null
+    command:
+      - |
+        sleep 10 &&
+        echo 'Migrating' &&
+        gantry server --config-file example.gantry.toml migrate &&
+        echo 'Running server' &&
+        exec gantry server --config-file example.gantry.toml
     environment:
       GANTRY_SERVER__HOST: "0.0.0.0"
       GANTRY_SERVER__DB__TIMESCALE_CONNECTION_URI: "postgresql+asyncpg://gantry:123456@${E2E_GANTRY_DB_HOST:-timescale_db}:5432/gantry"
       GANTRY_SERVER__DB__PGVECTOR_CONNECTION_URI: "postgresql+asyncpg://gantry:123456@${E2E_GANTRY_DB_HOST:-timescale_db}:5432/gantry"
       GANTRY_SERVER__DB__REDIS_CONNECTION_URI: "redis://${E2E_GANTRY_REDIS_HOST:-redis}:6379/0"
       GANTRY_SERVER__KEYCLOAK__SERVER_URL: "${E2E_GANTRY_KEYCLOAK_URL:-http://keycloak:8080/}"
+      GANTRY_SERVER__FILE_STORAGE__S3_ENDPOINT_URL: "${E2E_GANTRY_S3_ENDPOINT_URL:-http://minio:9000}"
+    volumes: !override
+      - ./example.gantry.toml:/app/example.gantry.toml:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -35,5 +93,12 @@ services:
         condition: service_started
       mailpit:
         condition: service_started
+      minio:
+        condition: service_healthy
+      minio_init:
+        condition: service_completed_successfully
     ports: !override
       - "${E2E_HOST_PORT:-8000}:8000"
+
+volumes:
+  minio_data:

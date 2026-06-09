@@ -115,6 +115,7 @@ class ConversationServiceTest(unittest.IsolatedAsyncioTestCase):
         redis_client.hget = AsyncMock(return_value=None)
         repo = MagicMock(spec=ConversationRepository)
         message = Message(
+            uuid=UUID("123e4567-e89b-12d3-a456-426614174001"),
             conversation_id=1,
             payload={"type": "text", "content": "hello"},
             timestamp=datetime(2026, 1, 15),

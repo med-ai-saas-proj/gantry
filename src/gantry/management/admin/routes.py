@@ -18,6 +18,7 @@ from gantry.management.project.dtos import (
     ProjectSettingsResponse,
     ProjectUserListResponse,
     UpdateProjectSettingsRequest,
+    ProjectUserPermissionsRequest,
     ProjectPermissionCatalogResponse,
 )
 from gantry.management.organization.dtos import (
@@ -28,6 +29,7 @@ from gantry.management.organization.dtos import (
     OrgUserListResponse,
     DeleteRequestResponse,
     UpdateSettingsRequest,
+    UserPermissionsRequest,
     UpdateOrgMetadataRequest,
     PermissionCatalogResponse,
 )
@@ -186,6 +188,27 @@ async def list_admin_organization_users(
     return await admin_service.listOrganizationUsers(org_id, pagination)
 
 
+@admin_router.put(
+    "/organizations/{org_id}/users/{user_id}/permissions",
+    response_model=AdminUserProfileResponse,
+    summary="Replace user organization permissions as admin",
+)
+async def set_admin_organization_user_permissions(
+    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
+    org_id: Annotated[str, Path()],
+    user_id: Annotated[str, Path()],
+    payload: Annotated[UserPermissionsRequest, Body()],
+    admin_service: Annotated[AdminService, Depends(getAdminService)],
+) -> AdminUserProfileResponse:
+    """Replace only organization permissions and preserve project permissions."""
+    del user_info
+    return await admin_service.setUserOrganizationPermissions(
+        user_id,
+        org_id,
+        payload.permissions,
+    )
+
+
 @admin_router.patch(
     "/organizations/{org_id}",
     response_model=OrgInfoResponse,
@@ -240,11 +263,12 @@ async def list_admin_project_permissions(
 async def list_admin_projects(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     org_id: Annotated[str, Query(..., min_length=1, alias="org_id")],
+    pagination: Annotated[AdminPaginationQuery, Depends()],
     admin_service: Annotated[AdminService, Depends(getAdminService)],
 ) -> ProjectListResponse:
     """Return projects for one organization without project membership checks."""
     del user_info
-    return await admin_service.listProjects(org_id)
+    return await admin_service.listProjects(org_id, pagination)
 
 
 @admin_router.post(
@@ -324,6 +348,27 @@ async def list_admin_project_users(
     """Canonical admin path for project-user listings."""
     del user_info
     return await admin_service.listProjectUsers(project_id, pagination)
+
+
+@admin_router.put(
+    "/projects/{project_id}/users/{user_id}/permissions",
+    response_model=AdminUserProfileResponse,
+    summary="Replace user project permissions as admin",
+)
+async def set_admin_project_user_permissions(
+    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
+    project_id: Annotated[str, Path()],
+    user_id: Annotated[str, Path()],
+    payload: Annotated[ProjectUserPermissionsRequest, Body()],
+    admin_service: Annotated[AdminService, Depends(getAdminService)],
+) -> AdminUserProfileResponse:
+    """Replace permissions for one project and preserve other permissions."""
+    del user_info
+    return await admin_service.setUserProjectPermissions(
+        user_id,
+        project_id,
+        payload.permissions,
+    )
 
 
 @admin_router.put(

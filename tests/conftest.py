@@ -24,6 +24,13 @@ def repo_root():
 
 
 @pytest.fixture(scope="session")
+def main_app():
+    from gantry.main.app import main_app
+
+    return main_app
+
+
+@pytest.fixture(scope="session")
 def management_app():
     from gantry.management import management_app
 
@@ -69,26 +76,6 @@ def gateway_openapi(gateway_app) -> dict:
 @pytest.fixture(scope="session")
 def internal_openapi(internal_app) -> dict:
     return internal_app.openapi()
-
-
-@pytest.fixture(scope="session")
-def management_paths(management_openapi: dict) -> dict:
-    return management_openapi["paths"]
-
-
-@pytest.fixture(scope="session")
-def service_paths(service_openapi: dict) -> dict:
-    return service_openapi["paths"]
-
-
-@pytest.fixture(scope="session")
-def gateway_paths(gateway_openapi: dict) -> dict:
-    return gateway_openapi["paths"]
-
-
-@pytest.fixture(scope="session")
-def internal_paths(internal_openapi: dict) -> dict:
-    return internal_openapi["paths"]
 
 
 @pytest.fixture

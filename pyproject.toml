@@ -49,6 +49,7 @@ dependencies = [
     "redis[hiredis]>=7.4.0",
     "langchain-text-splitters>=1.1.2",
     "beautifulsoup4>=4.14.3",
+    "scalar-fastapi>=1.8.1",
 ]
 
 [project.scripts]
@@ -76,7 +77,6 @@ dev = [
     "pyrefly>=0.45.0",
     "boto3-stubs[s3]>=1.42.33",
     "typer>=0.24.1",
-    "scalar-fastapi>=1.8.1",
     "gantry",
     "pytest>=9.0.3",
     "pytest-playwright>=0.7.2",

@@ -4,8 +4,10 @@ from gantry.management.auth import getUserInfo
 from gantry.management.auth.entities import UserInfo
 
 from .dtos import (
+    OrgListQuery,
     PaginatedQuery,
     OrgInfoResponse,
+    OrgListResponse,
     InviteUserRequest,
     InvitationResponse,
     OrgSettingsResponse,
@@ -25,13 +27,36 @@ from .dependencies import requiredOrgPermission
 
 from typing import Annotated
 
-from fastapi import Body, Path, Depends, Response, APIRouter
+from fastapi import Body, Path, Query, Depends, Response, APIRouter
 
 
 org_router = APIRouter(
     prefix="/organizations",
     tags=["organizations"],
 )
+
+
+def org_list_query(
+    limit: Annotated[
+        int,
+        Query(ge=1, le=100, description="Max items to return"),
+    ] = 20,
+    offset: Annotated[
+        int,
+        Query(ge=0, description="Number of items to skip"),
+    ] = 0,
+    q: Annotated[
+        str | None,
+        Query(
+            description=(
+                "Optional organization search text. Matches organization id, "
+                "name, or alias within the current user's memberships."
+            )
+        ),
+    ] = None,
+) -> OrgListQuery:
+    """Build documented query params for user organization listing."""
+    return OrgListQuery(limit=limit, offset=offset, q=q)
 
 
 @org_router.get(
@@ -42,6 +67,26 @@ org_router = APIRouter(
 async def list_org_permissions() -> PermissionCatalogResponse:
     """Return the full organization permission catalog for UI consumers."""
     return PermissionCatalogResponse(permissions=ALL_PERMISSIONS)
+
+
+@org_router.get(
+    "",
+    response_model=OrgListResponse,
+    summary="List current user's organizations",
+)
+async def list_user_orgs(
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    org_service: Annotated[OrgService, Depends(getOrgService)],
+    pagination: Annotated[OrgListQuery, Depends(org_list_query)],
+) -> OrgListResponse:
+    """List organizations joined by the current user with optional search."""
+    result = await org_service.listUserOrgs(
+        user_id=user_info["id"],
+        limit=pagination.limit,
+        offset=pagination.offset,
+        q=pagination.q,
+    )
+    return result.unwrap()
 
 
 @org_router.get(

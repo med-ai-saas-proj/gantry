@@ -391,6 +391,9 @@ class ProjectService:
         self,
         actor_user_id: str,
         organization_id: str | None = None,
+        q: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
     ) -> Result[
         ProjectListResponse,
         MemberNotFoundError | KeycloakOrgError | UserNotInOrganizationError,
@@ -405,8 +408,12 @@ class ProjectService:
 
         async with self.session_manager.get_session() as session:
             projects = await self.project_repo.listByMember(
-                session, actor_user_id, organization_id=organization_id
+                session,
+                actor_user_id,
+                organization_id=organization_id,
+                q=q,
             )
+            paged_projects = projects[offset : offset + limit]
             return Ok(
                 ProjectListResponse(
                     total=len(projects),
@@ -418,7 +425,7 @@ class ProjectService:
                             organization_id=p.organization_id,
                             archived=p.is_archived,
                         )
-                        for p in projects
+                        for p in paged_projects
                     ],
                 )
             )
@@ -427,6 +434,9 @@ class ProjectService:
         self,
         actor_user_id: str,
         organization_id: str,
+        q: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
     ) -> Result[
         ProjectListResponse,
         MemberNotFoundError | KeycloakOrgError | UserNotInOrganizationError,
@@ -441,8 +451,9 @@ class ProjectService:
         if org_owner_res.unwrap():
             async with self.session_manager.get_session() as session:
                 projects = await self.project_repo.listByOrg(
-                    session, organization_id
+                    session, organization_id, q=q
                 )
+                paged_projects = projects[offset : offset + limit]
                 return Ok(
                     ProjectListResponse(
                         total=len(projects),
@@ -454,11 +465,17 @@ class ProjectService:
                                 organization_id=p.organization_id,
                                 archived=p.is_archived,
                             )
-                            for p in projects
+                            for p in paged_projects
                         ],
                     )
                 )
-        return await self.listUserProjects(actor_user_id, organization_id)
+        return await self.listUserProjects(
+            actor_user_id,
+            organization_id,
+            q=q,
+            limit=limit,
+            offset=offset,
+        )
 
     async def _hasOrgWideProjectPermission(
         self,
@@ -488,6 +505,9 @@ class ProjectService:
         self,
         actor_user_id: str,
         organization_id: str,
+        q: str | None = None,
+        limit: int = 20,
+        offset: int = 0,
     ) -> Result[
         ProjectListResponse,
         MemberNotFoundError
@@ -497,8 +517,9 @@ class ProjectService:
         """List every project in an org when actor has org-wide project access."""
         async with self.session_manager.get_session() as session:
             projects = await self.project_repo.listByOrg(
-                session, organization_id
+                session, organization_id, q=q
             )
+            paged_projects = projects[offset : offset + limit]
             return Ok(
                 ProjectListResponse(
                     total=len(projects),
@@ -510,7 +531,7 @@ class ProjectService:
                             organization_id=p.organization_id,
                             archived=p.is_archived,
                         )
-                        for p in projects
+                        for p in paged_projects
                     ],
                 )
             )

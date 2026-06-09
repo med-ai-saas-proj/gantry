@@ -21,10 +21,12 @@ from gantry.service.conversation.factories import (
     getTreeConversationService,
 )
 from gantry.service.file_storage.factories import getFileStorageService
+from gantry.service.ai_gateway.factories import getAiGatewayService
 from gantry.service.rag.factories import getRagService
 
 from tests.api.fakes import (
     FakeAdminService,
+    FakeAiGatewayService,
     FakeApiKeyService,
     FakeBillingAggregateQueryService,
     FakeBillingSourceService,
@@ -41,18 +43,6 @@ from tests.api.fakes import (
     FakeProjectService,
     FakeRagService,
 )
-
-
-@pytest.fixture(scope="session")
-def required_management_operations() -> list[tuple[str, str]]:
-    return [
-        ("/v1/organizations/permissions", "get"),
-        ("/v1/projects/permissions", "get"),
-        ("/v1/api-keys/permissions", "get"),
-        ("/v1/api-keys/{api_key_uuid}", "get"),
-        ("/v1/admin/dashboard/summary", "get"),
-        ("/v1/admin/users", "get"),
-    ]
 
 
 @pytest.fixture
@@ -133,6 +123,11 @@ def fake_tree_conversation_service() -> FakeTreeConversationService:
 @pytest.fixture
 def fake_gateway_service() -> FakeGatewayService:
     return FakeGatewayService()
+
+
+@pytest.fixture
+def fake_ai_gateway_service() -> FakeAiGatewayService:
+    return FakeAiGatewayService()
 
 
 @pytest.fixture
@@ -243,6 +238,7 @@ def authenticated_internal_api(
     fake_credit_service,
     fake_invoice_service,
     fake_billing_transaction_service,
+    fake_ai_gateway_service,
 ):
     internal_override_dependencies[getAdminInfo] = lambda: fake_admin_info
     internal_override_dependencies[getApiKeyInfo] = lambda: fake_api_key_info
@@ -250,9 +246,11 @@ def authenticated_internal_api(
     internal_override_dependencies[getCreditService] = lambda: fake_credit_service
     internal_override_dependencies[getInvoiceService] = lambda: fake_invoice_service
     internal_override_dependencies[getBillingTransactionService] = lambda: fake_billing_transaction_service
+    internal_override_dependencies[getAiGatewayService] = lambda: fake_ai_gateway_service
     return {
         "api_key": fake_api_key_service,
         "credit": fake_credit_service,
         "invoice": fake_invoice_service,
         "billing_transaction": fake_billing_transaction_service,
+        "ai_gateway": fake_ai_gateway_service,
     }

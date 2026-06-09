@@ -266,8 +266,14 @@ class CacheRepository(ABC):
 
 
 class RedisCacheRepository(CacheRepository):
-    def __init__(self, redis: Redis, ttl: timedelta | None = None):
+    def __init__(
+        self,
+        redis: Redis,
+        ttl: timedelta | None = None,
+        lock_timeout: float = 30.0,
+    ):
         self.redis = redis
+        self.lock_timeout = lock_timeout
         super().__init__(ttl)
 
     @override
@@ -297,7 +303,10 @@ class RedisCacheRepository(CacheRepository):
         ) and cached.status != ResultStatus.Err:
             return cached.value
 
-        async with self.redis.lock(f"lock:{key}", timeout=0.5):
+        async with self.redis.lock(
+            f"lock:{key}",
+            timeout=self.lock_timeout,
+        ):
             # Check again if not creator
             if (
                 cached := await self.getCached(key)

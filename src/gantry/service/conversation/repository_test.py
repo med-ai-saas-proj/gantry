@@ -2,7 +2,7 @@ from .models import Message, ConversationType
 from .repository import ConversationRepository
 
 import unittest
-from uuid import UUID
+from uuid import UUID, uuid4
 from types import SimpleNamespace
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
@@ -49,6 +49,7 @@ class ConversationRepositoryTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_message_by_uuid_returns_row(self):
         message = Message(
+            uuid=uuid4(),
             conversation_id=1,
             payload={"type": "text", "content": "hello"},
             timestamp=datetime(2026, 1, 15),
@@ -72,6 +73,7 @@ class ConversationRepositoryTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_get_messages_by_uuids_returns_rows(self):
         message = Message(
+            uuid=uuid4(),
             conversation_id=1,
             payload={"type": "text", "content": "hello"},
             timestamp=datetime(2026, 1, 15),

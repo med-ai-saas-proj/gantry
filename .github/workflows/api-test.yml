@@ -26,10 +26,3 @@ jobs:
           PYTHONPATH: src
           COVERAGE_FAIL_UNDER: "80"
         run: make test-api
-      - name: Upload API reports
-        if: ${{ always() && env.ACT != 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-test-reports
-          path: reports/api
-          if-no-files-found: ignore

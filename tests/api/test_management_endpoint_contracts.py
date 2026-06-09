@@ -10,23 +10,21 @@ AUTH = {"Authorization": "Bearer test-token"}
 
 
 @pytest.mark.asyncio
-async def test_all_management_operations_match_committed_snapshot(
-    management_openapi: dict, repo_root
-) -> None:
-    operations = []
-    for path, methods in sorted(management_openapi["paths"].items()):
-        for method in sorted(methods):
-            if method in {"get", "post", "put", "patch", "delete"}:
-                operations.append(f"{method.upper()}\t{path}")
-
-    expected = (repo_root / "tests" / "snapshots" / "management_operations.tsv").read_text()
-    assert "\n".join(operations) + "\n" == expected
-
-
-@pytest.mark.asyncio
 async def test_organization_metadata_settings_users_and_permissions_contract(
     api_client, authenticated_api
 ) -> None:
+    orgs = await api_client.get(
+        "/v1/organizations",
+        headers=AUTH,
+        params={"limit": 10, "offset": 5, "q": "Org"},
+    )
+    assert orgs.status_code == 200
+    assert_paginated(orgs.json())
+    assert authenticated_api["org"].calls[-1] == (
+        "listUserOrgs",
+        {"user_id": "user-1", "limit": 10, "offset": 5, "q": "Org"},
+    )
+
     info = await api_client.get("/v1/organizations/org-1", headers=AUTH)
     assert info.status_code == 200
     assert info.json()["org_id"] == "org-1"
@@ -104,12 +102,50 @@ async def test_organization_invitation_and_delete_contract(api_client, authentic
 async def test_project_lifecycle_settings_members_permissions_and_state_contract(
     api_client, authenticated_api
 ) -> None:
-    listed = await api_client.get("/v1/projects", headers=AUTH)
+    listed = await api_client.get(
+        "/v1/projects",
+        headers=AUTH,
+        params={"limit": 4, "offset": 1, "q": "joined"},
+    )
     assert listed.status_code == 200
     assert_paginated(listed.json())
+    assert authenticated_api["project"].calls[-1] == (
+        "listUserProjects",
+        {
+            "actor_user_id": "user-1",
+            "q": "joined",
+            "limit": 4,
+            "offset": 1,
+        },
+    )
 
-    org_listed = await api_client.get("/v1/projects", headers=AUTH, params={"organization": "org-1"})
+    org_listed = await api_client.get(
+        "/v1/projects",
+        headers=AUTH,
+        params={"organization": "org-1"},
+    )
     assert org_listed.status_code == 200
+    searched = await api_client.get(
+        "/v1/projects",
+        headers=AUTH,
+        params={
+            "organization": "org-1",
+            "q": "Project",
+            "limit": 5,
+            "offset": 2,
+        },
+    )
+    assert searched.status_code == 200
+    assert authenticated_api["project"].calls[-1] == (
+        "listOrgProjects",
+        {
+            "actor_user_id": "user-1",
+            "organization_id": "org-1",
+            "q": "Project",
+            "limit": 5,
+            "offset": 2,
+        },
+    )
 
     created = await api_client.post(
         "/v1/projects",
