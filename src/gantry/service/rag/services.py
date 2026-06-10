@@ -754,25 +754,25 @@ class RagService:
             )
         return "\n".join(parsed_lines).strip()
 
-    @staticmethod
-    def _extractFromParquet(content: bytes) -> str:
-        parquet = importlib.import_module("pyarrow.parquet")
+    # @staticmethod
+    # def _extractFromParquet(content: bytes) -> str:
+    #     parquet = importlib.import_module("pyarrow.parquet")
 
-        table = parquet.read_table(io.BytesIO(content))
-        return "\n".join(
-            json.dumps(row, default=str, ensure_ascii=False)
-            for row in table.to_pylist()
-        ).strip()
+    #     table = parquet.read_table(io.BytesIO(content))
+    #     return "\n".join(
+    #         json.dumps(row, default=str, ensure_ascii=False)
+    #         for row in table.to_pylist()
+    #     ).strip()
 
-    @staticmethod
-    def _extractFromFeather(content: bytes) -> str:
-        feather = importlib.import_module("pyarrow.feather")
+    # @staticmethod
+    # def _extractFromFeather(content: bytes) -> str:
+    #     feather = importlib.import_module("pyarrow.feather")
 
-        table = feather.read_table(io.BytesIO(content))
-        return "\n".join(
-            json.dumps(row, default=str, ensure_ascii=False)
-            for row in table.to_pylist()
-        ).strip()
+    #     table = feather.read_table(io.BytesIO(content))
+    #     return "\n".join(
+    #         json.dumps(row, default=str, ensure_ascii=False)
+    #         for row in table.to_pylist()
+    #     ).strip()
 
     def _extractTextContent(
         self,
@@ -800,11 +800,11 @@ class RagService:
         )
         is_json = filename.endswith(".json") or "application/json" in mime_type
         is_jsonl = filename.endswith(".jsonl") or filename.endswith(".ndjson")
-        is_parquet = (
-            filename.endswith(".parquet")
-            or "application/vnd.apache.parquet" in mime_type
-        )
-        is_feather = filename.endswith(".feather")
+        # is_parquet = (
+        #     filename.endswith(".parquet")
+        #     or "application/vnd.apache.parquet" in mime_type
+        # )
+        # is_feather = filename.endswith(".feather")
 
         try:
             if is_pdf:
@@ -821,10 +821,10 @@ class RagService:
                 return Ok(self._extractFromJson(content))
             if is_jsonl:
                 return Ok(self._extractFromJsonLines(content))
-            if is_parquet:
-                return Ok(self._extractFromParquet(content))
-            if is_feather:
-                return Ok(self._extractFromFeather(content))
+            # if is_parquet:
+            #     return Ok(self._extractFromParquet(content))
+            # if is_feather:
+            #     return Ok(self._extractFromFeather(content))
             return Ok(content.decode("utf-8", errors="ignore").strip())
         except Exception as exc:
             return Err(
