@@ -6,8 +6,7 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.19 /uv /uvx /bin/
 
 WORKDIR /app
 
-ENV UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
+ENV UV_LINK_MODE=copy \
     UV_PYTHON_INSTALL_DIR=/app/.python
 
 COPY .python-version pyproject.toml uv.lock README.md ./
