@@ -3,8 +3,6 @@ name: Automation Tests
 on:
   pull_request:
     branches: [dev]
-  schedule:
-    - cron: "0 20 * * *"
   workflow_dispatch:
 
 concurrency:
