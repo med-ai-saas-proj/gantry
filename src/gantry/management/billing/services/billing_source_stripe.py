@@ -83,7 +83,9 @@ class StripeBillingSourceProviderInterface(BillingSourceProviderInterface):
                 "country": req.new_address.country,
             }
 
-        return await self.client.v1.customers.update_async(provider_id, payload)
+        return (
+            await self.client.v1.customers.update_async(provider_id, payload)
+        ).to_dict()
 
     async def updateCustomer(
         self, provider_id: str, req: UpdateBillingSourceRequest
@@ -91,13 +93,15 @@ class StripeBillingSourceProviderInterface(BillingSourceProviderInterface):
         return await self._wrap(self._updateCustomer(provider_id, req))
 
     async def _createSetupIntent(self, provider_id: str):
-        return await self.client.v1.setup_intents.create_async(
-            {
-                "customer": provider_id,
-                "usage": "off_session",
-                "payment_method_types": ["card", "us_bank_account"],
-            }
-        )
+        return (
+            await self.client.v1.setup_intents.create_async(
+                {
+                    "customer": provider_id,
+                    "usage": "off_session",
+                    "payment_method_types": ["card", "us_bank_account"],
+                }
+            )
+        ).to_dict()
 
     async def createSetupIntent(self, provider_id: str):
         return await self._wrap(self._createSetupIntent(provider_id))
@@ -106,7 +110,7 @@ class StripeBillingSourceProviderInterface(BillingSourceProviderInterface):
         res = await self.client.v1.setup_intents.list_async(
             {"customer": provider_id}
         )
-        return [i for i in res.data if i.status == "requires_action"]
+        return [i.to_dict() for i in res.data if i.status == "requires_action"]
 
     async def listRequiredActionSetupIntents(self, provider_id: str):
         return await self._wrap(
@@ -114,7 +118,9 @@ class StripeBillingSourceProviderInterface(BillingSourceProviderInterface):
         )
 
     async def _cancelSetupIntent(self, setup_intent_id: str):
-        return await self.client.v1.setup_intents.cancel_async(setup_intent_id)
+        return (
+            await self.client.v1.setup_intents.cancel_async(setup_intent_id)
+        ).to_dict()
 
     async def cancelSetupIntent(self, setup_intent_id: str):
         return await self._wrap(self._cancelSetupIntent(setup_intent_id))
@@ -123,29 +129,33 @@ class StripeBillingSourceProviderInterface(BillingSourceProviderInterface):
         res = await self.client.v1.payment_methods.list_async(
             {"customer": provider_id}
         )
-        return res.data
+        return [pm.to_dict() for pm in res.data]
 
     async def listPaymentMethods(self, provider_id: str):
         return await self._wrap(self._listPaymentMethods(provider_id))
 
     async def _getPaymentMethod(self, payment_method_id: str):
-        return await self.client.v1.payment_methods.retrieve_async(
-            payment_method_id
-        )
+        return (
+            await self.client.v1.payment_methods.retrieve_async(
+                payment_method_id
+            )
+        ).to_dict()
 
     async def getPaymentMethod(self, payment_method_id: str):
         return await self._wrap(self._getPaymentMethod(payment_method_id))
 
     async def _detachPaymentMethod(self, payment_method_id: str):
-        return await self.client.v1.payment_methods.detach_async(
-            payment_method_id
-        )
+        return (
+            await self.client.v1.payment_methods.detach_async(payment_method_id)
+        ).to_dict()
 
     async def detachPaymentMethod(self, payment_method_id: str):
         return await self._wrap(self._detachPaymentMethod(payment_method_id))
 
     async def _getCustomer(self, provider_id: str):
-        return await self.client.v1.customers.retrieve_async(provider_id)
+        return (
+            await self.client.v1.customers.retrieve_async(provider_id)
+        ).to_dict()
 
     async def getCustomer(
         self, provider_id: str
