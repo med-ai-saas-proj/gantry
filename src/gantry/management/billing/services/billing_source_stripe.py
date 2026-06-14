@@ -153,9 +153,7 @@ class StripeBillingSourceProviderInterface(BillingSourceProviderInterface):
         return await self._wrap(self._detachPaymentMethod(payment_method_id))
 
     async def _getCustomer(self, provider_id: str):
-        return (
-            await self.client.v1.customers.retrieve_async(provider_id)
-        ).to_dict()
+        return await self.client.v1.customers.retrieve_async(provider_id)
 
     async def getCustomer(
         self, provider_id: str
