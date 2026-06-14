@@ -1,3 +1,4 @@
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db.session import AsyncSessionManager
 from gantry.shared.utils.uuid_utils import uuid7
 from gantry.shared.custom_types.error_exception import (
@@ -26,7 +27,6 @@ import asyncio
 from typing import Literal, Sequence
 from datetime import UTC
 
-from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
 
 

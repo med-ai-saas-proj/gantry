@@ -1,5 +1,6 @@
 """Business logic for project management."""
 
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.keycloak import (
     KeycloakOrgError,
     OrgNotFoundError,
@@ -45,7 +46,6 @@ from .repositories import (
 
 from typing import Any, cast
 
-from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 

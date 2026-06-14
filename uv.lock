@@ -10,12 +10,6 @@ resolution-markers = [
     "python_full_version < '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
-[manifest]
-members = [
-    "gantry",
-    "pyrusult",
-]
-
 [[package]]
 name = "ag-ui-protocol"
 version = "0.1.18"
@@ -1654,7 +1648,6 @@ dependencies = [
     { name = "pydantic-ai-slim", extra = ["ag-ui", "anthropic", "bedrock", "cli", "cohere", "fastmcp", "google", "groq", "huggingface", "mcp", "mistral", "openai", "retries", "spec", "ui", "vertexai", "xai"] },
     { name = "pydantic-settings" },
     { name = "pypdf" },
-    { name = "pyrusult" },
     { name = "python-docx" },
     { name = "python-jose" },
     { name = "python-keycloak" },
@@ -1738,7 +1731,6 @@ requires-dist = [
     { name = "pydantic-ai-slim", extras = ["openai", "vertexai", "google", "xai", "groq", "anthropic", "mistral", "cohere", "bedrock", "huggingface", "cli", "mcp", "fastmcp", "ag-ui", "retries", "ui", "spec"], specifier = ">=1.70.0" },
     { name = "pydantic-settings", specifier = ">=2.11.0" },
     { name = "pypdf", specifier = ">=6.1.1" },
-    { name = "pyrusult", editable = "packages/pyrusult" },
     { name = "python-docx", specifier = ">=1.2.0" },
     { name = "python-jose", specifier = ">=3.5.0" },
     { name = "python-keycloak", specifier = ">=5.3.1" },
@@ -1761,7 +1753,7 @@ dev = [
     { name = "faker", specifier = ">=40.15.0" },
     { name = "fakeredis", specifier = ">=2.35.1" },
     { name = "freezegun", specifier = ">=1.5.5" },
-    { name = "gantry", editable = "." },
+    { name = "gantry" },
     { name = "inquirer", specifier = ">=3.4.1" },
     { name = "locust", specifier = ">=2.43.4" },
     { name = "mako", specifier = ">=1.3.10" },
@@ -4263,11 +4255,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/be/ad/1d23be700b6b2ddaeb362360c7145917a8edbbf7240ae428d40541772fce/pyrefly-1.0.0-py3-none-win_amd64.whl", hash = "sha256:c8abcb0f2082e83c890375128f9cff4aa4d3f210b85eea7b3046c1ae764e77f5", size = 13146369, upload-time = "2026-05-12T20:12:41.423Z" },
     { url = "https://files.pythonhosted.org/packages/8c/38/16589134f3012fd097a10dcc85771555f1a5fb76e04b682597180743af30/pyrefly-1.0.0-py3-none-win_arm64.whl", hash = "sha256:d150fa9e40e8392832be81c3bcfc0497c146674ce4d0f8e04e1ec29e775ffb8c", size = 12538326, upload-time = "2026-05-12T20:12:43.996Z" },
 ]
-
-[[package]]
-name = "pyrusult"
-version = "0.1.0"
-source = { editable = "packages/pyrusult" }
 
 [[package]]
 name = "pytest"

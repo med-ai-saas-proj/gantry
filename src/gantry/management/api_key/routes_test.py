@@ -1,8 +1,8 @@
+from pyrusult import Ok
+
 import os
 import unittest
 from unittest.mock import Mock, AsyncMock
-
-from pyrusult import Ok
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")

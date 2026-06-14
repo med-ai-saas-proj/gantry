@@ -10,6 +10,7 @@ from unittest.mock import ANY, Mock, AsyncMock, MagicMock, patch
 
 os.environ.setdefault("GANTRY_SERVER__CONFIG_FILE", "gantry.toml")
 
+from pyrusult import Ok, Err, ResultStatus
 from gantry.db.session import AsyncSessionManager
 from gantry.settings.rag import VectorOpsType, VectorIndexType
 from gantry.service.rag.dtos import (
@@ -28,7 +29,6 @@ from gantry.service.rag.services import (
 )
 from gantry.service.rag.settings import RagSettings
 
-from pyrusult import Ok, Err, ResultStatus
 from langchain_text_splitters import Language
 
 

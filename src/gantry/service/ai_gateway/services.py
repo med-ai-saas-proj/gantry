@@ -1,3 +1,4 @@
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db.session import AsyncSessionManager
 from gantry.service.conversation import (
     Message,
@@ -20,7 +21,6 @@ from dataclasses import asdict
 
 import tiktoken
 from pydantic import TypeAdapter
-from pyrusult import Ok, Err, Result, ResultStatus
 from ag_ui.core import (
     CustomEvent,
     RunAgentInput,

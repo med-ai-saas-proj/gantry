@@ -3,6 +3,7 @@
 Orchestrates the Keycloak admin client and Postgres repositories.
 """
 
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db import AsyncSessionManager
 from gantry.keycloak import (
     KeycloakOrgError,
@@ -44,7 +45,6 @@ from .repositories import (
 from typing import Any, cast
 from datetime import UTC, datetime, timedelta
 
-from pyrusult import Ok, Err, Result, ResultStatus
 from structlog.stdlib import BoundLogger
 
 

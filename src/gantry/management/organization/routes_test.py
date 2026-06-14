@@ -1,3 +1,4 @@
+from pyrusult import Ok
 from gantry.management.organization import routes
 from gantry.management.organization.dtos import (
     PaginatedQuery,
@@ -11,8 +12,6 @@ from gantry.management.organization.permissions import ALL_PERMISSIONS
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, AsyncMock
-
-from pyrusult import Ok
 
 
 class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):

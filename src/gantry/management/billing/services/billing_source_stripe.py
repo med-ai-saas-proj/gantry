@@ -1,3 +1,4 @@
+from pyrusult import Ok, Err
 from gantry.shared.custom_types.error_exception import (
     ExternalAPIError,
     NotImplementedError,
@@ -13,7 +14,6 @@ from types import CoroutineType
 from typing import Any
 
 from stripe import StripeError, StripeClient
-from pyrusult import Ok, Err
 from stripe.params import CustomerUpdateParams
 
 

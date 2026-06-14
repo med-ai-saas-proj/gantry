@@ -1,3 +1,4 @@
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db import AsyncSessionManager
 from gantry.settings.rag import VectorOpsType
 from gantry.service.file_storage.types import FileRecord
@@ -46,7 +47,6 @@ from typing import Any, Sequence, Awaitable, TypedDict, cast
 from datetime import datetime
 
 from openai import AsyncOpenAI
-from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import or_, cast as sqlalchemy_cast, func, delete, select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger

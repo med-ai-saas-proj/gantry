@@ -1,3 +1,5 @@
+from pyrusult import Ok, ResultStatus
+
 import os
 import unittest
 from types import SimpleNamespace
@@ -5,7 +7,6 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from unittest.mock import Mock, AsyncMock
 
-from pyrusult import Ok, ResultStatus
 from limits.aio import storage
 
 

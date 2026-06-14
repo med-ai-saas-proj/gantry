@@ -1,3 +1,4 @@
+from pyrusult import ResultStatus
 from gantry.service.conversation.models import Message, ConversationType
 from gantry.service.conversation.settings import ConversationSettings
 from gantry.service.conversation.repository import ConversationRepository
@@ -14,8 +15,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
-
-from pyrusult import ResultStatus
 
 
 class _AsyncContextManager:

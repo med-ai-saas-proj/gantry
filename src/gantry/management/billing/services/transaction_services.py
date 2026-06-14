@@ -1,3 +1,4 @@
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db.factories import AsyncSessionManager
 from gantry.shared.utils.redis import redis_get_or_load
 from gantry.shared.utils.uuid_utils import uuid7
@@ -47,7 +48,6 @@ from typing import Sequence, Awaitable, TypedDict, cast
 from decimal import Decimal
 from datetime import UTC, datetime, timedelta
 
-from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger

@@ -1,5 +1,6 @@
 """Service for managing project-scoped API keys."""
 
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db import AsyncSessionManager, getRedisConnectionPool
 from gantry.settings import ApiKeyPermission
 from gantry.management.project import ProjectRepository, ProjectNotFoundError
@@ -32,7 +33,6 @@ import secrets
 from typing import Callable, Sequence, TypedDict, NotRequired
 
 from limits import RateLimitItemPerMinute
-from pyrusult import Ok, Err, Result, ResultStatus
 from limits.aio import storage, strategies
 from structlog.stdlib import BoundLogger
 

@@ -1,12 +1,13 @@
 """Repository base class."""
 
+from pyrusult import Ok, Err, Result, ResultStatus
+
 import pickle
 import inspect
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Sequence, Coroutine, override
 from datetime import timedelta
 
-from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import (
     Select,
     ColumnElement,

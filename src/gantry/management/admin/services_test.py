@@ -1,3 +1,4 @@
+from pyrusult import Ok
 from gantry.management.admin.dtos import (
     AdminPaginationQuery,
     AdminUserPermissionUpdateRequest,
@@ -45,8 +46,6 @@ from types import SimpleNamespace
 from datetime import UTC, datetime
 from contextlib import asynccontextmanager
 from unittest.mock import Mock, AsyncMock, call
-
-from pyrusult import Ok
 
 
 class _DummySessionManager:

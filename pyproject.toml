@@ -37,7 +37,6 @@ dependencies = [
     "opentelemetry-exporter-prometheus>=0.60b1",
     "opentelemetry-exporter-otlp-proto-http>=1.39.1",
     "stripe>=14.4.1",
-    "pyrusult",
     "apscheduler>=3.11.2",
     "pgvector>=0.4.2",
     "openai>=1.109.1",
@@ -50,19 +49,10 @@ dependencies = [
     "beautifulsoup4>=4.14.3",
 ]
 
-[project.scripts]
-gantry = "gantry.__main__:main"
 
 [build-system]
 requires = ["uv_build>=0.9.11,<0.12"]
 build-backend = "uv_build"
-
-[tool.uv.workspace]
-members = ["packages/pyrusult", "."]
-
-[tool.uv.sources]
-pyrusult = { workspace = true }
-gantry = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -113,3 +103,7 @@ omit = ["*/tests/*", "*/migrations/*"]
 
 [tool.coverage.report]
 show_missing = true
+
+[tool.uv.build-backend]
+source-exclude = ["*_test.py"]
+module-name = ["gantry", "pyrusult"]
