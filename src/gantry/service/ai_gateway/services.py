@@ -29,7 +29,8 @@ from ag_ui.core import (
     MessagesSnapshotEvent,
 )
 from pydantic_ai import Agent, ModelSettings, AgentRunResult
-from ag_ui.core.types import Message as AGUIMessage
+from ag_ui.core.types import Message as AGUIMessage, TextInputContent
+from pydantic_ai.usage import RunUsage
 from pydantic_ai.models import Model, fallback, infer_model
 from pydantic_ai.ui.ag_ui import AGUIAdapter
 from pydantic_ai.providers import Provider, infer_provider_class
@@ -119,11 +120,13 @@ class AiGatewayService:
             )
         )
 
+        is_new_conversation = False
         if messages_history.status == ResultStatus.Err:
             messages_history = []
             await self.tree_conversation_service.createConversation(
                 project_id, {}, None, conversation_uuid
             )
+            is_new_conversation = True
         else:
             messages_history = messages_history.value
             messages_history = list(reversed(messages_history))
@@ -195,7 +198,7 @@ class AiGatewayService:
             dict_to_obj(msg.payload) for msg in messages_history
         ]
 
-        # for msg in aguiMessages:
+        # for msg in aguiMessagesHistory:
         #     print(
         #         f"Message from conversation service: {msg}, obj type: {type(msg)}"
         #     )
@@ -227,6 +230,56 @@ class AiGatewayService:
 
         async def _onComplete(run_result: AgentRunResult):
             new_messages = AGUIAdapter.dump_messages(run_result.new_messages())
+
+            title_usage: RunUsage | None = None
+            if is_new_conversation:
+                generated_title = False
+                # Generate a title from the first user message
+                for msg in input_message:
+                    if getattr(msg, "role", None) == "user":
+                        content = getattr(msg, "content", None)
+                        if content:
+                            if isinstance(content, list):
+                                text_content = " ".join(
+                                    part.text
+                                    for part in content
+                                    if isinstance(part, TextInputContent)
+                                )
+                            else:
+                                text_content = str(content)
+
+                            if text_content.strip():
+                                try:
+                                    async with self.agent[
+                                        self.settings.summary_model or model
+                                    ].iter(
+                                        "Generate a concise, descriptive "
+                                        "title (maximum 20 words) for a "
+                                        "conversation that starts with "
+                                        "this message. Return ONLY the "
+                                        "title text, nothing else:\n\n"
+                                        f"{text_content[:1000]}"
+                                    ) as agent_run:
+                                        async for _ in agent_run:
+                                            pass
+                                        result = agent_run.result
+                                        if result is not None:
+                                            title = result.output.strip()
+                                            title_usage = result.usage()
+                                            await self.tree_conversation_service.updateConversationMetadata(
+                                                conversation_uuid,
+                                                project_id,
+                                                {"title": title},
+                                            )
+                                            generated_title = True
+                                except Exception:
+                                    pass
+                        break
+                if not generated_title:
+                    await self.tree_conversation_service.updateConversationMetadata(
+                        conversation_uuid, project_id, {"title": "Untitled"}
+                    )
+
             res = (
                 await self.tree_conversation_service.storeConversationMessages(
                     conversation_uuid,
@@ -260,13 +313,23 @@ class AiGatewayService:
                 )
 
             yield MessagesSnapshotEvent(
-                timestamp=self.getTimestamp(), messages=new_messages
+                timestamp=self.getTimestamp(),
+                messages=input_message + new_messages,
             )
+
+            usages = [{"model": model, "usage": asdict(run_result.usage())}]
+            if title_usage is not None:
+                usages.append(
+                    {
+                        "model": self.settings.summary_model or model,
+                        "usage": asdict(title_usage),
+                    }
+                )
 
             yield CustomEvent(
                 timestamp=self.getTimestamp(),
                 name="model_usage",
-                value={"model": model, "usage": asdict(run_result.usage())},
+                value=usages,
             )
 
         return Ok(

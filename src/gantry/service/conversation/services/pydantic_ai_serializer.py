@@ -1,3 +1,5 @@
+from pyrusult import Err
+from gantry.shared.utils.uuid_utils import uuid7
 from gantry.service.conversation.types import SerializedSequenceContentPart
 
 from ..types import (
@@ -25,7 +27,6 @@ import uuid
 from typing import Sequence, cast
 from datetime import UTC, datetime
 
-from pyrusult import Err
 from pydantic_ai import (
     AudioUrl,
     ImageUrl,
@@ -241,6 +242,7 @@ class PydanticAISerializer(Serializer[ModelMessage]):
                         }
                     )
             return Message(
+                uuid=uuid7(),
                 conversation_id=conversation_id,
                 payload={
                     "parts": parts,
@@ -314,6 +316,7 @@ class PydanticAISerializer(Serializer[ModelMessage]):
                         }
                     )
             return Message(
+                uuid=uuid7(),
                 conversation_id=conversation_id,
                 payload={
                     "parts": parts,

@@ -30,6 +30,13 @@ class ModelSpec(BaseSettings):
 
 
 class AiGatewaySettings(BaseSettings):
+    summary_model: Annotated[
+        str | None,
+        Field(
+            description="Model used for summarizing conversation messages. "
+            "Should be in models list."
+        ),
+    ] = None
     models: Annotated[
         dict[str, ModelSpec],
         Field(

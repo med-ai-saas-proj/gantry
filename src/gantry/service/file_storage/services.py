@@ -1,3 +1,4 @@
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db.session import AsyncSessionManager
 from gantry.shared.utils.json_utils import json_serializer
 from gantry.shared.utils.uuid_utils import uuid7
@@ -16,9 +17,9 @@ import json
 import uuid
 import asyncio
 from typing import TYPE_CHECKING, BinaryIO
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
-from pyrusult import Ok, Err, Result, ResultStatus
+from sqlalchemy import or_, and_, select
 from redis.asyncio import Redis
 
 
@@ -442,3 +443,45 @@ class FileStorageService:
                 )
             project_id = project.id
         return await async_func(project_id=project_id, **kwargs)
+
+    async def cleanupJob(self):
+        """Background job to clean up deleted files from storage."""
+        async with self.session_manager.get_session() as session:
+            stmt = select(File).where(
+                or_(
+                    and_(
+                        File.status == FileStatus.DELETED,
+                        File.updated_at
+                        < datetime.now(UTC).replace(tzinfo=None)
+                        - timedelta(hours=1),
+                    ),
+                    and_(
+                        File.status == FileStatus.UPLOADING,
+                        File.created_at
+                        < datetime.now(UTC).replace(tzinfo=None)
+                        - timedelta(hours=1),
+                    ),
+                )
+            )
+
+            deleted_files = (await session.execute(stmt)).scalars().all()
+            deleted_file_info = [
+                {
+                    "id": file_record.id,
+                    "filepath": file_record.filepath,
+                }
+                for file_record in deleted_files
+            ]
+
+        for file_record in deleted_file_info:
+            try:
+                await asyncio.to_thread(
+                    self._deleteFileFromStorage, file_record["filepath"]
+                )
+                async with self.session_manager.get_session() as session:
+                    await self.file_repo.deleteFileById(
+                        session, file_record["id"]
+                    )
+                    await session.commit()
+            except Exception as e:
+                pass  # let the next cleanup job try again, we don't want to block on this

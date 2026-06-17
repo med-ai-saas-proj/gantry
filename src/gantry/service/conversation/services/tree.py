@@ -195,7 +195,10 @@ class TreeConversationService(ConversationService):
         new_structure = current_structure.copy()
         if from_node_id is not None:
             parent_id_str = str(from_node_id)
-            if parent_id_str not in new_structure:
+            if (
+                parent_id_str not in new_structure
+                and parent_id_str != ROOT_NODE_ID
+            ):
                 return Err(
                     InvalidValueError(
                         message=f"from_node_id {from_node_id} not found in current tree structure."
