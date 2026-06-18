@@ -25,11 +25,16 @@ ENV UV_LINK_MODE=copy \
     UV_PYTHON_INSTALL_DIR=/app/.python \
     PYTHONDONTWRITEBYTECODE=1
 
+COPY .python-version pyproject.toml uv.lock ./
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
 COPY --from=build /app/dist/*.whl ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv venv /app/.venv && \
-    uv pip install *.whl
+    uv pip install --no-deps *.whl && \
+    rm -f *.whl
 
 FROM alpine:3.23
 
