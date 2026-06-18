@@ -52,6 +52,7 @@ class BillingSourceDetailResponse(BillingSourceResponse):
     phone: str | None
     name: str | None
     billing_address: BillingAddressResponse | None
+    default_payment_method: str | None
 
 
 class TransactionInfoResponse(BaseModel):

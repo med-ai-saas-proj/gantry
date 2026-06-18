@@ -160,6 +160,12 @@ class BillingSourceService:
             )
             return Ok(
                 BillingSourceDetailResponse(
+                    default_payment_method=cast(
+                        str,
+                        billing_source_details.invoice_settings.default_payment_method,
+                    )
+                    if billing_source_details.invoice_settings
+                    else None,
                     billing_source_uid=billing_source.uuid,
                     organization_id=billing_source.organization_id,
                     source_type=billing_source.source_type,
