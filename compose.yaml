@@ -120,9 +120,7 @@ services:
       - full
 
   timescale_db:
-    build:
-      context: .
-      dockerfile: Dockerfile.db
+    image: docker.io/thng292/timescaledb-with-pg_textsearch
     container_name: timescale-db
     environment:
       POSTGRES_DB: gantry

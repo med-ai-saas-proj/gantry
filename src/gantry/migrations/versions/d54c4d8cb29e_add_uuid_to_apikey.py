@@ -8,8 +8,8 @@ Reason:
 
 """
 
-from typing import Sequence, Union
 import uuid
+from typing import Union, Sequence
 
 import sqlalchemy as sa
 from alembic import op

@@ -1,6 +1,6 @@
 from gantry.db.factories import getAsyncEngine
 
-from pathlib import Path
+from importlib.resources import files
 
 from alembic import command as AlembicCmd
 from alembic.config import Config
@@ -11,11 +11,10 @@ from pydantic_settings import (
 
 class Migrate(BaseSettings):
     async def cli_cmd(self):
-        from gantry.settings import AppSettings
         from gantry.db.factories import getSessionManager
 
-        PACKAGE_DIR = Path(__file__).parents[4]
-        alembic_cfg = Config(PACKAGE_DIR / "main-db-alembic.ini")
+        alembic_ini = files("gantry").joinpath("alembic.ini")
+        alembic_cfg = Config(str(alembic_ini))
 
         def runMigrate(conn):
             alembic_cfg.attributes["connection"] = conn

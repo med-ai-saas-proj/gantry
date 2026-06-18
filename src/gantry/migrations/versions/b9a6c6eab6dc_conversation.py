@@ -8,14 +8,13 @@ Reason:
 
 """
 
-from alembic import op
-
-from typing import Sequence, Union
+from typing import Union, Sequence
 from pathlib import Path
 
 import sqlalchemy as sa
-
+from alembic import op
 from sqlalchemy.dialects import postgresql
+
 
 # revision identifiers, used by Alembic.
 revision: str = "b9a6c6eab6dc"

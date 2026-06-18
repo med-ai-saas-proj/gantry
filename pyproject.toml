@@ -95,7 +95,7 @@ dev = [
 ]
 
 [tool.pyrefly]
-project-includes = ["src", "scripts", "alembic", "templates"]
+project-includes = ["src", "scripts", "templates"]
 project-excludes = ["**/.[!/.]*", "**/tests", "**/__pycache__"]
 search-path = ["."]
 

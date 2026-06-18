@@ -1,4 +1,3 @@
-from alembic import context
 from gantry.db.base import BaseSQLModel, BaseTimescaleSQLModel
 from gantry.main.app import main_app
 from gantry.db.settings import getDBSettings
@@ -6,6 +5,7 @@ from gantry.db.settings import getDBSettings
 import asyncio
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
