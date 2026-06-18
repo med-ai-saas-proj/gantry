@@ -10,7 +10,6 @@ ENV UV_LINK_MODE=copy \
     UV_PYTHON_INSTALL_DIR=/app/.python
 
 COPY .python-version pyproject.toml uv.lock README.md ./
-COPY packages/pyrusult/pyproject.toml packages/pyrusult/uv.lock packages/pyrusult/README.md packages/pyrusult/
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-workspace
