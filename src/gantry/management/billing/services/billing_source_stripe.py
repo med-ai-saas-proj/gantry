@@ -162,3 +162,21 @@ class StripeBillingSourceProviderInterface(BillingSourceProviderInterface):
         | Err[dict, ExternalAPIError | NotImplementedError]
     ):
         return await self._wrap(self._getCustomer(provider_id))
+
+    async def _setDefaultPaymentMethod(
+        self, provider_id: str, payment_method_id: str
+    ):
+        return await self.client.v1.customers.update_async(
+            provider_id,
+            {"invoice_settings": {"default_payment_method": payment_method_id}},
+        )
+
+    async def setDefaultPaymentMethod(
+        self, provider_id: str, payment_method_id: str
+    ) -> (
+        Ok[None, ExternalAPIError | NotImplementedError]
+        | Err[None, ExternalAPIError | NotImplementedError]
+    ):
+        return await self._wrap(
+            self._setDefaultPaymentMethod(provider_id, payment_method_id)
+        )

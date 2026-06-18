@@ -1,3 +1,4 @@
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db.session import AsyncSessionManager
 from gantry.shared.utils.redis import redis_lock
 from gantry.shared.custom_types.error_exception import (
@@ -26,7 +27,6 @@ from ..repositories.billing_source_repo import BillingSourceRepo
 from typing import cast
 
 from stripe import Customer, StripeClient
-from pyrusult import Ok, Err, Result, ResultStatus
 from redis.asyncio import Redis
 
 
@@ -305,3 +305,20 @@ class BillingSourceService:
         billing_source = res.value
         provider_imp = self.provider_impl[billing_source.source_type]
         return await provider_imp.detachPaymentMethod(payment_method_id)
+
+    async def setDefaultPaymentMethod(
+        self,
+        org_id: str,
+        payment_method_id: str,
+    ) -> Result[
+        None,
+        ExternalAPIError | BillingSourceNotFoundError | NotImplementedError,
+    ]:
+        res = await self._getBillingSourceOrError(org_id)
+        if res.status == ResultStatus.Err:
+            return res.into()
+        billing_source = res.value
+        provider_imp = self.provider_impl[billing_source.source_type]
+        return await provider_imp.setDefaultPaymentMethod(
+            billing_source.provider_id, payment_method_id
+        )

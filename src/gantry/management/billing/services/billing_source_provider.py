@@ -1,3 +1,4 @@
+from pyrusult import Result
 from gantry.shared.custom_types.error_exception import (
     ExternalAPIError,
     NotImplementedError,
@@ -5,8 +6,6 @@ from gantry.shared.custom_types.error_exception import (
 
 from abc import ABC, abstractmethod
 from typing import Any
-
-from pyrusult import Result
 
 
 class BillingSourceProviderInterface(ABC):
@@ -59,5 +58,11 @@ class BillingSourceProviderInterface(ABC):
     @abstractmethod
     async def detachPaymentMethod(
         self, payment_method_id: str
+    ) -> Result[None, ExternalAPIError | NotImplementedError]:
+        pass
+
+    @abstractmethod
+    async def setDefaultPaymentMethod(
+        self, provider_id: str, payment_method_id: str
     ) -> Result[None, ExternalAPIError | NotImplementedError]:
         pass

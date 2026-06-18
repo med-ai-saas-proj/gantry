@@ -113,6 +113,25 @@ async def delete_payment_method(
     res.unwrap()
 
 
+@billing_router.post(
+    "/sources/payment_method/default",
+    description="Set a payment method as the default for a billing source.",
+)
+async def set_default_payment_method(
+    payment_method_id: str,  # e.g. "pm_12345" for Stripe
+    user_info: Annotated[
+        UserInfo, Depends(requiredOrgPermission(OrgPermission.BILLING_MANAGE))
+    ],
+    billing_source_service: Annotated[
+        BillingSourceService, Depends(getBillingSourceService)
+    ],
+):
+    res = await billing_source_service.setDefaultPaymentMethod(
+        user_info["org_uuid"], payment_method_id
+    )
+    res.unwrap()
+
+
 @billing_router.get(
     "/sources/payment_methods",
     description="List payment methods for a billing source.",
