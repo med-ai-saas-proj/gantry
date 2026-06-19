@@ -1,5 +1,18 @@
 # syntax=docker/dockerfile:1.7
 
+FROM alpine:3.23 AS build
+
+COPY --from=ghcr.io/astral-sh/uv:0.11.19 /uv /uvx /bin/
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1
+
+COPY . .
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv build --wheel --out-dir dist/
+
 FROM alpine:3.23 AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.19 /uv /uvx /bin/
@@ -7,24 +20,28 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.19 /uv /uvx /bin/
 WORKDIR /app
 
 ENV UV_LINK_MODE=copy \
-    UV_PYTHON_INSTALL_DIR=/app/.python
+    UV_PYTHON=python3.13.5 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_PYTHON_INSTALL_DIR=/app/.python \
+    PYTHONDONTWRITEBYTECODE=1
 
-COPY .python-version pyproject.toml uv.lock README.md ./
+COPY .python-version pyproject.toml uv.lock ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-workspace
+    uv sync --frozen --no-dev --no-install-project
 
-COPY . .
+COPY --from=build /app/dist/*.whl ./
+
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv pip install --no-deps *.whl && \
+    rm -f *.whl
 
 FROM alpine:3.23
 
 ARG BUILD_DATE=unknown
 ARG VCS_REF=unknown
 
-ENV PATH="/app/.venv/bin:$PATH" \
-    PYTHONDONTWRITEBYTECODE=1
+ENV PATH="/app/.venv/bin:$PATH"
 
 LABEL org.opencontainers.image.title="gantry" \
       org.opencontainers.image.description="Gantry API service" \
