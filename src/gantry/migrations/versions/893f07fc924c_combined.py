@@ -53,7 +53,7 @@ def upgrade() -> None:
         sa.Column("org_id", sa.String(length=128), nullable=False),
         sa.Column(
             "requested_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -75,13 +75,13 @@ def upgrade() -> None:
         sa.Column("extra", sa.JSON(), server_default="{}", nullable=False),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -100,13 +100,13 @@ def upgrade() -> None:
         ),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -147,13 +147,13 @@ def upgrade() -> None:
         sa.Column("project_id", sa.BigInteger(), nullable=False),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -191,13 +191,13 @@ def upgrade() -> None:
         ),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -251,13 +251,13 @@ def upgrade() -> None:
         ),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -290,19 +290,19 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(length=128), nullable=False),
         sa.Column(
             "joined_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -325,13 +325,13 @@ def upgrade() -> None:
         sa.Column("extra", sa.JSON(), server_default="{}", nullable=False),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -360,7 +360,7 @@ def upgrade() -> None:
             "parts", postgresql.JSONB(astext_type=sa.Text()), nullable=False
         ),
         sa.Column("model_name", sa.String(length=32), nullable=True),
-        sa.Column("timestamp", sa.DateTime(), nullable=False),
+        sa.Column("timestamp", sa.DateTime(timezone=True), nullable=False),
         sa.Column("run_id", sa.String(length=128), nullable=True),
         sa.ForeignKeyConstraint(
             ["conversation_id"],
@@ -407,8 +407,8 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("provider_invoice_id", sa.String(length=128), nullable=True),
-        sa.Column("paid_at", sa.DateTime(), nullable=True),
-        sa.Column("refunded_at", sa.DateTime(), nullable=True),
+        sa.Column("paid_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("refunded_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "details", postgresql.JSONB(astext_type=sa.Text()), nullable=False
         ),
@@ -417,13 +417,13 @@ def upgrade() -> None:
         ),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -463,13 +463,13 @@ def upgrade() -> None:
         sa.Column("provider_id", sa.String(length=128), nullable=False),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -496,7 +496,7 @@ def upgrade() -> None:
         sa.Column("uuid", sa.Uuid(), nullable=False),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -504,7 +504,7 @@ def upgrade() -> None:
         sa.Column("project_id", sa.BigInteger(), nullable=True),
         sa.Column("organization_id", sa.String(length=128), nullable=False),
         sa.Column("amount", sa.Numeric(precision=18, scale=8), nullable=False),
-        sa.Column("captured_at", sa.DateTime(), nullable=True),
+        sa.Column("captured_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column(
             "status",
             sa.Enum("PENDING", "CAPTURED", "EXPIRED", name="transactionstatus"),
@@ -561,13 +561,13 @@ def upgrade() -> None:
         sa.Column("description", sa.String(length=256), nullable=False),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -587,13 +587,13 @@ def upgrade() -> None:
         sa.Column("amount", sa.Numeric(precision=18, scale=8), nullable=False),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -621,13 +621,13 @@ def upgrade() -> None:
         sa.Column("limit", sa.Numeric(precision=18, scale=8), nullable=True),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
@@ -694,13 +694,13 @@ def upgrade() -> None:
         sa.Column("project_id", sa.BigInteger(), nullable=True),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),
         sa.Column(
             "updated_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),

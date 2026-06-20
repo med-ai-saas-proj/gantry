@@ -30,7 +30,10 @@ def get_orm_class(table_name, dimension) -> type[RagData]:
         Column("hash", Text, nullable=False),
         Column("text", Text, nullable=True),
         Column(
-            "created_at", DateTime, nullable=False, server_default=text("NOW()")
+            "created_at",
+            DateTime(timezone=True),
+            nullable=False,
+            server_default=text("NOW()"),
         ),
         Column("project_id", Integer, nullable=False),
         Column("lang", Text, nullable=True),

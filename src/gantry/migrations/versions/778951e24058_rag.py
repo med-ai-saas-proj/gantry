@@ -8,6 +8,7 @@ Reason:
 
 """
 
+from stripe import TreasuryService
 from typing import Union, Sequence
 from pathlib import Path
 
@@ -49,7 +50,7 @@ def upgrade() -> None:
         sa.Column("model_name", sa.Text(), nullable=False),
         sa.Column(
             "created_at",
-            sa.DateTime(),
+            sa.DateTime(timezone=True),
             server_default=sa.text("now()"),
             nullable=False,
         ),

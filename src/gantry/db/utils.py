@@ -61,7 +61,7 @@ class WithCreateUpdateTimestamp(MappedAsDataclass, kw_only=True):
     """Add created_at and updated_at to table."""
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         # default=datetime.now(UTC).replace(tzinfo=None),
         server_default=func.now(),
         nullable=False,
@@ -69,7 +69,7 @@ class WithCreateUpdateTimestamp(MappedAsDataclass, kw_only=True):
     )
 
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         # default=datetime.now(UTC).replace(tzinfo=None),
         server_default=func.now(),
         onupdate=func.now(),
@@ -83,7 +83,7 @@ class WithCreateTimestamp(MappedAsDataclass, kw_only=True):
     """Add created_at to table."""
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         # default=datetime.now(UTC).replace(tzinfo=None),
         server_default=func.now(),
         nullable=False,

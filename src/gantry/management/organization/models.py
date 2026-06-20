@@ -58,7 +58,7 @@ class OrgDeletionRequest(WithID, OrgBaseSQLModel):
         String(128), unique=True, nullable=False, index=True
     )
     requested_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         init=False,

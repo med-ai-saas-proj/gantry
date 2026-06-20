@@ -1,3 +1,4 @@
+import traceback
 from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db import AsyncSessionManager
 from gantry.settings.rag import VectorOpsType
@@ -866,7 +867,8 @@ class RagService:
                 await self.processEmbeddingQueue()
             except Exception as exc:
                 self.logger.error(
-                    f"Error in embedding task processor loop", exc_info=exc
+                    f"Error in embedding task processor loop",
+                    exc_info=traceback.format_exception(exc),
                 )
                 continue
 

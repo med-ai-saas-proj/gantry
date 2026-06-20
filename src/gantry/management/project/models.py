@@ -54,7 +54,7 @@ class ProjectMember(WithCreateUpdateTimestamp, ProjectBaseSQLModel):
     )
     user_id: Mapped[str] = mapped_column(String(128), primary_key=True)
     joined_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         init=False,

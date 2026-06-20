@@ -73,7 +73,7 @@ class BillingTransaction(
 
     # use server time instead of db time to avoid billing period not matching
     created_at: Mapped[datetime] = mapped_column(
-        DateTime,
+        DateTime(timezone=True),
         # default=datetime.now(UTC).replace(tzinfo=None),
         server_default=func.now(),
         nullable=False,
@@ -95,7 +95,7 @@ class BillingTransaction(
 
     amount: Mapped[Decimal] = mapped_column(AMOUNT_COLUMN_TYPE, nullable=False)
     captured_at: Mapped[datetime | None] = mapped_column(
-        DateTime, nullable=True
+        DateTime(timezone=True), nullable=True
     )
 
     status: Mapped[TransactionStatus] = mapped_column(
@@ -176,9 +176,11 @@ class BillingInvoice(
     provider_invoice_id: Mapped[str | None] = mapped_column(
         String(128), nullable=True
     )  # e.g. Stripe invoice ID
-    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     refunded_at: Mapped[datetime | None] = mapped_column(
-        DateTime, nullable=True
+        DateTime(timezone=True), nullable=True
     )
     details: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
