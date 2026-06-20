@@ -23,7 +23,10 @@ app_settings = getAppSettings()
 async def recoverableErrorHandler(
     req: Request, e: RecoverableError
 ) -> JSONResponse:
-    if app_settings.stage == AppStage.DEV:
+    if (
+        app_settings.stage == AppStage.DEV
+        or app_settings.stage == AppStage.STAGING
+    ):
         assert e._stack_frames is not None
         getLogger().error(
             "Error from",
