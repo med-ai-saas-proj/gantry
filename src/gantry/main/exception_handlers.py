@@ -27,14 +27,13 @@ async def recoverableErrorHandler(
         app_settings.stage == AppStage.DEV
         or app_settings.stage == AppStage.STAGING
     ):
-        assert e._stack_frames is not None
         getLogger().error(
             "Error from",
             exception="".join(traceback.format_exception_only(e)),
             original_exception="".join(
                 traceback.format_exception_only(e._from)
             ),
-            stack="".join(e._stack_frames),
+            stack="".join(e._stack_frames or []),
         )
     return JSONResponse(e.format(), status_code=e.status)
 

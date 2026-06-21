@@ -3,6 +3,19 @@
     "AiGatewaySettings": {
       "additionalProperties": false,
       "properties": {
+        "summary_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model used for summarizing conversation messages. Should be in models list.",
+          "title": "Summary Model"
+        },
         "models": {
           "additionalProperties": {
             "$ref": "#/$defs/ModelSpec"
