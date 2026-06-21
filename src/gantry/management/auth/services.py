@@ -98,19 +98,21 @@ class AuthService:
         return self._openid_metadata
 
     def _getIssuer(self) -> str:
-        """Resolve the issuer from OpenID metadata with a safe fallback."""
-        metadata = self._getOpenIdMetadata()
-        issuer = metadata.get("issuer")
-        if isinstance(issuer, str) and issuer:
-            return issuer
+        """Return the issuer using the configured server_url.
+
+        Always use the internal URL rather than the one from well-known
+        metadata, which reflects Keycloak's public hostname and may not
+        match when accessed via the Docker network.
+        """
         return self._default_issuer
 
     def _getJwksUrl(self) -> str:
-        """Resolve the JWKS URL from OpenID metadata with a safe fallback."""
-        metadata = self._getOpenIdMetadata()
-        jwks_uri = metadata.get("jwks_uri")
-        if isinstance(jwks_uri, str) and jwks_uri:
-            return jwks_uri
+        """Return the JWKS URL using the configured server_url.
+
+        Always use the internal URL rather than the one from well-known
+        metadata, which reflects Keycloak's public hostname and may not
+        be reachable from within the Docker network.
+        """
         return self._default_jwks_url
 
     def _getJwkClient(self) -> PyJWKClient:
