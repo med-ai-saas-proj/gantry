@@ -836,6 +836,9 @@ class RagService:
     async def createBucket(
         self,
     ):
+        self.logger.info(
+            "Creating RAG bucket with settings", settings=self.setting
+        )
         async with self.session_manager.get_session() as session:
             table_name = getTableName(self.setting.rag_store_parameters)
             dimension = self.setting.rag_store_parameters["dimension"]
@@ -912,6 +915,7 @@ class RagService:
             if task_type == "text":
                 (
                     await self.processEmbeddingText(
+                        task_id=task_id,
                         text=task_dict["text"],
                         project_id=task_dict["project_id"],
                         chunk_splitter=ChunkSplitterType(
@@ -929,6 +933,7 @@ class RagService:
             else:
                 (
                     await self.processEmbedding(
+                        task_id=task_id,
                         file_uid=uuid.UUID(task_dict["file_uid"]),
                         project_id=task_dict["project_id"],
                         chunk_splitter=ChunkSplitterType(
@@ -1007,6 +1012,7 @@ class RagService:
 
     async def processEmbedding(
         self,
+        task_id: str,
         file_uid: uuid.UUID,
         project_id: int,
         chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
@@ -1045,29 +1051,88 @@ class RagService:
         if not chunks:
             return Ok(None)
 
-        embedding_response = await self.openai_client.embeddings.create(
-            model=self.setting.embedding_model,
-            input=chunks,
-            dimensions=self.setting.rag_store_parameters["dimension"],
-        )
-        embeddings = [item.embedding for item in embedding_response.data]
-        if not embeddings:
-            return Ok(None)
+        target_dimension = self.setting.rag_store_parameters["dimension"]
+        batch_size = self.setting.embedding_batch_size
+        batched_chunks = [
+            chunks[i : i + batch_size]
+            for i in range(0, len(chunks), batch_size)
+        ]
+        embeddings: list[list[float]] = []
+        for i, batch in enumerate(batched_chunks):
+            embedding_response = await self.openai_client.embeddings.create(
+                model=self.setting.embedding_model,
+                input=batch,
+                dimensions=self.setting.rag_store_parameters["dimension"],
+            )
+            batch_embeddings = [
+                item.embedding for item in embedding_response.data
+            ]
+            if len(batch_embeddings) != len(batch):
+                self.logger.error(
+                    f"Generated embeddings count {len(batch_embeddings)} does not match batch chunks count {len(batch)}.",
+                    task_id=task_id,
+                    current_batch=i + 1,
+                    current_batch_size=len(batch),
+                    batch_size=batch_size,
+                    total_batches=len(batched_chunks),
+                    total_chunks=len(chunks),
+                )
+                return Err(
+                    InternalServiceError(
+                        message="Failed to generate embeddings for all chunks in the batch."
+                    )
+                )
+
+            for j, embedding in enumerate(batch_embeddings):
+                if len(embedding) != target_dimension:
+                    self.logger.error(
+                        f"Generated embedding dimension {len(embedding)} does not match expected dimension {target_dimension} for chunk index {i * batch_size + j}.",
+                        task_id=task_id,
+                        current_batch=i + 1,
+                        current_batch_size=len(batch),
+                        batch_size=batch_size,
+                        total_batches=len(batched_chunks),
+                        total_chunks=len(chunks),
+                        rag_store_config=self.setting.rag_store_parameters,
+                    )
+                    return Err(
+                        InvalidEmbeddingDimensionError(
+                            message=f"Generated embedding dimension {len(embedding)} does not match expected dimension {target_dimension} for chunk index {i * batch_size + j}."
+                        )
+                    )
+
+            embeddings.extend(batch_embeddings)
+            self.logger.info(
+                f"Processed batch of {len(batch)} chunks for embeddings.",
+                task_id=task_id,
+                current_batch=i + 1,
+                current_batch_size=len(batch),
+                batch_size=batch_size,
+                total_batches=len(batched_chunks),
+                total_chunks=len(chunks),
+            )
+
         if len(embeddings) != len(chunks):
+            self.logger.error(
+                f"Generated embeddings count {len(embeddings)} does not match chunks count {len(chunks)}.",
+                task_id=task_id,
+                total_chunks=len(chunks),
+                total_embeddings=len(embeddings),
+            )
             return Err(
                 InternalServiceError(
                     message="Failed to generate embeddings for all chunks."
                 )
             )
-        target_dimension = self.setting.rag_store_parameters["dimension"]
+
+        self.logger.info(
+            f"Successfully generated embeddings for all chunks. Storing in database.",
+            task_id=task_id,
+            total_chunks=len(chunks),
+            total_embeddings=len(embeddings),
+        )
+
         table_name = getTableName(self.setting.rag_store_parameters)
-        for embedding in embeddings:
-            if len(embedding) != target_dimension:
-                return Err(
-                    InvalidEmbeddingDimensionError(
-                        message=f"Generated embedding dimension {len(embedding)} does not match expected dimension {target_dimension}."
-                    )
-                )
 
         async with self.session_manager.get_session() as session:
             DynamicBucket = get_orm_class(table_name, target_dimension)
@@ -1122,6 +1187,7 @@ class RagService:
 
     async def processEmbeddingText(
         self,
+        task_id: str,
         text: str | list[str],
         project_id: int,
         chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
@@ -1158,30 +1224,88 @@ class RagService:
         if not chunks:
             return Ok(None)
 
-        embedding_response = await self.openai_client.embeddings.create(
-            model=self.setting.embedding_model,
-            input=chunks,
-            dimensions=self.setting.rag_store_parameters["dimension"],
-        )
-        embeddings = [item.embedding for item in embedding_response.data]
-        if not embeddings:
-            return Ok(None)
+        target_dimension = self.setting.rag_store_parameters["dimension"]
+        batch_size = self.setting.embedding_batch_size
+        batched_chunks = [
+            chunks[i : i + batch_size]
+            for i in range(0, len(chunks), batch_size)
+        ]
+        embeddings: list[list[float]] = []
+        for i, batch in enumerate(batched_chunks):
+            embedding_response = await self.openai_client.embeddings.create(
+                model=self.setting.embedding_model,
+                input=batch,
+                dimensions=self.setting.rag_store_parameters["dimension"],
+            )
+            batch_embeddings = [
+                item.embedding for item in embedding_response.data
+            ]
+            if len(batch_embeddings) != len(batch):
+                self.logger.error(
+                    f"Generated embeddings count {len(batch_embeddings)} does not match batch chunks count {len(batch)}.",
+                    task_id=task_id,
+                    current_batch=i + 1,
+                    current_batch_size=len(batch),
+                    batch_size=batch_size,
+                    total_batches=len(batched_chunks),
+                    total_chunks=len(chunks),
+                )
+                return Err(
+                    InternalServiceError(
+                        message="Failed to generate embeddings for all chunks in the batch."
+                    )
+                )
+
+            for j, embedding in enumerate(batch_embeddings):
+                if len(embedding) != target_dimension:
+                    self.logger.error(
+                        f"Generated embedding dimension {len(embedding)} does not match expected dimension {target_dimension} for chunk index {i * batch_size + j}.",
+                        task_id=task_id,
+                        current_batch=i + 1,
+                        current_batch_size=len(batch),
+                        batch_size=batch_size,
+                        total_batches=len(batched_chunks),
+                        total_chunks=len(chunks),
+                        rag_store_config=self.setting.rag_store_parameters,
+                    )
+                    return Err(
+                        InvalidEmbeddingDimensionError(
+                            message=f"Generated embedding dimension {len(embedding)} does not match expected dimension {target_dimension} for chunk index {i * batch_size + j}."
+                        )
+                    )
+
+            embeddings.extend(batch_embeddings)
+            self.logger.info(
+                f"Processed batch of {len(batch)} chunks for embeddings.",
+                task_id=task_id,
+                current_batch=i + 1,
+                current_batch_size=len(batch),
+                batch_size=batch_size,
+                total_batches=len(batched_chunks),
+                total_chunks=len(chunks),
+            )
+
         if len(embeddings) != len(chunks):
+            self.logger.error(
+                f"Generated embeddings count {len(embeddings)} does not match chunks count {len(chunks)}.",
+                task_id=task_id,
+                total_chunks=len(chunks),
+                total_embeddings=len(embeddings),
+            )
             return Err(
                 InternalServiceError(
                     message="Failed to generate embeddings for all chunks."
                 )
             )
 
-        target_dimension = self.setting.rag_store_parameters["dimension"]
+        self.logger.info(
+            f"Successfully generated embeddings for all chunks. Storing in database.",
+            task_id=task_id,
+            total_chunks=len(chunks),
+            total_embeddings=len(embeddings),
+        )
+
         table_name = getTableName(self.setting.rag_store_parameters)
-        for embedding in embeddings:
-            if len(embedding) != target_dimension:
-                return Err(
-                    InvalidEmbeddingDimensionError(
-                        message=f"Generated embedding dimension {len(embedding)} does not match expected dimension {target_dimension}."
-                    )
-                )
 
         async with self.session_manager.get_session() as session:
             DynamicBucket = get_orm_class(table_name, target_dimension)

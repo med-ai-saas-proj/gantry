@@ -73,6 +73,12 @@ class RagSettings(BaseSettings):
             description="List of supported languages for bm25 separated by commas. For example: 'simple,english,french'.  The 'lang' field in RagData can only take values from this list."
         ),
     ] = "simple"  # default to 'simple' which can be used for language
+    embedding_batch_size: Annotated[
+        int,
+        Field(
+            description="Batch size for generating embeddings. Larger batch sizes can improve throughput but may increase memory usage."
+        ),
+    ] = 100
 
     rag_store_half_precision: Annotated[
         bool,
