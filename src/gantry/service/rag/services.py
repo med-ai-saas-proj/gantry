@@ -31,7 +31,6 @@ from .utils import (
     create_bm25_index,
     create_vector_index,
     create_embedding_table,
-    getHashUniqueIndexName,
 )
 from .models import RagMetadata
 from .settings import RagSettings
@@ -840,8 +839,12 @@ class RagService:
         async with self.session_manager.get_session() as session:
             table_name = getTableName(self.setting.rag_store_parameters)
             dimension = self.setting.rag_store_parameters["dimension"]
+            half_precision = self.setting.rag_store_parameters["half_precision"]
             await create_embedding_table(
-                session, table_name, dimension=dimension
+                session,
+                table_name,
+                dimension=dimension,
+                half_precision=half_precision,
             )
             await create_bm25_index(
                 session, table_name, self.setting.supported_langs_list
@@ -1045,6 +1048,7 @@ class RagService:
         embedding_response = await self.openai_client.embeddings.create(
             model=self.setting.embedding_model,
             input=chunks,
+            dimensions=self.setting.rag_store_parameters["dimension"],
         )
         embeddings = [item.embedding for item in embedding_response.data]
         if not embeddings:
@@ -1157,6 +1161,7 @@ class RagService:
         embedding_response = await self.openai_client.embeddings.create(
             model=self.setting.embedding_model,
             input=chunks,
+            dimensions=self.setting.rag_store_parameters["dimension"],
         )
         embeddings = [item.embedding for item in embedding_response.data]
         if not embeddings:
@@ -1527,6 +1532,7 @@ class RagService:
         embedding_response = await self.openai_client.embeddings.create(
             model=self.setting.embedding_model,
             input=[query],
+            dimensions=self.setting.rag_store_parameters["dimension"],
         )
         if (
             not embedding_response.data

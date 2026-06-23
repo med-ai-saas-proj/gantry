@@ -32,6 +32,7 @@ type IndexParams = HNSWIndexParams | IVFFlatIndexParams
 
 
 class RagParameters(TypedDict):
+    half_precision: bool
     dimension: int
     index_params: IndexParams
     ops_type: VectorOpsType
@@ -73,6 +74,12 @@ class RagSettings(BaseSettings):
         ),
     ] = "simple"  # default to 'simple' which can be used for language
 
+    rag_store_half_precision: Annotated[
+        bool,
+        Field(
+            description="Whether to use half-precision (float16) for storing embeddings in the RAG store. This can reduce memory usage and improve performance on compatible hardware, but may lead to slightly lower accuracy."
+        ),
+    ] = True
     rag_store_dimension: Annotated[
         int,
         Field(
@@ -139,4 +146,5 @@ class RagSettings(BaseSettings):
             "dimension": self.rag_store_dimension,
             "index_params": index_params,
             "ops_type": self.rag_store_ops_type,
+            "half_precision": self.rag_store_half_precision,
         }

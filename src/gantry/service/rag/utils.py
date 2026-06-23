@@ -12,7 +12,7 @@ from typing import Sequence, TypedDict, cast
 import httpx
 from sqlalchemy import Text, Table, Column, Integer, DateTime, text
 from sqlalchemy.orm import registry
-from pgvector.sqlalchemy import VECTOR
+from pgvector.sqlalchemy import VECTOR, HALFVEC
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -83,14 +83,25 @@ db_supported_langs = [
 
 
 async def create_embedding_table(
-    session: AsyncSession, table_name: str, dimension: int
+    session: AsyncSession, table_name: str, dimension: int, half_precision: bool
 ):
     sql = text("CREATE EXTENSION IF NOT EXISTS vector;")
     await session.execute(sql)
+    if half_precision:
+        if dimension > 4000:
+            raise ValueError(
+                "Dimension too high for half-precision (HALFVEC). The maximum supported dimension for HALFVEC is 4000. Please reduce the dimension or disable half-precision."
+            )
+    else:
+        if dimension > 2000:
+            raise ValueError(
+                "Dimension too high for VECTOR. The maximum supported dimension for VECTOR is 2000. Please reduce the dimension or enable half-precision."
+            )
+
     sql = text(f"""
     CREATE TABLE IF NOT EXISTS "Rag"."{table_name}" (
         id BIGSERIAL PRIMARY KEY,
-        embedding VECTOR({dimension}),
+        embedding {"HALFVEC" if half_precision else "VECTOR"}({dimension}),
         file_id BIGINT REFERENCES "FileStorage"."Files"(id) ON DELETE CASCADE,
         hash TEXT NOT NULL,
         project_id BIGINT NOT NULL REFERENCES "Project"."Projects"(id) ON DELETE CASCADE,
@@ -184,6 +195,18 @@ async def create_vector_index(
 ):
     index_name = getIndexName(table_name, rag_store_parameters)
     ops_type = rag_store_parameters["ops_type"]
+    half_precision = rag_store_parameters["half_precision"]
+    if ops_type == VectorOpsType.cosine:
+        ops_type = (
+            "halfvec_cosine_ops" if half_precision else "vector_cosine_ops"
+        )
+    elif ops_type == VectorOpsType.l2:
+        ops_type = "halfvec_l2_ops" if half_precision else "vector_l2_ops"
+    elif ops_type == VectorOpsType.ip:
+        ops_type = "halfvec_ip_ops" if half_precision else "vector_ip_ops"
+    else:
+        raise ValueError(f"Unsupported vector ops type: {ops_type}")
+
     parms = rag_store_parameters["index_params"]
     if parms["index_type"] == VectorIndexType.hnsw:
         m = parms["m"] if parms and parms.get("m") else 16
@@ -194,14 +217,14 @@ async def create_vector_index(
         )
         sql = text(f"""
             CREATE INDEX IF NOT EXISTS "{index_name}" ON "Rag"."{table_name}" 
-            USING hnsw (embedding {ops_type.value}) 
+            USING hnsw (embedding {ops_type})
             WITH (m = {m}, ef_construction = {ef_construction});
         """)
     elif parms["index_type"] == VectorIndexType.ivfflat:
         lists = parms["lists"] if parms and parms.get("lists") else 100
         sql = text(f"""
             CREATE INDEX IF NOT EXISTS "{index_name}" ON "Rag"."{table_name}" 
-            USING ivfflat (embedding {ops_type.value}) 
+            USING ivfflat (embedding {ops_type}) 
             WITH (lists = {lists});
         """)
     else:
@@ -225,14 +248,14 @@ def getTableName(rag_store_parameters: RagParameters) -> str:
             if index_params and index_params.get("ef_construction")
             else 64
         )
-        return f"rag_data_dim{dimension}_hnsw_{ops_type.value}_m{m}_ef{ef_construction}"
+        return f"rag_data_dim{dimension}_{'half' if rag_store_parameters['half_precision'] else 'full'}_hnsw_{ops_type.value}_m{m}_ef{ef_construction}"
     elif index_params["index_type"] == VectorIndexType.ivfflat:
         lists = (
             index_params["lists"]
             if index_params and index_params.get("lists")
             else 100
         )
-        return f"rag_data_dim{dimension}_ivfflat_{ops_type.value}_lists{lists}"
+        return f"rag_data_dim{dimension}_{'half' if rag_store_parameters['half_precision'] else 'full'}_ivfflat_{ops_type.value}_lists{lists}"
     else:
         raise ValueError(
             f"Unsupported index type: {index_params['index_type']}"
