@@ -1,5 +1,6 @@
 """Authentication and authorization services for management API."""
 
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.keycloak import KeycloakServiceClient
 from gantry.shared.consts import messages_const
 from gantry.shared.custom_types.error_exception import RecoverableError
@@ -11,7 +12,6 @@ from typing import Any
 import jwt
 from jwt import PyJWKClient
 from keycloak import KeycloakOpenID
-from pyrusult import Ok, Err, Result, ResultStatus
 
 
 class UnauthorizedError(RecoverableError):

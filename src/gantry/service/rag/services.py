@@ -1,4 +1,3 @@
-import traceback
 from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db import AsyncSessionManager
 from gantry.settings.rag import VectorOpsType
@@ -44,6 +43,7 @@ import json
 import uuid
 import hashlib
 import importlib
+import traceback
 from typing import Any, Sequence, Awaitable, TypedDict, cast
 from datetime import datetime
 
@@ -959,12 +959,6 @@ class RagService:
                 task_info=task_dict,
             )
         except Exception as exc:
-            self.logger.error(
-                f"Error processing embedding task with ID {task_id}",
-                exc_info=exc,
-                task_id=task_id,
-                task_info=task_dict,
-            )
             retry_time = await cast(
                 Awaitable[int],
                 self.redis.hincrby(self.REDIS_TASK_RETRY_HASH, task_id, 1),
@@ -975,7 +969,7 @@ class RagService:
                     task_id=task_id,
                     retry_attempt=retry_time,
                     task_info=task_dict,
-                    exc_info=exc,
+                    exc_info=traceback.format_exception(exc),
                 )
                 task_dict["status"] = "failed_and_retrying"
                 task_dict["failed_reason"] = str(exc)
@@ -997,6 +991,7 @@ class RagService:
                     task_id=task_id,
                     retry_attempt=retry_time,
                     task_info=task_dict,
+                    exc_info=traceback.format_exception(exc),
                 )
                 task_dict["status"] = "failed_and_dropped"
                 task_dict["failed_reason"] = str(exc)

@@ -97,7 +97,7 @@ async def create_embedding_table(
         text TEXT,
         chunk_metadata JSONB,
         lang TEXT default 'simple',
-        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
     );""")
     await session.execute(sql)
     sql = text(f"""
@@ -125,7 +125,7 @@ async def create_embedding_table(
     """)
     await session.execute(sql)
     sql = text(f"""
-    ALTER TABLE "Rag"."{table_name}" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT NOW();
+    ALTER TABLE "Rag"."{table_name}" ADD COLUMN IF NOT EXISTS created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
     """)
     await session.execute(sql)
     sql = text(f"""

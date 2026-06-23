@@ -8,11 +8,11 @@ Reason:
 
 """
 
-from stripe import TreasuryService
 from typing import Union, Sequence
 from pathlib import Path
 
 import sqlalchemy as sa
+from stripe import TreasuryService
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
