@@ -596,6 +596,12 @@
           "title": "Supported Langs",
           "type": "string"
         },
+        "rag_store_half_precision": {
+          "default": true,
+          "description": "Whether to use half-precision (float16) for storing embeddings in the RAG store. This can reduce memory usage and improve performance on compatible hardware, but may lead to slightly lower accuracy.",
+          "title": "Rag Store Half Precision",
+          "type": "boolean"
+        },
         "rag_store_dimension": {
           "default": 1536,
           "description": "Dimensionality of the vector embeddings stored in the RAG store.",

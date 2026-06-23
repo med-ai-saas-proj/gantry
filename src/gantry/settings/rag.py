@@ -79,7 +79,7 @@ class RagSettings(BaseSettings):
         Field(
             description="Whether to use half-precision (float16) for storing embeddings in the RAG store. This can reduce memory usage and improve performance on compatible hardware, but may lead to slightly lower accuracy."
         ),
-    ] = True
+    ] = False
     rag_store_dimension: Annotated[
         int,
         Field(
