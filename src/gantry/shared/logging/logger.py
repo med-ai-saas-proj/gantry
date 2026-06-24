@@ -1,4 +1,5 @@
 from gantry.settings import AppStage, getAppSettings
+from gantry.shared.utils.json_utils import json_serializer
 from gantry.shared.consts.common_const import APP_NAME
 
 from ..utils import request_id_utils
@@ -36,7 +37,7 @@ def add_open_telemetry_spans(_, __, event_dict):
 
 
 def orjson_renderer(_, __, event_dict):
-    return orjson.dumps(event_dict).decode()
+    return orjson.dumps(event_dict, default=json_serializer).decode()
 
 
 def ms_timestamper(_, __, event_dict):
