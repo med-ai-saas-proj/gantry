@@ -19,12 +19,12 @@ class Main(BaseSettings, cli_prog_name=APP_NAME):
     model_config = SettingsConfigDict(
         cli_parse_args=True,
         case_sensitive=False,
-        env_nested_delimiter="__",
         frozen=True,
         cli_implicit_flags=True,
         cli_kebab_case="no_enums",
         cli_avoid_json=True,
         env_prefix="GANTRY_",
+        env_nested_delimiter="__",
     )
     server: CliSubCommand[Server]
     # migrate: CliSubCommand[Migrate]
@@ -46,7 +46,7 @@ class Main(BaseSettings, cli_prog_name=APP_NAME):
             settings_cls, "server.config_file", "server"
         )
         dotenv_settings = DotEnvPathConfigSettingsSource(
-            settings_cls, "server.env_file", "server"
+            settings_cls, "server.env_file", None
         )
         return (
             init_settings,

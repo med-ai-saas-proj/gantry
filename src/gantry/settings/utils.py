@@ -61,15 +61,33 @@ class DotEnvPathConfigSettingsSource(PydanticBaseSettingsSource):
         super().__init__(settings_cls)
 
     def __call__(self) -> dict[str, Any]:
-        in_path = self.current_state
+        in_path: dict[str, Any] | str | None = self.current_state
         try:
             items = self.in_path.split(".")
             for item in items:
                 in_path = in_path.get(item)
         except:
             in_path = None
-        if in_path is not None:
-            res = DotEnvSettingsSource(self.settings_cls, in_path)()
+        if isinstance(in_path, str):
+            res = DotEnvSettingsSource(
+                self.settings_cls,
+                in_path,
+                None,
+                None,
+                self.settings_cls.model_config.get("case_sensitive", True),
+                self.settings_cls.model_config.get("env_prefix", None),
+                self.settings_cls.model_config.get("env_prefix_target", None),
+                self.settings_cls.model_config.get(
+                    "env_nested_delimiter", None
+                ),
+                self.settings_cls.model_config.get(
+                    "env_nested_max_split", None
+                ),
+                self.settings_cls.model_config.get("env_ignore_empty", None),
+                self.settings_cls.model_config.get("env_parse_none_str", None),
+                self.settings_cls.model_config.get("env_parse_enum", None),
+            )()
+            print(__file__, res)
             if self.out_path is None:
                 return res
             else:
