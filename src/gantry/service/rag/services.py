@@ -113,7 +113,7 @@ class InvalidEmbeddingDimensionError(RecoverableError):
         from_exception: Exception | None = None,
     ):
         super().__init__(from_exception)
-        self.message = message
+        self.detail = message
 
 
 class RagService:
