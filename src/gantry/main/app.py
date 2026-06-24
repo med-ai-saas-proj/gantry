@@ -118,7 +118,7 @@ async def global_middleware(
             error=str(e),
             traceback=traceback.format_exception(e),
         )
-        raise
+        raise e
     finally:
         request_id_utils.reset()
 

@@ -16,7 +16,7 @@ def json_serializer(obj: Any):
     if isinstance(obj, UUID):
         return str(obj)
     if isinstance(obj, BaseModel):
-        return obj.model_dump()
+        return obj.model_dump(mode="json")
     if isinstance(obj, Exception):
         return traceback.format_exception(obj)
     raise TypeError(f"Type {type(obj)} not serializable")
