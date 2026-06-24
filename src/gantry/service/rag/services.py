@@ -837,7 +837,8 @@ class RagService:
         self,
     ):
         self.logger.info(
-            "Creating RAG bucket with settings", settings=self.setting
+            "Creating RAG bucket with settings",
+            settings=self.setting.rag_store_parameters,
         )
         async with self.session_manager.get_session() as session:
             table_name = getTableName(self.setting.rag_store_parameters)
