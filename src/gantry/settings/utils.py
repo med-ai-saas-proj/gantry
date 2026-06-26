@@ -87,7 +87,6 @@ class DotEnvPathConfigSettingsSource(PydanticBaseSettingsSource):
                 self.settings_cls.model_config.get("env_parse_none_str", None),
                 self.settings_cls.model_config.get("env_parse_enum", None),
             )()
-            print(__file__, res)
             if self.out_path is None:
                 return res
             else:

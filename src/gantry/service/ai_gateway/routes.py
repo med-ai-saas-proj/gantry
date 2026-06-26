@@ -38,6 +38,7 @@ class RunAgentInputWithModelSettings(RunAgentInput):
     reserved_tokens: int | None = None
 
 
+@ai_gateway_router.get("/models")
 @ai_gateway_public_router.get("/models")
 async def get_models(
     ai_gateway_service: Annotated[
