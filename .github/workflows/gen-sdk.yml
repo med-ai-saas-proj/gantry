@@ -53,7 +53,7 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
         with:
           repository: ${{ env.TARGET_REPO }}
-          token: ${{ secrets.TARGET_REPO_TOKEN }}
+          token: ${{ secrets.TARGET_SDK_REPO_TOKEN }}
           path: target-sdk
           ref: ${{ env.TARGET_BRANCH }}
 
