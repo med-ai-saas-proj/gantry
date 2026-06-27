@@ -17,17 +17,17 @@ jobs:
 
     steps:
       - name: Checkout source repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+        uses: actions/checkout@v4 # v4
         with:
           path: source
 
       - name: Install uv
-        uses: astral-sh/setup-uv@22695119d769bdb6f7032ad67b9bca0ef12ae567 # v5
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8
         with:
           version: "latest"
 
       - name: Set up Python
-        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
+        uses: actions/setup-python@v5 # v5
         with:
           python-version-file: source/pyproject.toml
 
@@ -50,7 +50,7 @@ jobs:
           echo "✅ Target repo: $TARGET_REPO"
 
       - name: Checkout target SDK repository
-        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+        uses: actions/checkout@v4 # v4
         with:
           repository: ${{ env.TARGET_REPO }}
           token: ${{ secrets.TARGET_SDK_REPO_TOKEN }}
