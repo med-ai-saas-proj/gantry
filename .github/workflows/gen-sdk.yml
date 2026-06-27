@@ -3,7 +3,7 @@ name: Generate SDKs and Push to Target Repo
 on:
   push:
     branches:
-      - main
+      - master
 
 env:
   TARGET_REPO: ${{ vars.TARGET_SDK_REPO || 'undefined' }}
