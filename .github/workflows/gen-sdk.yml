@@ -1,0 +1,91 @@
+name: Generate SDKs and Push to Target Repo
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  TARGET_REPO: ${{ vars.TARGET_SDK_REPO || 'undefined' }}
+  TARGET_BRANCH: ${{ vars.TARGET_SDK_BRANCH || 'main' }}
+
+jobs:
+  generate-and-push-sdk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+        with:
+          path: source
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@22695119d769bdb6f7032ad67b9bca0ef12ae567 # v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5
+        with:
+          python-version-file: source/pyproject.toml
+
+      - name: Install dependencies
+        working-directory: source
+        run: uv sync --group dev
+
+      - name: Generate SDKs
+        working-directory: source
+        run: GANTRY_SERVER__CONFIG_FILE=example.gantry.toml uv run scripts/gen-openapi.py --commit-hash ${{ github.sha }}
+
+      - name: Validate target repo variable
+        run: |
+          if [ "$TARGET_REPO" = "undefined" ]; then
+            echo "❌ Error: TARGET_SDK_REPO variable is not set."
+            echo "   Set it in GitHub → Settings → Secrets and variables → Actions → Variables."
+            echo "   Example value: owner/sdk-repo"
+            exit 1
+          fi
+          echo "✅ Target repo: $TARGET_REPO"
+
+      - name: Checkout target SDK repository
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4
+        with:
+          repository: ${{ env.TARGET_REPO }}
+          token: ${{ secrets.TARGET_SDK_REPO_TOKEN }}
+          path: target-sdk
+          ref: ${{ env.TARGET_BRANCH }}
+
+      - name: Sync generated SDKs to target repository
+        run: |
+          SDK_DIR="source/sdk/${{ github.sha }}"
+          TARGET_SDK_DIR="target-sdk/sdk/${{ github.sha }}"
+
+          mkdir -p "$TARGET_SDK_DIR"
+
+          # Copy freshly generated SDKs preserving the commit-hash prefix
+          cp -r "$SDK_DIR/python" "$TARGET_SDK_DIR/python"
+          cp -r "$SDK_DIR/typescript" "$TARGET_SDK_DIR/typescript"
+          cp -r "$SDK_DIR/go" "$TARGET_SDK_DIR/go"
+
+      - name: Commit and push to target repository
+        working-directory: target-sdk
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "ℹ️ No changes to SDK files. Skipping commit."
+            exit 0
+          fi
+
+          git commit \
+            --no-gpg-sign \
+            -m "feat(sdk): generate SDKs from ${{ github.repository }}@${{ github.sha }}" \
+            -m "SDK output path: sdk/${{ github.sha }}/" \
+            -m "Triggered by commit ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+
+          git push origin ${{ env.TARGET_BRANCH }}
