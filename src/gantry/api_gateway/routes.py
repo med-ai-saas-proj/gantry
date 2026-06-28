@@ -11,9 +11,8 @@ from typing import Annotated
 from urllib.parse import urljoin
 
 import httpx
-from fastapi import Path, Depends, FastAPI, Request
+from fastapi import Path, Depends, FastAPI, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
-from starlette.background import BackgroundTask
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -28,6 +27,7 @@ gateway_app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 HOP_BY_HOP_HEADERS = {
     "connection",
@@ -99,6 +99,7 @@ async def gateway_proxy(
     gateway_service: Annotated[
         ApiGatewayService, Depends(getApiGatewayService)
     ],
+    background_tasks: BackgroundTasks,
 ):
     destination = gateway_service.getDestination(route_name=route_name).unwrap()
     gateway_service.checkPermission(
@@ -111,7 +112,7 @@ async def gateway_proxy(
     request_timeout = getApiGatewaySettings().request_timeout.total_seconds()
     client = httpx.AsyncClient(timeout=request_timeout)
 
-    full_url = urljoin(destination.address, full_path)
+    full_url = urljoin(destination.address.encoded_string(), full_path)
     req = client.build_request(
         method=request.method,
         url=full_url,
@@ -122,10 +123,10 @@ async def gateway_proxy(
     response = await client.send(request=req, stream=True)
     response_headers = filter_headers(dict(response.headers))
 
+    background_tasks.add_task(client.aclose)
     return StreamingResponse(
         response.aiter_raw(),
         status_code=response.status_code,
         headers=response_headers,
         media_type=response.headers.get("Content-Type"),
-        background=BackgroundTask(client.aclose),
     )

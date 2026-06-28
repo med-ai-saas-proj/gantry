@@ -1,7 +1,7 @@
 from gantry.service import service_app
 from gantry.settings import AppStage, getAppSettings
 from gantry.management import management_app
-from gantry.api_gateway import gateway_app
+from gantry.api_gateway import docs_app, gateway_app
 from gantry.service.rag import rag_internal_router
 from gantry.shared.utils import request_id_utils
 from gantry.otel.settings import getOtelSettings
@@ -126,9 +126,10 @@ async def global_middleware(
 main_app.middleware("http")(global_middleware)
 internal_app.middleware("http")(global_middleware)
 
-main_app.mount("/service", service_app, "service")
-main_app.mount("/management", management_app, "management")
+main_app.mount("/service", docs_app, "serice")
 main_app.mount("/gateway", gateway_app, "gateway")
+main_app.mount("/api", service_app, "api")
+main_app.mount("/management", management_app, "management")
 
 # main_app.mount("/", StaticFiles(directory="statics", html=True), name="static")
 
@@ -140,7 +141,14 @@ if getOtelSettings().metrics == MetricsType.prometheus:
 
     internal_app.mount("/metrics", make_asgi_app(), "prometheus")
 
-apps = [main_app, service_app, management_app, gateway_app, internal_app]
+apps = [
+    main_app,
+    service_app,
+    management_app,
+    gateway_app,
+    internal_app,
+    docs_app,
+]
 
 handler_map = {
     RecoverableError: exception_handlers.recoverableErrorHandler,

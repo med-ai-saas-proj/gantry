@@ -1,13 +1,13 @@
 from typing import Annotated
 from datetime import timedelta
 
-from pydantic import Field
+from pydantic import Field, AnyUrl
 from pydantic_settings import BaseSettings
 
 
 class ApiGatewayRoute(BaseSettings):
     address: Annotated[
-        str,
+        AnyUrl,
         Field(
             description="Upstream service address for this route.",
         ),
@@ -18,6 +18,10 @@ class ApiGatewayRoute(BaseSettings):
             description="Permission IDs required to access this route.",
         ),
     ] = []
+    openapi_json_url: Annotated[
+        AnyUrl | None,
+        Field(description="Open API json url, uses for docs in frontend"),
+    ] = None
     # auto_hold: Annotated[
     #     int | None,
     #     Field(

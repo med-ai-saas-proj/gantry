@@ -34,6 +34,8 @@
       "properties": {
         "address": {
           "description": "Upstream service address for this route.",
+          "format": "uri",
+          "minLength": 1,
           "title": "Address",
           "type": "string"
         },
@@ -45,6 +47,21 @@
           },
           "title": "Required Perms",
           "type": "array"
+        },
+        "openapi_json_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Open API json url, uses for docs in frontend",
+          "title": "Openapi Json Url"
         }
       },
       "required": [
@@ -596,8 +613,14 @@
           "title": "Supported Langs",
           "type": "string"
         },
+        "embedding_batch_size": {
+          "default": 100,
+          "description": "Batch size for generating embeddings. Larger batch sizes can improve throughput but may increase memory usage.",
+          "title": "Embedding Batch Size",
+          "type": "integer"
+        },
         "rag_store_half_precision": {
-          "default": true,
+          "default": false,
           "description": "Whether to use half-precision (float16) for storing embeddings in the RAG store. This can reduce memory usage and improve performance on compatible hardware, but may lead to slightly lower accuracy.",
           "title": "Rag Store Half Precision",
           "type": "boolean"

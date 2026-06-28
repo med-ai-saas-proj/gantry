@@ -26,6 +26,13 @@ class InsufficientPermission(RecoverableError):
     detail = "Api key does not have required permission"
 
 
+class DocNotFound(RecoverableError):
+    code = "doc_not_found"
+    status = 404
+    title = "Document for this service does not exist."
+    delail = "Document for this service does not exist."
+
+
 class ApiGatewayService:
     def __init__(
         self,
