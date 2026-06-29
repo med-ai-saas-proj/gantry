@@ -40,6 +40,10 @@ from gantry.management.organization.dtos import (
     UpdateOrgMetadataRequest,
     PermissionCatalogResponse,
 )
+from gantry.management.organization.services import (
+    MultipleOrganizationMembershipError,
+    UserAlreadyInAnotherOrganizationError,
+)
 
 import unittest
 from types import SimpleNamespace
@@ -218,6 +222,94 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         )
         self.org_service.requestDeleteOrg.assert_awaited_once_with("org-1")
 
+    async def test_add_organization_user_adds_member_and_seeds_permissions(
+        self,
+    ):
+        self.kc.getMemberOrganizations = AsyncMock(return_value=Ok([]))
+        self.kc.addMember = AsyncMock(return_value=Ok(True))
+        self.service.setUserOrganizationPermissions = AsyncMock(
+            return_value=SimpleNamespace(user_id="user-1")
+        )
+
+        result = await self.service.addOrganizationUser(
+            "org-1",
+            "user-1",
+            ["organization.owner"],
+        )
+
+        self.assertEqual(result.user_id, "user-1")
+        self.kc.addMember.assert_awaited_once_with("org-1", "user-1")
+        self.service.setUserOrganizationPermissions.assert_awaited_once_with(
+            "user-1",
+            "org-1",
+            ["organization.owner"],
+        )
+
+    async def test_add_organization_user_is_idempotent_for_same_org(self):
+        self.kc.getMemberOrganizations = AsyncMock(
+            return_value=Ok([{"id": "org-1", "name": "Org 1"}])
+        )
+        self.kc.addMember = AsyncMock()
+        self.service.setUserOrganizationPermissions = AsyncMock(
+            return_value=SimpleNamespace(user_id="user-1")
+        )
+
+        result = await self.service.addOrganizationUser(
+            "org-1",
+            "user-1",
+            ["organization.owner"],
+        )
+
+        self.assertEqual(result.user_id, "user-1")
+        self.kc.addMember.assert_not_awaited()
+        self.service.setUserOrganizationPermissions.assert_awaited_once_with(
+            "user-1",
+            "org-1",
+            ["organization.owner"],
+        )
+
+    async def test_add_organization_user_rejects_member_of_other_org(self):
+        self.kc.getMemberOrganizations = AsyncMock(
+            return_value=Ok([{"id": "org-2", "name": "Other"}])
+        )
+        self.kc.addMember = AsyncMock()
+
+        with self.assertRaises(UserAlreadyInAnotherOrganizationError):
+            await self.service.addOrganizationUser(
+                "org-1",
+                "user-1",
+                ["organization.owner"],
+            )
+
+        self.kc.addMember.assert_not_awaited()
+
+    async def test_add_organization_user_rejects_multiple_memberships(self):
+        self.kc.getMemberOrganizations = AsyncMock(
+            return_value=Ok([{"id": "org-1"}, {"id": "org-2"}])
+        )
+        self.kc.addMember = AsyncMock()
+
+        with self.assertRaises(MultipleOrganizationMembershipError):
+            await self.service.addOrganizationUser(
+                "org-1",
+                "user-1",
+                ["organization.owner"],
+            )
+
+        self.kc.addMember.assert_not_awaited()
+
+    async def test_add_organization_user_rejects_invalid_permissions(self):
+        self.kc.addMember = AsyncMock()
+
+        with self.assertRaises(InvalidAdminPermissionError):
+            await self.service.addOrganizationUser(
+                "org-1",
+                "user-1",
+                ["organization.nope"],
+            )
+
+        self.kc.addMember.assert_not_awaited()
+
     def test_list_project_permissions_returns_catalog(self):
         result = self.service.listProjectPermissions()
 
@@ -258,14 +350,15 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
 
         result = await self.service.updateOrganization(
             "org-1",
-            UpdateOrgMetadataRequest(name="New Org"),
+            UpdateOrgMetadataRequest(name="New Org", alias="new-alias"),
         )
 
         self.assertEqual(result.org_id, "org-1")
         self.assertEqual(result.name, "New Org")
+        self.assertEqual(result.alias, "new-alias")
         self.kc.updateOrg.assert_awaited_once_with(
             "org-1",
-            {"id": "org-1", "name": "New Org", "alias": "old"},
+            {"id": "org-1", "name": "New Org", "alias": "new-alias"},
         )
 
     async def test_list_projects_checks_org_maps_and_paginates_rows(self):

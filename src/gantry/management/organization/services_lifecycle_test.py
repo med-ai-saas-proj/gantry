@@ -10,10 +10,12 @@ from .services_test_support import (
     SimpleNamespace,
     OrgNotFoundError,
     BaseOrgServiceTest,
+    MemberNotFoundError,
     OwnerRemovalNotAllowedError,
     DeletionRequestNotFoundError,
     OwnerPermissionRequiredError,
     DeletionAlreadyRequestedError,
+    UserAlreadyInAnotherOrganizationError,
     datetime,
     _DummyError,
 )
@@ -21,6 +23,51 @@ from .services_test_support import (
 
 class TestOrgServiceLifecycle(BaseOrgServiceTest):
     """Organization service tests grouped by category."""
+
+    async def test_create_org_with_owner_seeds_owner_when_user_has_no_org(self):
+        """Creating an org can seed the first owner when user is unassigned."""
+        service = self._make_service()
+        service.kc.getMemberOrganizations = AsyncMock(return_value=Ok([]))
+        service.kc.createOrg = AsyncMock(return_value=Ok("org-1"))
+        service.kc.addMember = AsyncMock(return_value=Ok(True))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
+
+        res = await service.createOrg(
+            name="Org 1",
+            alias="org-1",
+            owner_id="user-1",
+        )
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().owner_id, "user-1")
+        service.kc.getMemberOrganizations.assert_awaited_once_with("user-1")
+        service.kc.createOrg.assert_awaited_once_with(
+            {"name": "Org 1", "alias": "org-1"}
+        )
+        service.kc.addMember.assert_awaited_once_with("org-1", "user-1")
+        service.kc.setUserAttribute.assert_awaited_once_with(
+            "user-1",
+            "org_permissions",
+            [OrgPermission.OWNER.value],
+        )
+
+    async def test_create_org_rejects_owner_already_in_another_org(self):
+        """Owner seeding must preserve the one-user-one-org invariant."""
+        service = self._make_service()
+        service.kc.getMemberOrganizations = AsyncMock(
+            return_value=Ok([{"id": "org-2", "name": "Other"}])
+        )
+        service.kc.createOrg = AsyncMock()
+
+        res = await service.createOrg(
+            name="Org 1",
+            alias="org-1",
+            owner_id="user-1",
+        )
+
+        self.assertTrue(res.status == ResultStatus.Err)
+        self.assertIsInstance(res.err(), UserAlreadyInAnotherOrganizationError)
+        service.kc.createOrg.assert_not_awaited()
 
     async def test_remove_owner_not_allowed(self):
         """Organization owner removal should be blocked."""
@@ -340,6 +387,25 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
 
         # Assert
         self.assertTrue(res.status == ResultStatus.Ok)
+        service.kc.removeMember.assert_awaited_once_with("org-1", "u-member")
+        service.kc.deleteUser.assert_awaited_once_with("u-member")
+
+    async def test_remove_user_succeeds_when_account_is_already_deleted(self):
+        """Removing membership is enough when Keycloak user deletion is already done."""
+        # Arrange
+        service = self._make_service()
+        service._getOrgOwnerId = AsyncMock(return_value=Ok("owner"))
+        service.kc.removeMember = AsyncMock(return_value=Ok(True))
+        service.kc.deleteUser = AsyncMock(
+            return_value=Err(MemberNotFoundError())
+        )
+
+        # Act
+        res = await service.removeUser("org-1", "u-member")
+
+        # Assert
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertTrue(res.unwrap())
         service.kc.removeMember.assert_awaited_once_with("org-1", "u-member")
         service.kc.deleteUser.assert_awaited_once_with("u-member")
 

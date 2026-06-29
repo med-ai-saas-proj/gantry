@@ -96,9 +96,7 @@ class OwnerRequiredForGrantError(RecoverableError):
     status = 403
     code = "owner_required_for_permission_grant"
     title = "Owner Required"
-    detail = (
-        "Only project owner can grant project.users.permissions.read_write."
-    )
+    detail = "Only project owner can grant owner-only project permissions."
 
 
 class LastOwnerRemovalNotAllowedError(RecoverableError):
@@ -726,10 +724,7 @@ class ProjectService:
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
             return project_res.into()
-        project_id, org_id, project_info = project_res.unwrap()
-        active_res = self._ensureProjectActive(project_info)
-        if active_res.status == ResultStatus.Err:
-            return active_res.into()
+        project_id, org_id, _ = project_res.unwrap()
 
         async with self.session_manager.get_session() as session:
             members = await self.membership_repo.listMembers(
@@ -881,10 +876,7 @@ class ProjectService:
         project_res = await self._getProjectOrErr(project_uuid)
         if project_res.status == ResultStatus.Err:
             return project_res.into()
-        project_id, _, project_info = project_res.unwrap()
-        active_res = self._ensureProjectActive(project_info)
-        if active_res.status == ResultStatus.Err:
-            return active_res.into()
+        project_id, _, _ = project_res.unwrap()
 
         perms_res = await self._getMemberPermissions(
             project_id, project_uuid, target_user_id
@@ -931,19 +923,16 @@ class ProjectService:
         org_owner_res = await self._isOrgOwner(org_id, actor_user_id)
         if org_owner_res.status == ResultStatus.Err:
             return org_owner_res.into()
-        if not org_owner_res.unwrap():
+        is_org_owner = org_owner_res.unwrap()
+        if not is_org_owner:
             actor_perms_res = await self._getMemberPermissions(
                 project_id, project_uuid, actor_user_id
             )
             if actor_perms_res.status == ResultStatus.Err:
                 return actor_perms_res.into()
             actor_perms = actor_perms_res.unwrap()
-
-            if (
-                ProjectPermission.USERS_PERMISSIONS_RW.value in permissions
-                and not has_permission(actor_perms, ProjectPermission.OWNER)
-            ):
-                return Err(OwnerRequiredForGrantError())
+        else:
+            actor_perms = []
 
         async with self.session_manager.get_session() as session:
             target = await self.membership_repo.getMembership(
@@ -957,8 +946,35 @@ class ProjectService:
             )
             if target_perms_res.status == ResultStatus.Err:
                 return target_perms_res.into()
+            target_perms = target_perms_res.unwrap()
+            is_granting_owner = (
+                ProjectPermission.OWNER.value in permissions
+                and ProjectPermission.OWNER.value not in target_perms
+            )
+            if (
+                not is_org_owner
+                and is_granting_owner
+                and not has_permission(actor_perms, ProjectPermission.OWNER)
+            ):
+                return Err(OwnerRequiredForGrantError())
+
+            is_granting_permission_rw = (
+                ProjectPermission.USERS_PERMISSIONS_RW.value in permissions
+                and ProjectPermission.USERS_PERMISSIONS_RW.value
+                not in target_perms
+            )
+            if (
+                not is_org_owner
+                and is_granting_permission_rw
+                and not has_permission(actor_perms, ProjectPermission.OWNER)
+                and not has_permission(
+                    actor_perms,
+                    ProjectPermission.USERS_PERMISSIONS_RW,
+                )
+            ):
+                return Err(OwnerRequiredForGrantError())
             is_removing_owner = (
-                ProjectPermission.OWNER.value in target_perms_res.unwrap()
+                ProjectPermission.OWNER.value in target_perms
                 and ProjectPermission.OWNER.value not in permissions
             )
             if is_removing_owner:

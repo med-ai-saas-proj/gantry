@@ -158,13 +158,16 @@ class BillingSourceService:
             billing_source_details = cast(
                 Customer, billing_source_details_res.value
             )
+            invoice_settings = getattr(
+                billing_source_details, "invoice_settings", None
+            )
             return Ok(
                 BillingSourceDetailResponse(
                     default_payment_method=cast(
                         str,
-                        billing_source_details.invoice_settings.default_payment_method,
+                        invoice_settings.default_payment_method,
                     )
-                    if billing_source_details.invoice_settings
+                    if invoice_settings
                     else None,
                     billing_source_uid=billing_source.uuid,
                     organization_id=billing_source.organization_id,

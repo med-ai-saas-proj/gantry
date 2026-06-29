@@ -45,6 +45,21 @@ class InsufficientPermissionsError(ForbiddenError):
         self.detail = f"Insufficient permissions. Required roles: {roles_str}"
 
 
+class InvalidClientTokenError(ForbiddenError):
+    """Raised when a token was issued for a different Keycloak client."""
+
+    code = "invalid_client_token"
+    title = "Invalid Client Token"
+
+    def __init__(self, expected_client_id: str, actual_client_id: str | None):
+        super().__init__()
+        actual = actual_client_id or "<missing>"
+        self.detail = (
+            "Token was issued for an unexpected Keycloak client. "
+            f"Expected {expected_client_id}, got {actual}."
+        )
+
+
 class AuthService:
     """Authentication and authorization service.
 
@@ -60,12 +75,14 @@ class AuthService:
         client_id: str,
         keycloak_client: KeycloakServiceClient,
         require_organization_claim: bool = True,
+        forbidden_realm_roles: set[str] | None = None,
     ):
         # Strip trailing slash from server URL
         self.server_url = server_url.rstrip("/")
         self.realm = realm
         self.client_id = client_id
         self.require_organization_claim = require_organization_claim
+        self.forbidden_realm_roles = forbidden_realm_roles or set()
         self.keycloak_client = keycloak_client
 
         self._default_jwks_url = (
@@ -123,6 +140,39 @@ class AuthService:
             self._jwk_client_url = jwks_url
         return self._jwk_client
 
+    def _ensureAuthorizedClient(
+        self, claims: dict[str, Any]
+    ) -> Result[bool, InvalidClientTokenError]:
+        """Ensure the access token was minted for this API client path."""
+        actual_client_id = claims.get("azp")
+        if actual_client_id != self.client_id:
+            return Err(
+                InvalidClientTokenError(
+                    self.client_id,
+                    actual_client_id
+                    if isinstance(actual_client_id, str)
+                    else None,
+                )
+            )
+        return Ok(True)
+
+    def _realmRoles(self, claims: dict[str, Any]) -> set[str]:
+        realm_access = claims.get("realm_access")
+        if not isinstance(realm_access, dict):
+            return set()
+        roles = realm_access.get("roles")
+        if not isinstance(roles, list):
+            return set()
+        return {role for role in roles if isinstance(role, str)}
+
+    def _ensureAllowedRealmRoles(
+        self, claims: dict[str, Any]
+    ) -> Result[bool, ForbiddenError]:
+        """Reject tokens with realm roles that are forbidden on this surface."""
+        if self.forbidden_realm_roles.intersection(self._realmRoles(claims)):
+            return Err(ForbiddenError())
+        return Ok(True)
+
     async def verifyToken(
         self, token: str
     ) -> Result[UserInfo, UnauthorizedError]:
@@ -140,12 +190,19 @@ class AuthService:
                 issuer=self._getIssuer(),
                 options={
                     "verify_exp": True,
-                    # "verify_iss": True,
                     # "verify_aud": True,
-                    "verify_iss": False,
+                    "verify_iss": True,
                     "verify_aud": False,
                 },
             )
+
+            client_res = self._ensureAuthorizedClient(payload)
+            if client_res.status == ResultStatus.Err:
+                return client_res.into()
+
+            role_res = self._ensureAllowedRealmRoles(payload)
+            if role_res.status == ResultStatus.Err:
+                return role_res.into()
 
             return await self._mapClaimsToAuthInfo(payload)
 
@@ -260,14 +317,17 @@ class AuthService:
                 issuer=self._getIssuer(),
                 options={
                     "verify_exp": True,
-                    # "verify_iss": True,
                     # "verify_aud": True,
-                    "verify_iss": False,
+                    "verify_iss": True,
                     "verify_aud": False,
                 },
             )
 
-            if self.ADMIN_REALM_ROLE not in payload["realm_access"]["roles"]:
+            client_res = self._ensureAuthorizedClient(payload)
+            if client_res.status == ResultStatus.Err:
+                return client_res.into()
+
+            if self.ADMIN_REALM_ROLE not in self._realmRoles(payload):
                 return Err(ForbiddenError())
 
             return Ok(

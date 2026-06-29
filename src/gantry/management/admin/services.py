@@ -50,7 +50,12 @@ from gantry.management.project.permissions import (
 )
 from gantry.management.api_key.repositories import ApiKeyRepository
 from gantry.management.project.repositories import ProjectRepository
-from gantry.management.organization.services import OrgService
+from gantry.management.organization.services import (
+    OrgService,
+    MultipleOrganizationMembershipError,
+    UserAlreadyInAnotherOrganizationError,
+    _extract_org_ids,
+)
 from gantry.management.organization.permissions import (
     ALL_PERMISSIONS as ALL_ORG_PERMISSIONS,
 )
@@ -76,6 +81,7 @@ from .permissions import (
 )
 
 from typing import Any
+
 
 
 class InvalidAdminPermissionError(RecoverableError):
@@ -272,7 +278,8 @@ class AdminService:
             alias=input_data.alias,
             owner_id=input_data.owner_id,
         )
-        return result.unwrap()
+        org = result.unwrap()
+        return org
 
     async def getOrganization(self, org_id: str) -> OrgInfoResponse:
         """Return one organization without user-scope permission checks."""
@@ -299,7 +306,8 @@ class AdminService:
             input_data.spending_limit,
             input_data.extra,
         )
-        return result.unwrap()
+        settings = result.unwrap()
+        return settings
 
     async def listOrganizationUsers(
         self,
@@ -315,23 +323,59 @@ class AdminService:
         )
         return result.unwrap()
 
+    async def addOrganizationUser(
+        self,
+        org_id: str,
+        user_id: str,
+        permissions: list[str],
+    ) -> AdminUserProfileResponse:
+        """Add a user to an organization and optionally seed permissions."""
+        self._raiseInvalidPermissions(
+            "organization",
+            permissions,
+            ALL_ORG_PERMISSIONS,
+        )
+        orgs_res = await self.kc.getMemberOrganizations(user_id)
+        existing_org_ids = _extract_org_ids(orgs_res.unwrap())
+        if len(existing_org_ids) > 1:
+            raise MultipleOrganizationMembershipError()
+        if existing_org_ids and org_id not in existing_org_ids:
+            raise UserAlreadyInAnotherOrganizationError()
+
+        if org_id not in existing_org_ids:
+            add_res = await self.kc.addMember(org_id, user_id)
+            add_res.unwrap()
+        if permissions:
+            return await self.setUserOrganizationPermissions(
+                user_id,
+                org_id,
+                permissions,
+            )
+        return await self._buildUserProfileResponse(user_id)
+
     async def updateOrganization(
         self,
         org_id: str,
         input_data: UpdateOrgMetadataRequest,
     ) -> OrgInfoResponse:
-        """Rename one organization without requiring org-owner membership."""
+        """Update one organization without requiring org-owner membership."""
         current_org_res = await self.kc.getOrg(org_id)
         current_org = current_org_res.unwrap()
         payload = dict(current_org)
-        payload["name"] = input_data.name
+        if input_data.name is not None:
+            payload["name"] = input_data.name
+        if input_data.alias is not None:
+            payload["alias"] = input_data.alias
 
         update_res = await self.kc.updateOrg(org_id, payload)
         update_res.unwrap()
+        updated_name = str(payload.get("name") or payload.get("alias") or "")
+        updated_alias = payload.get("alias")
 
         return OrgInfoResponse(
             org_id=org_id,
-            name=input_data.name,
+            name=updated_name,
+            alias=str(updated_alias) if updated_alias is not None else None,
             owner_id=None,
         )
 
@@ -341,7 +385,8 @@ class AdminService:
     ) -> DeleteRequestResponse:
         """Request delayed organization deletion through the existing lifecycle."""
         result = await self.org_service.requestDeleteOrg(org_id)
-        return result.unwrap()
+        deletion = result.unwrap()
+        return deletion
 
     def listProjectPermissions(self) -> ProjectPermissionCatalogResponse:
         """Return the project permission catalog."""
@@ -392,33 +437,35 @@ class AdminService:
                 organization_id=org_id,
             )
             await session.commit()
-            return self._toProjectInfoResponse(project)
+            response = self._toProjectInfoResponse(project)
+            return response
 
-    async def getProject(self, project_id: str) -> ProjectInfoResponse:
+    async def getProject(self, project_uuid: str) -> ProjectInfoResponse:
         """Return one project without requiring project membership."""
-        return await self._getProjectInfoOrErr(project_id)
+        return await self._getProjectInfoOrErr(project_uuid)
 
     async def getProjectSettings(
         self,
-        project_id: str,
+        project_uuid: str,
     ) -> ProjectSettingsResponse:
         """Return project settings without requiring project membership."""
-        result = await self.project_service.getProjectSettings(project_id)
+        result = await self.project_service.getProjectSettings(project_uuid)
         return result.unwrap()
 
     async def updateProjectSettings(
         self,
-        project_id: str,
+        project_uuid: str,
         input_data: UpdateProjectSettingsRequest,
     ) -> ProjectSettingsResponse:
         """Update project settings without project permission checks."""
         result = await self.project_service.updateProjectSettings(
-            project_id,
+            project_uuid,
             input_data.rate_limit,
             input_data.spending_limit,
             input_data.extra,
         )
-        return result.unwrap()
+        settings = result.unwrap()
+        return settings
 
     async def listProjectUsers(
         self,
@@ -436,56 +483,59 @@ class AdminService:
 
     async def updateProject(
         self,
-        project_id: str,
+        project_uuid: str,
         input_data: UpdateProjectRequest,
     ) -> ProjectInfoResponse:
         """Update one project without project permission checks."""
         result = await self.project_service.updateProject(
-            project_uuid=project_id,
+            project_uuid=project_uuid,
             name=input_data.name,
             description=input_data.description,
         )
-        return result.unwrap()
+        project = result.unwrap()
+        return project
 
     async def deleteProject(
         self,
-        project_id: str,
+        project_uuid: str,
     ) -> ProjectArchiveResponse:
         """Soft-delete one project by marking it archived."""
-        return await self.archiveProject(project_id)
+        return await self.archiveProject(project_uuid)
 
     async def archiveProject(
         self,
-        project_id: str,
+        project_uuid: str,
     ) -> ProjectArchiveResponse:
         """Archive one project without project permission checks."""
         result = await self.project_service.setProjectArchived(
-            project_uuid=project_id,
+            project_uuid=project_uuid,
             archived=True,
         )
-        return result.unwrap()
+        response = result.unwrap()
+        return response
 
     async def unarchiveProject(
         self,
-        project_id: str,
+        project_uuid: str,
     ) -> ProjectArchiveResponse:
         """Unarchive one project without project permission checks."""
         result = await self.project_service.setProjectArchived(
-            project_uuid=project_id,
+            project_uuid=project_uuid,
             archived=False,
         )
-        return result.unwrap()
+        response = result.unwrap()
+        return response
 
     def listApiKeyPermissions(self) -> ApiKeyPermissionCatalogResponse:
         """Return the API-key permission catalog."""
         return self.apikey_service.getPermissionCatalog()
 
     async def listApiKeys(
-        self, project_id: str, disabled: bool | None = None
+        self, project_uuid: str, disabled: bool | None = None
     ) -> ApiKeyListResponse:
         """Return API keys for one project without permission checks."""
         result = await self.apikey_service.getApiKeys(
-            project_uuid=project_id,
+            project_uuid=project_uuid,
             disabled=disabled,
         )
         return result.unwrap()
@@ -493,18 +543,19 @@ class AdminService:
     async def createApiKey(
         self,
         admin_info: AdminInfo,
-        project_id: str,
+        project_uuid: str,
         input_data: ApiKeyWriteRequest,
     ) -> ApiKeyCreateResponse:
         """Create an API key in one project without project permission checks."""
         result = await self.apikey_service.createApiKey(
             actor_user_id=admin_info["id"],
-            project_uuid=project_id,
+            project_uuid=project_uuid,
             name=input_data.name,
             description=input_data.description,
             permissions=input_data.permissions,
         )
-        return result.unwrap()
+        api_key = result.unwrap()
+        return api_key
 
     async def getApiKey(
         self,
@@ -531,7 +582,8 @@ class AdminService:
             permissions=input_data.permissions,
             disabled=input_data.disabled,
         )
-        return result.unwrap()
+        api_key = result.unwrap()
+        return api_key
 
     async def deleteApiKey(self, api_key_uuid: str) -> bool:
         """Delete one API key without project permission checks."""

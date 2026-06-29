@@ -187,21 +187,29 @@ class TestProjectServiceState(BaseProjectServiceTest):
         # Assert
         self.assertTrue(res.status == ResultStatus.Err)
 
-    async def test_list_project_users_archived_project_denied(self):
-        """Archived project should reject user listing."""
+    async def test_list_project_users_archived_project_allowed(self):
+        """Archived project should still allow read-only user listing."""
         # Arrange
         service = self._make_service()
         archived_info = SimpleNamespace(archived=True)
         service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", archived_info))
         )
+        service.membership_repo.listMembers = AsyncMock(
+            return_value=[SimpleNamespace(user_id="u1")]
+        )
+        service.kc.getOrgMembers = AsyncMock(
+            return_value=Ok(
+                [{"id": "u1", "username": "one", "email": "1@test"}]
+            )
+        )
 
         # Act
         res = await service.listProjectUsers("proj-1")
 
         # Assert
-        self.assertTrue(res.status == ResultStatus.Err)
-        self.assertIsInstance(res.err(), ProjectArchivedError)
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().total, 1)
 
     async def test_authorize_project_permission_archived_project_denied(self):
         """Archived project should reject permission-based access."""

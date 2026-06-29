@@ -18,6 +18,7 @@ def getAuthService() -> AuthService:
         realm=keycloak_settings.realm_name,
         client_id=auth_settings.client_id,
         keycloak_client=getKeycloakServiceClient(),
+        forbidden_realm_roles={AuthService.ADMIN_REALM_ROLE},
     )
 
 

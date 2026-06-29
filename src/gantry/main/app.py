@@ -152,7 +152,7 @@ apps = [
 
 handler_map = {
     RecoverableError: exception_handlers.recoverableErrorHandler,
-    UnrecoverableError: exception_handlers.recoverableErrorHandler,
+    UnrecoverableError: exception_handlers.unrecoverableErrorHandler,
     RequestValidationError: exception_handlers.fastapi_exception_handler,
     ResponseValidationError: exception_handlers.fastapi_exception_handler,
     ValidationError: exception_handlers.pydantic_exception_handler,

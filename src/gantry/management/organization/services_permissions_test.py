@@ -286,6 +286,51 @@ class TestOrgServicePermissions(BaseOrgServiceTest):
         self.assertTrue(res.status == ResultStatus.Err)
         self.assertIsInstance(res.err(), OwnerRequiredForGrantError)
 
+    async def test_permission_manager_can_keep_existing_rw_while_updating(
+        self,
+    ):
+        """Permission managers may keep existing RW while changing other permissions."""
+        # Arrange
+        service = self._make_service()
+        service._getOrgOwnerId = AsyncMock(return_value=Ok("u-owner"))
+        service._getMemberPermissions = AsyncMock(
+            side_effect=[
+                Ok([OrgPermission.USERS_PERMISSIONS_RW.value]),
+                Ok([OrgPermission.USERS_PERMISSIONS_RW.value]),
+            ]
+        )
+        service._ensureUserInOrg = AsyncMock(return_value=Ok(True))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
+
+        # Act
+        res = await service.updateUserPermissions(
+            org_id="org-1",
+            actor_user_id="u-manager",
+            user_id="u-target",
+            permissions=[
+                OrgPermission.USERS_PERMISSIONS_RW.value,
+                OrgPermission.SETTINGS_READ.value,
+            ],
+        )
+
+        # Assert
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(
+            res.unwrap().permissions,
+            [
+                OrgPermission.USERS_PERMISSIONS_RW.value,
+                OrgPermission.SETTINGS_READ.value,
+            ],
+        )
+        service.kc.setUserAttribute.assert_awaited_once_with(
+            "u-target",
+            "org_permissions",
+            [
+                OrgPermission.USERS_PERMISSIONS_RW.value,
+                OrgPermission.SETTINGS_READ.value,
+            ],
+        )
+
     async def test_update_user_permissions_success(self):
         """Valid permission update should persist via Keycloak attribute."""
         # Arrange

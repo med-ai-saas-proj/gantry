@@ -1,5 +1,6 @@
 """Unit tests for the Keycloak service adapter."""
 
+from pyrusult import Ok, ResultStatus
 from gantry.keycloak.services import (
     KeycloakOrgError,
     KeycloakServiceClient,
@@ -8,8 +9,6 @@ from gantry.keycloak.services import (
 
 import unittest
 from unittest.mock import AsyncMock
-
-from pyrusult import Ok, ResultStatus
 
 
 def _client(admin=None) -> KeycloakServiceClient:
@@ -162,6 +161,32 @@ class TestKeycloakServiceClientAdminLists(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.status, ResultStatus.Err)
         self.assertIsInstance(result.err(), KeycloakOrgConfigError)
+
+    async def test_invite_user_uses_explicit_frontend_client_for_redirects(
+        self,
+    ):
+        response = type("Response", (), {"status_code": 204})()
+        client = _client(type("Admin", (), {})())
+        client._rawRequest = AsyncMock(return_value=Ok(response))
+
+        result = await client.inviteUser(
+            "org-1",
+            "new@example.com",
+            client_id="gantry-frontend",
+            redirect_uri="http://localhost:3000",
+        )
+
+        self.assertEqual(result.status, ResultStatus.Ok)
+        client._rawRequest.assert_awaited_once_with(
+            "post",
+            "/admin/realms/gantry/organizations/org-1/members/invite-user",
+            data={
+                "email": "new@example.com",
+                "clientId": "gantry-frontend",
+                "redirectUri": "http://localhost:3000",
+            },
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
 
 
 if __name__ == "__main__":

@@ -126,6 +126,7 @@ async def update_org_info(
         org_id=org_id,
         actor_user_id=user_info["id"],
         name=input_data.name,
+        alias=input_data.alias,
     )
     return result.unwrap()
 
@@ -333,6 +334,7 @@ async def delete_invitation(
 
 @org_router.post(
     "/{org_id}/invitations/{invitation_id}/resend",
+    response_model=InvitationResponse,
     summary="Resend an invitation",
 )
 async def resend_invitation(
@@ -343,11 +345,10 @@ async def resend_invitation(
     org_id: Annotated[str, Path()],
     invitation_id: Annotated[str, Path()],
     org_service: Annotated[OrgService, Depends(getOrgService)],
-) -> Response:
-    """Resend the invitation email for one invitation."""
+) -> InvitationResponse:
+    """Resend the invitation email and return the new invitation record."""
     result = await org_service.resendInvitation(org_id, invitation_id)
-    result.unwrap()
-    return Response(status_code=200)
+    return result.unwrap()
 
 
 @org_router.get(

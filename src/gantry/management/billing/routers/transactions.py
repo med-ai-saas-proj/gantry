@@ -62,7 +62,7 @@ async def listTransactions(
         ]
 
     res, total = await billing_service.getTransactions(
-        org_id=user_info["org_uuid"],
+        orgId=user_info["org_uuid"],
         project_uuids=project_uuids,
         start_date=start_date,
         end_date=end_date,
@@ -87,7 +87,7 @@ async def getTransactionDetails(
 ) -> ObjectResponse[TransactionInfoResponse]:
     res = (
         await billing_service.getTransactionById(
-            org_id=user_info["org_uuid"], transaction_uid=transaction_uid
+            orgId=user_info["org_uuid"], transaction_uid=transaction_uid
         )
     ).unwrap()
 

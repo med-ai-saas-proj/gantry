@@ -7,6 +7,16 @@ from pydantic_settings import BaseSettings
 
 
 class OrgSettings(BaseSettings):
+    invite_client_id: Annotated[
+        str,
+        Field(
+            description=(
+                "Keycloak public client id used for invitation registration "
+                "links and post-accept redirects."
+            ),
+        ),
+    ] = "gantry-frontend"
+
     invite_redirect_uri: Annotated[
         str,
         Field(

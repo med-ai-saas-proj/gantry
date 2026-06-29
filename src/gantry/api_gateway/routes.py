@@ -51,6 +51,14 @@ def filter_headers(headers: dict[str, str]) -> dict[str, str]:
     }
 
 
+def _to_url_string(address) -> str:
+    """Normalize Pydantic URL objects and plain strings to URL text."""
+    encoded_string = getattr(address, "encoded_string", None)
+    if callable(encoded_string):
+        return encoded_string()
+    return str(address)
+
+
 def _inject_api_key_context_headers(
     api_key_info: ApiKeyInfo,
 ) -> dict[str, str]:
@@ -112,7 +120,7 @@ async def gateway_proxy(
     request_timeout = getApiGatewaySettings().request_timeout.total_seconds()
     client = httpx.AsyncClient(timeout=request_timeout)
 
-    full_url = urljoin(destination.address.encoded_string(), full_path)
+    full_url = urljoin(_to_url_string(destination.address), full_path)
     req = client.build_request(
         method=request.method,
         url=full_url,

@@ -27,6 +27,10 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/admin/organizations/{org_id}/settings", paths)
         self.assertIn("/admin/organizations/{org_id}/users", paths)
         self.assertIn(
+            "post",
+            paths["/admin/organizations/{org_id}/users"],
+        )
+        self.assertIn(
             "/admin/organizations/{org_id}/users/{user_id}/permissions",
             paths,
         )
@@ -324,6 +328,49 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             "user-1",
             "org-1",
             ["organization.settings.read"],
+        )
+
+    async def test_add_admin_organization_user_delegates_to_service(self):
+        admin_service = Mock()
+        payload = routes.AdminAddOrganizationUserRequest(
+            user_id="user-1",
+            permissions=["organization.owner"],
+        )
+        expected = routes.AdminUserProfileResponse(
+            user_id="user-1",
+            username="alice",
+            email="alice@test",
+            first_name=None,
+            last_name=None,
+            enabled=True,
+            email_verified=True,
+            organizations=[
+                routes.AdminUserOrganizationInfoResponse(
+                    org_id="org-1",
+                    name="Org 1",
+                    alias=None,
+                )
+            ],
+            permissions=routes.AdminUserPermissionSummaryResponse(
+                organization_permissions=["organization.owner"],
+                effective_organization_permissions=["organization.owner"],
+                project_permissions=[],
+            ),
+        )
+        admin_service.addOrganizationUser = AsyncMock(return_value=expected)
+
+        result = await routes.add_admin_organization_user(
+            ADMIN_INFO,
+            "org-1",
+            payload,
+            admin_service,
+        )
+
+        self.assertEqual(result, expected)
+        admin_service.addOrganizationUser.assert_awaited_once_with(
+            "org-1",
+            "user-1",
+            ["organization.owner"],
         )
 
     async def test_set_admin_project_user_permissions_delegates_scope(self):

@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from unittest.mock import AsyncMock
+
 import pytest
 
+from pyrusult import Ok
+
+from gantry.management.project.services import ProjectArchivedError
 from tests.helpers.http import assert_paginated
 
 pytestmark = pytest.mark.api
@@ -85,6 +90,8 @@ async def test_organization_invitation_and_delete_contract(api_client, authentic
 
     resend = await api_client.post("/v1/organizations/org-1/invitations/inv-1/resend", headers=AUTH)
     assert resend.status_code == 200
+    assert resend.json()["id"] == "inv-2"
+    assert resend.json()["email"] == "a@example.com"
 
     delete_invite = await api_client.delete("/v1/organizations/org-1/invitations/inv-1", headers=AUTH)
     assert delete_invite.status_code == 200
@@ -193,6 +200,53 @@ async def test_project_lifecycle_settings_members_permissions_and_state_contract
     unarchive = await api_client.post("/v1/projects/11111111-1111-1111-1111-111111111111/unarchive", headers=AUTH)
     assert unarchive.status_code == 200
     assert unarchive.json()["archived"] is False
+
+
+@pytest.mark.asyncio
+async def test_archived_project_read_resources_remain_visible(
+    api_client,
+    authenticated_api,
+) -> None:
+    authenticated_api["project"].isProjectArchived = AsyncMock(
+        return_value=Ok(True)
+    )
+
+    project = await api_client.get(
+        "/v1/projects/11111111-1111-1111-1111-111111111111",
+        headers=AUTH,
+    )
+    settings = await api_client.get(
+        "/v1/projects/11111111-1111-1111-1111-111111111111/settings",
+        headers=AUTH,
+    )
+    users = await api_client.get(
+        "/v1/projects/11111111-1111-1111-1111-111111111111/users",
+        headers=AUTH,
+    )
+    permissions = await api_client.get(
+        "/v1/projects/11111111-1111-1111-1111-111111111111/users/user-2/permissions",
+        headers=AUTH,
+    )
+    update_settings = await api_client.patch(
+        "/v1/projects/11111111-1111-1111-1111-111111111111/settings",
+        headers=AUTH,
+        json={"rate_limit": 300, "spending_limit": 999, "extra": {}},
+    )
+
+    assert project.status_code == 200
+    assert settings.status_code == 200
+    assert users.status_code == 200
+    assert permissions.status_code == 200
+    assert update_settings.status_code == ProjectArchivedError.status
+    assert update_settings.json()["code"] == ProjectArchivedError.code
+    assert any(
+        name == "authorizeProjectPermission"
+        and payload["project_uuid"]
+        == "11111111-1111-1111-1111-111111111111"
+        and payload["user_id"] == "user-1"
+        and payload["allow_archived"] is True
+        for name, payload in authenticated_api["project"].calls
+    )
 
 
 @pytest.mark.asyncio

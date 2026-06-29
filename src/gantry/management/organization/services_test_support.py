@@ -1,15 +1,15 @@
 """Shared test support for organization service unit tests."""
 
 # Standard library
+# Third-party
+from pyrusult import Ok, Err, ResultStatus
+
 import os
 import unittest
 from types import SimpleNamespace
 from datetime import UTC, datetime
 from contextlib import asynccontextmanager
 from unittest.mock import Mock, AsyncMock
-
-# Third-party
-from pyrusult import Ok, Err, ResultStatus
 
 
 # Test environment bootstrap
@@ -19,6 +19,7 @@ os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
 from gantry.management.organization.services import (
     OrgService,
     OrgNotFoundError,
+    MemberNotFoundError,
     InvalidPermissionError,
     OwnerRequiredForGrantError,
     OwnerRemovalNotAllowedError,
@@ -43,6 +44,7 @@ __all__ = [
     "DeletionRequestNotFoundError",
     "Err",
     "InvalidPermissionError",
+    "MemberNotFoundError",
     "Mock",
     "MultipleOrganizationMembershipError",
     "Ok",

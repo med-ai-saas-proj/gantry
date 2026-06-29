@@ -286,7 +286,7 @@ class FakeOrgService(ConfigurableFake):
 
     async def resendInvitation(self, org_id: str, invitation_id: str):
         self.calls.append(("resendInvitation", {"org_id": org_id, "invitation_id": invitation_id}))
-        return Ok(True)
+        return Ok({"id": "inv-2", "email": "a@example.com", "status": "PENDING"})
 
     async def ensureCanReadUserPermissions(self, **kwargs):
         self.calls.append(("ensureCanReadUserPermissions", kwargs))
@@ -698,6 +698,7 @@ def billing_source_payload(detail: bool = False) -> dict[str, Any]:
                 "email": "billing@example.com",
                 "phone": "+10000000000",
                 "name": "Billing User",
+                "default_payment_method": None,
                 "billing_address": {
                     "line1": "1 Main",
                     "line2": "Suite 1",
@@ -1100,6 +1101,10 @@ class FakeGatewayService(ConfigurableFake):
 class FakeAiGatewayService(ConfigurableFake):
     def __init__(self) -> None:
         self.calls: list[tuple[str, Any]] = []
+
+    def getModels(self) -> list[str]:
+        self.calls.append(("getModels", None))
+        return ["gpt-test"]
 
     async def route(self, model, project_id, run_input, model_settings):
         self.calls.append(("route", {"model": model, "project_id": project_id}))

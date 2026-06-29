@@ -40,6 +40,7 @@ from .dtos import (
     AdminUserListResponse,
     AdminUserProfileResponse,
     AdminDashboardSummaryResponse,
+    AdminAddOrganizationUserRequest,
     AdminUserPermissionUpdateRequest,
     AdminUserOrganizationInfoResponse,
     AdminUserPermissionSummaryResponse,
@@ -186,6 +187,27 @@ async def list_admin_organization_users(
     """Canonical admin path for organization-user listings."""
     del user_info
     return await admin_service.listOrganizationUsers(org_id, pagination)
+
+
+@admin_router.post(
+    "/organizations/{org_id}/users",
+    response_model=AdminUserProfileResponse,
+    status_code=201,
+    summary="Add organization user as admin",
+)
+async def add_admin_organization_user(
+    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
+    org_id: Annotated[str, Path()],
+    payload: Annotated[AdminAddOrganizationUserRequest, Body()],
+    admin_service: Annotated[AdminService, Depends(getAdminService)],
+) -> AdminUserProfileResponse:
+    """Add a user to an organization and optionally seed permissions."""
+    del user_info
+    return await admin_service.addOrganizationUser(
+        org_id,
+        payload.user_id,
+        payload.permissions,
+    )
 
 
 @admin_router.put(

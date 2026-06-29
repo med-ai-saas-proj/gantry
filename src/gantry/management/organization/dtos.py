@@ -4,7 +4,7 @@ from gantry.shared.dtos.base import BaseDTO
 
 from typing import Any
 
-from pydantic import Field, EmailStr
+from pydantic import Field, EmailStr, model_validator
 
 
 # Query helpers
@@ -37,6 +37,7 @@ class OrgInfoResponse(BaseDTO):
 
     org_id: str
     name: str
+    alias: str | None = None
     owner_id: str | None = None
 
 
@@ -52,7 +53,15 @@ class CreateOrgRequest(BaseDTO):
 
     name: str = Field(..., min_length=1, max_length=256)
     alias: str | None = Field(None, min_length=1, max_length=256)
-    owner_id: str | None = Field(None, min_length=1, max_length=128)
+    owner_id: str | None = Field(
+        None,
+        min_length=1,
+        max_length=128,
+        description=(
+            "Optional initial owner user ID. Provide this from admin UIs "
+            "when the organization should be usable immediately after create."
+        ),
+    )
 
 
 class DeleteRequestResponse(BaseDTO):
@@ -85,7 +94,14 @@ class DeleteCancelResponse(BaseDTO):
 class UpdateOrgMetadataRequest(BaseDTO):
     """Body for updating basic org metadata."""
 
-    name: str = Field(..., min_length=1, max_length=256)
+    name: str | None = Field(None, min_length=1, max_length=256)
+    alias: str | None = Field(None, min_length=1, max_length=256)
+
+    @model_validator(mode="after")
+    def require_metadata_field(self) -> "UpdateOrgMetadataRequest":
+        if self.name is None and self.alias is None:
+            raise ValueError("Provide at least one organization metadata field")
+        return self
 
 
 # Users
