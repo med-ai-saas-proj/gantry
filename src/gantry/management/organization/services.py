@@ -47,6 +47,7 @@ from datetime import UTC, datetime, timedelta
 
 from structlog.stdlib import BoundLogger
 
+
 _ORG_PERM_ATTR = "org_permissions"
 
 

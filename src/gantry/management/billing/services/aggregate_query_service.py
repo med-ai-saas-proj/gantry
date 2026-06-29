@@ -1,3 +1,4 @@
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db.session import AsyncSessionManager
 from gantry.management.api_key import ApiKeyService, InvalidAPIKey
 from gantry.management.project import Project, ProjectNotFoundError
@@ -9,7 +10,6 @@ from uuid import UUID
 from typing import Any, Sequence
 from datetime import UTC, datetime
 
-from pyrusult import Ok, Err, Result, ResultStatus
 from sqlalchemy import select
 from structlog.stdlib import BoundLogger
 

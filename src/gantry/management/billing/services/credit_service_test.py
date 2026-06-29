@@ -1,3 +1,5 @@
+from pyrusult import ResultStatus
+
 from .credit_service import CreditService
 from ..repositories.credit_repo import CreditRepo
 
@@ -7,8 +9,6 @@ from typing import Any, cast
 from decimal import Decimal
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
-
-from pyrusult import ResultStatus
 
 
 class _AsyncContextManager:

@@ -1,3 +1,4 @@
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.db.session import AsyncSessionManager
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
@@ -38,7 +39,6 @@ from decimal import Decimal
 from datetime import UTC, datetime
 
 from stripe import Invoice, StripeError, StripeClient
-from pyrusult import Ok, Err, Result, ResultStatus
 from structlog.stdlib import BoundLogger
 
 

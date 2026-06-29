@@ -83,7 +83,6 @@ from .permissions import (
 from typing import Any
 
 
-
 class InvalidAdminPermissionError(RecoverableError):
     """Raised when admin payload contains unknown org/project permissions."""
 

@@ -195,7 +195,7 @@ async def create_vector_index(
 ):
     index_name = getIndexName(table_name, rag_store_parameters)
     ops_type = rag_store_parameters["ops_type"]
-    half_precision = rag_store_parameters["half_precision"]
+    half_precision = rag_store_parameters.get("half_precision", False)
     if ops_type == VectorOpsType.cosine:
         ops_type = (
             "halfvec_cosine_ops" if half_precision else "vector_cosine_ops"
@@ -241,6 +241,7 @@ def getTableName(rag_store_parameters: RagParameters) -> str:
     dimension = rag_store_parameters["dimension"]
     index_params = rag_store_parameters["index_params"]
     ops_type = rag_store_parameters["ops_type"]
+    half_precision = rag_store_parameters.get("half_precision", False)
     if index_params["index_type"] == VectorIndexType.hnsw:
         m = index_params["m"] if index_params and index_params.get("m") else 16
         ef_construction = (
@@ -248,14 +249,16 @@ def getTableName(rag_store_parameters: RagParameters) -> str:
             if index_params and index_params.get("ef_construction")
             else 64
         )
-        return f"rag_data_dim{dimension}_{'half' if rag_store_parameters['half_precision'] else 'full'}_hnsw_{ops_type.value}_m{m}_ef{ef_construction}"
+        precision = "half" if half_precision else "full"
+        return f"rag_data_dim{dimension}_{precision}_hnsw_{ops_type.value}_m{m}_ef{ef_construction}"
     elif index_params["index_type"] == VectorIndexType.ivfflat:
         lists = (
             index_params["lists"]
             if index_params and index_params.get("lists")
             else 100
         )
-        return f"rag_data_dim{dimension}_{'half' if rag_store_parameters['half_precision'] else 'full'}_ivfflat_{ops_type.value}_lists{lists}"
+        precision = "half" if half_precision else "full"
+        return f"rag_data_dim{dimension}_{precision}_ivfflat_{ops_type.value}_lists{lists}"
     else:
         raise ValueError(
             f"Unsupported index type: {index_params['index_type']}"
