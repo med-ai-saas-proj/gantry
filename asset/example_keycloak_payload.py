@@ -3,18 +3,18 @@ payload = {
     "iat": 1765598162,
     "auth_time": 1765597006,
     "jti": "onrtrt:10928cb0-4f4e-66ff-0aef-5b67c2a9b5a0",
-    "iss": "http://localhost:8080/realms/dev-realm",
+    "iss": "http://localhost:8080/realms/gantry",
     "aud": "account",
     "sub": "809da58b-19ff-48c9-8037-5553b8b86a90",
     "typ": "Bearer",
-    "azp": "frontend-app",
+    "azp": "gantry-frontend",
     "sid": "64da6118-8f03-85a5-8793-01145bac60a2",
     "acr": "0",
     "allowed-origins": ["http://localhost:3000"],
     "realm_access": {
         "roles": [
             "offline_access",
-            "default-roles-dev-realm",
+            "default-roles-gantry",
             "uma_authorization",
         ]
     },

@@ -4,6 +4,7 @@ This module uses `python-keycloak` for authentication/session handling,
 while organization endpoints are called via raw admin REST paths.
 """
 
+from pyrusult import Ok, Err, Result, ResultStatus
 from gantry.shared.utils.permission_utils import (
     normalize_project_permission_map,
     serialize_project_permission_values,
@@ -14,7 +15,6 @@ from typing import Any
 from urllib.parse import urljoin
 
 from keycloak import KeycloakAdmin, KeycloakOpenIDConnection
-from pyrusult import Ok, Err, Result, ResultStatus
 from keycloak.exceptions import KeycloakError
 
 
@@ -650,13 +650,14 @@ class KeycloakServiceClient:
         self,
         org_id: str,
         email: str,
+        client_id: str | None = None,
         redirect_uri: str | None = None,
         first_name: str | None = None,
         last_name: str | None = None,
     ) -> Result[bool, KeycloakPossibleError | OrgNotFoundError]:
         path = f"{self._adminBase()}/organizations/{org_id}/members/invite-user"
         form: dict[str, str] = {"email": email}
-        form["clientId"] = self.service_client_id
+        form["clientId"] = client_id or self.service_client_id
         if redirect_uri:
             form["redirectUri"] = redirect_uri
         if first_name:

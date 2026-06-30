@@ -843,7 +843,9 @@ class RagService:
         async with self.session_manager.get_session() as session:
             table_name = getTableName(self.setting.rag_store_parameters)
             dimension = self.setting.rag_store_parameters["dimension"]
-            half_precision = self.setting.rag_store_parameters["half_precision"]
+            half_precision = self.setting.rag_store_parameters.get(
+                "half_precision", False
+            )
             await create_embedding_table(
                 session,
                 table_name,

@@ -14,6 +14,7 @@ from .factories import (
 import os
 from typing import Annotated
 
+import structlog.contextvars
 from fastapi import Depends, Security
 from fastapi.security import OAuth2AuthorizationCodeBearer
 
@@ -74,6 +75,13 @@ async def _getUserInfo(
     Returns UserInfo if token is valid, raises UnauthorizedError otherwise.
     """
     user_info = (await auth_service.verifyToken(token)).unwrap()
+    structlog.contextvars.bind_contextvars(
+        actor_user_id=user_info["id"],
+        actor_type="user",
+        actor_org_id=user_info.get("org_uuid"),
+        org_id=user_info.get("org_uuid"),
+        auth_surface="management",
+    )
     return user_info
 
 
@@ -86,6 +94,11 @@ async def _getAdminInfo(
 ) -> AdminInfo:
     """Get authenticated admin user info and require Keycloak realm role `ADMIN`."""
     user_info = admin_auth_service.verifyTokenAdmin(token).unwrap()
+    structlog.contextvars.bind_contextvars(
+        actor_user_id=user_info["id"],
+        actor_type="admin",
+        auth_surface="admin",
+    )
     return user_info
 
 
@@ -111,7 +124,7 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
         )
 
         if auth.credentials == "bypass_token":
-            return UserInfo(
+            user_info = UserInfo(
                 id="test_user",
                 username="test_user",
                 email="test_user@example.com",
@@ -121,6 +134,14 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
                     "00000000-0000-0000-0000-000000000000": ALL_PROJECT_PERMISSIONS
                 },
             )
+            structlog.contextvars.bind_contextvars(
+                actor_user_id=user_info["id"],
+                actor_type="user",
+                actor_org_id=user_info.get("org_uuid"),
+                org_id=user_info.get("org_uuid"),
+                auth_surface="management",
+            )
+            return user_info
         raise UnauthorizedError()
 
     getUserInfo = mock_getUserInfo
@@ -129,11 +150,17 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],
     ) -> AdminInfo:
         if auth.credentials == "bypass_token":
-            return AdminInfo(
+            admin_info = AdminInfo(
                 id="test_admin",
                 username="test_admin",
                 email="test_admin@example.com",
             )
+            structlog.contextvars.bind_contextvars(
+                actor_user_id=admin_info["id"],
+                actor_type="admin",
+                auth_surface="admin",
+            )
+            return admin_info
         raise UnauthorizedError()
 
     getAdminInfo = mock_getAdminUserInfo

@@ -35,8 +35,8 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Err)
         self.assertIsInstance(res.err(), InvalidProjectPermissionError)
 
-    async def test_update_user_permissions_owner_required_for_rw_grant(self):
-        """Only project owner can grant users.permissions.read_write."""
+    async def test_update_user_permissions_rw_manager_can_grant_rw(self):
+        """Project permission managers can grant users.permissions.read_write."""
         # Arrange
         service = self._make_service()
         active_info = SimpleNamespace(archived=False)
@@ -49,6 +49,9 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         service.membership_repo.getMembership = AsyncMock(
             return_value=SimpleNamespace(user_id="target")
         )
+        service._getPermissionsFromAttrs = AsyncMock(return_value=Ok([]))
+        service.kc.getUserAttributes = AsyncMock(return_value=Ok({}))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
 
         # Act
         res = await service.updateUserPermissions(
@@ -59,8 +62,87 @@ class TestProjectServicePermissionUpdates(BaseProjectServiceTest):
         )
 
         # Assert
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(
+            res.unwrap().permissions,
+            ["project.users.permissions.read_write"],
+        )
+
+    async def test_update_user_permissions_owner_required_for_owner_grant(
+        self,
+    ):
+        """Only project owner can grant project.owner."""
+        # Arrange
+        service = self._make_service()
+        active_info = SimpleNamespace(archived=False)
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((10, "org-1", active_info))
+        )
+        service._getMemberPermissions = AsyncMock(
+            return_value=Ok([ProjectPermission.USERS_PERMISSIONS_RW.value])
+        )
+        service.membership_repo.getMembership = AsyncMock(
+            return_value=SimpleNamespace(user_id="target")
+        )
+        service._getPermissionsFromAttrs = AsyncMock(return_value=Ok([]))
+        service.kc.getUserAttributes = AsyncMock(return_value=Ok({}))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
+
+        # Act
+        res = await service.updateUserPermissions(
+            "proj-1",
+            "actor",
+            "target",
+            [ProjectPermission.OWNER.value],
+        )
+
+        # Assert
         self.assertTrue(res.status == ResultStatus.Err)
         self.assertIsInstance(res.err(), OwnerRequiredForGrantError)
+        service.kc.setUserAttribute.assert_not_awaited()
+
+    async def test_update_user_permissions_keeps_existing_rw_without_owner(
+        self,
+    ):
+        """RW managers may keep their existing RW permission while editing."""
+        # Arrange
+        service = self._make_service()
+        active_info = SimpleNamespace(archived=False)
+        service._getProjectOrErr = AsyncMock(
+            return_value=Ok((10, "org-1", active_info))
+        )
+        service._getMemberPermissions = AsyncMock(
+            return_value=Ok([ProjectPermission.USERS_PERMISSIONS_RW.value])
+        )
+        service.membership_repo.getMembership = AsyncMock(
+            return_value=SimpleNamespace(user_id="actor")
+        )
+        service._getPermissionsFromAttrs = AsyncMock(
+            return_value=Ok([ProjectPermission.USERS_PERMISSIONS_RW.value])
+        )
+        service.kc.getUserAttributes = AsyncMock(return_value=Ok({}))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
+
+        # Act
+        res = await service.updateUserPermissions(
+            "proj-1",
+            "actor",
+            "actor",
+            [
+                ProjectPermission.USERS_PERMISSIONS_RW.value,
+                ProjectPermission.SETTINGS_READ.value,
+            ],
+        )
+
+        # Assert
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(
+            res.unwrap().permissions,
+            [
+                ProjectPermission.USERS_PERMISSIONS_RW.value,
+                ProjectPermission.SETTINGS_READ.value,
+            ],
+        )
 
     async def test_update_user_permissions_target_not_in_project(self):
         """Updating permissions should fail if target is not a project member."""

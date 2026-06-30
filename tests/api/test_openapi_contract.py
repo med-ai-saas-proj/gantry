@@ -6,11 +6,17 @@ pytestmark = pytest.mark.api
 
 
 @pytest.mark.asyncio
-async def test_openapi_json_status_and_schema(api_client) -> None:
-    response = await api_client.get("/docs/openapi.json")
+async def test_openapi_json_status_and_schema(
+    api_client,
+    management_app,
+) -> None:
+    if management_app.openapi_url:
+        response = await api_client.get(management_app.openapi_url)
+        assert response.status_code == 200
+        payload = response.json()
+    else:
+        payload = management_app.openapi()
 
-    assert response.status_code == 200
-    payload = response.json()
     assert payload["openapi"].startswith("3.")
     assert "paths" in payload
     assert "components" in payload

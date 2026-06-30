@@ -349,21 +349,24 @@ class TestProjectServiceMembership(BaseProjectServiceTest):
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().permissions, ["project.settings.read"])
 
-    async def test_get_user_permissions_archived_project_denied(self):
-        """Archived project should reject permission reads."""
+    async def test_get_user_permissions_archived_project_allowed(self):
+        """Archived project should still allow read-only permission reads."""
         # Arrange
         service = self._make_service()
         archived_info = SimpleNamespace(archived=True)
         service._getProjectOrErr = AsyncMock(
             return_value=Ok((10, "org-1", archived_info))
         )
+        service._getMemberPermissions = AsyncMock(
+            return_value=Ok(["project.settings.read"])
+        )
 
         # Act
         res = await service.getUserPermissions("proj-1", "u2")
 
         # Assert
-        self.assertTrue(res.status == ResultStatus.Err)
-        self.assertIsInstance(res.err(), ProjectArchivedError)
+        self.assertTrue(res.status == ResultStatus.Ok)
+        self.assertEqual(res.unwrap().permissions, ["project.settings.read"])
 
     async def test_get_user_permissions_propagates_member_permission_error(
         self,

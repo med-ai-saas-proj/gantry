@@ -1,6 +1,6 @@
 #:schema config-schema.json
-stage = "PROD"
-allowed_origins = ["http://localhost:3000"]
+stage = "DEV"
+allowed_origins = ["http://localhost:3000", "http://localhost:3002"]
 port = 8000
 internal_port = 9000
 log_level = "DEBUG"
@@ -66,6 +66,7 @@ s3_presigned_url_expiry_seconds = 3600
 redis_cache_expiry_seconds = 3600
 
 [organization]
+invite_client_id = "gantry-frontend"
 invite_redirect_uri = "http://localhost:3000"
 deletion_cancel_window_days = 30
 deletion_worker_interval_seconds = 60

@@ -527,6 +527,12 @@
     "OrgSettings": {
       "additionalProperties": false,
       "properties": {
+        "invite_client_id": {
+          "default": "gantry-frontend",
+          "description": "Keycloak public client id used for invitation registration links and post-accept redirects.",
+          "title": "Invite Client Id",
+          "type": "string"
+        },
         "invite_redirect_uri": {
           "default": "http://localhost:3000",
           "description": "Redirect URI used for invitation registration links.",

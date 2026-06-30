@@ -19,14 +19,14 @@ from testcontainers.redis import RedisContainer
 from tests.settings import REPO_ROOT, REALM
 
 
-DEFAULT_TIMESCALE_IMAGE = "gantry-integration-db:latest"
+DEFAULT_TIMESCALE_IMAGE = "docker.io/thng292/timescaledb-with-pg_textsearch"
 TIMESCALE_IMAGE = os.getenv(
     "GANTRY_INTEGRATION_TIMESCALE_IMAGE",
     DEFAULT_TIMESCALE_IMAGE,
 )
 BUILD_DEFAULT_TIMESCALE_IMAGE = os.getenv(
     "GANTRY_INTEGRATION_BUILD_TIMESCALE_IMAGE",
-    "1",
+    "0",
 ).lower() in {"1", "true", "yes"}
 REDIS_IMAGE = os.getenv("GANTRY_INTEGRATION_REDIS_IMAGE", "redis:8-alpine")
 KEYCLOAK_IMAGE = os.getenv(
@@ -103,7 +103,7 @@ def _require_docker() -> None:
 
 def _ensure_timescale_image() -> None:
     """Build the test DB image that contains Gantry-required extensions."""
-    if TIMESCALE_IMAGE != DEFAULT_TIMESCALE_IMAGE or not BUILD_DEFAULT_TIMESCALE_IMAGE:
+    if not BUILD_DEFAULT_TIMESCALE_IMAGE:
         return
 
     import docker

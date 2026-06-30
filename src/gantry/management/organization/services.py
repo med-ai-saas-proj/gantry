@@ -484,6 +484,7 @@ class OrgService:
                     OrgInfoResponse(
                         org_id=str(org.get("id") or ""),
                         name=str(org.get("name") or org.get("alias") or ""),
+                        alias=org.get("alias"),
                         owner_id=None,
                     )
                     for org in orgs
@@ -520,6 +521,7 @@ class OrgService:
                     OrgInfoResponse(
                         org_id=str(org.get("id") or ""),
                         name=str(org.get("name") or org.get("alias") or ""),
+                        alias=org.get("alias"),
                         owner_id=None,
                     )
                     for org in page
@@ -537,9 +539,19 @@ class OrgService:
         KeycloakOrgError
         | MemberNotFoundError
         | OrgNotFoundError
+        | UserAlreadyInAnotherOrganizationError
         | KeycloakPossibleError,
     ]:
         """Create an organization from the admin dashboard."""
+        if owner_id:
+            orgs_res = await self.kc.getMemberOrganizations(owner_id)
+            if orgs_res.status == ResultStatus.Err:
+                return orgs_res.into()
+
+            org_ids = _extract_org_ids(orgs_res.unwrap())
+            if org_ids:
+                return Err(UserAlreadyInAnotherOrganizationError())
+
         payload: CreateOrgPayload = {"name": name}
         if alias:
             payload["alias"] = alias
@@ -565,6 +577,7 @@ class OrgService:
             OrgInfoResponse(
                 org_id=org_id,
                 name=name,
+                alias=alias,
                 owner_id=owner_id,
             )
         )
@@ -573,7 +586,8 @@ class OrgService:
         self,
         org_id: str,
         actor_user_id: str,
-        name: str,
+        name: str | None,
+        alias: str | None = None,
     ) -> Result[
         OrgInfoResponse,
         OrgNotFoundError
@@ -583,7 +597,7 @@ class OrgService:
         | MultipleOwnersError
         | OwnerPermissionRequiredError,
     ]:
-        """Rename an organization after owner checks pass."""
+        """Update organization metadata after owner checks pass."""
         owner_id_res = await self._getOrgOwnerId(org_id)
         if owner_id_res.status == ResultStatus.Err:
             return owner_id_res.into()
@@ -596,16 +610,22 @@ class OrgService:
             return current_org_res.into()
         current_org = current_org_res.unwrap()
         payload = dict(current_org)
-        payload["name"] = name
+        if name is not None:
+            payload["name"] = name
+        if alias is not None:
+            payload["alias"] = alias
 
         update_res = await self.kc.updateOrg(org_id, payload)
         if update_res.status == ResultStatus.Err:
             return update_res.into()
 
+        updated_name = str(payload.get("name") or payload.get("alias") or "")
+        updated_alias = payload.get("alias")
         return Ok(
             OrgInfoResponse(
                 org_id=org_id,
-                name=name,
+                name=updated_name,
+                alias=str(updated_alias) if updated_alias is not None else None,
                 owner_id=owner_id,
             )
         )
@@ -709,7 +729,12 @@ class OrgService:
         remove_res = await self.kc.removeMember(org_id, user_id)
         if remove_res.status == ResultStatus.Err:
             return remove_res
-        return await self.kc.deleteUser(user_id)
+        delete_res = await self.kc.deleteUser(user_id)
+        if delete_res.status == ResultStatus.Ok:
+            return delete_res
+        if isinstance(delete_res.err(), MemberNotFoundError):
+            return Ok(True)
+        return delete_res
 
     # invitations
     async def getInvitations(
@@ -726,11 +751,10 @@ class OrgService:
 
         results = []
         for inv in raw_list:
-            email = inv.get("email", "")
             results.append(
                 InvitationResponse(
                     id=str(inv.get("id", "")),
-                    email=email,
+                    email=inv.get("email", ""),
                     status=inv.get("status"),
                 )
             )
@@ -790,7 +814,7 @@ class OrgService:
         invite_res = await self.kc.inviteUser(
             org_id,
             email,
-            # client_id=settings.keycloak_service_client_id,
+            client_id=settings.invite_client_id,
             redirect_uri=settings.invite_redirect_uri,
         )
         if invite_res.status == ResultStatus.Err:
@@ -803,16 +827,54 @@ class OrgService:
         bool, InvitationNotFoundError | KeycloakOrgError | KeycloakPossibleError
     ]:
         """Delete an existing invitation."""
-        delete_res = await self.kc.deleteInvitation(org_id, invitation_id)
-        return delete_res
+        return await self.kc.deleteInvitation(org_id, invitation_id)
 
     async def resendInvitation(
         self, org_id: str, invitation_id: str
     ) -> Result[
-        bool, InvitationNotFoundError | KeycloakOrgError | KeycloakPossibleError
+        InvitationResponse,
+        InvitationNotFoundError
+        | OrgNotFoundError
+        | KeycloakOrgError
+        | KeycloakPossibleError,
     ]:
-        """Resend an existing invitation via Keycloak."""
-        return await self.kc.resendInvitation(org_id, invitation_id)
+        """Resend an invitation and return the replacement Keycloak record."""
+        old_inv_res = await self.kc.getInvitation(org_id, invitation_id)
+        if old_inv_res.status == ResultStatus.Err:
+            return old_inv_res.into()
+
+        old_inv = cast(KeycloakInvitationPayload, old_inv_res.unwrap())
+        email = str(old_inv.get("email", "")).strip()
+        if not email:
+            return Err(InvitationNotFoundError())
+
+        resend_res = await self.kc.resendInvitation(org_id, invitation_id)
+        if resend_res.status == ResultStatus.Err:
+            return resend_res.into()
+
+        new_inv_res = await self.kc.getInvitations(org_id, email=email)
+        if new_inv_res.status == ResultStatus.Err:
+            return new_inv_res.into()
+
+        raw_list = cast(list[KeycloakInvitationPayload], new_inv_res.unwrap())
+        new_inv = next(
+            (
+                inv
+                for inv in raw_list
+                if str(inv.get("email", "")).casefold() == email.casefold()
+            ),
+            None,
+        )
+        if new_inv is None:
+            return Err(InvitationNotFoundError())
+
+        return Ok(
+            InvitationResponse(
+                id=str(new_inv.get("id", "")),
+                email=new_inv.get("email", ""),
+                status=new_inv.get("status"),
+            )
+        )
 
     # user permissions
     async def ensureCanReadUserPermissions(
@@ -908,9 +970,19 @@ class OrgService:
             return actor_perms_res.into()
         actor_perms = actor_perms_res.unwrap()
 
-        if (
+        target_perms = actor_perms
+        if user_id != actor_user_id:
+            target_perms_res = await self._getMemberPermissions(org_id, user_id)
+            if target_perms_res.status == ResultStatus.Err:
+                return target_perms_res.into()
+            target_perms = target_perms_res.unwrap()
+
+        is_granting_permission_rw = (
             OrgPermission.USERS_PERMISSIONS_RW.value in permissions
-            and not has_permission(actor_perms, OrgPermission.OWNER)
+            and OrgPermission.USERS_PERMISSIONS_RW.value not in target_perms
+        )
+        if is_granting_permission_rw and not has_permission(
+            actor_perms, OrgPermission.OWNER
         ):
             return Err(OwnerRequiredForGrantError())
 

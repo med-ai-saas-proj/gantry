@@ -57,6 +57,13 @@ class AdminUserListResponse(BaseDTO):
     results: list[AdminUserListItemResponse]
 
 
+class AdminAddOrganizationUserRequest(BaseDTO):
+    """Admin request to add a user to an organization and seed permissions."""
+
+    user_id: str = Field(..., min_length=1, max_length=128)
+    permissions: list[str] = Field(default_factory=list)
+
+
 class AdminUserProjectPermissionResponse(BaseDTO):
     """Project-scoped permissions grouped by project UUID."""
 

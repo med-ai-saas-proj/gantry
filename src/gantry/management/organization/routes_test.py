@@ -111,7 +111,7 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
         service.createInvitation = AsyncMock(return_value=Ok(True))
         service.getInvitation = AsyncMock(return_value=Ok(invitation))
         service.deleteInvitation = AsyncMock(return_value=Ok(True))
-        service.resendInvitation = AsyncMock(return_value=Ok(True))
+        service.resendInvitation = AsyncMock(return_value=Ok(invitation))
         service.ensureCanReadUserPermissions = AsyncMock(return_value=Ok(True))
         service.getUserPermissions = AsyncMock(return_value=Ok(perms))
         service.updateUserPermissions = AsyncMock(return_value=Ok(perms))
@@ -154,7 +154,7 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
         resend_response = await routes.resend_invitation(
             user_info, "org-1", "inv-1", service
         )
-        self.assertEqual(resend_response.status_code, 200)
+        self.assertEqual(resend_response, invitation)
         self.assertEqual(
             await routes.get_user_permissions(
                 user_info, "org-1", "u2", service

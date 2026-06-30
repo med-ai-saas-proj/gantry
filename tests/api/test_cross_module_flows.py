@@ -641,6 +641,8 @@ async def test_user_org_admin_workbench_flow_covers_invites_delete_and_billing(
     assert invitation_detail.status_code == 200
     assert invitation_detail.json()["id"] == "inv-1"
     assert resend.status_code == 200
+    assert resend.json()["id"] == "inv-2"
+    assert resend.json()["email"] == "a@example.com"
     assert delete_invitation.status_code == 200
     assert delete_request.status_code == 202
     assert cancel_delete.status_code == 200
@@ -670,7 +672,12 @@ async def test_user_org_admin_workbench_flow_covers_invites_delete_and_billing(
         ("getOrgInfo", "org-1"),
         (
             "updateOrgInfo",
-            {"org_id": "org-1", "actor_user_id": "user-1", "name": "Org 1 renamed"},
+            {
+                "org_id": "org-1",
+                "actor_user_id": "user-1",
+                "name": "Org 1 renamed",
+                "alias": None,
+            },
         ),
         ("getUsers", {"org_id": "org-1", "offset": 0, "limit": 10, "q": "alice"}),
         ("getInvitations", "org-1"),

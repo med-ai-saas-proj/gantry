@@ -64,7 +64,12 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
 
         # Assert
         self.assertTrue(res.status == ResultStatus.Ok)
-        service.kc.inviteUser.assert_awaited_once()
+        service.kc.inviteUser.assert_awaited_once_with(
+            "org-1",
+            "new@example.com",
+            client_id="gantry-frontend",
+            redirect_uri="http://localhost:3000",
+        )
 
     async def test_create_invitation_existing_user_without_orgs_is_allowed(
         self,
@@ -106,6 +111,20 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         self.assertTrue(res.status == ResultStatus.Ok)
         self.assertEqual(res.unwrap().results[0].id, "inv-1")
 
+        service.kc.getInvitations = AsyncMock(
+            return_value=Ok(
+                [
+                    {
+                        "id": "inv-2",
+                        "email": "a@test",
+                        "status": "pending",
+                    }
+                ]
+            )
+        )
+        second_res = await service.getInvitations("org-1")
+        self.assertEqual(second_res.unwrap().results[0].id, "inv-2")
+
     async def test_get_invitation_maps_single_invitation(self):
         """Single invitation lookup should map Keycloak payload to DTO."""
         # Arrange
@@ -128,11 +147,31 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         self.assertEqual(res.unwrap().email, "a@test")
 
     async def test_delete_and_resend_invitation_delegate_to_keycloak(self):
-        """Delete/resend invitation flows should delegate and return success."""
+        """Resend should return only the new Keycloak invitation record."""
         # Arrange
         service = self._make_service()
         service.kc.deleteInvitation = AsyncMock(return_value=Ok(True))
+        service.kc.getInvitation = AsyncMock(
+            return_value=Ok(
+                {
+                    "id": "inv-1",
+                    "email": "a@test",
+                    "status": "pending",
+                }
+            )
+        )
         service.kc.resendInvitation = AsyncMock(return_value=Ok(True))
+        service.kc.getInvitations = AsyncMock(
+            return_value=Ok(
+                [
+                    {
+                        "id": "inv-2",
+                        "email": "a@test",
+                        "status": "pending",
+                    }
+                ]
+            )
+        )
 
         # Act
         delete_res = await service.deleteInvitation("org-1", "inv-1")
@@ -141,6 +180,14 @@ class TestOrgServiceInvitations(BaseOrgServiceTest):
         # Assert
         self.assertTrue(delete_res.status == ResultStatus.Ok)
         self.assertTrue(resend_res.status == ResultStatus.Ok)
+        self.assertEqual(resend_res.unwrap().id, "inv-2")
+        self.assertEqual(resend_res.unwrap().email, "a@test")
+        service.kc.deleteInvitation.assert_awaited_once_with("org-1", "inv-1")
+        service.kc.getInvitation.assert_awaited_once_with("org-1", "inv-1")
+        service.kc.resendInvitation.assert_awaited_once_with("org-1", "inv-1")
+        service.kc.getInvitations.assert_awaited_once_with(
+            "org-1", email="a@test"
+        )
 
     async def test_get_org_owner_id_requires_exactly_one_owner(self):
         """Owner lookup should reject zero-owner and multi-owner states."""

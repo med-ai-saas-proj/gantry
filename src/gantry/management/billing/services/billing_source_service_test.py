@@ -1,3 +1,5 @@
+from pyrusult import Ok, ResultStatus
+
 from ..models import BillingSourceProvider
 from .billing_source_service import BillingSourceService
 from ..repositories.billing_source_repo import BillingSourceRepo
@@ -7,8 +9,6 @@ from uuid import UUID
 from types import SimpleNamespace
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
-
-from pyrusult import Ok, ResultStatus
 
 
 class _AsyncContextManager:

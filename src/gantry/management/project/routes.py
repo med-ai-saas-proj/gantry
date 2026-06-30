@@ -125,7 +125,12 @@ async def update_project(
 async def get_project_settings(
     user_info: Annotated[
         UserInfo,
-        Depends(requiredProjectPermission(ProjectPermission.SETTINGS_READ)),
+        Depends(
+            requiredProjectPermission(
+                ProjectPermission.SETTINGS_READ,
+                allow_archived=True,
+            )
+        ),
     ],
     project_uuid: Annotated[str, Path()],
     project_service: Annotated[ProjectService, Depends(getProjectService)],
@@ -167,7 +172,12 @@ async def update_project_settings(
 async def get_project_users(
     user_info: Annotated[
         UserInfo,
-        Depends(requiredProjectPermission(ProjectPermission.USERS_GET_ALL)),
+        Depends(
+            requiredProjectPermission(
+                ProjectPermission.USERS_GET_ALL,
+                allow_archived=True,
+            )
+        ),
     ],
     project_uuid: Annotated[str, Path()],
     pagination: Annotated[PaginationQuery, Depends()],
@@ -236,6 +246,7 @@ async def get_project_user_permissions(
             project_uuid=project_uuid,
             user_id=user_info["id"],
             required=ProjectPermission.USERS_PERMISSIONS_RW,
+            allow_archived=True,
         )
         authz_res.unwrap()
 

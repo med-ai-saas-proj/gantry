@@ -1,3 +1,5 @@
+from pyrusult import Ok, ResultStatus
+
 from ..type import AggregatePeriod
 from ..repositories.transaction_repo import TransactionRepository
 from ..services.aggregate_query_service import BillingAggregateQueryService
@@ -7,8 +9,6 @@ from uuid import uuid4
 from types import SimpleNamespace
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
-
-from pyrusult import Ok, ResultStatus
 
 
 class _AsyncContextManager:

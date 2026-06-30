@@ -1,5 +1,6 @@
 """Repositories for Organization Postgres models."""
 
+from pyrusult import ResultStatus
 from gantry.db import Repository, CacheRepository
 
 from .models import (
@@ -9,7 +10,6 @@ from .models import (
 
 from datetime import datetime
 
-from pyrusult import ResultStatus
 from sqlalchemy import func, delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert as pg_insert
