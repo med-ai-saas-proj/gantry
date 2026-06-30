@@ -40,6 +40,7 @@ def test_filter_headers_removes_hop_by_hop_headers_case_insensitively() -> None:
 
     assert filtered == {"X-Keep": "yes"}
 
+
 def test_inject_api_key_context_headers_uses_public_header_names() -> None:
     headers = _inject_api_key_context_headers(_api_key_info_payload())
 

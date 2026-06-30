@@ -191,7 +191,7 @@ class AuthService:
                 options={
                     "verify_exp": True,
                     # "verify_aud": True,
-                    "verify_iss": True,
+                    "verify_iss": False,
                     "verify_aud": False,
                 },
             )

@@ -50,6 +50,7 @@ def filter_headers(headers: dict[str, str]) -> dict[str, str]:
         k: v for k, v in headers.items() if k.lower() not in HOP_BY_HOP_HEADERS
     }
 
+
 def _inject_api_key_context_headers(
     api_key_info: ApiKeyInfo,
 ) -> dict[str, str]:
