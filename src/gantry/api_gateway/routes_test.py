@@ -3,7 +3,6 @@ from __future__ import annotations
 from gantry.api_gateway.routes import (
     filter_headers,
     _inject_api_key_context_headers,
-    _to_url_string,
 )
 
 import json
@@ -40,16 +39,6 @@ def test_filter_headers_removes_hop_by_hop_headers_case_insensitively() -> None:
     )
 
     assert filtered == {"X-Keep": "yes"}
-
-
-def test_to_url_string_accepts_plain_string_and_pydantic_url() -> None:
-    assert _to_url_string("https://upstream.example/base/") == (
-        "https://upstream.example/base/"
-    )
-    assert _to_url_string(AnyUrl("https://upstream.example/base/")) == (
-        "https://upstream.example/base/"
-    )
-
 
 def test_inject_api_key_context_headers_uses_public_header_names() -> None:
     headers = _inject_api_key_context_headers(_api_key_info_payload())
