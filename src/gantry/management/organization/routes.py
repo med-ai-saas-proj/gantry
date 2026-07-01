@@ -1,6 +1,6 @@
 """API routes for the Organization module."""
 
-from gantry.management.auth import getUserInfo
+from gantry.management.auth import getUserInfo, getUserInfoWithoutOrg
 from gantry.management.auth.entities import UserInfo
 
 from .dtos import (
@@ -8,8 +8,10 @@ from .dtos import (
     PaginatedQuery,
     OrgInfoResponse,
     OrgListResponse,
+    CreateOrgRequest,
     InviteUserRequest,
     InvitationResponse,
+    CreateOwnOrgRequest,
     OrgSettingsResponse,
     OrgUserListResponse,
     DeleteCancelResponse,
@@ -85,6 +87,25 @@ async def list_user_orgs(
         limit=pagination.limit,
         offset=pagination.offset,
         q=pagination.q,
+    )
+    return result.unwrap()
+
+
+@org_router.post(
+    "",
+    response_model=OrgInfoResponse,
+    summary="Create organization",
+)
+async def create_org(
+    user_info: Annotated[UserInfo, Depends(getUserInfoWithoutOrg)],
+    input_data: Annotated[CreateOwnOrgRequest, Body()],
+    org_service: Annotated[OrgService, Depends(getOrgService)],
+) -> OrgInfoResponse:
+    """Create an organization for a user who is not in any organization."""
+    result = await org_service.createOrgForUser(
+        user_id=user_info["id"],
+        name=input_data.name,
+        alias=input_data.alias,
     )
     return result.unwrap()
 

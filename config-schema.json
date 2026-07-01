@@ -296,12 +296,60 @@
       "additionalProperties": false,
       "properties": {
         "server_url": {
-          "description": "Keycloak server base URL.",
+          "description": "Keycloak base URL reachable by the backend. This is also used as the fallback public URL when public_server_url is not configured.",
           "format": "uri",
           "maxLength": 2083,
           "minLength": 1,
           "title": "Server Url",
           "type": "string"
+        },
+        "public_server_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Public Keycloak base URL exposed to browsers and used by OpenAPI OAuth flows.",
+          "title": "Public Server Url"
+        },
+        "issuer_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Expected JWT issuer URL. Configure this when Keycloak tokens use a public hostname that differs from server_url.",
+          "title": "Issuer Url"
+        },
+        "jwks_url": {
+          "anyOf": [
+            {
+              "format": "uri",
+              "maxLength": 2083,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JWKS URL used by the backend to fetch signing keys. Configure this when issuer_url is public but keys should be fetched over the cluster/internal network.",
+          "title": "Jwks Url"
         },
         "realm_name": {
           "description": "Keycloak realm name.",

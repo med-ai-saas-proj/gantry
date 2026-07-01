@@ -278,6 +278,31 @@ class TestAuthService(unittest.IsolatedAsyncioTestCase):
             "http://localhost:8080/realms/dev/protocol/openid-connect/certs",
         )
 
+    def test_get_issuer_and_jwks_can_be_configured_separately(self):
+        service = AuthService(
+            server_url="http://gantry-keycloak:8080",
+            realm="gantry",
+            client_id="gantry-admin",
+            keycloak_client=self.keycloak_client,
+            issuer_url="https://keycloak.benhvien-hcmus.uk/realms/gantry",
+            jwks_url=(
+                "http://gantry-keycloak:8080/realms/gantry/"
+                "protocol/openid-connect/certs"
+            ),
+        )
+
+        self.assertEqual(
+            service._getIssuer(),
+            "https://keycloak.benhvien-hcmus.uk/realms/gantry",
+        )
+        self.assertEqual(
+            service._getJwksUrl(),
+            (
+                "http://gantry-keycloak:8080/realms/gantry/"
+                "protocol/openid-connect/certs"
+            ),
+        )
+
     def test_get_openid_metadata_falls_back_when_well_known_fails(self):
         def raise_error():
             raise RuntimeError("boom")

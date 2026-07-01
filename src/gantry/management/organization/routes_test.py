@@ -3,6 +3,7 @@ from gantry.management.organization import routes
 from gantry.management.organization.dtos import (
     PaginatedQuery,
     InviteUserRequest,
+    CreateOwnOrgRequest,
     UpdateSettingsRequest,
     UserPermissionsRequest,
     UpdateOrgMetadataRequest,
@@ -34,6 +35,33 @@ class TestOrganizationRoutes(unittest.IsolatedAsyncioTestCase):
             limit=10,
             offset=5,
             q="clinic",
+        )
+
+    async def test_create_organization_route_delegates_current_user_as_owner(
+        self,
+    ):
+        service = Mock()
+        org = SimpleNamespace(
+            org_id="org-1",
+            name="Org 1",
+            alias="org-1",
+            owner_id="u1",
+        )
+        service.createOrgForUser = AsyncMock(return_value=Ok(org))
+
+        user_info = {"id": "u1", "roles": []}
+        self.assertEqual(
+            await routes.create_org(
+                user_info,
+                CreateOwnOrgRequest(name="Org 1", alias="org-1"),
+                service,
+            ),
+            org,
+        )
+        service.createOrgForUser.assert_awaited_once_with(
+            user_id="u1",
+            name="Org 1",
+            alias="org-1",
         )
 
     async def test_metadata_and_settings_routes(self):

@@ -6,7 +6,11 @@ from gantry.api_gateway.factories import getApiGatewayService
 from gantry.management.admin.factories import getAdminService
 from gantry.management.api_key.dependencies import getApiKeyInfo
 from gantry.management.api_key.factories import getApiKeyService
-from gantry.management.auth.dependencies import getAdminInfo, getUserInfo
+from gantry.management.auth.dependencies import (
+    getAdminInfo,
+    getUserInfo,
+    getUserInfoWithoutOrg,
+)
 from gantry.management.billing.factories import (
     getBillingAggregateQueryService,
     getBillingSourceService,
@@ -148,6 +152,7 @@ def authenticated_api(
     mocker,
 ):
     override_dependencies[getUserInfo] = lambda: fake_user_info
+    override_dependencies[getUserInfoWithoutOrg] = lambda: fake_user_info
     override_dependencies[getAdminInfo] = lambda: fake_admin_info
     override_dependencies[getProjectService] = lambda: fake_project_service
     override_dependencies[getApiKeyService] = lambda: fake_api_key_service

@@ -30,6 +30,18 @@ async def test_organization_metadata_settings_users_and_permissions_contract(
         {"user_id": "user-1", "limit": 10, "offset": 5, "q": "Org"},
     )
 
+    created = await api_client.post(
+        "/v1/organizations",
+        headers=AUTH,
+        json={"name": "New Org", "alias": "new-org"},
+    )
+    assert created.status_code == 200
+    assert created.json()["owner_id"] == "user-1"
+    assert authenticated_api["org"].calls[-1] == (
+        "createOrgForUser",
+        {"user_id": "user-1", "name": "New Org", "alias": "new-org"},
+    )
+
     info = await api_client.get("/v1/organizations/org-1", headers=AUTH)
     assert info.status_code == 200
     assert info.json()["org_id"] == "org-1"
