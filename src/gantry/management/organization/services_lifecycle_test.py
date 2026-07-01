@@ -69,6 +69,32 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         self.assertIsInstance(res.err(), UserAlreadyInAnotherOrganizationError)
         service.kc.createOrg.assert_not_awaited()
 
+    async def test_create_org_for_user_seeds_current_user_as_owner(self):
+        """Self-service org creation should make the creator the owner."""
+        service = self._make_service()
+        service.kc.getMemberOrganizations = AsyncMock(return_value=Ok([]))
+        service.kc.createOrg = AsyncMock(return_value=Ok("org-1"))
+        service.kc.addMember = AsyncMock(return_value=Ok(True))
+        service.kc.setUserAttribute = AsyncMock(return_value=Ok(True))
+
+        res = await service.createOrgForUser(
+            user_id="user-1",
+            name="Org 1",
+            alias="org-1",
+        )
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        payload = res.unwrap()
+        self.assertEqual(payload.org_id, "org-1")
+        self.assertEqual(payload.owner_id, "user-1")
+        service.kc.getMemberOrganizations.assert_awaited_once_with("user-1")
+        service.kc.addMember.assert_awaited_once_with("org-1", "user-1")
+        service.kc.setUserAttribute.assert_awaited_once_with(
+            "user-1",
+            "org_permissions",
+            [OrgPermission.OWNER.value],
+        )
+
     async def test_remove_owner_not_allowed(self):
         """Organization owner removal should be blocked."""
         # Arrange

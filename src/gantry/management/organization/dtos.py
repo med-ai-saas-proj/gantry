@@ -64,6 +64,13 @@ class CreateOrgRequest(BaseDTO):
     )
 
 
+class CreateOwnOrgRequest(BaseDTO):
+    """Body for creating the current user's first organization."""
+
+    name: str = Field(..., min_length=1, max_length=256)
+    alias: str | None = Field(None, min_length=1, max_length=256)
+
+
 class DeleteRequestResponse(BaseDTO):
     """Org deletion request acknowledgement."""
 

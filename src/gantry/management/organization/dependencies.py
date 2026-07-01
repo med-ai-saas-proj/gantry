@@ -19,7 +19,9 @@ from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
 keycloak_settings = getKeycloakSettings()
-server_url_str = keycloak_settings.server_url.encoded_string()
+server_url_str = (
+    keycloak_settings.public_server_url or keycloak_settings.server_url
+).encoded_string()
 realm_name = keycloak_settings.realm_name
 org_settings = getOrgSettings()
 

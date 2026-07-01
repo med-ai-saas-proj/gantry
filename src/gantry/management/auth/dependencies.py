@@ -9,6 +9,7 @@ from .factories import (
     AuthService,
     getAuthService,
     getAdminAuthService,
+    getAuthServiceWithoutOrg,
 )
 
 import os
@@ -20,7 +21,9 @@ from fastapi.security import OAuth2AuthorizationCodeBearer
 
 
 keycloak_settings = getKeycloakSettings()
-server_url_str = keycloak_settings.server_url.encoded_string()
+server_url_str = (
+    keycloak_settings.public_server_url or keycloak_settings.server_url
+).encoded_string()
 realm_name = keycloak_settings.realm_name
 
 oauth_2_scheme = OAuth2AuthorizationCodeBearer(
@@ -88,6 +91,29 @@ async def _getUserInfo(
 getUserInfo = _getUserInfo
 
 
+async def _getUserInfoWithoutOrg(
+    token: Annotated[str, Security(oauth_2_scheme)],
+    auth_service: Annotated[AuthService, Depends(getAuthServiceWithoutOrg)],
+) -> UserInfo:
+    """Get authenticated user info without requiring org membership.
+
+    Intended for onboarding endpoints that are reachable before the user has
+    joined or created an organization.
+    """
+    user_info = (await auth_service.verifyToken(token)).unwrap()
+    structlog.contextvars.bind_contextvars(
+        actor_user_id=user_info["id"],
+        actor_type="user",
+        actor_org_id=user_info.get("org_uuid"),
+        org_id=user_info.get("org_uuid"),
+        auth_surface="management",
+    )
+    return user_info
+
+
+getUserInfoWithoutOrg = _getUserInfoWithoutOrg
+
+
 async def _getAdminInfo(
     token: Annotated[str, Security(admin_oauth_2_scheme)],
     admin_auth_service: Annotated[AuthService, Depends(getAdminAuthService)],
@@ -145,6 +171,7 @@ if app_settings.stage == AppStage.DEV and enable_mock_auth:
         raise UnauthorizedError()
 
     getUserInfo = mock_getUserInfo
+    getUserInfoWithoutOrg = mock_getUserInfo
 
     async def mock_getAdminUserInfo(
         auth: Annotated[HTTPAuthorizationCredentials, Depends(security)],

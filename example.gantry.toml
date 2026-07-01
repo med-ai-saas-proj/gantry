@@ -28,6 +28,11 @@ permissions = [
 
 [keycloak]
 server_url = "http://localhost:8080/"
+# For production behind a reverse proxy, keep server_url reachable by the
+# backend and set these to the public issuer used in Keycloak tokens.
+# public_server_url = "https://auth.example.com/"
+# issuer_url = "https://auth.example.com/realms/gantry"
+# jwks_url = "http://keycloak:8080/realms/gantry/protocol/openid-connect/certs"
 realm_name = "gantry"
 service_client_id = "gantry-backend"
 service_client_secret = "sW4f7NOGqpcNmpstgfYbeBoUigJoA5EX"

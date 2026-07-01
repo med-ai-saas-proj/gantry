@@ -582,6 +582,30 @@ class OrgService:
             )
         )
 
+    async def createOrgForUser(
+        self,
+        user_id: str,
+        name: str,
+        alias: str | None = None,
+    ) -> Result[
+        OrgInfoResponse,
+        KeycloakOrgError
+        | MemberNotFoundError
+        | OrgNotFoundError
+        | UserAlreadyInAnotherOrganizationError
+        | KeycloakPossibleError,
+    ]:
+        """Create an organization only when the current user has no org.
+
+        The creator is added as the first organization member and receives
+        the permanent organization owner permission.
+        """
+        return await self.createOrg(
+            name=name,
+            alias=alias,
+            owner_id=user_id,
+        )
+
     async def updateOrgInfo(
         self,
         org_id: str,
