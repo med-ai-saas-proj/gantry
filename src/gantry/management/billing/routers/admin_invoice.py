@@ -60,7 +60,7 @@ async def mark_invoice_as_refunded(
 async def list_invoices(
     admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     invoice_service: Annotated[InvoiceService, Depends(getInvoiceService)],
-    org_ids: list[str] | None = None,
+    org_id: str,
     from_date: datetime | None = None,  # ISO date string
     to_date: datetime | None = None,  # ISO date string
     paid: bool | None = None,
@@ -68,8 +68,8 @@ async def list_invoices(
     offset: int = 0,
 ) -> PaginatedResponse[InvoiceInfoResponse]:
     invoices, total = (
-        await invoice_service.listInvoicesForAdmin(
-            org_ids=org_ids,
+        await invoice_service.listInvoices(
+            org_id=org_id,
             offset=offset,
             limit=limit,
             from_date=from_date,

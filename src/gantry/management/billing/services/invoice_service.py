@@ -134,42 +134,6 @@ class InvoiceService:
             await session.commit()
             return Ok(None)
 
-    async def listInvoicesForAdmin(
-        self,
-        org_ids: list[str] | None,
-        offset: int = 0,
-        limit: int = 100,
-        from_date: datetime | None = None,
-        to_date: datetime | None = None,
-        paid: bool | None = None,
-    ) -> Result[tuple[Sequence[InvoiceInfoResponse], int], None]:
-        async with self.session_manager.get_session() as session:
-            invs, total = await self.invoice_repo.listReadyInvoicesForAdmin(
-                session=session,
-                org_ids=org_ids,
-                offset=offset,
-                limit=limit,
-                from_date=from_date,
-                to_date=to_date,
-                paid=paid,
-            )
-            return Ok(
-                (
-                    [
-                        InvoiceInfoResponse(
-                            invoice_uid=inv["invoice_uid"],
-                            billing_period=inv["billing_period"],
-                            total_amount=inv["total_amount"],
-                            paid_at=inv["paid_at"],
-                            details=inv["details"],
-                            used_credits=inv["used_credits"],
-                        )
-                        for inv in invs
-                    ],
-                    total,
-                )
-            )
-
     async def getInvoiceByIdForAdmin(
         self,
         invoice_uid: UUID,

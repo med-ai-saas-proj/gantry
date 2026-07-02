@@ -28,6 +28,7 @@ async def listTransactions(
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
+    org_id: str,
     project_uuids: list[UUID] | None = Query(
         None
     ),  # filter by project_uuid or whole organization
@@ -36,7 +37,8 @@ async def listTransactions(
     limit: int = 100,
     offset: int = 0,
 ) -> PaginatedResponse[TransactionInfoResponse]:
-    res, total = await billing_service.getTransactionsForAdmin(
+    res, total = await billing_service.getTransactions(
+        org_id=org_id,
         project_uuids=project_uuids,
         start_date=start_date,
         end_date=end_date,

@@ -175,55 +175,6 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             for row in rows
         ], rows[0].total if rows else 0
 
-    async def getTransactionInfoListForAdmin(
-        self,
-        session: AsyncSession,
-        project_uuids: list[UUID] | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        offset: int = 0,
-        limit: int = 100,
-    ) -> tuple[Sequence[BillingTransactionInfo], int]:
-        """Get the transaction records by a list of UUIDs."""
-        stmt = (
-            select(
-                BillingTransaction.uuid,
-                BillingTransaction.amount,
-                BillingTransaction.created_at,
-                BillingTransaction.details,
-                BillingTransaction.captured_at,
-                BillingTransaction.organization_id,
-                BillingTransaction.status,
-                Project.uuid.label("project_uuid"),
-                func.count().over().label("total"),
-            )
-            .select_from(BillingTransaction)
-            .join(Project, BillingTransaction.project_id == Project.id)
-        )
-        if project_uuids and len(project_uuids) > 0:
-            stmt = stmt.where(Project.uuid.in_(project_uuids))
-        if start_date:
-            stmt = stmt.where(BillingTransaction.created_at >= start_date)
-        if end_date:
-            stmt = stmt.where(BillingTransaction.created_at <= end_date)
-        stmt = stmt.order_by(BillingTransaction.created_at.desc())
-        stmt = self.buildFilterPagination(stmt, offset=offset, limit=limit)
-        res = await session.execute(stmt)
-        rows = res.all()
-        return [
-            {
-                "organization_id": row.organization_id,
-                "transaction_uid": row.uuid,
-                "amount": row.amount,
-                "date": row.created_at,
-                "project_uuid": row.project_uuid,
-                "details": row.details,
-                "captured_at": row.captured_at,
-                "status": row.status,
-            }
-            for row in rows
-        ], rows[0].total if rows else 0
-
     async def getTransactionInfoByUUID(
         self,
         session: AsyncSession,
@@ -535,51 +486,6 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             ).label("total_amount"),
         ).where(
             TimescaleDBDailyBillingSummary.organization_id == org_id,
-            TimescaleDBDailyBillingSummary.bucket >= start_time,
-        )
-        if project_ids is not None and len(project_ids) > 0:
-            stmt = stmt.where(
-                TimescaleDBDailyBillingSummary.project_id.in_(project_ids)
-            )
-        if end_time:
-            stmt = stmt.where(TimescaleDBDailyBillingSummary.bucket < end_time)
-        stmt = stmt.group_by(bucket)
-        result = await session.execute(stmt)
-        rows = result.all()
-        return [
-            {
-                "period_bucket": row.period_bucket,
-                "transaction_count": row.transaction_count,
-                "total_amount": row.total_amount,
-            }
-            for row in rows
-        ]
-
-    async def sumByPeriodByProjectsForAdmin(
-        self,
-        session: AsyncSession,
-        project_ids: list[int] | None,
-        start_time: datetime,
-        end_time: datetime | None,
-        period: AggregatePeriod,
-        period_scale: int = 1,  # e.g. for period=weekly, period_scale=2 means 2-week aggregation buckets.
-    ) -> Sequence[BillingAggregateReport]:
-        """Sum the total amount for a project in a time period."""
-        bucket = func.public.time_bucket(
-            text(f"'{period_scale} {bucket_map[period]}'"),
-            TimescaleDBDailyBillingSummary.bucket,
-        ).label("period_bucket")
-        stmt = select(
-            bucket,
-            func.coalesce(
-                func.sum(TimescaleDBDailyBillingSummary.transaction_count),
-                0,
-            ).label("transaction_count"),
-            func.coalesce(
-                func.sum(TimescaleDBDailyBillingSummary.total_amount),
-                Decimal("0"),
-            ).label("total_amount"),
-        ).where(
             TimescaleDBDailyBillingSummary.bucket >= start_time,
         )
         if project_ids is not None and len(project_ids) > 0:
