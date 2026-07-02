@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM alpine:3.23 AS build
+FROM debian:stable-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.11.19 /uv /uvx /bin/
 

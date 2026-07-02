@@ -20,7 +20,7 @@ docs_app.add_middleware(
     CORSMiddleware,
     allow_origins=getAppSettings().allowed_origins,
     allow_credentials=True,  # keep only if you really need cookies/auth
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
 )
 
