@@ -2,7 +2,7 @@ import os
 
 
 APP_NAME = "gantry"
-APP_VERSION = "0.0.3"
+APP_VERSION = "0.1.1"
 ROOT_FOLDER = os.path.abspath(
     os.path.join(os.path.abspath(__file__), 3 * "../")
 )
