@@ -175,7 +175,9 @@ class AuthService:
 
     async def verifyToken(
         self, token: str
-    ) -> Result[UserInfo, UnauthorizedError]:
+    ) -> Result[
+        UserInfo, UnauthorizedError | ForbiddenError | InvalidClientTokenError
+    ]:
         """Verify Keycloak JWT token."""
         try:
             # Get the signing key from the token header

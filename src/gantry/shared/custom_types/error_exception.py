@@ -21,7 +21,7 @@ class RecoverableError(Exception):
         message: str | None = None,
     ) -> None:
         super().__init__(self.format())
-        if getAppSettings().stage == AppStage.DEV:
+        if getAppSettings().stage in [AppStage.DEV, AppStage.STAGING]:
             self._stack_frames = traceback.format_stack()
         else:
             self._stack_frames = None
