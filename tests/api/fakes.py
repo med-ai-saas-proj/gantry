@@ -238,6 +238,24 @@ class FakeOrgService(ConfigurableFake):
         )
         return Ok({"total": 1, "results": [org_payload()]})
 
+    async def createOrgForUser(
+        self,
+        user_id: str,
+        name: str,
+        alias: str | None,
+    ):
+        self.calls.append(
+            (
+                "createOrgForUser",
+                {"user_id": user_id, "name": name, "alias": alias},
+            )
+        )
+        payload = org_payload("org-created")
+        payload["name"] = name
+        payload["alias"] = alias
+        payload["owner_id"] = user_id
+        return Ok(payload)
+
     async def updateOrgInfo(self, **kwargs):
         self.calls.append(("updateOrgInfo", kwargs))
         payload = org_payload(kwargs["org_id"])

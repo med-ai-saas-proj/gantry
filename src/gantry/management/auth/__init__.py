@@ -12,6 +12,7 @@ from .factories import getAuthService, getAdminAuthService
 from .dependencies import (
     getUserInfo,
     getAdminInfo,
+    getUserInfoWithoutOrg,
 )
 
 

@@ -1,8 +1,8 @@
+from pyrusult import Ok, Err
+
 import os
 import unittest
 from unittest.mock import Mock, AsyncMock
-
-from pyrusult import Ok, Err
 
 
 os.environ.setdefault("KEYCLOAK_SERVICE_CLIENT_SECRET", "test-secret")
@@ -14,6 +14,7 @@ from gantry.management.auth.dependencies import (
     _getAdminInfo,
     getUserOrgUuid,
     requireUserOrgUuid,
+    _getUserInfoWithoutOrg,
 )
 
 
@@ -49,6 +50,26 @@ class TestAuthDependencies(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(MissingOrganizationClaimError):
             await _getUserInfo("token", auth_service)
+
+    async def test_get_user_info_without_org_allows_empty_org_context(self):
+        auth_service = Mock()
+        auth_service.verifyToken = AsyncMock(
+            return_value=Ok(
+                {
+                    "id": "u1",
+                    "username": "alice",
+                    "email": "a@test",
+                    "org_uuid": "",
+                    "org_permissions": [],
+                    "project_permissions": {},
+                }
+            )
+        )
+
+        user_info = await _getUserInfoWithoutOrg("token", auth_service)
+
+        self.assertEqual(user_info["id"], "u1")
+        self.assertEqual(user_info["org_uuid"], "")
 
     async def test_get_admin_info_unwraps_admin_token(self):
         auth_service = Mock()

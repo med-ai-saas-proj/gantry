@@ -76,6 +76,8 @@ class AuthService:
         keycloak_client: KeycloakServiceClient,
         require_organization_claim: bool = True,
         forbidden_realm_roles: set[str] | None = None,
+        issuer_url: str | None = None,
+        jwks_url: str | None = None,
     ):
         # Strip trailing slash from server URL
         self.server_url = server_url.rstrip("/")
@@ -90,6 +92,8 @@ class AuthService:
             f"/protocol/openid-connect/certs"
         )
         self._default_issuer = f"{self.server_url}/realms/{self.realm}"
+        self._issuer_url = issuer_url.rstrip("/") if issuer_url else None
+        self._jwks_url = jwks_url.rstrip("/") if jwks_url else None
         self._openid_client = KeycloakOpenID(
             server_url=self.server_url,
             realm_name=self.realm,
@@ -117,20 +121,19 @@ class AuthService:
     def _getIssuer(self) -> str:
         """Return the issuer using the configured server_url.
 
-        Always use the internal URL rather than the one from well-known
-        metadata, which reflects Keycloak's public hostname and may not
-        match when accessed via the Docker network.
+        In production, Keycloak often issues tokens with a public hostname
+        while the backend reaches JWKS through the internal network. In that
+        case issuer_url should be configured explicitly.
         """
-        return self._default_issuer
+        return self._issuer_url or self._default_issuer
 
     def _getJwksUrl(self) -> str:
-        """Return the JWKS URL using the configured server_url.
+        """Return the JWKS URL used by the backend.
 
-        Always use the internal URL rather than the one from well-known
-        metadata, which reflects Keycloak's public hostname and may not
-        be reachable from within the Docker network.
+        Defaults to the internal server_url. Configure jwks_url explicitly
+        when the backend should fetch keys from a different address.
         """
-        return self._default_jwks_url
+        return self._jwks_url or self._default_jwks_url
 
     def _getJwkClient(self) -> PyJWKClient:
         """Get a cached PyJWKClient bound to the resolved JWKS URL."""
