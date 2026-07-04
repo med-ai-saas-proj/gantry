@@ -74,50 +74,6 @@ class BillingAggregateQueryService:
             )
             return Ok(agg)
 
-    async def getAggregateByProjectsForAdmin(
-        self,
-        project_uuids: list[UUID] | None,
-        start_time: datetime,
-        end_time: datetime | None,
-        aggregate_period: AggregatePeriod,
-        period_scale: int,
-    ) -> Result[Sequence[BillingAggregateReport], ProjectNotFoundError]:
-        """Fetch the current total_amount for the given project/org/period."""
-        if project_uuids is not None and len(project_uuids) > 0:
-            async with self.session_manager.get_session() as session:
-                projs_info_res = await session.execute(
-                    select(Project.id, Project.uuid).where(
-                        Project.uuid.in_(project_uuids)
-                    )
-                )
-                projs_info = {row.uuid: row.id for row in projs_info_res.all()}
-                project_ids = list(projs_info.values())
-                existed_project_uuids = set(projs_info.keys())
-                missing_project_uuids = (
-                    set(project_uuids) - existed_project_uuids
-                )
-                if missing_project_uuids:
-                    return Err(
-                        ProjectNotFoundError(
-                            message=f"Project UUIDs not found: {', '.join(str(project_uuid) for project_uuid in missing_project_uuids)}"
-                        )
-                    )
-        else:
-            project_ids = []  # means aggregate for whole organization
-
-        async with self.session_manager.get_session() as session:
-            agg = await self.billing_transaction_repo.sumByPeriodByProjectsForAdmin(
-                session,
-                project_ids=project_ids,
-                start_time=start_time.astimezone(UTC).replace(tzinfo=None),
-                end_time=end_time.astimezone(UTC).replace(tzinfo=None)
-                if end_time
-                else None,
-                period=aggregate_period,
-                period_scale=period_scale,
-            )
-            return Ok(agg)
-
     async def getAggregateByApikeys(
         self,
         apikeys: list[str] | None,

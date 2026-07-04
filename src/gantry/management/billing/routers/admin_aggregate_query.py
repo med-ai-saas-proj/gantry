@@ -1,11 +1,6 @@
-from gantry.management.auth.entities import UserInfo, AdminInfo
+from gantry.management.auth.entities import AdminInfo
 from gantry.management.auth.dependencies import getAdminInfo
-from gantry.management.project.factories import getProjectService
 from gantry.shared.custom_types.responses import ListResponse
-from gantry.management.project.permissions import ProjectPermission
-from gantry.management.project.dependencies import assertProjectsRole
-from gantry.management.organization.permissions import OrgPermission
-from gantry.management.organization.dependencies import requiredOrgPermission
 
 from ..type import AggregatePeriod, BillingAggregateReport
 from .router import billing_router
@@ -29,6 +24,7 @@ async def get_aggregate_by_projects(
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],
+    org_id: str,
     period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
@@ -38,12 +34,13 @@ async def get_aggregate_by_projects(
     ),  # filter by project_uuid or whole organization
 ) -> ListResponse[BillingAggregateReport]:
     res = (
-        await billing_service.getAggregateByProjectsForAdmin(
+        await billing_service.getAggregateByProjects(
             project_uuids=project_uuids,
             start_time=period_start,
             end_time=period_end,
             aggregate_period=period,
             period_scale=period_scale,
+            org_id=org_id,
         )
     ).unwrap()
     return ListResponse[BillingAggregateReport](data=res)
@@ -59,11 +56,11 @@ async def get_aggregate_by_org(
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],
+    org_id: str,
     period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
     period: AggregatePeriod,
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
-    org_id: str = Query(),
 ) -> ListResponse[BillingAggregateReport]:
     res = (
         await billing_service.getAggregateByOrg(

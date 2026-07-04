@@ -896,44 +896,6 @@ class TransactionService:
                 )
             )
 
-    async def getTransactionsForAdmin(
-        self,
-        project_uuids: list[UUID] | None = None,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
-        limit: int = 100,
-        offset: int = 0,
-    ) -> tuple[Sequence[TransactionInfoResponse], int]:
-        """List transactions with optional filters (e.g. project_id, date range, etc.). Supports pagination."""
-
-        async with self.session_manager.get_session() as session:
-            (
-                transactions,
-                total,
-            ) = await self.transaction_repo.getTransactionInfoListForAdmin(
-                session=session,
-                project_uuids=project_uuids,
-                start_date=start_date,
-                end_date=end_date,
-                offset=offset,
-                limit=limit,
-            )
-            return (
-                [
-                    TransactionInfoResponse(
-                        transaction_uid=trx["transaction_uid"],
-                        project_uuid=trx["project_uuid"],
-                        amount=trx["amount"],
-                        details=trx["details"],
-                        date=trx["date"],
-                        captured_at=trx["captured_at"],
-                        status=trx["status"],
-                    )
-                    for trx in transactions
-                ],
-                total,
-            )
-
     async def getTransactionByIdForAdmin(
         self, transaction_uid: UUID
     ) -> Result[TransactionInfoResponse, TransactionNotFound]:

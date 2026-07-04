@@ -148,63 +148,6 @@ class InvoiceRepo(Repository[BillingInvoice, int]):
         res = await session.execute(stmt)
         return res.scalar_one_or_none()
 
-    async def listReadyInvoicesForAdmin(
-        self,
-        session: AsyncSession,
-        org_ids: list[str] | None,
-        offset: int = 0,
-        limit: int = 100,
-        from_date: datetime | None = None,
-        to_date: datetime | None = None,
-        paid: bool | None = None,
-    ) -> tuple[Sequence[BillingInvoiceInfo], int]:
-        stmt = (
-            select(
-                BillingInvoice.id,
-                BillingInvoice.uuid,
-                BillingInvoice.billing_period,
-                BillingInvoice.total_amount,
-                BillingInvoice.provider,
-                BillingInvoice.provider_invoice_id,
-                BillingInvoice.paid_at,
-                BillingInvoice.details,
-                BillingInvoice.used_credits,
-                func.count().over().label("total"),
-            )
-            .select_from(BillingInvoice)
-            .where(
-                BillingInvoice.provider_invoice_id.is_not(None)
-            )  # only return invoices that have been created in provider
-        )
-        if org_ids is not None and len(org_ids) > 0:
-            stmt = stmt.where(BillingInvoice.organization_id.in_(org_ids))
-        if from_date is not None:
-            stmt = stmt.where(BillingInvoice.billing_period >= from_date)
-        if to_date is not None:
-            stmt = stmt.where(BillingInvoice.billing_period <= to_date)
-        if paid is not None:
-            if paid:
-                stmt = stmt.where(BillingInvoice.paid_at.is_not(None))
-            else:
-                stmt = stmt.where(BillingInvoice.paid_at.is_(None))
-        stmt = stmt.offset(offset).limit(limit)
-        res = await session.execute(stmt)
-        rows = res.all()
-        return [
-            {
-                "invoice_id": row.id,
-                "invoice_uid": row.uuid,
-                "billing_period": row.billing_period,
-                "total_amount": row.total_amount,
-                "used_credits": row.used_credits,
-                "provider": row.provider,
-                "provider_invoice_id": row.provider_invoice_id,
-                "paid_at": row.paid_at,
-                "details": row.details,
-            }
-            for row in rows
-        ], rows[0].total if rows else 0
-
     async def listReadyInvoices(
         self,
         session: AsyncSession,
