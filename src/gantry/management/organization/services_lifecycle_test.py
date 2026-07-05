@@ -154,6 +154,47 @@ class TestOrgServiceLifecycle(BaseOrgServiceTest):
         self.assertEqual(payload.results[0].org_id, "org-3")
         service.kc.getMemberOrganizations.assert_awaited_once_with("user-1")
 
+    async def test_list_orgs_enriches_owner_and_deletion_metadata(self):
+        """Admin org overview should show owners and pending delete metadata."""
+        service = self._make_service()
+        requested_at = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
+        service.kc.listOrgs = AsyncMock(
+            return_value=Ok(
+                [
+                    {"id": "org-1", "name": "Active Org"},
+                    {"id": "org-2", "name": "Deleting Org"},
+                ]
+            )
+        )
+        service.deletion_repo.getByOrgId = AsyncMock(
+            side_effect=[
+                None,
+                SimpleNamespace(id=1, requested_at=requested_at),
+            ]
+        )
+        service._getOrgOwnerId = AsyncMock(return_value=Ok("owner-1"))
+
+        res = await service.listOrgs(limit=10, offset=0, q=None)
+
+        self.assertTrue(res.status == ResultStatus.Ok)
+        payload = res.unwrap()
+        self.assertEqual(payload.total, 2)
+        self.assertEqual(payload.results[0].org_id, "org-1")
+        self.assertEqual(payload.results[0].owner_id, "owner-1")
+        self.assertIsNone(payload.results[0].requested_at)
+        self.assertIsNone(payload.results[0].delete_at)
+        self.assertEqual(payload.results[1].org_id, "org-2")
+        self.assertEqual(payload.results[1].owner_id, "owner-1")
+        self.assertEqual(
+            payload.results[1].requested_at,
+            "2026-01-01T00:00:00+00:00",
+        )
+        self.assertEqual(
+            payload.results[1].delete_at,
+            "2026-01-31T00:00:00+00:00",
+        )
+        self.assertEqual(service._getOrgOwnerId.await_count, 2)
+
     async def test_request_delete_org_success(self):
         """Deletion request should return timestamps and commit."""
         # Arrange

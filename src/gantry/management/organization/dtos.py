@@ -39,6 +39,8 @@ class OrgInfoResponse(BaseDTO):
     name: str
     alias: str | None = None
     owner_id: str | None = None
+    requested_at: str | None = None
+    delete_at: str | None = None
 
 
 class OrgListResponse(BaseDTO):

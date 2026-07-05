@@ -477,19 +477,45 @@ class OrgService:
             return orgs_res.into()
         orgs = cast(list[KeycloakOrgPayload], orgs_res.unwrap())
 
-        return Ok(
-            OrgListResponse(
-                total=len(orgs),
-                results=[
+        results: list[OrgInfoResponse] = []
+        async with self.session_manager.get_session() as session:
+            for org in orgs:
+                org_id = str(org.get("id") or "")
+                if not org_id:
+                    continue
+
+                pending_delete = await self.deletion_repo.getByOrgId(
+                    session, org_id
+                )
+                requested_at: str | None = None
+                delete_at: str | None = None
+                if pending_delete is not None:
+                    requested_at_dt = pending_delete.requested_at
+                    requested_at = requested_at_dt.isoformat()
+                    delete_at = self._computeCancelBefore(
+                        requested_at_dt
+                    ).isoformat()
+
+                owner_id: str | None = None
+                owner_res = await self._getOrgOwnerId(org_id)
+                if owner_res.status == ResultStatus.Ok:
+                    owner_id = owner_res.unwrap()
+
+                results.append(
                     OrgInfoResponse(
-                        org_id=str(org.get("id") or ""),
+                        org_id=org_id,
                         name=str(org.get("name") or org.get("alias") or ""),
                         alias=org.get("alias"),
-                        owner_id=None,
+                        owner_id=owner_id,
+                        requested_at=requested_at,
+                        delete_at=delete_at,
                     )
-                    for org in orgs
-                    if org.get("id")
-                ],
+                )
+
+        return Ok(
+            OrgListResponse(
+                total=len(results),
+                results=results,
             )
         )
 
