@@ -367,6 +367,10 @@ class FakeAdminService(ConfigurableFake):
             "cancel_before": "2026-01-31T00:00:00",
         }
 
+    async def cancelDeleteOrganization(self, org_id: str):
+        self.calls.append(("cancelDeleteOrganization", org_id))
+        return {"id": org_id, "cancelled": True}
+
     async def getOrganizationSettings(self, org_id: str):
         self.calls.append(("getOrganizationSettings", org_id))
         return {"rate_limit": 100, "spending_limit": 1000, "extra": {"tier": "pro"}}

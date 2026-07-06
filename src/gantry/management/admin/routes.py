@@ -27,6 +27,7 @@ from gantry.management.organization.dtos import (
     CreateOrgRequest,
     OrgSettingsResponse,
     OrgUserListResponse,
+    DeleteCancelResponse,
     DeleteRequestResponse,
     UpdateSettingsRequest,
     UserPermissionsRequest,
@@ -261,6 +262,21 @@ async def delete_admin_organization(
     """Request delayed organization deletion through the existing lifecycle."""
     del user_info
     return await admin_service.deleteOrganization(org_id)
+
+
+@admin_router.post(
+    "/organizations/{org_id}/deletion/cancel",
+    response_model=DeleteCancelResponse,
+    summary="Cancel organization deletion as admin",
+)
+async def cancel_delete_admin_organization(
+    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
+    org_id: Annotated[str, Path()],
+    admin_service: Annotated[AdminService, Depends(getAdminService)],
+) -> DeleteCancelResponse:
+    """Cancel a delayed organization deletion without org-owner permission."""
+    del user_info
+    return await admin_service.cancelDeleteOrganization(org_id)
 
 
 @admin_router.get(

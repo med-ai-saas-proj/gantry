@@ -70,6 +70,13 @@ async def test_admin_organization_routes(api_client, authenticated_api) -> None:
     assert delete_org.status_code == 202
     assert delete_org.json()["id"] == "org-1"
 
+    cancel_delete = await api_client.post(
+        "/v1/admin/organizations/org-1/deletion/cancel",
+        headers=AUTH,
+    )
+    assert cancel_delete.status_code == 200
+    assert cancel_delete.json() == {"id": "org-1", "cancelled": True}
+
 
 @pytest.mark.asyncio
 async def test_admin_project_routes(api_client, authenticated_api) -> None:

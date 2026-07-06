@@ -27,6 +27,10 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         self.assertIn("/admin/organizations/{org_id}/settings", paths)
         self.assertIn("/admin/organizations/{org_id}/users", paths)
         self.assertIn(
+            "/admin/organizations/{org_id}/deletion/cancel",
+            paths,
+        )
+        self.assertIn(
             "post",
             paths["/admin/organizations/{org_id}/users"],
         )
@@ -134,6 +138,22 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, expected)
         admin_service.listOrganizations.assert_awaited_once_with(pagination)
+
+    async def test_cancel_delete_admin_organization_delegates_to_service(self):
+        admin_service = Mock()
+        expected = routes.DeleteCancelResponse(id="org-1", cancelled=True)
+        admin_service.cancelDeleteOrganization = AsyncMock(
+            return_value=expected
+        )
+
+        result = await routes.cancel_delete_admin_organization(
+            ADMIN_INFO,
+            "org-1",
+            admin_service,
+        )
+
+        self.assertEqual(result, expected)
+        admin_service.cancelDeleteOrganization.assert_awaited_once_with("org-1")
 
     async def test_create_admin_project_delegates_to_admin_service(self):
         admin_service = Mock()

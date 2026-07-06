@@ -40,6 +40,7 @@ from gantry.management.organization.dtos import (
     CreateOrgRequest,
     OrgSettingsResponse,
     OrgUserListResponse,
+    DeleteCancelResponse,
     DeleteRequestResponse,
     UpdateSettingsRequest,
     UpdateOrgMetadataRequest,
@@ -399,6 +400,15 @@ class AdminService:
         result = await self.org_service.requestDeleteOrg(org_id)
         deletion = result.unwrap()
         return deletion
+
+    async def cancelDeleteOrganization(
+        self,
+        org_id: str,
+    ) -> DeleteCancelResponse:
+        """Cancel delayed organization deletion without org-owner permission."""
+        result = await self.org_service.cancelDeleteOrg(org_id)
+        result.unwrap()
+        return DeleteCancelResponse(id=org_id, cancelled=True)
 
     def listProjectPermissions(self) -> ProjectPermissionCatalogResponse:
         """Return the project permission catalog."""

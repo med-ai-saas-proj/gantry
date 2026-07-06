@@ -35,6 +35,7 @@ from gantry.management.organization.dtos import (
     CreateOrgRequest,
     OrgSettingsResponse,
     OrgUserListResponse,
+    DeleteCancelResponse,
     DeleteRequestResponse,
     UpdateSettingsRequest,
     UpdateOrgMetadataRequest,
@@ -205,15 +206,21 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         )
         self.org_service.getUsers = AsyncMock(return_value=Ok(users))
         self.org_service.requestDeleteOrg = AsyncMock(return_value=Ok(deletion))
+        self.org_service.cancelDeleteOrg = AsyncMock(return_value=Ok(True))
 
         users_result = await self.service.listOrganizationUsers(
             "org-1",
             pagination,
         )
         delete_result = await self.service.deleteOrganization("org-1")
+        cancel_result = await self.service.cancelDeleteOrganization("org-1")
 
         self.assertEqual(users_result, users)
         self.assertEqual(delete_result, deletion)
+        self.assertEqual(
+            cancel_result,
+            DeleteCancelResponse(id="org-1", cancelled=True),
+        )
         self.org_service.getUsers.assert_awaited_once_with(
             "org-1",
             limit=10,
@@ -221,6 +228,7 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
             q="alice",
         )
         self.org_service.requestDeleteOrg.assert_awaited_once_with("org-1")
+        self.org_service.cancelDeleteOrg.assert_awaited_once_with("org-1")
 
     async def test_add_organization_user_adds_member_and_seeds_permissions(
         self,
