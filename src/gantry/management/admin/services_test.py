@@ -1027,6 +1027,42 @@ class TestAdminService(unittest.IsolatedAsyncioTestCase):
         )
         self.kc.countUsers.assert_awaited_once_with(search="alice")
 
+    async def test_list_unassigned_users_filters_and_paginates_without_orgs(
+        self,
+    ):
+        self.kc.listUsers = AsyncMock(
+            return_value=Ok(
+                [
+                    {"id": "user-1", "username": "alice", "enabled": True},
+                    {"id": "user-2", "username": "bob", "enabled": True},
+                    {"id": "user-3", "username": "cara", "enabled": False},
+                    {"id": "user-4", "username": "dan", "enabled": True},
+                ]
+            )
+        )
+        self.kc.getMemberOrganizations = AsyncMock(
+            side_effect=[
+                Ok([]),
+                Ok([{"id": "org-1"}]),
+                Ok([]),
+                Ok([]),
+            ]
+        )
+
+        result = await self.service.listUnassignedUsers(
+            AdminPaginationQuery(limit=1, offset=1, q="a")
+        )
+
+        self.assertEqual(result.total, 3)
+        self.assertEqual(len(result.results), 1)
+        self.assertEqual(result.results[0].user_id, "user-3")
+        self.kc.listUsers.assert_awaited_once_with(
+            first=0,
+            max_results=100,
+            search="a",
+        )
+        self.assertEqual(self.kc.getMemberOrganizations.await_count, 4)
+
     async def test_get_user_organizations_maps_memberships(self):
         self.kc.getMemberOrganizations = AsyncMock(
             return_value=Ok(

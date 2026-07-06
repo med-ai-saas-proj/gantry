@@ -563,6 +563,21 @@ async def list_admin_users(
 
 
 @admin_router.get(
+    "/users/unassigned",
+    response_model=AdminUserListResponse,
+    summary="List users without organization membership",
+)
+async def list_admin_unassigned_users(
+    user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
+    pagination: Annotated[AdminPaginationQuery, Depends()],
+    admin_service: Annotated[AdminService, Depends(getAdminService)],
+) -> AdminUserListResponse:
+    """List Keycloak users that can be selected as a new organization owner."""
+    del user_info
+    return await admin_service.listUnassignedUsers(pagination)
+
+
+@admin_router.get(
     "/users/{user_id}/organizations",
     response_model=list[AdminUserOrganizationInfoResponse],
     summary="List organizations for a specific user",

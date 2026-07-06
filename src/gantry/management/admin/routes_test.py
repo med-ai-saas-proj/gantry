@@ -41,6 +41,7 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             paths,
         )
         self.assertIn("/admin/users/{user_id}/organizations", paths)
+        self.assertIn("/admin/users/unassigned", paths)
         self.assertIn("/admin/users/{user_id}/profile", paths)
         self.assertIn("/admin/users/{user_id}/permissions", paths)
 
@@ -496,6 +497,7 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         admin_service = Mock()
         pagination = routes.AdminPaginationQuery(limit=10, offset=0, q=None)
         users = routes.OrgUserListResponse(total=0, results=[])
+        unassigned_users = routes.AdminUserListResponse(total=0, results=[])
         projects = routes.ProjectUserListResponse(total=0, results=[])
         orgs = []
         profile = routes.AdminUserProfileResponse(
@@ -519,6 +521,9 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         )
         admin_service.listOrganizationUsers = AsyncMock(return_value=users)
         admin_service.listProjectUsers = AsyncMock(return_value=projects)
+        admin_service.listUnassignedUsers = AsyncMock(
+            return_value=unassigned_users
+        )
         admin_service.getUserOrganizations = AsyncMock(return_value=orgs)
         admin_service.getUserProfile = AsyncMock(return_value=profile)
         admin_service.getUserPermissions = AsyncMock(
@@ -536,6 +541,11 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
         await routes.list_admin_project_users(
             ADMIN_INFO,
             "project-1",
+            pagination,
+            admin_service,
+        )
+        await routes.list_admin_unassigned_users(
+            ADMIN_INFO,
             pagination,
             admin_service,
         )
@@ -574,6 +584,7 @@ class TestAdminRoutes(unittest.IsolatedAsyncioTestCase):
             "project-1",
             pagination,
         )
+        admin_service.listUnassignedUsers.assert_awaited_once_with(pagination)
         admin_service.getUserOrganizations.assert_awaited_once_with("user-1")
         admin_service.getUserProfile.assert_awaited_once_with("user-1")
         admin_service.getUserPermissions.assert_awaited_once_with("user-1")

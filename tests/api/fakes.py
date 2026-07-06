@@ -488,6 +488,23 @@ class FakeAdminService(ConfigurableFake):
         self.pagination = pagination
         return {"total": 1, "results": [{"user_id": "user-1", "username": "alice", "email": "alice@example.com", "first_name": "Alice", "last_name": "Example", "enabled": True, "email_verified": True}]}
 
+    async def listUnassignedUsers(self, pagination):
+        self.calls.append(("listUnassignedUsers", pagination))
+        return {
+            "total": 1,
+            "results": [
+                {
+                    "user_id": "user-unassigned",
+                    "username": "owner-candidate",
+                    "email": "owner@example.com",
+                    "first_name": "Owner",
+                    "last_name": "Candidate",
+                    "enabled": True,
+                    "email_verified": True,
+                }
+            ],
+        }
+
     async def getUserOrganizations(self, user_id: str):
         self.calls.append(("getUserOrganizations", user_id))
         return [{"org_id": "org-1", "name": "Org 1", "alias": "org-1"}]

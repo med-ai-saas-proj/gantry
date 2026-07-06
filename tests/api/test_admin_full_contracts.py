@@ -201,6 +201,18 @@ async def test_admin_api_key_routes(api_client, authenticated_api) -> None:
 
 @pytest.mark.asyncio
 async def test_admin_user_profile_permission_and_organization_routes(api_client, authenticated_api) -> None:
+    unassigned = await api_client.get(
+        "/v1/admin/users/unassigned",
+        headers=AUTH,
+        params={"limit": 5, "offset": 2, "q": "alice"},
+    )
+    assert unassigned.status_code == 200
+    assert_paginated(unassigned.json())
+    pagination = authenticated_api["admin"].calls[-1][1]
+    assert pagination.limit == 5
+    assert pagination.offset == 2
+    assert pagination.q == "alice"
+
     organizations = await api_client.get(
         "/v1/admin/users/user-1/organizations",
         headers=AUTH,

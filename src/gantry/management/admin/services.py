@@ -190,6 +190,19 @@ class AdminService:
                 raise ProjectNotFoundError()
             return self._toProjectInfoResponse(project)
 
+    @staticmethod
+    def _toAdminUserListItem(user: dict[str, Any]) -> AdminUserListItemResponse:
+        """Map one Keycloak user payload to the admin list DTO."""
+        return AdminUserListItemResponse(
+            user_id=str(user.get("id") or ""),
+            username=user.get("username"),
+            email=user.get("email"),
+            first_name=user.get("firstName"),
+            last_name=user.get("lastName"),
+            enabled=bool(user.get("enabled", False)),
+            email_verified=bool(user.get("emailVerified", False)),
+        )
+
     async def _buildUserProfileResponse(
         self,
         user_id: str,
@@ -606,18 +619,50 @@ class AdminService:
         return AdminUserListResponse(
             total=total,
             results=[
-                AdminUserListItemResponse(
-                    user_id=str(user.get("id") or ""),
-                    username=user.get("username"),
-                    email=user.get("email"),
-                    first_name=user.get("firstName"),
-                    last_name=user.get("lastName"),
-                    enabled=bool(user.get("enabled", False)),
-                    email_verified=bool(user.get("emailVerified", False)),
-                )
+                self._toAdminUserListItem(user)
                 for user in users
                 if user.get("id")
             ],
+        )
+
+    async def listUnassignedUsers(
+        self,
+        pagination: AdminPaginationQuery,
+    ) -> AdminUserListResponse:
+        """List users that do not belong to any organization."""
+        batch_size = 100
+        first = 0
+        unassigned_users: list[dict[str, Any]] = []
+
+        while True:
+            users_res = await self.kc.listUsers(
+                first=first,
+                max_results=batch_size,
+                search=pagination.q,
+            )
+            users = users_res.unwrap()
+            if not users:
+                break
+
+            for user in users:
+                user_id = user.get("id")
+                if not user_id:
+                    continue
+                orgs_res = await self.kc.getMemberOrganizations(str(user_id))
+                orgs = _extract_org_ids(orgs_res.unwrap())
+                if not orgs:
+                    unassigned_users.append(user)
+
+            if len(users) < batch_size:
+                break
+            first += batch_size
+
+        page = unassigned_users[
+            pagination.offset : pagination.offset + pagination.limit
+        ]
+        return AdminUserListResponse(
+            total=len(unassigned_users),
+            results=[self._toAdminUserListItem(user) for user in page],
         )
 
     async def getUserOrganizations(
