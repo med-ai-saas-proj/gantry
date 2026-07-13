@@ -1,3 +1,4 @@
+from pyrusult import Ok, Err, Result
 from gantry.shared.custom_types.error_exception import RecoverableError
 
 import json
@@ -5,7 +6,6 @@ import datetime
 from typing import Literal, TypedDict
 
 import httpx
-from pyrusult import Ok, Err, Result
 
 
 LOG_QUERY_ENDPOINT = "/loki/api/v1/query_range"

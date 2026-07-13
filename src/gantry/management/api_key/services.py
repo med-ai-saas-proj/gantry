@@ -297,9 +297,7 @@ class ApiKeyService:
         self, api_key: ApiKeySnapshot, project_uuid: str
     ) -> ApiKeyResponse:
         return ApiKeyResponse(
-            api_key_id=int(api_key["api_key_id"]),
             api_key_uuid=str(api_key["api_key_uuid"]),
-            project_id=int(api_key["project_id"]),
             project_uuid=project_uuid,
             name=str(api_key["name"]),
             description=str(api_key["description"]),
@@ -380,9 +378,7 @@ class ApiKeyService:
 
         return Ok(
             ApiKeyCreateResponse(
-                api_key_id=created.id,
                 api_key_uuid=str(created.uuid),
-                project_id=project_id,
                 project_uuid=normalized_project_uuid,
                 name=created.name,
                 description=created.description,
