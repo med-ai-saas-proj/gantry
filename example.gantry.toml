@@ -24,6 +24,8 @@ permissions = [
     { id = "file.delete", name = "File Delete", description = "Allow deleting files" },
     { id = "rag.read", name = "RAG Read", description = "Allow reading RAG resources" },
     { id = "rag.write", name = "RAG Write", description = "Allow writing RAG resources" },
+    { id = "chatbot", name = "Chatbot", description = "Allow using the chatbot" },
+    { id = "medical-records", name = "Medical Records", description = "Allow managing medical records" },
 ]
 
 [keycloak]
@@ -89,10 +91,19 @@ prometheus_port = 9000
     "gpt-oss-20b",
 ] }
 "gpt-oss-20b" = { provider = "groq", model_id = "openai/gpt-oss-20b", context_window = 128000, api_key = "gsk_" }
+"deepseek-v4-flash" = { provider = "openai", model_id = "deepseek-v4-flash", context_window = 1000000, api_key = "sk-", base_url = "https://api.deepseek.com" }
 
 [api_gateway]
 routes = { "chat" = { "address" = "http://localhost:3000/chat/", required_perms = [
-    "demo",
+    "chatbot",
+] }, "patients" = { address = "http://localhost:3000/patients/", required_perms = [
+    "medical-records",
+] }, "hospitalizations" = { address = "http://localhost:3000/hospitalizations/", required_perms = [
+    "medical-records",
+] }, "medical-records" = { address = "http://localhost:3000/medical-records/", required_perms = [
+    "medical-records",
+] }, "extract" = { address = "http://localhost:3000/extract/", required_perms = [
+    "medical-records",
 ] } }
 
 # routes = { "get_objects" = { "address" = "https://api.restful-api.dev/objects", required_perms = [

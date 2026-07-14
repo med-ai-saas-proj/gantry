@@ -7,7 +7,7 @@ from .settings import getApiGatewaySettings
 from .factories import getApiGatewayService
 
 import json
-from typing import Annotated
+from typing import Optional, Annotated
 from urllib.parse import urljoin
 
 import httpx
@@ -84,14 +84,10 @@ def _inject_api_key_context_headers(
 
 
 @gateway_app.api_route(
-    "/{route_name}",
-    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-)
-@gateway_app.api_route(
     "/{route_name}/{full_path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
 )
-async def gateway_proxy(
+async def gateway_proxy_with_path(
     route_name: Annotated[str, Path()],
     full_path: Annotated[str | None, Path()],
     request: Request,
@@ -99,6 +95,47 @@ async def gateway_proxy(
     gateway_service: Annotated[
         ApiGatewayService, Depends(getApiGatewayService)
     ],
+    background_tasks: BackgroundTasks,
+):
+    return await _gateway_proxy(
+        route_name,
+        request,
+        apikey_info,
+        full_path,
+        gateway_service,
+        background_tasks,
+    )
+
+
+@gateway_app.api_route(
+    "/{route_name}",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+async def gateway_proxy(
+    route_name: Annotated[str, Path()],
+    request: Request,
+    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
+    gateway_service: Annotated[
+        ApiGatewayService, Depends(getApiGatewayService)
+    ],
+    background_tasks: BackgroundTasks,
+):
+    return await _gateway_proxy(
+        route_name,
+        request,
+        apikey_info,
+        None,
+        gateway_service,
+        background_tasks,
+    )
+
+
+async def _gateway_proxy(
+    route_name: str,
+    request: Request,
+    apikey_info: ApiKeyInfo,
+    full_path: Optional[str],
+    gateway_service: ApiGatewayService,
     background_tasks: BackgroundTasks,
 ):
     destination = gateway_service.getDestination(route_name=route_name).unwrap()
@@ -112,7 +149,9 @@ async def gateway_proxy(
     request_timeout = getApiGatewaySettings().request_timeout.total_seconds()
     client = httpx.AsyncClient(timeout=request_timeout)
 
-    full_url = urljoin(destination.address.encoded_string(), full_path)
+    full_url = urljoin(
+        destination.address.encoded_string(), full_path or ""
+    ).rstrip("/")
     req = client.build_request(
         method=request.method,
         url=full_url,
