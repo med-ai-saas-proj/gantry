@@ -17,7 +17,7 @@ class QueryLogRequest(BaseModel):
     )
     level: Literal["debug", "info", "warn", "error"] | None
     keyword: list[str | KeywordSearchQuery] | None | str | KeywordSearchQuery
-    filters: dict[str | LogFilterKey, str | FilterQuery] | None
+    filters: dict[str | LogFilterKey, str | FilterQuery | list[str]] | None
     custom_query: str | None = Field(
         default=None,
         description="Custom query string, should be valid Loki Label Filters",

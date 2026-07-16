@@ -744,8 +744,16 @@
           "minLength": 1,
           "title": "Loki Url",
           "type": "string"
+        },
+        "service_name": {
+          "description": "Service name to be used in logs.",
+          "title": "Service Name",
+          "type": "string"
         }
       },
+      "required": [
+        "service_name"
+      ],
       "title": "UserLogSettings",
       "type": "object"
     },

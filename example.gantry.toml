@@ -57,6 +57,7 @@ stripe_webhook_secret = ""                #apikey
 
 [user_log]
 loki_url = "http://localhost:3100/"
+service_name = "healthcare-api"
 
 [conversation]
 cache_ttl = 600

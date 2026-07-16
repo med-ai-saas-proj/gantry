@@ -1,6 +1,5 @@
 from gantry.settings import getAppSettings
 from gantry.management.auth import UserInfo, getUserInfo
-from gantry.shared.consts.common_const import APP_NAME
 
 from .dtos import QueryLogRequest
 from .factories import getLogQueryService
@@ -15,6 +14,7 @@ logging_router = APIRouter(prefix="/logging", tags=["logging"])
 
 log_query_service = getLogQueryService()
 app_settings = getAppSettings()
+logging_settings = app_settings.user_log
 
 
 @logging_router.get(
@@ -45,11 +45,15 @@ async def simple_query_log(
     filters_dict = {}
     for f in filters.split(",") if filters is not None else []:
         key, value = f.split(":")
-        filters_dict[key] = value
+        if key and value:
+            if key in filters_dict:
+                filters_dict[key].append(value)
+            else:
+                filters_dict[key] = [value]
 
     res = log_query_service.search_logs(
         user_info["org_uuid"],
-        APP_NAME,
+        logging_settings.service_name,
         start,
         end,
         limit,
@@ -72,7 +76,7 @@ async def query_log(
 ) -> list[dict]:
     res = log_query_service.search_logs(
         user_info["org_uuid"],
-        APP_NAME,
+        logging_settings.service_name,
         query_request.start,
         query_request.end,
         query_request.limit,

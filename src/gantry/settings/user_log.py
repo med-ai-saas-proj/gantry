@@ -11,3 +11,9 @@ class UserLogSettings(BaseSettings):
             description="Loki server URL for user activity logs.",
         ),
     ] = HttpUrl("http://localhost:3100")
+    service_name: Annotated[
+        str,
+        Field(
+            description="Service name to be used in logs.",
+        ),
+    ]

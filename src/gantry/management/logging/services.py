@@ -66,7 +66,7 @@ class LogQueryService:
         | KeywordSearchQuery
         | list[KeywordSearchQuery | str]
         | None = None,
-        filter: dict[LogFilterKey, str | FilterQuery] | None = None,
+        filter: dict[LogFilterKey, str | FilterQuery | list[str]] | None = None,
         user_query: str | None = None,
     ):
         """Search logs from Loki with optional filters."""
@@ -91,7 +91,7 @@ class LogQueryService:
 
         if filter:
             for key, value in filter.items():
-                pipeline.append(f'| {filter_pipeline(key, value)}"')
+                pipeline.append(f"| {filter_pipeline(key, value)}")
 
         if user_query:
             if user_query.startswith("|"):
@@ -101,6 +101,7 @@ class LogQueryService:
 
         query = f"{selector} {' '.join(pipeline)}".strip()
 
+        # print(f"Querying logs with query: {query}, start: {start}, end: {end}, limit: {limit}, direction: {direction}")
         return self.query_logs(
             query=query, start=start, end=end, limit=limit, direction=direction
         )
@@ -141,6 +142,7 @@ class LogQueryService:
             else:
                 return Err(InvalidLogQueryError())
         except httpx.HTTPStatusError as exc:
+            # print(f"HTTP error occurred: {exc.response.status_code} - {exc.response.text}")
             return Err(InvalidLogQueryError())
         except httpx.RequestError as exc:
             return Err(LogQueryServiceError())
@@ -228,10 +230,13 @@ def keyword_pipeline(search_term: str | KeywordSearchQuery):
         raise ValueError(f"Invalid search term type: {type(search_term)}")
 
 
-def filter_pipeline(key: LogFilterKey, value: str | FilterQuery):
+def filter_pipeline(key: LogFilterKey, value: str | FilterQuery | list[str]):
     """Convert a filter term to a Loki label filter expression. Supports equality, inequality, regex, negative regex, greater than, less than, greater than or equal, and less than or equal."""
-    if isinstance(value, str):
+    if isinstance(value, str) or (isinstance(value, list) and len(value) == 1):
         return f'| {key}="{value}"'
+    elif isinstance(value, list):
+        combined_regex = "|".join(value)
+        return f'{key} =~ "{combined_regex}"'
     elif isinstance(value, dict):
         if value["mode"] == "eq":
             return f'{key}="{value["value"]}"'
