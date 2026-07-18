@@ -1,4 +1,5 @@
 from gantry.settings import getAppSettings
+from gantry.shared.consts import common_const
 from gantry.management.auth import UserInfo, getUserInfo
 
 from .dtos import QueryLogRequest
@@ -14,7 +15,6 @@ logging_router = APIRouter(prefix="/logging", tags=["logging"])
 
 log_query_service = getLogQueryService()
 app_settings = getAppSettings()
-logging_settings = app_settings.user_log
 
 
 @logging_router.get(
@@ -53,7 +53,7 @@ async def simple_query_log(
 
     res = log_query_service.search_logs(
         user_info["org_uuid"],
-        logging_settings.service_name,
+        common_const.APP_NAME,
         start,
         end,
         limit,
@@ -76,7 +76,7 @@ async def query_log(
 ) -> list[dict]:
     res = log_query_service.search_logs(
         user_info["org_uuid"],
-        logging_settings.service_name,
+        common_const.APP_NAME,
         query_request.start,
         query_request.end,
         query_request.limit,

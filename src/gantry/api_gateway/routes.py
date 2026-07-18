@@ -1,6 +1,7 @@
 from gantry.settings import AppStage, getAppSettings
 from gantry.shared.health import setup_health_routes
 from gantry.management.api_key import ApiKeyInfo, getApiKeyInfo
+from gantry.shared.logging.logger import getServiceLogger
 
 from .service import ApiGatewayService
 from .settings import getApiGatewaySettings
@@ -8,6 +9,7 @@ from .factories import getApiGatewayService
 
 import json
 from typing import Optional, Annotated
+from urllib import request
 from urllib.parse import urljoin
 
 import httpx
@@ -161,6 +163,19 @@ async def _gateway_proxy(
     )
     response = await client.send(request=req, stream=True)
     response_headers = filter_headers(dict(response.headers))
+
+    getServiceLogger(
+        org_id=apikey_info["organization_uuid"],
+        project_id=apikey_info["project_uuid"],
+    ).info(
+        f"api_gateway",
+        route_name=route_name,
+        full_path=full_path,
+        method=request.method,
+        status_code=response.status_code,
+        headers=incoming_headers,
+        api_key_id=apikey_info["api_key_uuid"],
+    )
 
     background_tasks.add_task(client.aclose)
     return StreamingResponse(
