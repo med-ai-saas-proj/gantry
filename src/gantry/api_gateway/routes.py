@@ -9,7 +9,6 @@ from .factories import getApiGatewayService
 
 import json
 from typing import Optional, Annotated
-from urllib import request
 from urllib.parse import urljoin
 
 import httpx
@@ -152,7 +151,8 @@ async def _gateway_proxy(
     client = httpx.AsyncClient(timeout=request_timeout)
 
     full_url = urljoin(
-        destination.address.encoded_string(), full_path or ""
+        destination.address.encoded_string(),
+        full_path,
     ).rstrip("/")
     req = client.build_request(
         method=request.method,
@@ -168,13 +168,14 @@ async def _gateway_proxy(
         org_id=apikey_info["organization_uuid"],
         project_id=apikey_info["project_uuid"],
     ).info(
-        f"api_gateway",
+        "api_gateway",
         route_name=route_name,
         full_path=full_path,
         method=request.method,
         status_code=response.status_code,
-        headers=incoming_headers,
+        # headers=incoming_headers,
         api_key_id=apikey_info["api_key_uuid"],
+        media_type=response.headers.get("Content-Type"),
     )
 
     background_tasks.add_task(client.aclose)

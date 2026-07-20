@@ -683,18 +683,14 @@ class ApiKeyService:
                     RateLimitItemPerMinute(
                         apikey_info["rpm_limit_organization"]
                     ),
-                    "apikey",
-                    "org",
-                    apikey_info["hashed_key"],
+                    apikey_info["organization_uuid"],
                 )
             )
         if apikey_info["rpm_limit_project"]:
             tasks.append(
                 self.limiter.hit(
                     RateLimitItemPerMinute(apikey_info["rpm_limit_project"]),
-                    "apikey",
-                    "org",
-                    apikey_info["hashed_key"],
+                    apikey_info["project_uuid"],
                 )
             )
         if all(await asyncio.gather(*tasks)):
