@@ -54,6 +54,7 @@ class TimescaleDBDailyBillingSummary(BaseTimescaleSQLModel):
     organization_id: Mapped[str] = mapped_column(primary_key=True)
     project_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     apikey_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    service_name: Mapped[str] = mapped_column(String(128), primary_key=True)
 
     total_amount: Mapped[Decimal] = mapped_column(Numeric())
     transaction_count: Mapped[int] = mapped_column(BigInteger)
@@ -90,6 +91,9 @@ class BillingTransaction(
         BigInteger, nullable=True, index=True
     )
     organization_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, index=True
+    )
+    service_name: Mapped[str] = mapped_column(
         String(128), nullable=False, index=True
     )
 

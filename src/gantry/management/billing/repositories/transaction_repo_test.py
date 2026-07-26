@@ -28,6 +28,7 @@ class TransactionRepositoryTest(unittest.IsolatedAsyncioTestCase):
             amount=Decimal("10.5"),
             details={"example": "data"},
             created_at=created_at,
+            service_name="gpt-4",
         )
 
         assert tx.uuid == transaction_uid
@@ -37,6 +38,7 @@ class TransactionRepositoryTest(unittest.IsolatedAsyncioTestCase):
         assert tx.amount == Decimal("10.5")
         assert tx.details == {"example": "data"}
         assert tx.created_at == created_at
+        assert tx.service_name == "gpt-4"
         assert tx.captured_at is None
         assert tx.status == TransactionStatus.PENDING
         session.add.assert_called_once_with(tx)
@@ -56,6 +58,7 @@ class TransactionRepositoryTest(unittest.IsolatedAsyncioTestCase):
             amount=Decimal("10.5"),
             details={},
             created_at=datetime(2026, 1, 15),
+            service_name="gpt-4",
             capture=True,
         )
 
@@ -63,38 +66,6 @@ class TransactionRepositoryTest(unittest.IsolatedAsyncioTestCase):
         assert tx.captured_at is not None
         session.add.assert_called_once_with(tx)
         session.flush.assert_awaited_once()
-
-    async def test_sum_by_period_maps_execute_rows_without_db(self):
-        result = MagicMock()
-        result.all.return_value = [
-            SimpleNamespace(
-                period_bucket=datetime(2026, 1, 1),
-                transaction_count=2,
-                total_amount=Decimal("30.5"),
-            )
-        ]
-        session = MagicMock()
-        session.execute = AsyncMock(return_value=result)
-        repo = TransactionRepository()
-
-        reports = await repo.sumByPeriodByApiKeys(
-            session=session,
-            apikey_ids=[1, 2, 3],
-            org_id="org1",
-            start_time=datetime(2026, 1, 1),
-            end_time=datetime(2026, 12, 31),
-            period=AggregatePeriod.MONTHLY,
-            period_scale=1,
-        )
-
-        assert reports == [
-            {
-                "period_bucket": datetime(2026, 1, 1),
-                "transaction_count": 2,
-                "total_amount": Decimal("30.5"),
-            }
-        ]
-        session.execute.assert_awaited_once()
 
     async def test_get_by_api_keys_short_circuits_empty_list_without_db(self):
         session = MagicMock()
@@ -137,4 +108,81 @@ class TransactionRepositoryTest(unittest.IsolatedAsyncioTestCase):
         )
 
         assert expired == [expired_tx]
+        session.execute.assert_awaited_once()
+
+    async def test_sum_by_period_by_service_and_project_maps_rows_without_db(
+        self,
+    ):
+        result = MagicMock()
+        result.all.return_value = [
+            SimpleNamespace(
+                period_bucket=datetime(2026, 1, 1),
+                transaction_count=3,
+                total_amount=Decimal("45.0"),
+                service_name="gpt-4",
+                project_id=42,
+                project_uuid=uuid7(),
+                project_name="my-project",
+            ),
+        ]
+        session = MagicMock()
+        session.execute = AsyncMock(return_value=result)
+        repo = TransactionRepository()
+
+        reports = (
+            await repo.sumByPeriodByServiceAndProjectGroupedByServiceAndProject(
+                session=session,
+                service_names=["gpt-4"],
+                project_ids=[42],
+                org_id="org1",
+                start_time=datetime(2026, 1, 1),
+                end_time=datetime(2026, 12, 31),
+                period=AggregatePeriod.MONTHLY,
+                period_scale=1,
+            )
+        )
+
+        assert reports == [
+            {
+                "period_bucket": datetime(2026, 1, 1),
+                "transaction_count": 3,
+                "total_amount": Decimal("45.0"),
+                "service_name": "gpt-4",
+                "project_id": 42,
+                "project_uuid": result.all.return_value[0].project_uuid,
+                "project_name": "my-project",
+            },
+        ]
+        session.execute.assert_awaited_once()
+
+    async def test_sum_by_period_by_service_name_maps_rows_without_db(self):
+        result = MagicMock()
+        result.all.return_value = [
+            SimpleNamespace(
+                period_bucket=datetime(2026, 1, 1),
+                transaction_count=4,
+                total_amount=Decimal("55.0"),
+            ),
+        ]
+        session = MagicMock()
+        session.execute = AsyncMock(return_value=result)
+        repo = TransactionRepository()
+
+        reports = await repo.sumByPeriodFilterByServiceName(
+            session=session,
+            service_names=["gpt-4", "claude-3"],
+            org_id="org1",
+            start_time=datetime(2026, 1, 1),
+            end_time=datetime(2026, 12, 31),
+            period=AggregatePeriod.MONTHLY,
+            period_scale=1,
+        )
+
+        assert reports == [
+            {
+                "period_bucket": datetime(2026, 1, 1),
+                "transaction_count": 4,
+                "total_amount": Decimal("55.0"),
+            },
+        ]
         session.execute.assert_awaited_once()

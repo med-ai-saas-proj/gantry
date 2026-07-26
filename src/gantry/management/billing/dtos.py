@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 class PostRequest(BaseModel):
     api_key_uuid: UUID
+    service_name: str
     amount: ScaledAmount
     details: dict = {}
     capture: bool = False
@@ -63,6 +64,16 @@ class TransactionInfoResponse(BaseModel):
     details: dict
     captured_at: datetime | None
     status: TransactionStatus
+    service_name: str
+
+
+class ServiceProjectStatisticsResponse(BaseModel):
+    period_bucket: datetime
+    transaction_count: int
+    total_amount: Decimal
+    service_name: str
+    project_uuid: UUID
+    project_name: str
 
 
 class InvoiceInfoResponse(BaseModel):

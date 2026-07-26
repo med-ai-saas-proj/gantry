@@ -207,6 +207,7 @@ class TransactionService:
     _IDEMPOTENCY_KEY_TTL = (
         3600  # seconds, how long to keep idempotency keys in cache
     )
+    _PROCESSING_IDEMPOTENCY_KEY_TTL = 60  # seconds, how long to keep idempotency keys in cache for processing requests
 
     def __init__(
         self,
@@ -421,13 +422,15 @@ class TransactionService:
         async def load_org_usage_from_db(
             session: AsyncSession,
         ) -> str:
-            usage = await self.transaction_repo.sumByPeriodByOrganizations(
-                session,
-                [org_id],
-                billing_period,
-                next_billing_period,
-                AggregatePeriod.MONTHLY,
-                period_scale=1,
+            usage = (
+                await self.transaction_repo.sumByPeriodFilterByOrganizations(
+                    session,
+                    [org_id],
+                    billing_period,
+                    next_billing_period,
+                    AggregatePeriod.MONTHLY,
+                    period_scale=1,
+                )
             )
             v = (
                 usage[0]["total_amount"]
@@ -439,7 +442,7 @@ class TransactionService:
         async def load_project_usage_from_db(
             session: AsyncSession,
         ) -> str:
-            usage = await self.transaction_repo.sumByPeriodByProjects(
+            usage = await self.transaction_repo.sumByPeriodFilterByProjects(
                 session,
                 [project_id],
                 org_id,
@@ -623,7 +626,7 @@ class TransactionService:
                 json.dumps(transaction_record),  # ARGV[2]
                 str(transaction_uuid),  # ARGV[3]
                 BILLING_CACHE_TTL_SECONDS,  # ARGV[4]
-                self._IDEMPOTENCY_KEY_TTL,  # ARGV[5]
+                self._PROCESSING_IDEMPOTENCY_KEY_TTL,  # ARGV[5]
             ),
         )
         if trx_res == 0:
@@ -676,6 +679,7 @@ class TransactionService:
                     project_id=project_id,
                     org_id=org_id,
                     amount=amount,
+                    service_name=req.service_name,
                     details=req.details,
                     capture=req.capture,
                     created_at=now,
@@ -866,6 +870,7 @@ class TransactionService:
                         date=trx["date"],
                         captured_at=trx["captured_at"],
                         status=trx["status"],
+                        service_name=trx["service_name"],
                     )
                     for trx in transactions
                 ],
@@ -893,6 +898,7 @@ class TransactionService:
                     date=trx["date"],
                     captured_at=trx["captured_at"],
                     status=trx["status"],
+                    service_name=trx["service_name"],
                 )
             )
 
@@ -916,6 +922,7 @@ class TransactionService:
                     date=trx["date"],
                     captured_at=trx["captured_at"],
                     status=trx["status"],
+                    service_name=trx["service_name"],
                 )
             )
 

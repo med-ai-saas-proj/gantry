@@ -7,7 +7,11 @@ from gantry.management.project.dependencies import assertProjectsRole
 from gantry.management.organization.permissions import OrgPermission
 from gantry.management.organization.dependencies import requiredOrgPermission
 
-from ..type import AggregatePeriod, BillingAggregateReport
+from ..dtos import ServiceProjectStatisticsResponse
+from ..type import (
+    AggregatePeriod,
+    BillingAggregateReport,
+)
 from .router import billing_router
 from ..factories import getBillingAggregateQueryService
 from ..services.aggregate_query_service import BillingAggregateQueryService
@@ -44,7 +48,7 @@ async def get_aggregate_by_projects(
             project_service=getProjectService(),
             user_info=user_info,
             project_uuids=project_uids_set,
-            required_permissions=[ProjectPermission.BILLING_VIEW_USAGE],
+            required_permissions=[ProjectPermission.MEMBER],
         )
         project_uids = [UUID(uid) for uid in project_uids_set]
     else:  # if no project_uids filter provided, default to all projects user has access to
@@ -53,7 +57,7 @@ async def get_aggregate_by_projects(
         ]
 
     res = (
-        await billing_service.getAggregateByProjects(
+        await billing_service.getAggregateSumByProjects(
             project_uuids=project_uids,
             org_id=user_info["org_uuid"],
             start_time=period_start,
@@ -63,38 +67,6 @@ async def get_aggregate_by_projects(
         )
     ).unwrap()
     return ListResponse[BillingAggregateReport](data=res)
-
-
-# NOTE: frontend can't call this endpoint due to api key can't show again in the UI after it's created and it without uuid
-# so we can't let users filter by apikeys.
-# @billing_router.get(
-#     "/aggregates/apikeys",
-#     description="Get aggregated billing data for a given period (e.g. daily, monthly) and optional filters (e.g. apikey_id). Useful for dashboards, reports, etc.",
-# )
-# async def get_aggregate_by_apikeys(
-#     user_info: Annotated[UserInfo, Depends(getUserInfo)],
-#     billing_service: Annotated[
-#         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
-#     ],
-#     period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
-#     period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
-#     period: AggregatePeriod,
-#     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
-#     apikeys: list[str] | None = Query(
-#         None
-#     ),  # filter by apikey_id or whole organization
-# ) -> ListResponse[BillingAggregateReport]:
-#     res = (
-#         await billing_service.get_aggregate_by_apikeys(
-#             apikeys=apikeys,
-#             org_id=user_info["org_id"],
-#             start_time=period_start,
-#             end_time=period_end,
-#             aggregate_period=period,
-#             period_scale=period_scale,
-#         )
-#     ).unwrap()
-#     return ListResponse[BillingAggregateReport](data=res)
 
 
 @billing_router.get(
@@ -115,7 +87,7 @@ async def get_aggregate_by_org(
     period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
 ) -> ListResponse[BillingAggregateReport]:
     res = (
-        await billing_service.getAggregateByOrg(
+        await billing_service.getAggregateSumByOrg(
             org_id=user_info["org_uuid"],
             start_time=period_start,
             end_time=period_end,
@@ -124,3 +96,75 @@ async def get_aggregate_by_org(
         )
     ).unwrap()
     return ListResponse[BillingAggregateReport](data=res)
+
+
+@billing_router.get(
+    "/aggregates/services",
+    description="Get aggregated billing data for a given period filtered by service names. Returns a single sum across all specified service names per time bucket. Useful for dashboards, reports, etc.",
+)
+async def get_aggregate_by_service_name(
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    billing_service: Annotated[
+        BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
+    ],
+    period_start: datetime,
+    period_end: datetime,
+    period: AggregatePeriod,
+    period_scale: int = 1,
+    service_names: list[str] = Query(default=[]),
+) -> ListResponse[BillingAggregateReport]:
+    res = (
+        await billing_service.getAggregateSumByServiceName(
+            service_names=service_names,
+            org_id=user_info["org_uuid"],
+            start_time=period_start,
+            end_time=period_end,
+            aggregate_period=period,
+            period_scale=period_scale,
+        )
+    ).unwrap()
+    return ListResponse[BillingAggregateReport](data=res)
+
+
+@billing_router.get(
+    "/aggregates/service-project-statistics",
+    description="Get aggregated billing data grouped by service name and project for a given period. Supports optional filtering by service names and project UUIDs. Useful for dashboards, reports, etc.",
+)
+async def get_aggregate_by_service_and_project(
+    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    billing_service: Annotated[
+        BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
+    ],
+    period_start: datetime,
+    period_end: datetime,
+    period: AggregatePeriod,
+    period_scale: int = 1,
+    service_names: list[str] = Query(default=[]),
+    project_uuids: list[UUID] | None = Query(None),
+) -> ListResponse[ServiceProjectStatisticsResponse]:
+    project_uids_set = (
+        [str(uid) for uid in project_uuids] if project_uuids else []
+    )
+    if project_uids_set:
+        await assertProjectsRole(
+            project_service=getProjectService(),
+            user_info=user_info,
+            project_uuids=project_uids_set,
+            required_permissions=[ProjectPermission.MEMBER],
+        )
+        project_uids = [UUID(uid) for uid in project_uids_set]
+    else:
+        project_uids = None
+
+    res = (
+        await billing_service.getAggregateGroupByAndSumByServiceAndProject(
+            service_names=service_names if service_names else None,
+            project_uuids=project_uids,
+            org_id=user_info["org_uuid"],
+            start_time=period_start,
+            end_time=period_end,
+            aggregate_period=period,
+            period_scale=period_scale,
+        )
+    ).unwrap()
+    return ListResponse[ServiceProjectStatisticsResponse](data=res)

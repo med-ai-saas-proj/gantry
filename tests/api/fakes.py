@@ -699,6 +699,7 @@ def transaction_payload():
         details={"model": "gpt"},
         captured_at=None,
         status=TransactionStatus.PENDING,
+        service_name="gpt-4",
     )
 
 

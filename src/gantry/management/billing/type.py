@@ -20,13 +20,23 @@ class BillingAggregateReport(TypedDict):
     total_amount: Decimal
 
 
-class BillingAggregateReportGroupedBy(TypedDict):
+class BillingAggregateReportGroupedByProject(TypedDict):
     period_bucket: datetime
     transaction_count: int
     total_amount: Decimal
-    group_by_uuid_key: UUID | str
-    group_by_int_key: int
-    group_by_name: str | None
+    project_int: int
+    project_uuid: UUID
+    project_name: str
+
+
+class BillingAggregateReportGroupedByServiceAndProject(TypedDict):
+    period_bucket: datetime
+    transaction_count: int
+    total_amount: Decimal
+    service_name: str
+    project_id: int
+    project_uuid: UUID
+    project_name: str
 
 
 class BillingTransactionInfo(TypedDict):
@@ -38,6 +48,7 @@ class BillingTransactionInfo(TypedDict):
     details: dict
     captured_at: datetime | None
     status: TransactionStatus
+    service_name: str
 
 
 class BillingInvoiceInfo(TypedDict):

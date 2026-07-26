@@ -45,7 +45,7 @@ class AggregateQueryServiceTest(unittest.IsolatedAsyncioTestCase):
             apikey_service=MagicMock(),
         )
 
-        res = await service.getAggregateByOrg(
+        res = await service.getAggregateSumByOrg(
             org_id="org1",
             start_time=datetime(2026, 1, 1, tzinfo=UTC),
             end_time=None,
@@ -56,26 +56,28 @@ class AggregateQueryServiceTest(unittest.IsolatedAsyncioTestCase):
         assert res.status == ResultStatus.Ok
         repo.sumByPeriodByOrganizations.assert_awaited_once()
 
-    async def test_get_aggregate_by_apikeys_uses_api_key_service(self):
+    async def test_get_aggregate_by_service_name_calls_repo(self):
         session = MagicMock()
         repo = MagicMock(spec=TransactionRepository)
-        repo.sumByPeriodByApiKeys = AsyncMock(
-            return_value=[{"total_amount": 1}]
-        )
-        apikey_service = MagicMock()
-        apikey_service.getApiKeysInfo = AsyncMock(
-            return_value=Ok([{"api_key_id": 7}])
+        repo.sumByPeriodByServiceName = AsyncMock(
+            return_value=[
+                {
+                    "period_bucket": datetime(2026, 1, 1),
+                    "transaction_count": 5,
+                    "total_amount": 100,
+                }
+            ]
         )
         logger = MagicMock()
         service = BillingAggregateQueryService(
             logger=logger,
             session_manager=_SessionManager(session),
             transaction_repo=repo,
-            apikey_service=apikey_service,
+            apikey_service=MagicMock(),
         )
 
-        res = await service.getAggregateByApikeys(
-            apikeys=[str(uuid4())],
+        res = await service.getAggregateSumByServiceName(
+            service_names=["gpt-4", "claude-3"],
             org_id="org1",
             start_time=datetime(2026, 1, 1, tzinfo=UTC),
             end_time=None,
@@ -84,5 +86,48 @@ class AggregateQueryServiceTest(unittest.IsolatedAsyncioTestCase):
         )
 
         assert res.status == ResultStatus.Ok
-        apikey_service.getApiKeysInfo.assert_awaited_once()
-        repo.sumByPeriodByApiKeys.assert_awaited_once()
+        repo.sumByPeriodByServiceName.assert_awaited_once_with(
+            session,
+            service_names=["gpt-4", "claude-3"],
+            org_id="org1",
+            start_time=datetime(2026, 1, 1),
+            end_time=None,
+            period=AggregatePeriod.MONTHLY,
+            period_scale=1,
+        )
+
+    async def test_get_aggregate_by_service_and_project_calls_repo(self):
+        session = MagicMock()
+        repo = MagicMock(spec=TransactionRepository)
+        repo.sumByPeriodByServiceAndProjectGroupedByServiceAndProject = (
+            AsyncMock(return_value=[])
+        )
+        logger = MagicMock()
+        service = BillingAggregateQueryService(
+            logger=logger,
+            session_manager=_SessionManager(session),
+            transaction_repo=repo,
+            apikey_service=MagicMock(),
+        )
+
+        res = await service.getAggregateGroupByAndSumByServiceAndProject(
+            service_names=["gpt-4"],
+            project_uuids=None,
+            org_id="org1",
+            start_time=datetime(2026, 1, 1, tzinfo=UTC),
+            end_time=None,
+            aggregate_period=AggregatePeriod.MONTHLY,
+            period_scale=1,
+        )
+
+        assert res.status == ResultStatus.Ok
+        repo.sumByPeriodByServiceAndProjectGroupedByServiceAndProject.assert_awaited_once_with(
+            session,
+            service_names=["gpt-4"],
+            project_ids=None,
+            org_id="org1",
+            start_time=datetime(2026, 1, 1),
+            end_time=None,
+            period=AggregatePeriod.MONTHLY,
+            period_scale=1,
+        )
