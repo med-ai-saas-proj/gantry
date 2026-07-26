@@ -1,12 +1,13 @@
 from pyrusult import Ok, Err, Result
 from gantry.db.session import AsyncSessionManager
-from gantry.management.api_key import ApiKeyService, InvalidAPIKey
 from gantry.management.project import Project, ProjectNotFoundError
 
 from ..dtos import ServiceProjectStatisticsResponse
 from ..type import (
     AggregatePeriod,
     BillingAggregateReport,
+    BillingAggregateReportGroupedByOrg,
+    BillingAggregateReportGroupedByService,
 )
 from ..repositories.transaction_repo import TransactionRepository
 
@@ -24,12 +25,10 @@ class BillingAggregateQueryService:
         logger: BoundLogger,
         session_manager: AsyncSessionManager,
         transaction_repo: TransactionRepository,
-        apikey_service: ApiKeyService,
     ) -> None:
         self.logger = logger
         self.session_manager = session_manager
         self.billing_transaction_repo = transaction_repo
-        self.apikey_service = apikey_service
 
     async def getAggregateSumByProjects(
         self,
@@ -102,7 +101,7 @@ class BillingAggregateQueryService:
             )
             return Ok(agg)
 
-    async def getAggregateSumByServiceName(
+    async def getAggregateSumByServices(
         self,
         service_names: list[str],
         org_id: str,
@@ -112,20 +111,87 @@ class BillingAggregateQueryService:
         period_scale: int,
     ) -> Result[Sequence[BillingAggregateReport], None]:
         async with self.session_manager.get_session() as session:
-            agg = await self.billing_transaction_repo.sumByPeriodFilterByServiceName(
+            agg = (
+                await self.billing_transaction_repo.sumByPeriodFilterByServices(
+                    session,
+                    service_names=service_names,
+                    org_id=org_id,
+                    start_time=start_time.astimezone(UTC).replace(tzinfo=None),
+                    end_time=end_time.astimezone(UTC).replace(tzinfo=None)
+                    if end_time
+                    else None,
+                    period=aggregate_period,
+                    period_scale=period_scale,
+                )
+            )
+            return Ok(agg)
+
+    async def getAggregateGroupByOrgForAdmin(
+        self,
+        start_time: datetime,
+        end_time: datetime | None,
+        aggregate_period: AggregatePeriod,
+        period_scale: int,
+        org_ids: list[str] | None = None,
+    ) -> Result[Sequence[BillingAggregateReportGroupedByOrg], None]:
+        async with self.session_manager.get_session() as session:
+            agg = await self.billing_transaction_repo.sumByPeriodGroupedByOrganizations(
                 session,
-                service_names=service_names,
-                org_id=org_id,
                 start_time=start_time.astimezone(UTC).replace(tzinfo=None),
                 end_time=end_time.astimezone(UTC).replace(tzinfo=None)
                 if end_time
                 else None,
                 period=aggregate_period,
                 period_scale=period_scale,
+                org_ids=org_ids,
             )
             return Ok(agg)
 
-    async def getAggregateGroupByAndSumByServiceAndProject(
+    async def getAggregateGroupByServiceForAdmin(
+        self,
+        start_time: datetime,
+        end_time: datetime | None,
+        aggregate_period: AggregatePeriod,
+        period_scale: int,
+        org_ids: list[str] | None = None,
+    ) -> Result[Sequence[BillingAggregateReportGroupedByService], None]:
+        async with self.session_manager.get_session() as session:
+            agg = await self.billing_transaction_repo.sumByPeriodGroupedByServiceForAdmin(
+                session,
+                start_time=start_time.astimezone(UTC).replace(tzinfo=None),
+                end_time=end_time.astimezone(UTC).replace(tzinfo=None)
+                if end_time
+                else None,
+                period=aggregate_period,
+                period_scale=period_scale,
+                org_ids=org_ids,
+            )
+            return Ok(agg)
+
+    async def getAggregateGroupByService(
+        self,
+        org_id: str,
+        start_time: datetime,
+        end_time: datetime | None,
+        aggregate_period: AggregatePeriod,
+        period_scale: int,
+    ) -> Result[Sequence[BillingAggregateReportGroupedByService], None]:
+        async with self.session_manager.get_session() as session:
+            agg = (
+                await self.billing_transaction_repo.sumByPeriodGroupedByService(
+                    session,
+                    org_id=org_id,
+                    start_time=start_time.astimezone(UTC).replace(tzinfo=None),
+                    end_time=end_time.astimezone(UTC).replace(tzinfo=None)
+                    if end_time
+                    else None,
+                    period=aggregate_period,
+                    period_scale=period_scale,
+                )
+            )
+            return Ok(agg)
+
+    async def getAggregateGroupByServiceAndProject(
         self,
         service_names: list[str] | None,
         project_uuids: list[UUID] | None,

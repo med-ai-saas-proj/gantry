@@ -5,7 +5,9 @@ from ..type import (
     AggregatePeriod,
     BillingAggregateReport,
     BillingTransactionInfo,
+    BillingAggregateReportGroupedByOrg,
     BillingAggregateReportGroupedByProject,
+    BillingAggregateReportGroupedByService,
     BillingAggregateReportGroupedByServiceAndProject,
 )
 from ..models import (
@@ -483,7 +485,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             for row in rows
         ]
 
-    async def sumByPeriodFilterByServiceName(
+    async def sumByPeriodFilterByServices(
         self,
         session: AsyncSession,
         service_names: list[str],
@@ -526,6 +528,153 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
                 "period_bucket": row.period_bucket,
                 "transaction_count": row.transaction_count,
                 "total_amount": row.total_amount,
+            }
+            for row in rows
+        ]
+
+    async def sumByPeriodGroupedByOrganizations(
+        self,
+        session: AsyncSession,
+        start_time: datetime,
+        end_time: datetime | None,
+        period: AggregatePeriod,
+        period_scale: int = 1,
+        org_ids: list[str] | None = None,
+    ) -> Sequence[BillingAggregateReportGroupedByOrg]:
+        """Sum total amount per organization per time bucket."""
+        bucket = func.public.time_bucket(
+            text(f"'{period_scale} {bucket_map[period]}'"),
+            TimescaleDBDailyBillingSummary.bucket,
+        ).label("period_bucket")
+        stmt = select(
+            bucket,
+            TimescaleDBDailyBillingSummary.organization_id,
+            func.coalesce(
+                func.sum(TimescaleDBDailyBillingSummary.transaction_count),
+                0,
+            ).label("transaction_count"),
+            func.coalesce(
+                func.sum(TimescaleDBDailyBillingSummary.total_amount),
+                Decimal("0"),
+            ).label("total_amount"),
+        ).where(
+            TimescaleDBDailyBillingSummary.bucket >= start_time,
+        )
+        if org_ids is not None and len(org_ids) > 0:
+            stmt = stmt.where(
+                TimescaleDBDailyBillingSummary.organization_id.in_(org_ids)
+            )
+        if end_time:
+            stmt = stmt.where(TimescaleDBDailyBillingSummary.bucket < end_time)
+        stmt = stmt.group_by(
+            bucket, TimescaleDBDailyBillingSummary.organization_id
+        )
+
+        result = await session.execute(stmt)
+        rows = result.all()
+        return [
+            {
+                "period_bucket": row.period_bucket,
+                "transaction_count": row.transaction_count,
+                "total_amount": row.total_amount,
+                "organization_id": row.organization_id,
+            }
+            for row in rows
+        ]
+
+    async def sumByPeriodGroupedByServiceForAdmin(
+        self,
+        session: AsyncSession,
+        start_time: datetime,
+        end_time: datetime | None,
+        period: AggregatePeriod,
+        period_scale: int = 1,
+        org_ids: list[str] | None = None,
+    ) -> Sequence[BillingAggregateReportGroupedByService]:
+        """Sum total amount per service name per time bucket (admin: optional org filter)."""
+        bucket = func.public.time_bucket(
+            text(f"'{period_scale} {bucket_map[period]}'"),
+            TimescaleDBDailyBillingSummary.bucket,
+        ).label("period_bucket")
+        stmt = select(
+            bucket,
+            TimescaleDBDailyBillingSummary.service_name,
+            func.coalesce(
+                func.sum(TimescaleDBDailyBillingSummary.transaction_count),
+                0,
+            ).label("transaction_count"),
+            func.coalesce(
+                func.sum(TimescaleDBDailyBillingSummary.total_amount),
+                Decimal("0"),
+            ).label("total_amount"),
+        ).where(
+            TimescaleDBDailyBillingSummary.bucket >= start_time,
+        )
+        if org_ids is not None and len(org_ids) > 0:
+            stmt = stmt.where(
+                TimescaleDBDailyBillingSummary.organization_id.in_(org_ids)
+            )
+        if end_time:
+            stmt = stmt.where(TimescaleDBDailyBillingSummary.bucket < end_time)
+        stmt = stmt.group_by(
+            bucket, TimescaleDBDailyBillingSummary.service_name
+        )
+
+        result = await session.execute(stmt)
+        rows = result.all()
+        return [
+            {
+                "period_bucket": row.period_bucket,
+                "transaction_count": row.transaction_count,
+                "total_amount": row.total_amount,
+                "service_name": row.service_name,
+            }
+            for row in rows
+        ]
+
+    async def sumByPeriodGroupedByService(
+        self,
+        session: AsyncSession,
+        org_id: str,
+        start_time: datetime,
+        end_time: datetime | None,
+        period: AggregatePeriod,
+        period_scale: int = 1,
+    ) -> Sequence[BillingAggregateReportGroupedByService]:
+        """Sum total amount per service name per time bucket for a single org."""
+        bucket = func.public.time_bucket(
+            text(f"'{period_scale} {bucket_map[period]}'"),
+            TimescaleDBDailyBillingSummary.bucket,
+        ).label("period_bucket")
+        stmt = select(
+            bucket,
+            TimescaleDBDailyBillingSummary.service_name,
+            func.coalesce(
+                func.sum(TimescaleDBDailyBillingSummary.transaction_count),
+                0,
+            ).label("transaction_count"),
+            func.coalesce(
+                func.sum(TimescaleDBDailyBillingSummary.total_amount),
+                Decimal("0"),
+            ).label("total_amount"),
+        ).where(
+            TimescaleDBDailyBillingSummary.organization_id == org_id,
+            TimescaleDBDailyBillingSummary.bucket >= start_time,
+        )
+        if end_time:
+            stmt = stmt.where(TimescaleDBDailyBillingSummary.bucket < end_time)
+        stmt = stmt.group_by(
+            bucket, TimescaleDBDailyBillingSummary.service_name
+        )
+
+        result = await session.execute(stmt)
+        rows = result.all()
+        return [
+            {
+                "period_bucket": row.period_bucket,
+                "transaction_count": row.transaction_count,
+                "total_amount": row.total_amount,
+                "service_name": row.service_name,
             }
             for row in rows
         ]

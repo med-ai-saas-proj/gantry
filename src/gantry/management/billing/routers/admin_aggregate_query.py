@@ -6,6 +6,8 @@ from ..dtos import ServiceProjectStatisticsResponse
 from ..type import (
     AggregatePeriod,
     BillingAggregateReport,
+    BillingAggregateReportGroupedByOrg,
+    BillingAggregateReportGroupedByService,
 )
 from .router import billing_router
 from ..factories import getBillingAggregateQueryService
@@ -20,22 +22,22 @@ from fastapi import Query, Depends
 
 @billing_router.get(
     "/admin/aggregates/projects",
-    description="Get aggregated billing data for a given period (e.g. daily, monthly) and optional filters (e.g. project_id). Useful for dashboards, reports, etc.",
+    description="Aggregate usage costs across one or more projects in a specified organization, bucketed by the specified time period. When no project UUIDs are provided, all projects in the org are included. Returns one entry per time bucket with the summed cost.",
     tags=["admin"],
 )
-async def get_aggregate_by_projects(
+async def get_aggregate_sum_by_projects(
     admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],
     org_id: str,
-    period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
-    period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
+    period_start: datetime,  # inclusive start of the aggregation window, ISO 8601
+    period_end: datetime,  # exclusive end of the aggregation window, ISO 8601
     period: AggregatePeriod,
-    period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
+    period_scale: int = 1,  # number of native period units per bucket
     project_uuids: list[UUID] | None = Query(
         None
-    ),  # filter by project_uuid or whole organization
+    ),  # restrict to specific project UUIDs; if omitted, all projects in the org are included
 ) -> ListResponse[BillingAggregateReport]:
     res = (
         await billing_service.getAggregateSumByProjects(
@@ -52,19 +54,19 @@ async def get_aggregate_by_projects(
 
 @billing_router.get(
     "/admin/aggregates/organizations",
-    description="Get aggregated billing data for a given period (e.g. daily, monthly) for the whole organization. Useful for dashboards, reports, etc.",
+    description="Aggregate usage costs for an entire organization, bucketed by the specified time period. Returns one entry per time bucket with the summed cost across all projects and services in the org.",
     tags=["admin"],
 )
-async def get_aggregate_by_org(
+async def get_aggregate_sum_by_org(
     admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],
     org_id: str,
-    period_start: datetime,  # ISO date string to specify the start of the aggregation period (e.g. "2024-01-01")
-    period_end: datetime,  # ISO date string to specify the end of the aggregation period (e.g. "2024-01-31")
+    period_start: datetime,  # inclusive start of the aggregation window, ISO 8601
+    period_end: datetime,  # exclusive end of the aggregation window, ISO 8601
     period: AggregatePeriod,
-    period_scale: int = 1,  # e.g. if period=DAILY and period_scale=2 -> aggregate by 2 days
+    period_scale: int = 1,  # number of native period units per bucket
 ) -> ListResponse[BillingAggregateReport]:
     res = (
         await billing_service.getAggregateSumByOrg(
@@ -80,10 +82,10 @@ async def get_aggregate_by_org(
 
 @billing_router.get(
     "/admin/aggregates/services",
-    description="Get aggregated billing data for a given period filtered by service names. Returns a single sum across all specified service names per time bucket. Useful for dashboards, reports, etc.",
+    description="Aggregate usage costs across specified service names in a given organization, bucketed by the specified time period. When no service names are provided, all services are included. Returns one entry per time bucket with the summed cost.",
     tags=["admin"],
 )
-async def get_aggregate_by_service_name(
+async def get_aggregate_sum_by_services(
     admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
@@ -96,7 +98,7 @@ async def get_aggregate_by_service_name(
     service_names: list[str] = Query(default=[]),
 ) -> ListResponse[BillingAggregateReport]:
     res = (
-        await billing_service.getAggregateSumByServiceName(
+        await billing_service.getAggregateSumByServices(
             service_names=service_names,
             org_id=org_id,
             start_time=period_start,
@@ -109,11 +111,11 @@ async def get_aggregate_by_service_name(
 
 
 @billing_router.get(
-    "/admin/aggregates/service-project-statistics",
-    description="Get aggregated billing data grouped by service name and project for a given period. Supports optional filtering by service names and project UUIDs. Useful for dashboards, reports, etc.",
+    "/admin/aggregates/grouped-by-service-and-project",
+    description="Aggregate usage costs grouped by (service name, project) within a given organization, bucketed by the specified time period. Returns per-service and per-project breakdowns one row at a time, allowing callers to reconstruct a grid of service × project costs.",
     tags=["admin"],
 )
-async def get_aggregate_by_service_and_project(
+async def get_aggregate_grouped_by_service_and_project(
     admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
@@ -127,7 +129,7 @@ async def get_aggregate_by_service_and_project(
     project_uuids: list[UUID] | None = Query(None),
 ) -> ListResponse[ServiceProjectStatisticsResponse]:
     res = (
-        await billing_service.getAggregateGroupByAndSumByServiceAndProject(
+        await billing_service.getAggregateGroupByServiceAndProject(
             service_names=service_names if service_names else None,
             project_uuids=project_uuids,
             org_id=org_id,
@@ -138,3 +140,59 @@ async def get_aggregate_by_service_and_project(
         )
     ).unwrap()
     return ListResponse[ServiceProjectStatisticsResponse](data=res)
+
+
+@billing_router.get(
+    "/admin/aggregates/grouped-by-organizations",
+    description="Aggregate usage costs grouped by organization, bucketed by the specified time period. Optionally filter by specific org IDs. Returns one entry per time bucket per org with the total cost for that org.",
+    tags=["admin"],
+)
+async def get_aggregate_grouped_by_org(
+    admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
+    billing_service: Annotated[
+        BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
+    ],
+    period_start: datetime,
+    period_end: datetime,
+    period: AggregatePeriod,
+    period_scale: int = 1,
+    org_ids: list[str] = Query(default=[]),
+) -> ListResponse[BillingAggregateReportGroupedByOrg]:
+    res = (
+        await billing_service.getAggregateGroupByOrgForAdmin(
+            start_time=period_start,
+            end_time=period_end,
+            aggregate_period=period,
+            period_scale=period_scale,
+            org_ids=org_ids if org_ids else None,
+        )
+    ).unwrap()
+    return ListResponse[BillingAggregateReportGroupedByOrg](data=res)
+
+
+@billing_router.get(
+    "/admin/aggregates/grouped-by-services",
+    description="Aggregate usage costs grouped by service name, bucketed by the specified time period. Optionally filter by specific org IDs. Returns one entry per time bucket per service with the total cost for that service.",
+    tags=["admin"],
+)
+async def get_aggregate_grouped_by_service(
+    admin_info: Annotated[AdminInfo, Depends(getAdminInfo)],
+    billing_service: Annotated[
+        BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
+    ],
+    period_start: datetime,
+    period_end: datetime,
+    period: AggregatePeriod,
+    period_scale: int = 1,
+    org_ids: list[str] = Query(default=[]),
+) -> ListResponse[BillingAggregateReportGroupedByService]:
+    res = (
+        await billing_service.getAggregateGroupByServiceForAdmin(
+            start_time=period_start,
+            end_time=period_end,
+            aggregate_period=period,
+            period_scale=period_scale,
+            org_ids=org_ids if org_ids else None,
+        )
+    ).unwrap()
+    return ListResponse[BillingAggregateReportGroupedByService](data=res)

@@ -29,6 +29,20 @@ class BillingAggregateReportGroupedByProject(TypedDict):
     project_name: str
 
 
+class BillingAggregateReportGroupedByOrg(TypedDict):
+    period_bucket: datetime
+    transaction_count: int
+    total_amount: Decimal
+    organization_id: str
+
+
+class BillingAggregateReportGroupedByService(TypedDict):
+    period_bucket: datetime
+    transaction_count: int
+    total_amount: Decimal
+    service_name: str
+
+
 class BillingAggregateReportGroupedByServiceAndProject(TypedDict):
     period_bucket: datetime
     transaction_count: int

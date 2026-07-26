@@ -168,7 +168,7 @@ class TransactionRepositoryTest(unittest.IsolatedAsyncioTestCase):
         session.execute = AsyncMock(return_value=result)
         repo = TransactionRepository()
 
-        reports = await repo.sumByPeriodFilterByServiceName(
+        reports = await repo.sumByPeriodFilterByServices(
             session=session,
             service_names=["gpt-4", "claude-3"],
             org_id="org1",
