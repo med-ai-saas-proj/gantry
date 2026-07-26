@@ -25,8 +25,6 @@ class ProjectPermission(str, Enum):
     RAG_MANAGE = "project.rag.manage"
     FILE_STORAGE_MANAGE = "project.file_storage.manage"
 
-    BILLING_VIEW_USAGE = "project.billing.view_usage"
-
 
 PERMISSION_HIERARCHY: Final[
     dict[ProjectPermission, list[ProjectPermission]]

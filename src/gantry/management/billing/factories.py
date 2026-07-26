@@ -63,13 +63,10 @@ def getBillingSourceService() -> BillingSourceService:
 
 @lru_cache(1)
 def getBillingAggregateQueryService() -> BillingAggregateQueryService:
-    from gantry.management.api_key.factories import getApiKeyService
-
     return BillingAggregateQueryService(
         logger=getLogger(),
         session_manager=getSessionManager(),
         transaction_repo=TransactionRepository(),
-        apikey_service=getApiKeyService(),
     )
 
 

@@ -450,23 +450,25 @@ class InvoiceService:
             if have_pending:
                 return Err(ExistingPendingTransactionsError())
 
-            total_usage = await self.transaction_repo.sumByPeriodByProjectsGroupedByProjects(
-                session=session,
-                org_id=org_id,
-                project_ids=None,  # all projects
-                start_time=previous_period,
-                end_time=current_period,
-                period=AggregatePeriod.MONTHLY,
-                period_scale=1,
+            total_usage = (
+                await self.transaction_repo.sumByPeriodGroupedByProjects(
+                    session=session,
+                    org_id=org_id,
+                    project_ids=None,  # all projects
+                    start_time=previous_period,
+                    end_time=current_period,
+                    period=AggregatePeriod.MONTHLY,
+                    period_scale=1,
+                )
             )
             lines: list[CreateBillingInvoiceLineItemInfo] = []
             for usage in total_usage:
                 print(usage)
                 lines.append(
                     {
-                        "description": f"Usage in {usage['period_bucket'].date()}: {usage['group_by_name']}",
+                        "description": f"Usage in {usage['period_bucket'].date()}: {usage['project_name']}",
                         "amount": usage["total_amount"],
-                        "project_id": usage["group_by_int_key"],
+                        "project_id": usage["project_int"],
                     }
                 )
             total_amount = sum([line["amount"] for line in lines], Decimal(0))
