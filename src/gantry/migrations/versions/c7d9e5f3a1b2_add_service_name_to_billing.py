@@ -102,13 +102,13 @@ def upgrade() -> None:
     );"""
     )
 
-    op.execute(
-        """CALL "public".refresh_continuous_aggregate (
-            '"Billing"."daily_billing_summary"',
-            '2020-01-01',
-            (now() - INTERVAL '1 hour')::timestamp
-        );"""
-    )
+    # op.execute(
+    #     """CALL "public".refresh_continuous_aggregate (
+    #         '"Billing"."daily_billing_summary"',
+    #         '2020-01-01',
+    #         (now() - INTERVAL '1 hour')::timestamp
+    #     );"""
+    # )
 
 
 def downgrade() -> None:
