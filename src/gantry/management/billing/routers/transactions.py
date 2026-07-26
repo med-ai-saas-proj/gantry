@@ -6,6 +6,8 @@ from gantry.management.project.dependencies import (
     assertProjectRole,
     assertProjectsRole,
 )
+from gantry.management.organization.permissions import OrgPermission
+from gantry.management.organization.dependencies import requiredOrgPermission
 from gantry.shared.custom_types.responses.response import (
     ObjectResponse,
     PaginatedResponse,
@@ -31,7 +33,7 @@ from fastapi.params import Depends
 async def listTransactions(
     user_info: Annotated[
         UserInfo,
-        Security(getUserInfo),
+        Depends(requiredOrgPermission(OrgPermission.BILLING_VIEW_USAGE)),
     ],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
@@ -53,7 +55,7 @@ async def listTransactions(
             project_service=getProjectService(),
             user_info=user_info,
             project_uuids=project_uids_set,
-            required_permissions=[ProjectPermission.BILLING_VIEW_USAGE],
+            required_permissions=[ProjectPermission.MEMBER],
         )
         project_uuids = [UUID(uid) for uid in project_uids_set]
     else:  # if no project_uids filter provided, default to all projects user has access to
@@ -80,7 +82,10 @@ async def listTransactions(
 )
 async def getTransactionDetails(
     transaction_uid: UUID,
-    user_info: Annotated[UserInfo, Security(getUserInfo)],
+    user_info: Annotated[
+        UserInfo,
+        Depends(requiredOrgPermission(OrgPermission.BILLING_VIEW_USAGE)),
+    ],
     billing_service: Annotated[
         TransactionService, Depends(getBillingTransactionService)
     ],
@@ -95,7 +100,7 @@ async def getTransactionDetails(
         project_service=getProjectService(),
         user_info=user_info,
         project_uuid=str(res.project_uuid),
-        required_permissions=[ProjectPermission.BILLING_VIEW_USAGE],
+        required_permissions=[ProjectPermission.MEMBER],
     )
 
     return ObjectResponse[TransactionInfoResponse](data=res)

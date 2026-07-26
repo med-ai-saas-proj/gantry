@@ -28,7 +28,10 @@ from fastapi import Query, Depends
     description="Get aggregated billing data for a given period (e.g. daily, monthly) and optional filters (e.g. project_id). Useful for dashboards, reports, etc.",
 )
 async def get_aggregate_by_projects(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo,
+        Depends(requiredOrgPermission(OrgPermission.BILLING_VIEW_USAGE)),
+    ],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],
@@ -103,7 +106,10 @@ async def get_aggregate_by_org(
     description="Get aggregated billing data for a given period filtered by service names. Returns a single sum across all specified service names per time bucket. Useful for dashboards, reports, etc.",
 )
 async def get_aggregate_by_service_name(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo,
+        Depends(requiredOrgPermission(OrgPermission.BILLING_VIEW_USAGE)),
+    ],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],
@@ -131,7 +137,10 @@ async def get_aggregate_by_service_name(
     description="Get aggregated billing data grouped by service name and project for a given period. Supports optional filtering by service names and project UUIDs. Useful for dashboards, reports, etc.",
 )
 async def get_aggregate_by_service_and_project(
-    user_info: Annotated[UserInfo, Depends(getUserInfo)],
+    user_info: Annotated[
+        UserInfo,
+        Depends(requiredOrgPermission(OrgPermission.BILLING_VIEW_USAGE)),
+    ],
     billing_service: Annotated[
         BillingAggregateQueryService, Depends(getBillingAggregateQueryService)
     ],
