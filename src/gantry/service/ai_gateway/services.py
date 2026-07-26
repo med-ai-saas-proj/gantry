@@ -94,7 +94,7 @@ class AiGatewayService:
     async def route(
         self,
         model: str,
-        project_id: int,
+        project_id: int | None,
         run_input: RunAgentInput,
         model_settings: ModelSettings,
         max_turns: int = 100,
@@ -105,31 +105,35 @@ class AiGatewayService:
             return Err(ModelNotFound())
         # Get messages form conversation services using run_input.thread_id and run_input.parent_run_id
 
+        input_message = run_input.messages
         conversation_uuid = UUID(run_input.thread_id)
         parent_run_id = (
             UUID(run_input.parent_run_id) if run_input.parent_run_id else None
         )
-        input_message = run_input.messages
-        messages_history = (
-            await self.tree_conversation_service.getConversationMessages(
-                conversation_uid=conversation_uuid,
-                project_id=project_id,
-                branch_node_id=parent_run_id,
-                limit=max_turns - len(input_message),
-                order_by="desc",
+        if project_id:
+            messages_history = (
+                await self.tree_conversation_service.getConversationMessages(
+                    conversation_uid=conversation_uuid,
+                    project_id=project_id,
+                    branch_node_id=parent_run_id,
+                    limit=max_turns - len(input_message),
+                    order_by="desc",
+                )
             )
-        )
 
-        is_new_conversation = False
-        if messages_history.status == ResultStatus.Err:
-            messages_history = []
-            await self.tree_conversation_service.createConversation(
-                project_id, {}, None, conversation_uuid
-            )
-            is_new_conversation = True
+            is_new_conversation = False
+            if messages_history.status == ResultStatus.Err:
+                messages_history = []
+                await self.tree_conversation_service.createConversation(
+                    project_id, {}, None, conversation_uuid
+                )
+                is_new_conversation = True
+            else:
+                messages_history = messages_history.value
+                messages_history = list(reversed(messages_history))
         else:
-            messages_history = messages_history.value
-            messages_history = list(reversed(messages_history))
+            messages_history = []
+            is_new_conversation = True
 
         system_messages = []
         if system_prompt:
@@ -232,7 +236,7 @@ class AiGatewayService:
             new_messages = AGUIAdapter.dump_messages(run_result.new_messages())
 
             title_usage: RunUsage | None = None
-            if is_new_conversation:
+            if is_new_conversation and project_id is not None:
                 generated_title = False
                 # Generate a title from the first user message
                 for msg in input_message:
@@ -280,8 +284,8 @@ class AiGatewayService:
                         conversation_uuid, project_id, {"title": "Untitled"}
                     )
 
-            res = (
-                await self.tree_conversation_service.storeConversationMessages(
+            if project_id is not None:
+                res = await self.tree_conversation_service.storeConversationMessages(
                     conversation_uuid,
                     project_id,
                     [
@@ -304,13 +308,12 @@ class AiGatewayService:
                     ],
                     from_node_id=parent_run_id,
                 )
-            )
-            if res.status == ResultStatus.Err:
-                yield RunErrorEvent(
-                    timestamp=self.getTimestamp(),
-                    message=res.value.detail
-                    or "Failed to store conversation messages",
-                )
+                if res.status == ResultStatus.Err:
+                    yield RunErrorEvent(
+                        timestamp=self.getTimestamp(),
+                        message=res.value.detail
+                        or "Failed to store conversation messages",
+                    )
 
             yield MessagesSnapshotEvent(
                 timestamp=self.getTimestamp(),

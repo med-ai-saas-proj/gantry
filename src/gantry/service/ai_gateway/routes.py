@@ -54,20 +54,34 @@ async def get_models(
     # response_class=EventSourceResponse,
 )
 async def ag_ui_gateway(
-    project_id: Annotated[UUID, Query()],
     ai_gateway_service: Annotated[
         AiGatewayService, Depends(getAiGatewayService)
     ],
     model: Annotated[str, Path()],
     run_input: Annotated[RunAgentInputWithModelSettings, Body(embed=False)],
+    project_id: Annotated[UUID | None, Query()] = None,
 ):
 
     model_settings = run_input.model_settings or {}
+    if project_id is not None:
+        return EventSourceResponse(
+            (
+                await ai_gateway_service.routeWithProjectUUID(
+                    model,
+                    project_id,
+                    run_input,
+                    model_settings,
+                    system_prompt=run_input.system_prompt,
+                    max_turns=run_input.max_turns or 100,
+                    reserved_tokens=run_input.reserved_tokens or 0,
+                )
+            ).unwrap()
+        )
     return EventSourceResponse(
         (
-            await ai_gateway_service.routeWithProjectUUID(
+            await ai_gateway_service.route(
                 model,
-                project_id,
+                None,
                 run_input,
                 model_settings,
                 system_prompt=run_input.system_prompt,

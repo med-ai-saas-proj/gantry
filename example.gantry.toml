@@ -93,21 +93,32 @@ prometheus_port = 9000
 "gpt-oss-20b" = { provider = "groq", model_id = "openai/gpt-oss-20b", context_window = 128000, api_key = "gsk_" }
 "deepseek-v4-flash" = { provider = "openai", model_id = "deepseek-v4-flash", context_window = 1000000, api_key = "sk-", base_url = "https://api.deepseek.com" }
 
-[api_gateway]
-routes = { "chat" = { "address" = "http://localhost:3000/chat/", required_perms = [
-    "chatbot",
-] }, "patients" = { address = "http://localhost:3000/patients/", required_perms = [
-    "medical-records",
-] }, "hospitalizations" = { address = "http://localhost:3000/hospitalizations/", required_perms = [
-    "medical-records",
-] }, "medical-records" = { address = "http://localhost:3000/medical-records/", required_perms = [
-    "medical-records",
-] }, "extract" = { address = "http://localhost:3000/extract/", required_perms = [
-    "medical-records",
-] } }
+# [api_gateway]
+# routes = { "chat" = { "address" = "http://localhost:3000/chat/", required_perms = [
+#     "chatbot",
+# ] }, "patients" = { address = "http://localhost:3000/patients/", required_perms = [
+#     "medical-records",
+# ] }, "hospitalizations" = { address = "http://localhost:3000/hospitalizations/", required_perms = [
+#     "medical-records",
+# ] }, "medical-records" = { address = "http://localhost:3000/medical-records/", required_perms = [
+#     "medical-records",
+# ] }, "extract" = { address = "http://localhost:3000/extract/", required_perms = [
+#     "medical-records",
+# ] } }
 
 # routes = { "get_objects" = { "address" = "https://api.restful-api.dev/objects", required_perms = [
 #     "objects:read",
 # ] }, "create_object" = { "address" = "https://api.restful-api.dev/objects", required_perms = [
 #     "object:write",
 # ] } }
+
+[[apikey.permissions]]
+id = "working-app"
+name = "Working App"
+description = "Access to working app"
+
+[api_gateway.routes.working-app]
+address = "http://localhost:3000"
+required_perms = ["working-app"]
+auto_hold = 1
+auto_charge = 1
