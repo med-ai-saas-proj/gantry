@@ -182,7 +182,7 @@ class AggregateQueryServiceTest(unittest.IsolatedAsyncioTestCase):
         repo.sumByPeriodGroupedByOrganizations = AsyncMock(return_value=[])
         service, session = self._make_service(repo)
 
-        res = await service.getAggregateGroupByOrgForAdmin(
+        res = await service.getAggregateGroupByOrgAll(
             start_time=datetime(2026, 1, 1, tzinfo=UTC),
             end_time=None,
             aggregate_period=AggregatePeriod.MONTHLY,
@@ -204,7 +204,7 @@ class AggregateQueryServiceTest(unittest.IsolatedAsyncioTestCase):
         repo.sumByPeriodGroupedByOrganizations = AsyncMock(return_value=[])
         service, session = self._make_service(repo)
 
-        res = await service.getAggregateGroupByOrgForAdmin(
+        res = await service.getAggregateGroupByOrgAll(
             start_time=datetime(2026, 1, 1, tzinfo=UTC),
             end_time=datetime(2026, 2, 1, tzinfo=UTC),
             aggregate_period=AggregatePeriod.DAILY,
@@ -240,7 +240,7 @@ class AggregateQueryServiceTest(unittest.IsolatedAsyncioTestCase):
         )
         service, session = self._make_service(repo)
 
-        res = await service.getAggregateGroupByServiceForAdmin(
+        res = await service.getAggregateGroupByServiceAll(
             start_time=datetime(2026, 1, 1, tzinfo=UTC),
             end_time=datetime(2026, 2, 1, tzinfo=UTC),
             aggregate_period=AggregatePeriod.DAILY,
@@ -271,7 +271,7 @@ class AggregateQueryServiceTest(unittest.IsolatedAsyncioTestCase):
         )
         service, session = self._make_service(repo)
 
-        res = await service.getAggregateGroupByServiceForAdmin(
+        res = await service.getAggregateGroupByServiceAll(
             start_time=datetime(2026, 1, 1, tzinfo=UTC),
             end_time=datetime(2026, 2, 1, tzinfo=UTC),
             aggregate_period=AggregatePeriod.DAILY,

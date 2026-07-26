@@ -582,7 +582,7 @@ class TransactionRepository(Repository[BillingTransaction, UUID]):
             for row in rows
         ]
 
-    async def sumByPeriodGroupedByServiceForAdmin(
+    async def sumByPeriodGroupedByServiceAll(
         self,
         session: AsyncSession,
         start_time: datetime,

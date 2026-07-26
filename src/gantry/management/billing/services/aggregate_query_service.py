@@ -126,7 +126,7 @@ class BillingAggregateQueryService:
             )
             return Ok(agg)
 
-    async def getAggregateGroupByOrgForAdmin(
+    async def getAggregateGroupByOrgAll(
         self,
         start_time: datetime,
         end_time: datetime | None,
@@ -147,7 +147,7 @@ class BillingAggregateQueryService:
             )
             return Ok(agg)
 
-    async def getAggregateGroupByServiceForAdmin(
+    async def getAggregateGroupByServiceAll(
         self,
         start_time: datetime,
         end_time: datetime | None,
@@ -156,7 +156,7 @@ class BillingAggregateQueryService:
         org_ids: list[str] | None = None,
     ) -> Result[Sequence[BillingAggregateReportGroupedByService], None]:
         async with self.session_manager.get_session() as session:
-            agg = await self.billing_transaction_repo.sumByPeriodGroupedByServiceForAdmin(
+            agg = await self.billing_transaction_repo.sumByPeriodGroupedByServiceAll(
                 session,
                 start_time=start_time.astimezone(UTC).replace(tzinfo=None),
                 end_time=end_time.astimezone(UTC).replace(tzinfo=None)

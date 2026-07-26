@@ -159,7 +159,7 @@ async def get_aggregate_grouped_by_org(
     org_ids: list[str] = Query(default=[]),
 ) -> ListResponse[BillingAggregateReportGroupedByOrg]:
     res = (
-        await billing_service.getAggregateGroupByOrgForAdmin(
+        await billing_service.getAggregateGroupByOrgAll(
             start_time=period_start,
             end_time=period_end,
             aggregate_period=period,
@@ -187,7 +187,7 @@ async def get_aggregate_grouped_by_service(
     org_ids: list[str] = Query(default=[]),
 ) -> ListResponse[BillingAggregateReportGroupedByService]:
     res = (
-        await billing_service.getAggregateGroupByServiceForAdmin(
+        await billing_service.getAggregateGroupByServiceAll(
             start_time=period_start,
             end_time=period_end,
             aggregate_period=period,
