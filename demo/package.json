@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "@ag-ui/client": "^0.0.57",
+    "@ag-ui/core": "^0.0.57",
     "express": "^5.2.1"
   }
 }

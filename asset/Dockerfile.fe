@@ -1,0 +1,18 @@
+FROM alpine AS downloads
+ADD https://github.com/med-ai-saas-proj/user-dashboard/releases/download/latest/dist.tar.gz /tmp/user-dashboard.tar.gz
+ADD https://github.com/med-ai-saas-proj/admin-dashboard/releases/download/latest/dist.tar.gz /tmp/admin-dashboard.tar.gz
+RUN mkdir -p /out/user-dashboard /out/admin-dashboard && \
+    tar -xzf /tmp/user-dashboard.tar.gz -C /out/user-dashboard/ && \
+    tar -xzf /tmp/admin-dashboard.tar.gz -C /out/admin-dashboard/
+
+FROM nginx:stable AS serve
+
+COPY --from=downloads /out/user-dashboard/ /var/www/user-dashboard/
+COPY --from=downloads /out/admin-dashboard/ /var/www/admin-dashboard/
+
+COPY nginx-fes.conf /etc/nginx/nginx.conf
+
+# User-dashboard
+EXPOSE 3000
+# Admin-dashboard
+EXPOSE 5173

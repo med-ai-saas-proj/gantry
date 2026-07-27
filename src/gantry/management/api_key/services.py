@@ -147,7 +147,7 @@ class ApiKeyService:
         self.permissions = permissions
         self.permissions_ids_set = set(p.id for p in self.permissions)
         self.limits_storage = limits_storage
-        self.limiter = strategies.FixedWindowRateLimiter(self.limits_storage)
+        self.limiter = strategies.MovingWindowRateLimiter(self.limits_storage)
 
     def _createApiKeySecret(self) -> str:
         return secrets.token_urlsafe(self.api_key_secret_length)
@@ -519,10 +519,12 @@ class ApiKeyService:
             return api_key_res.into()
         api_key = api_key_res.unwrap()
         return Ok(
-            {
-                "api_key_id": int(api_key["api_key_id"]),
-                "project_id": int(api_key["project_id"]),
-            }
+            ApiKeyInternalIds(
+                {
+                    "api_key_id": int(api_key["api_key_id"]),
+                    "project_id": int(api_key["project_id"]),
+                }
+            )
         )
 
     async def getApiKeysInfo(

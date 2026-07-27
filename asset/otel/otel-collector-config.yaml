@@ -28,31 +28,31 @@ exporters:
       enabled: true
 
   otlphttp/loki:
-    endpoint:  http://loki:3100/otlp
+    endpoint: http://loki:3100/otlp
     tls:
       insecure: true
 
   debug:
     verbosity: detailed
 
-  otlp/jaeger:
-    endpoint: jaeger:4317
-    tls:
-      insecure: true
-
+  # otlp/jaeger:
+  #   endpoint: jaeger:4317
+  #   tls:
+  #     insecure: true
 
 service:
   telemetry:
     logs:
       encoding: json
+      level: warn
 
   extensions:
     - health_check
   pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [otlp/jaeger, debug]
+    # traces:
+    #   receivers: [otlp]
+    #   processors: [batch]
+    #   exporters: [otlp/jaeger, debug]
     metrics:
       receivers: [otlp]
       processors: [batch]

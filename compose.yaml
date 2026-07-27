@@ -18,8 +18,6 @@ services:
         reservations:
           cpus: "0.1"
           memory: 20M
-    profiles:
-      - full
 
   prometheus:
     image: prom/prometheus:latest
@@ -218,6 +216,25 @@ services:
       - frontend-dev
     volumes:
       - ./gantry.toml:/app/gantry.toml:ro
+
+  frontends:
+    build:
+      context: ./asset
+      dockerfile: Dockerfile.fe
+    volumes:
+      - ./asset/env-admin.js:/var/www/admin-dashboard/env.js:ro
+      - ./asset/env-user.js:/var/www/user-dashboard/env.js:ro
+    ports:
+      - "3000:3000"
+      - "5173:5173"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 50M
+        reservations:
+          cpus: "0.1"
+          memory: 20M
 
 volumes:
   timescale_data:

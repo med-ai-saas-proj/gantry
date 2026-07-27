@@ -1,7 +1,14 @@
 from gantry.settings import AppStage, getAppSettings
+import asyncio
 from gantry.shared.health import setup_health_routes
 from gantry.management.api_key import ApiKeyInfo, getApiKeyInfo
+from gantry.management.billing import (
+    PostRequest,
+    TransactionService,
+    getBillingTransactionService,
+)
 from gantry.shared.logging.logger import getServiceLogger
+from gantry.shared.utils.uuid_utils import uuid7
 
 from .service import ApiGatewayService
 from .settings import getApiGatewaySettings
@@ -96,6 +103,9 @@ async def gateway_proxy_with_path(
     gateway_service: Annotated[
         ApiGatewayService, Depends(getApiGatewayService)
     ],
+    transaction_service: Annotated[
+        TransactionService, Depends(getBillingTransactionService)
+    ],
     background_tasks: BackgroundTasks,
 ):
     return await _gateway_proxy(
@@ -104,6 +114,7 @@ async def gateway_proxy_with_path(
         apikey_info,
         full_path,
         gateway_service,
+        transaction_service,
         background_tasks,
     )
 
@@ -119,6 +130,9 @@ async def gateway_proxy(
     gateway_service: Annotated[
         ApiGatewayService, Depends(getApiGatewayService)
     ],
+    transaction_service: Annotated[
+        TransactionService, Depends(getBillingTransactionService)
+    ],
     background_tasks: BackgroundTasks,
 ):
     return await _gateway_proxy(
@@ -127,6 +141,7 @@ async def gateway_proxy(
         apikey_info,
         None,
         gateway_service,
+        transaction_service,
         background_tasks,
     )
 
@@ -137,12 +152,26 @@ async def _gateway_proxy(
     apikey_info: ApiKeyInfo,
     full_path: Optional[str],
     gateway_service: ApiGatewayService,
+    transaction_service: TransactionService,
     background_tasks: BackgroundTasks,
 ):
     destination = gateway_service.getDestination(route_name=route_name).unwrap()
     gateway_service.checkPermission(
         apikey_info["permissions"], destination
     ).unwrap()
+
+    key = uuid7()
+    transaction_uuid = None
+    if destination.auto_charge is not None:
+        result = await transaction_service.post(
+            str(key),
+            PostRequest(
+                api_key_uuid=apikey_info["api_key_uuid"],
+                service_name=route_name,
+                amount=destination.auto_charge,
+            ),
+        )
+        transaction_uuid = result.unwrap()
 
     incoming_headers = filter_headers(dict(request.headers))
     incoming_headers.update(_inject_api_key_context_headers(apikey_info))
@@ -178,6 +207,13 @@ async def _gateway_proxy(
         media_type=response.headers.get("Content-Type"),
     )
 
+    async def capture():
+        if destination.auto_charge is not None:
+            (await transaction_service.capture(
+                transaction_uuid,
+                destination.auto_charge
+            )).unwrap()
+    background_tasks.add_task(capture)
     background_tasks.add_task(client.aclose)
     return StreamingResponse(
         response.aiter_raw(),

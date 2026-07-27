@@ -2,6 +2,8 @@ from pyrusult import Ok, Err, Result
 from gantry.settings import ApiGatewayRoute
 from gantry.shared.custom_types.error_exception import RecoverableError
 
+from limits import RateLimitItemPerMinute
+from limits.aio import storage, strategies
 from structlog.stdlib import BoundLogger
 
 
@@ -33,21 +35,35 @@ class DocNotFound(RecoverableError):
     delail = "Document for this service does not exist."
 
 
+class ServiceOverloaded(RecoverableError):
+    status = 429
+    code = "service_overloaded"
+    title = "Service Overloaded"
+    detail = "The service is overloaded. Please try again later."
+
+
 class ApiGatewayService:
     def __init__(
         self,
         logger: BoundLogger,
         routes: dict[str, ApiGatewayRoute],
+        limit_storage: storage.Storage,
     ):
         self.logger = logger
         self.routes = routes
+        self.limit_storage = limit_storage
+        self.limiter = strategies.MovingWindowRateLimiter(self.limit_storage)
 
     def getDestination(
         self, route_name: str
-    ) -> Result[ApiGatewayRoute, RouteNotFoundError]:
+    ) -> Result[ApiGatewayRoute, RouteNotFoundError | ServiceOverloaded]:
         res = self.routes.get(route_name)
         if res is None:
             return Err(RouteNotFoundError())
+        if res.rate_limit is not None:
+            limit = RateLimitItemPerMinute(res.rate_limit)
+            if self.limiter.hit(limit, "api_gateway", route_name):
+                return Err(ServiceOverloaded())
         return Ok(res)
 
     def checkPermission(

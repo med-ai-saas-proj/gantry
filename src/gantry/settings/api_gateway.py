@@ -1,3 +1,5 @@
+from gantry.shared.utils.scaled_amount import ScaledAmount
+
 from typing import Annotated
 from datetime import timedelta
 
@@ -22,24 +24,18 @@ class ApiGatewayRoute(BaseSettings):
         AnyUrl | None,
         Field(description="Open API json url, uses for docs in frontend"),
     ] = None
-    # auto_hold: Annotated[
-    #     int | None,
-    #     Field(
-    #         description="Credits to hold automatically per request.",
-    #     ),
-    # ] = None
-    # auto_charge: Annotated[
-    #     int | None,
-    #     Field(
-    #         description="Credits to charge automatically per request.",
-    #     ),
-    # ] = None
-    # rate_limit: Annotated[
-    #     int | None,
-    #     Field(
-    #         description="Maximum requests per minute for this route.",
-    #     ),
-    # ] = None
+    auto_charge: Annotated[
+        ScaledAmount | None,
+        Field(
+            description="Credits to charge automatically per request.",
+        ),
+    ] = None
+    rate_limit: Annotated[
+        int | None,
+        Field(
+            description="Maximum requests per minute for this route.",
+        ),
+    ] = None
 
 
 class ApiGatewaySettings(BaseSettings):
