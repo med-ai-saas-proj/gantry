@@ -14,7 +14,7 @@ from ..factories import getSequenceConversationService
 from ..services.sequence import SequenceConversationService
 
 import uuid
-from typing import Literal, Sequence, Annotated, cast
+from typing import Literal, Sequence, Annotated
 
 from fastapi import Body, Query, Depends, Security, APIRouter
 

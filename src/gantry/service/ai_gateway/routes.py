@@ -1,43 +1,18 @@
-from gantry.shared.dependencies import getProjectId, getOptionalProjectId
+from gantry.shared.dependencies import getOptionalProjectId
 
+from .dtos import RunAgentInputWithModelSettings
 from .services import AiGatewayService
 from .factories import getAiGatewayService
 
-from uuid import UUID
-from typing import Literal, Annotated, TypedDict
+from typing import Annotated
 
-from fastapi import Body, Path, Query, Depends, APIRouter
-from ag_ui.core import Event, RunAgentInput
+from fastapi import Body, Path, Depends, APIRouter
+from ag_ui.core import Event
 from fastapi.sse import EventSourceResponse
-
-
-class ModelSettingsInput(
-    TypedDict,
-    total=False,
-):
-    max_tokens: int
-    temperature: float
-    top_p: float
-    timeout: float
-    parallel_tool_calls: bool
-    seed: int
-    presence_penalty: float
-    frequency_penalty: float
-    logit_bias: dict[str, int]
-    stop_sequences: list[str]
-    thinking: bool | Literal["minimal", "low", "medium", "high", "xhigh"]
-    service_tier: Literal["auto", "default", "flex", "priority"]
 
 
 ai_gateway_router = APIRouter(prefix="/ai-gateway", tags=["ai-gateway"])
 ai_gateway_public_router = APIRouter(prefix="/ai-gateway", tags=["ai-gateway"])
-
-
-class RunAgentInputWithModelSettings(RunAgentInput):
-    model_settings: ModelSettingsInput | None = None
-    system_prompt: str | list[str] | None = None
-    max_turns: int | None = None
-    reserved_tokens: int | None = None
 
 
 @ai_gateway_router.get("/models")

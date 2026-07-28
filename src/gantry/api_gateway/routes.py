@@ -14,7 +14,7 @@ from .settings import getApiGatewaySettings
 from .factories import getApiGatewayService
 
 import json
-import asyncio
+from uuid import UUID
 from typing import Optional, Annotated
 from urllib.parse import urljoin
 
@@ -166,7 +166,7 @@ async def _gateway_proxy(
         result = await transaction_service.post(
             str(key),
             PostRequest(
-                api_key_uuid=apikey_info["api_key_uuid"],
+                api_key_uuid=UUID(apikey_info["api_key_uuid"]),
                 service_name=route_name,
                 amount=destination.auto_charge,
             ),
@@ -208,7 +208,7 @@ async def _gateway_proxy(
     )
 
     async def capture():
-        if destination.auto_charge is not None:
+        if destination.auto_charge is not None and transaction_uuid is not None:
             (
                 await transaction_service.capture(
                     transaction_uuid, destination.auto_charge

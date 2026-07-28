@@ -4,7 +4,6 @@ from gantry.service.conversation import (
     Message,
     TreeConversationService,
 )
-from gantry.management.project.repositories import ProjectRepository
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
 )
@@ -38,7 +37,7 @@ from pydantic_ai.providers import Provider, infer_provider_class
 def _meta_infer_provider(api_key: str | None, base_url: str | None):
     def _infer_provider(provider: str) -> Provider[Any]:
         provider_class = infer_provider_class(provider)
-        return provider_class(api_key=api_key, base_url=base_url)
+        return provider_class(api_key=api_key, base_url=base_url)  # type: ignore
 
     return _infer_provider
 
