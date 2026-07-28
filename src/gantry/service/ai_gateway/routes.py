@@ -1,3 +1,5 @@
+from gantry.shared.dependencies import getProjectId, getOptionalProjectId
+
 from .services import AiGatewayService
 from .factories import getAiGatewayService
 
@@ -59,14 +61,14 @@ async def ag_ui_gateway(
     ],
     model: Annotated[str, Path()],
     run_input: Annotated[RunAgentInputWithModelSettings, Body(embed=False)],
-    project_id: Annotated[UUID | None, Query()] = None,
+    project_id: Annotated[int | None, Depends(getOptionalProjectId)] = None,
 ):
 
     model_settings = run_input.model_settings or {}
     if project_id is not None:
         return EventSourceResponse(
             (
-                await ai_gateway_service.routeWithProjectUUID(
+                await ai_gateway_service.route(
                     model,
                     project_id,
                     run_input,

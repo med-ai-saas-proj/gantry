@@ -1,34 +1,4 @@
-from gantry.management.api_key import ApiKeyInfo, requiredPermissions
-from gantry.service.file_storage.dtos import FileInfoResponse
-
-from ..dtos import (
-    RagQueryResponse,
-    AddRagFileRequest,
-    AddTextToRagRequest,
-    EmbeddingTaskResponse,
-    AddRagEmbeddingRequest,
-    QueryRagQueryByTextRequest,
-    QueryRagSimilaritySearchRequest,
-)
-from ..services import RagService
-from ..factories import getRagService
-
-import uuid
-from uuid import UUID
-from typing import Annotated
-from collections.abc import Sequence
-
-from fastapi import Body, Query, Depends, Security, APIRouter
-
-
-rag_internal_router = APIRouter(tags=["rag"], prefix="/rag")
-
-from gantry.management.auth.entities import UserInfoWithProjectContext
-from gantry.management.project.permissions import ProjectPermission
-from gantry.management.project.dependencies import (
-    ProjectExtractFrom,
-    requiredProjectPermission,
-)
+from gantry.shared.dependencies import getProjectId
 
 from ..dtos import (
     RagQueryResponse,
@@ -37,14 +7,17 @@ from ..dtos import (
     EmbeddingTaskResponse,
     QueryRagQueryByTextRequest,
 )
-from .routers import rag_router
 from ..services import RagService
 from ..factories import getRagService
 from ...file_storage.dtos import FileInfoResponse
 
+from uuid import UUID
 from typing import Sequence, Annotated
 
-from fastapi import Body, Query, Depends, Security, APIRouter
+from fastapi import Body, Query, Header, Depends, APIRouter
+
+
+rag_internal_router = APIRouter(tags=["rag"], prefix="/rag")
 
 
 @rag_internal_router.get(
@@ -53,10 +26,10 @@ from fastapi import Body, Query, Depends, Security, APIRouter
     description="Endpoint to list distinct file ids stored in a RAG.",
 )
 async def get_files(
-    project_uuid: Annotated[UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> Sequence[FileInfoResponse]:
-    res = await rag_service.getFilesInRagByProjectUid(project_uuid)
+    res = await rag_service.getFilesInRag(project_id)
     return [
         FileInfoResponse(
             id=str(file_info["uid"]),
@@ -78,12 +51,14 @@ async def get_files(
 )
 async def add_file(
     body: Annotated[AddRagFileRequest, Body()],
-    project_uuid: Annotated[UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
+    project_uuid: Annotated[UUID, Header(alias="X-Project-UUID")],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> str:
     task_id = (
-        await rag_service.addFileByProjectUid(
+        await rag_service.addFile(
             body.file_uid,
+            project_id,
             project_uuid,
             body.chunk_splitter,
             body.chunk_size,
@@ -103,12 +78,14 @@ async def add_file(
 )
 async def add_text(
     body: Annotated[AddTextToRagRequest, Body()],
-    project_uuid: Annotated[UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
+    project_uuid: Annotated[UUID, Header(alias="X-Project-UUID")],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> str:
     task_id = (
-        await rag_service.addTextByProjectUid(
+        await rag_service.addText(
             body.text,
+            project_id,
             project_uuid,
             body.chunk_splitter,
             body.chunk_size,
@@ -128,12 +105,11 @@ async def add_text(
 )
 async def get_task_status(
     task_id: str,
-    project_uuid: Annotated[UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> EmbeddingTaskResponse:
-    """Get the status of an asynchronous RAG embedding task."""
     task_result = (
-        await rag_service.getTaskStatusByProjectUid(task_id, project_uuid)
+        await rag_service.getTaskStatus(task_id, project_id)
     ).unwrap()
 
     return EmbeddingTaskResponse(
@@ -160,7 +136,7 @@ async def get_task_status(
 )
 async def query_similar_by_text(
     body: Annotated[QueryRagQueryByTextRequest, Body()],
-    project_uuid: Annotated[UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
     rag_service: Annotated[RagService, Depends(getRagService)],
     include_embedding: bool = Query(
         default=False,
@@ -168,8 +144,8 @@ async def query_similar_by_text(
     ),
 ):
     results = (
-        await rag_service.querySimilarByTextByProjectUid(
-            project_uuid,
+        await rag_service.querySimilarByText(
+            project_id,
             body.query_text,
             body.filters,
             body.top_k,

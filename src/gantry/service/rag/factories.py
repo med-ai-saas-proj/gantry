@@ -19,7 +19,6 @@ def getRagService():
 
     return RagService(
         getSessionManager(),
-        ProjectRepository(getRedisCacheRepo()),
         FileRepository(),
         getRagSettings(),
         getFileStorageService(),

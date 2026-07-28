@@ -18,5 +18,4 @@ def getFileStorageService():
         getObjectStorageSettings(),
         FileRepository(),
         getRedis(),
-        getProjectRepository(),
     )

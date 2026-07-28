@@ -1,5 +1,4 @@
 from gantry.settings import AppStage, getAppSettings
-import asyncio
 from gantry.shared.health import setup_health_routes
 from gantry.management.api_key import ApiKeyInfo, getApiKeyInfo
 from gantry.management.billing import (
@@ -15,6 +14,7 @@ from .settings import getApiGatewaySettings
 from .factories import getApiGatewayService
 
 import json
+import asyncio
 from typing import Optional, Annotated
 from urllib.parse import urljoin
 
@@ -209,10 +209,12 @@ async def _gateway_proxy(
 
     async def capture():
         if destination.auto_charge is not None:
-            (await transaction_service.capture(
-                transaction_uuid,
-                destination.auto_charge
-            )).unwrap()
+            (
+                await transaction_service.capture(
+                    transaction_uuid, destination.auto_charge
+                )
+            ).unwrap()
+
     background_tasks.add_task(capture)
     background_tasks.add_task(client.aclose)
     return StreamingResponse(

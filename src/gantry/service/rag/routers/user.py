@@ -1,3 +1,4 @@
+from gantry.shared.dependencies import resolveProjectId
 from gantry.management.auth.entities import UserInfoWithProjectContext
 from gantry.management.project.permissions import ProjectPermission
 from gantry.management.project.dependencies import (
@@ -42,7 +43,9 @@ async def get_files(
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> Sequence[FileInfoResponse]:
-    res = await rag_service.getFilesInRagByProjectUid(user_info["project_uuid"])
+    res = await rag_service.getFilesInRag(
+        await resolveProjectId(user_info["project_uuid"])
+    )
     return [
         FileInfoResponse(
             id=str(file_info["uid"]),
@@ -75,10 +78,13 @@ async def add_file(
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> str:
+    project_id = await resolveProjectId(user_info["project_uuid"])
+    project_uuid = user_info["project_uuid"]
     task_id = (
-        await rag_service.addFileByProjectUid(
+        await rag_service.addFile(
             body.file_uid,
-            user_info["project_uuid"],
+            project_id,
+            project_uuid,
             body.chunk_splitter,
             body.chunk_size,
             body.chunk_overlap,
@@ -108,10 +114,13 @@ async def add_text(
     ],
     rag_service: Annotated[RagService, Depends(getRagService)],
 ) -> str:
+    project_id = await resolveProjectId(user_info["project_uuid"])
+    project_uuid = user_info["project_uuid"]
     task_id = (
-        await rag_service.addTextByProjectUid(
+        await rag_service.addText(
             body.text,
-            user_info["project_uuid"],
+            project_id,
+            project_uuid,
             body.chunk_splitter,
             body.chunk_size,
             body.chunk_overlap,
@@ -143,8 +152,8 @@ async def get_task_status(
 ) -> EmbeddingTaskResponse:
     """Get the status of an asynchronous RAG embedding task."""
     task_result = (
-        await rag_service.getTaskStatusByProjectUid(
-            task_id, user_info["project_uuid"]
+        await rag_service.getTaskStatus(
+            task_id, await resolveProjectId(user_info["project_uuid"])
         )
     ).unwrap()
 
@@ -188,8 +197,8 @@ async def query_similar_by_text(
     ),
 ):
     results = (
-        await rag_service.querySimilarByTextByProjectUid(
-            user_info["project_uuid"],
+        await rag_service.querySimilarByText(
+            await resolveProjectId(user_info["project_uuid"]),
             body.query_text,
             body.filters,
             body.top_k,

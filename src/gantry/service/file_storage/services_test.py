@@ -10,6 +10,7 @@ from unittest.mock import ANY, Mock, AsyncMock, patch
 
 os.environ.setdefault("GANTRY_SERVER__CONFIG_FILE", "gantry.toml")
 
+from pyrusult import Ok, ResultStatus
 from gantry.db.session import AsyncSessionManager
 from gantry.service.file_storage.models import FileStatus
 from gantry.service.file_storage.services import (
@@ -17,8 +18,6 @@ from gantry.service.file_storage.services import (
     FileNotFoundInSystemError,
 )
 from gantry.service.file_storage.settings import ObjectStorageSettings
-
-from pyrusult import Ok, ResultStatus
 
 
 class _SessionContext:
@@ -75,7 +74,6 @@ def _make_service(
             settings,
             file_repo,
             redis,
-            project_repo,
         ),
         session,
         file_repo,
@@ -147,29 +145,6 @@ class TestFileStorageService(unittest.IsolatedAsyncioTestCase):
         session.commit.assert_awaited()
         storage.put_object.assert_called_once()
         file_repo.markFileAsAvailableById.assert_awaited_once_with(session, 99)
-
-    async def test_upload_file_by_project_uuid_looks_up_project_and_delegates(
-        self,
-    ):
-        project_uid = uuid4()
-        service, _, _, _, project_repo, _, _ = _make_service()
-        project_repo.getByUuid = AsyncMock(
-            return_value=SimpleNamespace(id=17, uuid=project_uid)
-        )
-        service.uploadFile = AsyncMock(return_value=uuid4())
-
-        result = await service.uploadFileByProjectUUID(
-            file_name="a.txt",
-            file_data=b"a",
-            file_size=1,
-            mime_type="text/plain",
-            project_uid=project_uid,
-            ext=None,
-        )
-
-        self.assertIsInstance(result, UUID)
-        project_repo.getByUuid.assert_awaited_once_with(ANY, str(project_uid))
-        service.uploadFile.assert_awaited_once()
 
     async def test_get_file_info_uses_cache_hit(self):
         file_uid = uuid4()
@@ -305,19 +280,6 @@ class TestFileStorageService(unittest.IsolatedAsyncioTestCase):
         )
         storage.delete_object.assert_called_once()
         file_repo.deleteFileById.assert_awaited_once_with(session, 5)
-
-    async def test_delete_file_by_project_uuid_looks_up_project(self):
-        project_uid = uuid4()
-        service, _, _, _, project_repo, _, _ = _make_service()
-        project_repo.getByUuid = AsyncMock(
-            return_value=SimpleNamespace(id=17, uuid=project_uid)
-        )
-        service.deleteFile = AsyncMock(return_value=Ok(None))
-
-        result = await service.deleteFileByProjectUUID(uuid4(), project_uid)
-
-        self.assertTrue(result.status == ResultStatus.Ok)
-        service.deleteFile.assert_awaited_once()
 
     async def test_list_files_in_project_maps_rows(self):
         service, session, file_repo, _, _, _, _ = _make_service()

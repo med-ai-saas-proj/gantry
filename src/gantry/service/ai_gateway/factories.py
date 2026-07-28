@@ -14,5 +14,4 @@ def getAiGatewayService():
         getAIGatewaySettings(),
         getTreeConversationService(),
         getSessionManager(),
-        getProjectRepository(),
     )
