@@ -16,7 +16,7 @@ from .factories import getApiGatewayService
 import json
 from uuid import UUID
 from typing import Optional, Annotated
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import httpx
 from fastapi import Path, Depends, FastAPI, Request, BackgroundTasks
@@ -24,7 +24,9 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 
-gateway_app = FastAPI(debug=getAppSettings().stage == AppStage.DEV)
+gateway_app = FastAPI(
+    debug=getAppSettings().stage == AppStage.DEV, redirect_slashes=False
+)
 
 setup_health_routes(gateway_app)
 
@@ -51,11 +53,24 @@ HOP_BY_HOP_HEADERS = {
     "content-encoding",
 }
 
+INFO_HEADERS = {
+    "x-organization-uuid",
+    "x-project-uuid",
+    "x-api-key-uuid",
+    "x-permissions",
+    "x-rpm-limit-organization",
+    "x-rpm-limit-project",
+    "x-spending-limit-organization",
+    "x-spending-limit-project",
+}
+
 
 def filter_headers(headers: dict[str, str]) -> dict[str, str]:
     """Remove hop-by-hop headers + auto-calculated ones."""
     return {
-        k: v for k, v in headers.items() if k.lower() not in HOP_BY_HOP_HEADERS
+        k: v
+        for k, v in headers.items()
+        if k.lower() not in HOP_BY_HOP_HEADERS and k.lower() not in INFO_HEADERS
     }
 
 
@@ -92,6 +107,10 @@ def _inject_api_key_context_headers(
 
 
 @gateway_app.api_route(
+    "/{route_name}/{full_path:path}/",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+@gateway_app.api_route(
     "/{route_name}/{full_path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
 )
@@ -119,6 +138,10 @@ async def gateway_proxy_with_path(
     )
 
 
+@gateway_app.api_route(
+    "/{route_name}/",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
 @gateway_app.api_route(
     "/{route_name}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
@@ -155,6 +178,7 @@ async def _gateway_proxy(
     transaction_service: TransactionService,
     background_tasks: BackgroundTasks,
 ):
+    # print(f"Incoming request for route: {route_name}, full_path: {full_path}")
     destination = gateway_service.getDestination(route_name=route_name).unwrap()
     gateway_service.checkPermission(
         apikey_info["permissions"], destination
@@ -176,13 +200,33 @@ async def _gateway_proxy(
     incoming_headers = filter_headers(dict(request.headers))
     incoming_headers.update(_inject_api_key_context_headers(apikey_info))
 
+    gateway_host = request.headers.get(
+        "host", getApiGatewaySettings().public_host
+    )
+    # print(f"incoming_headers: {incoming_headers}")
+    incoming_headers["X-Forwarded-Host"] = gateway_host
+    incoming_headers["X-Forwarded-Proto"] = request.url.scheme
+    incoming_headers["X-Forwarded-For"] = (
+        request.client.host if request.client else ""
+    )
+    incoming_headers["Host"] = gateway_host
+
     request_timeout = getApiGatewaySettings().request_timeout.total_seconds()
     client = httpx.AsyncClient(timeout=request_timeout)
 
     full_url = urljoin(
         destination.address.encoded_string(),
         full_path,
-    ).rstrip("/")
+    )
+
+    original_path = request.url.path
+    has_trailing_slash = original_path.endswith("/")
+
+    if has_trailing_slash and not full_url.endswith("/"):
+        full_url += "/"
+    if not has_trailing_slash and full_url.endswith("/"):
+        full_url = full_url.rstrip("/")
+
     req = client.build_request(
         method=request.method,
         url=full_url,
@@ -192,6 +236,32 @@ async def _gateway_proxy(
     )
     response = await client.send(request=req, stream=True)
     response_headers = filter_headers(dict(response.headers))
+
+    if 300 <= response.status_code < 400 and "location" in response_headers:
+        original_location = response_headers["location"]
+        parsed_url = urlparse(original_location)
+        if parsed_url.netloc == gateway_host:
+            new_path = "/gateway" + (
+                parsed_url.path
+                if parsed_url.path.startswith("/")
+                else "/" + parsed_url.path
+            )
+            new_has_trailing_slash = original_location.endswith("/")
+            if new_has_trailing_slash and not new_path.endswith("/"):
+                new_path += "/"
+            if not new_has_trailing_slash and new_path.endswith("/"):
+                new_path = new_path.rstrip("/")
+            corrected_location = urlunparse(
+                (
+                    parsed_url.scheme,
+                    parsed_url.netloc,
+                    new_path,
+                    parsed_url.params,
+                    parsed_url.query,
+                    parsed_url.fragment,
+                )
+            )
+            response_headers["location"] = corrected_location
 
     getServiceLogger(
         org_id=apikey_info["organization_uuid"],

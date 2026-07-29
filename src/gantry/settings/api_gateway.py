@@ -39,6 +39,10 @@ class ApiGatewayRoute(BaseSettings):
 
 
 class ApiGatewaySettings(BaseSettings):
+    public_host: Annotated[
+        str,
+        Field(description="Public host for the API Gateway."),
+    ] = "localhost:8000"
     routes: Annotated[
         dict[str, ApiGatewayRoute],
         Field(description="Route definitions keyed by route name."),
