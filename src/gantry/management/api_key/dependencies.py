@@ -1,7 +1,11 @@
+from gantry.settings import AppStage, getAppSettings
+
 from .entities import ApiKeyInfo
+from .services import InvalidAPIKey
 from .factories import ApiKeyService, getApiKeyService
 
 import os
+import uuid
 from typing import Annotated
 
 from fastapi import Depends, Request, Security
@@ -32,12 +36,6 @@ def requiredPermissions(permissions: list[str]):
         (await api_key_service.rateLimit(api_key_info)).unwrap()
         # _inject_api_key_context_headers(request, api_key_info)
         return api_key_info
-
-    from gantry.settings import AppStage, getAppSettings
-
-    from .services import InvalidAPIKey
-
-    import uuid
 
     app_settings = getAppSettings()
     if app_settings.stage == AppStage.DEV and enable_mock_auth:
@@ -73,10 +71,6 @@ async def getApiKeyInfo(
     api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
 ) -> ApiKeyInfo:
     """Dependency to get API key info without permission checks."""
-    from gantry.settings import AppStage, getAppSettings
-
-    import uuid
-
     app_settings = getAppSettings()
     if app_settings.stage == AppStage.DEV and enable_mock_auth:
         if api_key == "bypass_key":

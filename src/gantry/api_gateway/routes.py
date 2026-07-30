@@ -1,5 +1,4 @@
 from gantry.settings import AppStage, getAppSettings
-import asyncio
 from gantry.shared.health import setup_health_routes
 from gantry.management.api_key import ApiKeyInfo, getApiKeyInfo
 from gantry.management.billing import (
@@ -15,6 +14,8 @@ from .settings import getApiGatewaySettings
 from .factories import getApiGatewayService
 
 import json
+import asyncio
+from uuid import UUID
 from typing import Optional, Annotated
 from urllib.parse import urljoin
 
@@ -51,31 +52,57 @@ HOP_BY_HOP_HEADERS = {
     "content-encoding",
 }
 
+GATEWAY_INJECTED_HEADERS = {
+    "x-organization-uuid",
+    "x-project-uuid",
+    "x-api-key-uuid",
+    "x-permissions",
+    "x-rpm-limit-organization",
+    "x-rpm-limit-project",
+    "x-spending-limit-organization",
+    "x-spending-limit-project",
+    "x-forwarded-for",
+    "x-forwarded-proto",
+    "x-forwarded-host",
+}
+
+STRIPPED_HEADERS = HOP_BY_HOP_HEADERS | GATEWAY_INJECTED_HEADERS
+
 
 def filter_headers(headers: dict[str, str]) -> dict[str, str]:
-    """Remove hop-by-hop headers + auto-calculated ones."""
+    """Remove hop-by-hop and gateway-injected headers."""
     return {
-        k: v for k, v in headers.items() if k.lower() not in HOP_BY_HOP_HEADERS
+        k: v for k, v in headers.items() if k.lower() not in STRIPPED_HEADERS
     }
+
+
+def _build_forwarded_headers(request: Request) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    client_host = request.client.host if request.client else None
+
+    existing_xff = request.headers.get("x-forwarded-for")
+    if client_host:
+        headers["X-Forwarded-For"] = (
+            f"{existing_xff}, {client_host}" if existing_xff else client_host
+        )
+    elif existing_xff:
+        headers["X-Forwarded-For"] = existing_xff
+
+    proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+    headers["X-Forwarded-Proto"] = proto
+
+    host = request.headers.get("x-forwarded-host") or request.headers.get(
+        "host", ""
+    )
+    if host:
+        headers["X-Forwarded-Host"] = host
+
+    return headers
 
 
 def _inject_api_key_context_headers(
     api_key_info: ApiKeyInfo,
 ) -> dict[str, str]:
-    # headers["X-Organization-UUID"] = api_key_info["organization_uuid"]
-    # headers["X-Project-UUID"] = api_key_info["project_uuid"]
-    # headers["X-API-Key-UUID"] = api_key_info["api_key_uuid"]
-    # headers["X-Permissions"] = json.dumps(api_key_info["permissions"])
-    # headers["X-RPM-Limit-Organization"] = str(
-    #     api_key_info["rpm_limit_organization"]
-    # )
-    # headers["X-RPM-Limit-Project"] = str(api_key_info["rpm_limit_project"])
-    # headers["X-Spending-Limit-Organization"] = str(
-    #     api_key_info["spending_limit_organization"]
-    # )
-    # headers["X-Spending-Limit-Project"] = str(
-    #     api_key_info["spending_limit_project"]
-    # )
     headers = {
         "X-Organization-UUID": api_key_info["organization_uuid"],
         "X-Project-UUID": api_key_info["project_uuid"],
@@ -166,7 +193,7 @@ async def _gateway_proxy(
         result = await transaction_service.post(
             str(key),
             PostRequest(
-                api_key_uuid=apikey_info["api_key_uuid"],
+                api_key_uuid=UUID(apikey_info["api_key_uuid"]),
                 service_name=route_name,
                 amount=destination.auto_charge,
             ),
@@ -174,10 +201,11 @@ async def _gateway_proxy(
         transaction_uuid = result.unwrap()
 
     incoming_headers = filter_headers(dict(request.headers))
+    incoming_headers.update(_build_forwarded_headers(request))
     incoming_headers.update(_inject_api_key_context_headers(apikey_info))
 
     request_timeout = getApiGatewaySettings().request_timeout.total_seconds()
-    client = httpx.AsyncClient(timeout=request_timeout)
+    client = httpx.AsyncClient(timeout=request_timeout, follow_redirects=False)
 
     full_url = urljoin(
         destination.address.encoded_string(),
@@ -208,11 +236,13 @@ async def _gateway_proxy(
     )
 
     async def capture():
-        if destination.auto_charge is not None:
-            (await transaction_service.capture(
-                transaction_uuid,
-                destination.auto_charge
-            )).unwrap()
+        if destination.auto_charge is not None and transaction_uuid is not None:
+            (
+                await transaction_service.capture(
+                    transaction_uuid, destination.auto_charge
+                )
+            ).unwrap()
+
     background_tasks.add_task(capture)
     background_tasks.add_task(client.aclose)
     return StreamingResponse(
