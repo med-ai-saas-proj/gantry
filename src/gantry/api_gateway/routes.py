@@ -17,6 +17,7 @@ import json
 import asyncio
 from uuid import UUID
 from typing import Optional, Annotated
+from contextlib import asynccontextmanager
 from urllib.parse import urljoin
 
 import httpx
@@ -25,7 +26,19 @@ from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 
-gateway_app = FastAPI(debug=getAppSettings().stage == AppStage.DEV)
+client = httpx.AsyncClient()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await client.aclose()
+
+
+gateway_app = FastAPI(
+    debug=getAppSettings().stage == AppStage.DEV, lifespan=lifespan
+)
+
 
 setup_health_routes(gateway_app)
 
@@ -205,7 +218,6 @@ async def _gateway_proxy(
     incoming_headers.update(_inject_api_key_context_headers(apikey_info))
 
     request_timeout = getApiGatewaySettings().request_timeout.total_seconds()
-    client = httpx.AsyncClient(timeout=request_timeout, follow_redirects=False)
 
     full_url = urljoin(
         destination.address.encoded_string(),
@@ -217,6 +229,7 @@ async def _gateway_proxy(
         headers=incoming_headers,
         content=request.stream(),
         params=request.query_params,
+        timeout=request_timeout,
     )
     response = await client.send(request=req, stream=True)
     response_headers = filter_headers(dict(response.headers))
@@ -244,7 +257,6 @@ async def _gateway_proxy(
             ).unwrap()
 
     background_tasks.add_task(capture)
-    background_tasks.add_task(client.aclose)
     return StreamingResponse(
         response.aiter_raw(),
         status_code=response.status_code,
