@@ -200,16 +200,12 @@ async def _gateway_proxy(
     incoming_headers = filter_headers(dict(request.headers))
     incoming_headers.update(_inject_api_key_context_headers(apikey_info))
 
-    gateway_host = request.headers.get(
-        "host", getApiGatewaySettings().public_host
-    )
-    # print(f"incoming_headers: {incoming_headers}")
-    incoming_headers["X-Forwarded-Host"] = gateway_host
+    original_host = request.headers.get("host", "")
+    incoming_headers["X-Forwarded-Host"] = original_host
     incoming_headers["X-Forwarded-Proto"] = request.url.scheme
     incoming_headers["X-Forwarded-For"] = (
         request.client.host if request.client else ""
     )
-    incoming_headers["Host"] = gateway_host
 
     request_timeout = getApiGatewaySettings().request_timeout.total_seconds()
     client = httpx.AsyncClient(timeout=request_timeout)
@@ -237,31 +233,17 @@ async def _gateway_proxy(
     response = await client.send(request=req, stream=True)
     response_headers = filter_headers(dict(response.headers))
 
-    if 300 <= response.status_code < 400 and "location" in response_headers:
+    if (
+        300 <= response.status_code < 400
+        and "location" in response_headers
+        and destination.proxy_redirect
+    ):
         original_location = response_headers["location"]
-        parsed_url = urlparse(original_location)
-        if parsed_url.netloc == gateway_host:
-            new_path = "/gateway" + (
-                parsed_url.path
-                if parsed_url.path.startswith("/")
-                else "/" + parsed_url.path
-            )
-            new_has_trailing_slash = original_location.endswith("/")
-            if new_has_trailing_slash and not new_path.endswith("/"):
-                new_path += "/"
-            if not new_has_trailing_slash and new_path.endswith("/"):
-                new_path = new_path.rstrip("/")
-            corrected_location = urlunparse(
-                (
-                    parsed_url.scheme,
-                    parsed_url.netloc,
-                    new_path,
-                    parsed_url.params,
-                    parsed_url.query,
-                    parsed_url.fragment,
-                )
-            )
-            response_headers["location"] = corrected_location
+        for original, redirect in destination.proxy_redirect.items():
+            if original_location.startswith(original):
+                new_location = original_location.replace(original, redirect, 1)
+                response_headers["location"] = new_location
+                break
 
     getServiceLogger(
         org_id=apikey_info["organization_uuid"],

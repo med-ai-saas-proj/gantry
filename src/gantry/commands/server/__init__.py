@@ -76,8 +76,6 @@ class Server(AppSettings):
             port=self.internal_port,
             # workers=self.internal_workers,
             log_level=self.log_level.value.lower(),
-            proxy_headers=True,
-            forwarded_allow_ips="*",
         )
         main_server = uvicorn.Server(main_server_config)
         internal_server = uvicorn.Server(internal_server_config)
