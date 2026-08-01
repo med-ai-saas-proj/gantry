@@ -1,6 +1,12 @@
 from gantry.settings import AppStage, getAppSettings
 from gantry.shared.health import setup_health_routes
-from gantry.management.api_key import ApiKeyInfo, getApiKeyInfo
+from gantry.management.api_key import (
+    ApiKeyInfo,
+    ApiKeyService,
+    ApiKeyHeaderNotFound,
+    api_key_header,
+    getApiKeyService,
+)
 from gantry.management.billing import (
     PostRequest,
     TransactionService,
@@ -14,14 +20,13 @@ from .settings import getApiGatewaySettings
 from .factories import getApiGatewayService
 
 import json
-import asyncio
 from uuid import UUID
 from typing import Optional, Annotated
 from contextlib import asynccontextmanager
 from urllib.parse import urljoin
 
 import httpx
-from fastapi import Path, Depends, FastAPI, Request, BackgroundTasks
+from fastapi import Path, Depends, FastAPI, Request, Security, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -139,7 +144,8 @@ async def gateway_proxy_with_path(
     route_name: Annotated[str, Path()],
     full_path: Annotated[str | None, Path()],
     request: Request,
-    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
+    api_key: Annotated[str, Security(api_key_header)],
+    api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     gateway_service: Annotated[
         ApiGatewayService, Depends(getApiGatewayService)
     ],
@@ -151,10 +157,11 @@ async def gateway_proxy_with_path(
     return await _gateway_proxy(
         route_name,
         request,
-        apikey_info,
+        api_key,
         full_path,
         gateway_service,
         transaction_service,
+        api_key_service,
         background_tasks,
     )
 
@@ -166,7 +173,8 @@ async def gateway_proxy_with_path(
 async def gateway_proxy(
     route_name: Annotated[str, Path()],
     request: Request,
-    apikey_info: Annotated[ApiKeyInfo, Depends(getApiKeyInfo)],
+    api_key: Annotated[str, Security(api_key_header)],
+    api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     gateway_service: Annotated[
         ApiGatewayService, Depends(getApiGatewayService)
     ],
@@ -178,10 +186,11 @@ async def gateway_proxy(
     return await _gateway_proxy(
         route_name,
         request,
-        apikey_info,
+        api_key,
         None,
         gateway_service,
         transaction_service,
+        api_key_service,
         background_tasks,
     )
 
@@ -189,20 +198,29 @@ async def gateway_proxy(
 async def _gateway_proxy(
     route_name: str,
     request: Request,
-    apikey_info: ApiKeyInfo,
+    api_key: str | None,
     full_path: Optional[str],
     gateway_service: ApiGatewayService,
     transaction_service: TransactionService,
+    api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     background_tasks: BackgroundTasks,
 ):
     destination = gateway_service.getDestination(route_name=route_name).unwrap()
-    gateway_service.checkPermission(
-        apikey_info["permissions"], destination
-    ).unwrap()
+    if destination.require_key:
+        if api_key is None:
+            raise ApiKeyHeaderNotFound()
+        user_info = await api_key_service.parseApiKey(api_key)
+        apikey_info = user_info.unwrap()
+        (await api_key_service.rateLimit(apikey_info)).unwrap()
+        gateway_service.checkPermission(
+            apikey_info["permissions"], destination
+        ).unwrap()
+    else:
+        apikey_info = None
 
     key = uuid7()
     transaction_uuid = None
-    if destination.auto_charge is not None:
+    if destination.auto_charge is not None and apikey_info is not None:
         result = await transaction_service.post(
             str(key),
             PostRequest(
@@ -215,14 +233,15 @@ async def _gateway_proxy(
 
     incoming_headers = filter_headers(dict(request.headers))
     incoming_headers.update(_build_forwarded_headers(request))
-    incoming_headers.update(_inject_api_key_context_headers(apikey_info))
+    if apikey_info is not None:
+        incoming_headers.update(_inject_api_key_context_headers(apikey_info))
 
     request_timeout = getApiGatewaySettings().request_timeout.total_seconds()
 
     full_url = urljoin(
         destination.address.encoded_string(),
         full_path,
-    ).rstrip("/")
+    )
     req = client.build_request(
         method=request.method,
         url=full_url,
@@ -234,19 +253,20 @@ async def _gateway_proxy(
     response = await client.send(request=req, stream=True)
     response_headers = filter_headers(dict(response.headers))
 
-    getServiceLogger(
-        org_id=apikey_info["organization_uuid"],
-        project_id=apikey_info["project_uuid"],
-    ).info(
-        "api_gateway",
-        route_name=route_name,
-        full_path=full_path,
-        method=request.method,
-        status_code=response.status_code,
-        # headers=incoming_headers,
-        api_key_id=apikey_info["api_key_uuid"],
-        media_type=response.headers.get("Content-Type"),
-    )
+    if apikey_info is not None:
+        getServiceLogger(
+            org_id=apikey_info["organization_uuid"],
+            project_id=apikey_info["project_uuid"],
+        ).info(
+            "api_gateway",
+            route_name=route_name,
+            full_path=full_path,
+            method=request.method,
+            status_code=response.status_code,
+            # headers=incoming_headers,
+            api_key_id=apikey_info["api_key_uuid"],
+            media_type=response.headers.get("Content-Type"),
+        )
 
     async def capture():
         if destination.auto_charge is not None and transaction_uuid is not None:

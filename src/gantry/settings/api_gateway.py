@@ -20,6 +20,12 @@ class ApiGatewayRoute(BaseSettings):
             description="Permission IDs required to access this route.",
         ),
     ] = []
+    require_key: Annotated[
+        bool,
+        Field(
+            description="Does this route need an API key to access, if no then auto_charge and required_perms will have no effect"
+        ),
+    ] = True
     openapi_json_url: Annotated[
         AnyUrl | None,
         Field(description="Open API json url, uses for docs in frontend"),
