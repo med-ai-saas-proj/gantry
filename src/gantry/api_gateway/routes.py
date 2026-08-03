@@ -1,5 +1,4 @@
 from gantry.settings import AppStage, getAppSettings
-from gantry.shared.health import setup_health_routes
 from gantry.management.api_key import (
     ApiKeyInfo,
     ApiKeyService,
@@ -44,8 +43,6 @@ gateway_app = FastAPI(
     debug=getAppSettings().stage == AppStage.DEV, lifespan=lifespan
 )
 
-
-setup_health_routes(gateway_app)
 
 gateway_app.add_middleware(
     CORSMiddleware,
