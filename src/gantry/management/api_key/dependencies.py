@@ -1,7 +1,12 @@
+from gantry.settings import AppStage, getAppSettings
+from gantry.shared.custom_types.error_exception import RecoverableError
+
 from .entities import ApiKeyInfo
+from .services import InvalidAPIKey
 from .factories import ApiKeyService, getApiKeyService
 
 import os
+import uuid
 from typing import Annotated
 
 from fastapi import Depends, Request, Security
@@ -11,6 +16,7 @@ from fastapi.security import APIKeyHeader
 api_key_header = APIKeyHeader(
     name="X-Api-Key",
     description="API authorization header. Put your API token here.",
+    auto_error=False,
 )
 
 enable_mock_auth = os.getenv("GANTRY_ENABLE_MOCK_AUTH", "").lower() in {
@@ -20,24 +26,27 @@ enable_mock_auth = os.getenv("GANTRY_ENABLE_MOCK_AUTH", "").lower() in {
 }
 
 
+class ApiKeyHeaderNotFound(RecoverableError):
+    status = 401
+    title = "Api Key header not found"
+    code = "api_key_header_not_found"
+    message = "This endpoint require an Api Key in X-Api-Key."
+
+
 def requiredPermissions(permissions: list[str]):
     """Dependency to verify the API key and create required permissions."""
 
     async def get_api_key(
-        api_key: Annotated[str, Security(api_key_header)],
+        api_key: Annotated[str | None, Security(api_key_header)],
         api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     ) -> ApiKeyInfo:
+        if api_key is None:
+            raise ApiKeyHeaderNotFound()
         user_info = await api_key_service.verifyApiKey(api_key, permissions)
         api_key_info = user_info.unwrap()
         (await api_key_service.rateLimit(api_key_info)).unwrap()
         # _inject_api_key_context_headers(request, api_key_info)
         return api_key_info
-
-    from gantry.settings import AppStage, getAppSettings
-
-    from .services import InvalidAPIKey
-
-    import uuid
 
     app_settings = getAppSettings()
     if app_settings.stage == AppStage.DEV and enable_mock_auth:
@@ -69,13 +78,12 @@ def requiredPermissions(permissions: list[str]):
 
 
 async def getApiKeyInfo(
-    api_key: Annotated[str, Security(api_key_header)],
+    api_key: Annotated[str | None, Security(api_key_header)],
     api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
 ) -> ApiKeyInfo:
     """Dependency to get API key info without permission checks."""
-    from gantry.settings import AppStage, getAppSettings
-
-    import uuid
+    if api_key is None:
+        raise ApiKeyHeaderNotFound()
 
     app_settings = getAppSettings()
     if app_settings.stage == AppStage.DEV and enable_mock_auth:

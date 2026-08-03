@@ -3,6 +3,10 @@ import { HttpAgent } from "@ag-ui/client";
 
 const app = express();
 app.use(express.json());
+app.use((req, res, next) => {
+  console.log(`${req.method} request received at ${req.url}`);
+  next(); // Always call next to move to the next handler!
+});
 
 async function runOCR(image) {
   return `PATIENT PROFILE
@@ -127,6 +131,10 @@ app.post("/structured-ocr", async (req, res) => {
     body: JSON.stringify({ real_amount: calculatePrice(json) }),
   });
 });
+
+app.get("/health", async (req, res) => {
+  res.status(200).send({"hello": "world"})
+})
 
 const port = 6969;
 const server = app.listen(port, () => console.log(`App listening on port ${port}`));

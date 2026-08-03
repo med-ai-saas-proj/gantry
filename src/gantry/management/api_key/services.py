@@ -648,7 +648,11 @@ class ApiKeyService:
             return Err(ApiKeyDisabledError())
         if not context["user_uuid"]:
             return Err(UserNotFoundError())
-
+        context["permissions"] = [
+            perm_id
+            for perm_id in context["permissions"]
+            if perm_id in self.permissions_ids_set
+        ]
         return Ok(self._toApiKeyInfo(api_key_uuid, context))
 
     async def verifyApiKey(

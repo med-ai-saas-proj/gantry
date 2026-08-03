@@ -1,10 +1,17 @@
 """Shared lightweight runtime health endpoints."""
 
-from fastapi import FastAPI, Response
+from typing import Literal, TypedDict
+
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 
-async def health_response() -> Response:
-    return Response(status_code=200)
+class HealthResponse(TypedDict):
+    status: Literal["OK"]
+
+
+async def health_response():
+    return JSONResponse(HealthResponse(status="OK"))
 
 
 def setup_health_routes(app: FastAPI) -> None:
@@ -12,11 +19,13 @@ def setup_health_routes(app: FastAPI) -> None:
         "/health",
         health_response,
         methods=["GET"],
+        response_model=HealthResponse,
         include_in_schema=False,
     )
     app.add_api_route(
         "/ready",
         health_response,
         methods=["GET"],
+        response_model=HealthResponse,
         include_in_schema=False,
     )

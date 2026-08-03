@@ -88,10 +88,10 @@ def configure_default_logging(
             )
         )
 
-    # processors += [
-    #     orjson_renderer if settings.stage != AppStage.DEV else ConsoleRenderer()
-    # ]
-    processors += [orjson_renderer]
+    processors += [
+        orjson_renderer if settings.stage != AppStage.DEV else ConsoleRenderer()
+    ]
+    # processors += [orjson_renderer]
 
     return structlog.wrap_logger(
         logger,
