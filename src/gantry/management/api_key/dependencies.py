@@ -87,6 +87,8 @@ async def getApiKeyInfo(
 
     app_settings = getAppSettings()
     if app_settings.stage == AppStage.DEV and enable_mock_auth:
+        from .settings import getApiKeysSettings
+
         if api_key == "bypass_key":
             return {
                 "api_key_id": 0,
@@ -96,7 +98,9 @@ async def getApiKeyInfo(
                 "project_id": 0,
                 "project_uuid": str(uuid.UUID(int=0)),
                 "organization_uuid": "test_org1",
-                "permissions": ["demo"],
+                "permissions": [
+                    perm.id for perm in getApiKeysSettings().permissions
+                ],
                 "rpm_limit_organization": 1000000,
                 "rpm_limit_project": 1000000,
                 "spending_limit_organization": 1000000,

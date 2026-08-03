@@ -1,6 +1,5 @@
 from gantry.db.factories import getSessionManager
 from gantry.service.conversation import getTreeConversationService
-from gantry.management.project.factories import getProjectRepository
 
 from .services import AiGatewayService
 from .settings import getAIGatewaySettings
@@ -14,5 +13,4 @@ def getAiGatewayService():
         getAIGatewaySettings(),
         getTreeConversationService(),
         getSessionManager(),
-        getProjectRepository(),
     )

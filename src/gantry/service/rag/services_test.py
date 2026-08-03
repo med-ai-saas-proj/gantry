@@ -106,7 +106,6 @@ def _make_service(
     return (
         RagService(
             session_manager=cast(AsyncSessionManager, _SessionManager(session)),
-            project_repo=project_repo,
             file_repo=file_repo,
             setting=settings,
             file_storage_service=Mock(),

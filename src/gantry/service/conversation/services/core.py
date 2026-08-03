@@ -1,6 +1,9 @@
+from pyrusult import Ok, Err, Result
 from gantry.db.session import AsyncSessionManager
 from gantry.shared.utils.json_utils import json_serializer
-from gantry.shared.custom_types.error_exception import RecoverableError
+from gantry.shared.custom_types.error_exception import (
+    RecoverableError,
+)
 
 from ..types import (
     ConversationMetadata,
@@ -17,7 +20,6 @@ import uuid
 from typing import Sequence, Awaitable, cast
 from dataclasses import asdict
 
-from pyrusult import Ok, Err, Result
 from redis.asyncio import Redis
 
 

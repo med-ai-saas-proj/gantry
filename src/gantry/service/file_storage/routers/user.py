@@ -1,5 +1,5 @@
-from gantry.management.auth import UserInfo
-from gantry.management.auth.entities import UserInfo, UserInfoWithProjectContext
+from gantry.shared.dependencies import resolveProjectId
+from gantry.management.auth.entities import UserInfoWithProjectContext
 from gantry.management.project.permissions import ProjectPermission
 from gantry.management.project.dependencies import (
     ProjectExtractFrom,
@@ -74,12 +74,12 @@ async def upload_file(
     if ext is None and file.filename:
         ext = file.filename.split(".")[-1]  # Fallback to filename extension
 
-    file_id = await file_storage_service.uploadFileByProjectUUID(
+    file_id = await file_storage_service.uploadFile(
         file.filename or "unknown",
         file.file,
         file.size,
         mime_type,
-        user_info["project_uuid"],
+        await resolveProjectId(user_info["project_uuid"]),
         ext,
     )
     return FileUploadResponse(
@@ -109,8 +109,8 @@ async def list_files(
 ):
     """List files in the file storage service."""
 
-    files_info = await file_storage_service.listFilesInProjectByUUID(
-        user_info["project_uuid"]
+    files_info = await file_storage_service.listFilesInProject(
+        await resolveProjectId(user_info["project_uuid"])
     )
     return [
         FileInfoResponse(
@@ -162,8 +162,8 @@ async def download_file(
     """Download a file by file ID."""
 
     presigned_url = (
-        await file_storage_service.getFileUrlByProjectUUID(
-            file_id, user_info["project_uuid"]
+        await file_storage_service.getFileUrl(
+            file_id, await resolveProjectId(user_info["project_uuid"])
         )
     ).unwrap()
     return RedirectResponse(url=presigned_url)
@@ -192,8 +192,8 @@ async def get_file_info_and_presigned_url(
         presigned_url,
         file_info,
     ) = (
-        await file_storage_service.getFileInfoAndUrlByProjectUUID(
-            file_id, user_info["project_uuid"]
+        await file_storage_service.getFileInfoAndUrl(
+            file_id, await resolveProjectId(user_info["project_uuid"])
         )
     ).unwrap()
     return FileInfoWithPresignedURLResponse(
@@ -231,8 +231,8 @@ async def get_file_info(
     """Get file info by file ID."""
 
     file_info = (
-        await file_storage_service.getFileInfoByProjectUUID(
-            file_id, user_info["project_uuid"]
+        await file_storage_service.getFileInfo(
+            file_id, await resolveProjectId(user_info["project_uuid"])
         )
     ).unwrap()
     return FileInfoResponse(
@@ -269,8 +269,8 @@ async def get_file_presigned_url(
     """Get presigned URL for file download."""
 
     presigned_url = (
-        await file_storage_service.getFileUrlByProjectUUID(
-            file_id, user_info["project_uuid"]
+        await file_storage_service.getFileUrl(
+            file_id, await resolveProjectId(user_info["project_uuid"])
         )
     ).unwrap()
     return FilePresignedURLResponse(
@@ -301,8 +301,8 @@ async def delete_file(
 ):
     """Delete a file by file ID."""
     (
-        await file_storage_service.deleteFileByProjectUUID(
-            file_id, user_info["project_uuid"]
+        await file_storage_service.deleteFile(
+            file_id, await resolveProjectId(user_info["project_uuid"])
         )
     ).unwrap()
     return None
@@ -333,8 +333,10 @@ async def update_file_metadata(
     """Update file metadata by file ID."""
 
     (
-        await file_storage_service.updateFileMetadataByProjectUUID(
-            file_id, user_info["project_uuid"], body.extra_metadata
+        await file_storage_service.updateFileMetadata(
+            file_id,
+            await resolveProjectId(user_info["project_uuid"]),
+            body.extra_metadata,
         )
     ).unwrap()
     return None

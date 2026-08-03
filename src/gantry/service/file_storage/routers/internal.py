@@ -1,3 +1,5 @@
+from gantry.shared.dependencies import getProjectId
+
 from ..dtos import (
     FileInfoResponse,
     FileUploadResponse,
@@ -16,9 +18,7 @@ from typing import Annotated
 
 from fastapi import (
     Body,
-    Query,
     Depends,
-    Security,
     APIRouter,
     UploadFile,
     HTTPException,
@@ -43,9 +43,8 @@ async def upload_file(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
-    project_uuid: Annotated[uuid.UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
 ):
-    """Upload a file to the file storage service."""
     if file.size is None or file.size == 0:
         raise HTTPException(status_code=400, detail="File is empty.")
 
@@ -56,17 +55,17 @@ async def upload_file(
         mime_type = original_mime_type
         ext = mimetypes.guess_extension(mime_type)
         if ext is not None:
-            ext = ext.lstrip(".")  # Remove leading dot
+            ext = ext.lstrip(".")
 
     if ext is None and file.filename:
-        ext = file.filename.split(".")[-1]  # Fallback to filename extension
+        ext = file.filename.split(".")[-1]
 
-    file_id = await file_storage_service.uploadFileByProjectUUID(
+    file_id = await file_storage_service.uploadFile(
         file.filename or "unknown",
         file.file,
         file.size,
         mime_type,
-        project_uuid,
+        project_id,
         ext,
     )
     return FileUploadResponse(
@@ -84,13 +83,9 @@ async def list_files(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
-    project_uuid: Annotated[uuid.UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
 ):
-    """List files in the file storage service."""
-
-    files_info = await file_storage_service.listFilesInProjectByUUID(
-        project_uuid
-    )
+    files_info = await file_storage_service.listFilesInProject(project_id)
     return [
         FileInfoResponse(
             id=str(file_info["uid"]),
@@ -125,17 +120,13 @@ async def list_files(
 )
 async def download_file(
     file_id: uuid.UUID,
-    project_uuid: Annotated[uuid.UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
 ):
-    """Download a file by file ID."""
-
     presigned_url = (
-        await file_storage_service.getFileUrlByProjectUUID(
-            file_id, project_uuid
-        )
+        await file_storage_service.getFileUrl(file_id, project_id)
     ).unwrap()
     return RedirectResponse(url=presigned_url)
 
@@ -151,16 +142,13 @@ async def get_file_info_and_presigned_url(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
-    project_uuid: Annotated[uuid.UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
 ) -> FileInfoWithPresignedURLResponse:
-    """Get file URL and info by file ID."""
     (
         presigned_url,
         file_info,
     ) = (
-        await file_storage_service.getFileInfoAndUrlByProjectUUID(
-            file_id, project_uuid
-        )
+        await file_storage_service.getFileInfoAndUrl(file_id, project_id)
     ).unwrap()
     return FileInfoWithPresignedURLResponse(
         id=str(file_info["uid"]),
@@ -184,14 +172,10 @@ async def get_file_info(
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
-    project_uuid: Annotated[uuid.UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
 ):
-    """Get file info by file ID."""
-
     file_info = (
-        await file_storage_service.getFileInfoByProjectUUID(
-            file_id, project_uuid
-        )
+        await file_storage_service.getFileInfo(file_id, project_id)
     ).unwrap()
     return FileInfoResponse(
         id=str(file_info["uid"]),
@@ -211,17 +195,13 @@ async def get_file_info(
 )
 async def get_file_presigned_url(
     file_id: uuid.UUID,
-    project_uuid: Annotated[uuid.UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
 ):
-    """Get presigned URL for file download."""
-
     presigned_url = (
-        await file_storage_service.getFileUrlByProjectUUID(
-            file_id, project_uuid
-        )
+        await file_storage_service.getFileUrl(file_id, project_id)
     ).unwrap()
     return FilePresignedURLResponse(
         url=presigned_url,
@@ -236,17 +216,12 @@ async def get_file_presigned_url(
 )
 async def delete_file(
     file_id: uuid.UUID,
-    project_uuid: Annotated[uuid.UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
 ):
-    """Delete a file by file ID."""
-    (
-        await file_storage_service.deleteFileByProjectUUID(
-            file_id, project_uuid
-        )
-    ).unwrap()
+    (await file_storage_service.deleteFile(file_id, project_id)).unwrap()
     return None
 
 
@@ -259,16 +234,14 @@ async def delete_file(
 async def update_file_metadata(
     file_id: uuid.UUID,
     body: Annotated[UpdateFileMetadataRequest, Body()],
-    project_uuid: Annotated[uuid.UUID, Query()],
+    project_id: Annotated[int, Depends(getProjectId)],
     file_storage_service: Annotated[
         FileStorageService, Depends(getFileStorageService)
     ],
 ):
-    """Update file metadata by file ID."""
-
     (
-        await file_storage_service.updateFileMetadataByProjectUUID(
-            file_id, project_uuid, body.extra_metadata
+        await file_storage_service.updateFileMetadata(
+            file_id, project_id, body.extra_metadata
         )
     ).unwrap()
     return None

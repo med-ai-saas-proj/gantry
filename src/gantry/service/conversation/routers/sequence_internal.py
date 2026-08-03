@@ -1,6 +1,5 @@
-from gantry.management.api_key import ApiKeyInfo, requiredPermissions
+from gantry.shared.dependencies import getProjectId
 
-from .base import conversation_router
 from ..dtos import (
     Message,
     AddMessageRequest,
@@ -16,32 +15,29 @@ from ..services.sequence import SequenceConversationService
 import uuid
 from typing import Literal, Sequence, Annotated
 
-from fastapi import Body, Query, Depends, Security, APIRouter
+from fastapi import Body, Query, Header, Depends, APIRouter
 
 
-sequence_conversation_router = APIRouter()
+sequence_internal_router = APIRouter()
 
 
-@sequence_conversation_router.post(
+@sequence_internal_router.post(
     "/",
-    summary="Create a new conversation",
+    summary="Create a new conversation (internal)",
     description="Endpoint to create a new conversation.",
     response_model=CreateConversationResponse,
     status_code=201,
 )
 async def create_conversation(
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
-    ],
     body: Annotated[CreateConversationRequest, Body()],
+    project_id: Annotated[int, Depends(getProjectId)],
     conversation_service: Annotated[
         SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
-    """Create a new conversation."""
     conversation_uid = (
         await conversation_service.createConversation(
-            project_id=api_key_info["project_id"],
+            project_id=project_id,
             extra_metadata=body.extra_metadata,
             messages=body.messages,
         )
@@ -49,25 +45,22 @@ async def create_conversation(
     return CreateConversationResponse(conversation_uid=conversation_uid)
 
 
-@sequence_conversation_router.get(
+@sequence_internal_router.get(
     "/{conversation_uid}",
-    summary="Get conversation metadata",
+    summary="Get conversation metadata (internal)",
     description="Endpoint to retrieve conversation details by conversation UID.",
     response_model=ConversationMetadataResponse,
 )
 async def get_conversation_metadata(
     conversation_uid: uuid.UUID,
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
-    ],
+    project_id: Annotated[int, Depends(getProjectId)],
     conversation_service: Annotated[
         SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
-    """Get conversation metadata by conversation UID."""
     metadata = (
         await conversation_service.getConversationMetadata(
-            conversation_uid, api_key_info["project_id"]
+            conversation_uid, project_id
         )
     ).unwrap()
     return ConversationMetadataResponse(
@@ -82,66 +75,58 @@ async def get_conversation_metadata(
     )
 
 
-@sequence_conversation_router.put(
+@sequence_internal_router.put(
     "/{conversation_uid}/metadata",
-    summary="Update conversation metadata",
+    summary="Update conversation metadata (internal)",
     description="Endpoint to update conversation metadata by conversation UID.",
     status_code=204,
 )
 async def update_conversation_metadata(
     conversation_uid: uuid.UUID,
     body: Annotated[UpdateConversationMetadataRequest, Body()],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
-    ],
+    project_id: Annotated[int, Depends(getProjectId)],
     conversation_service: Annotated[
         SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
-    """Update conversation metadata by conversation UID."""
     (
         await conversation_service.updateConversationMetadata(
             conversation_uid=conversation_uid,
-            project_id=api_key_info["project_id"],
+            project_id=project_id,
             extra_metadata=body.extra_metadata,
         )
     ).unwrap()
 
 
-@sequence_conversation_router.delete(
+@sequence_internal_router.delete(
     "/{conversation_uid}",
-    summary="Delete a conversation",
+    summary="Delete a conversation (internal)",
     description="Endpoint to delete a conversation by conversation UID.",
     status_code=204,
 )
 async def delete_conversation(
     conversation_uid: uuid.UUID,
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["conversation.delete"]))
-    ],
+    project_id: Annotated[int, Depends(getProjectId)],
     conversation_service: Annotated[
         SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
-    """Delete a conversation by conversation UID."""
     (
         await conversation_service.deleteConversation(
-            conversation_uid, api_key_info["project_id"]
+            conversation_uid, project_id
         )
     ).unwrap()
 
 
-@sequence_conversation_router.get(
+@sequence_internal_router.get(
     "/{conversation_uid}/messages",
-    summary="Get conversation messages",
+    summary="Get conversation messages (internal)",
     description="Endpoint to retrieve conversation details and messages by conversation UID.",
     response_model=Sequence[Message],
 )
 async def get_conversation_messages(
     conversation_uid: uuid.UUID,
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
-    ],
+    project_id: Annotated[int, Depends(getProjectId)],
     conversation_service: Annotated[
         SequenceConversationService, Depends(getSequenceConversationService)
     ],
@@ -149,11 +134,10 @@ async def get_conversation_messages(
     limit: Annotated[int, Query(gt=0, le=100)] = 20,
     order_by: Annotated[Literal["asc", "desc"], Query()] = "asc",
 ):
-    """Get conversation details and messages by conversation UID."""
     messages = (
         await conversation_service.getConversationMessages(
             conversation_uid,
-            api_key_info["project_id"],
+            project_id,
             limit=limit,
             last_cursor=last_cursor,
             order_by=order_by,
@@ -174,18 +158,16 @@ async def get_conversation_messages(
     return res
 
 
-@sequence_conversation_router.post(
+@sequence_internal_router.post(
     "/{conversation_uid}/messages",
-    summary="Add a message to the conversation.",
+    summary="Add a message to the conversation (internal)",
     description="Endpoint to add a new message to the conversation by conversation UID.",
     status_code=201,
 )
 async def add_message_to_conversation(
     conversation_uid: uuid.UUID,
     body: Annotated[AddMessageRequest, Body()],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
-    ],
+    project_id: Annotated[int, Depends(getProjectId)],
     conversation_service: Annotated[
         SequenceConversationService, Depends(getSequenceConversationService)
     ],
@@ -193,57 +175,52 @@ async def add_message_to_conversation(
     (
         await conversation_service.storeConversationMessages(
             conversation_uid=conversation_uid,
-            project_id=api_key_info["project_id"],
+            project_id=project_id,
             msgs=body.messages,
         )
     ).unwrap()
 
 
-@sequence_conversation_router.delete(
+@sequence_internal_router.delete(
     "/{conversation_uid}/messages/{message_uid}",
-    summary="Delete a message from the conversation.",
+    summary="Delete a message from the conversation (internal)",
     description="Endpoint to delete a message from the conversation by conversation UID and message UID.",
     status_code=204,
 )
 async def delete_message_from_conversation(
     conversation_uid: uuid.UUID,
     message_uid: uuid.UUID,
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["conversation.write"]))
-    ],
+    project_id: Annotated[int, Depends(getProjectId)],
     conversation_service: Annotated[
         SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
-    """Delete a message from the conversation by conversation UID and message UID."""
     (
         await conversation_service.deleteConversationMessage(
             conversation_uid=conversation_uid,
-            project_id=api_key_info["project_id"],
+            project_id=project_id,
             message_uid=message_uid,
         )
     ).unwrap()
 
 
-@sequence_conversation_router.post(
+@sequence_internal_router.post(
     "/{conversation_uid}/messages/bulk",
-    summary="Get multiple messages by UIDs from the conversation.",
+    summary="Get multiple messages by UIDs from the conversation (internal)",
     description="Endpoint to retrieve multiple specific messages from the conversation by conversation UID and message UIDs.",
     response_model=Sequence[Message],
 )
 async def get_messages_from_conversation(
     conversation_uid: uuid.UUID,
     body: Annotated[GetMessagesByUuidsRequest, Body()],
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
-    ],
+    project_id: Annotated[int, Depends(getProjectId)],
     conversation_service: Annotated[
         SequenceConversationService, Depends(getSequenceConversationService)
     ],
 ):
     res = await conversation_service.getConversationMessagesByUuids(
         conversation_uid=conversation_uid,
-        project_id=api_key_info["project_id"],
+        project_id=project_id,
         message_uids=body.message_uids,
     )
     return [
@@ -258,18 +235,16 @@ async def get_messages_from_conversation(
     ]
 
 
-@sequence_conversation_router.get(
+@sequence_internal_router.get(
     "/{conversation_uid}/messages/{message_uid}",
-    summary="Get a specific message from the conversation.",
+    summary="Get a specific message from the conversation (internal)",
     description="Endpoint to retrieve a specific message from the conversation by conversation UID and message UID.",
     response_model=Message,
 )
 async def get_message_from_conversation(
     conversation_uid: uuid.UUID,
     message_uid: uuid.UUID,
-    api_key_info: Annotated[
-        ApiKeyInfo, Security(requiredPermissions(["conversation.read"]))
-    ],
+    project_id: Annotated[int, Depends(getProjectId)],
     conversation_service: Annotated[
         SequenceConversationService, Depends(getSequenceConversationService)
     ],
@@ -277,7 +252,7 @@ async def get_message_from_conversation(
     res = (
         await conversation_service.getConversationMessageByUuid(
             conversation_uid=conversation_uid,
-            project_id=api_key_info["project_id"],
+            project_id=project_id,
             message_uid=message_uid,
         )
     ).unwrap()
@@ -288,8 +263,3 @@ async def get_message_from_conversation(
         timestamp=res.timestamp,
         extra_metadata=res.extra_metadata,
     )
-
-
-conversation_router.include_router(
-    sequence_conversation_router, prefix="/sequence"
-)

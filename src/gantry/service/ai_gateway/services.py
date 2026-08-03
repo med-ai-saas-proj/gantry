@@ -4,10 +4,8 @@ from gantry.service.conversation import (
     Message,
     TreeConversationService,
 )
-from gantry.management.project.repositories import ProjectRepository
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
-    InternalServiceError,
 )
 
 from .settings import AiGatewaySettings
@@ -39,7 +37,7 @@ from pydantic_ai.providers import Provider, infer_provider_class
 def _meta_infer_provider(api_key: str | None, base_url: str | None):
     def _infer_provider(provider: str) -> Provider[Any]:
         provider_class = infer_provider_class(provider)
-        return provider_class(api_key=api_key, base_url=base_url)
+        return provider_class(api_key=api_key, base_url=base_url)  # type: ignore
 
     return _infer_provider
 
@@ -56,12 +54,10 @@ class AiGatewayService:
         settings: AiGatewaySettings,
         tree_conversation_service: TreeConversationService,
         session_manager: AsyncSessionManager,
-        project_repo: ProjectRepository,
     ) -> None:
         self.settings = settings
         self.tree_conversation_service = tree_conversation_service
         self.session_manager = session_manager
-        self.project_repo = project_repo
         self.agent: dict[str, Agent] = {}
         models: dict[str, Model] = {}
         for model_name, specs in settings.models.items():
@@ -385,41 +381,6 @@ class AiGatewayService:
     @classmethod
     def getTimestamp(cls):
         return int(datetime.now(UTC).timestamp() * 1000)
-
-    async def routeWithProjectUUID(
-        self,
-        model: str,
-        project_uid: uuid.UUID,
-        run_input: RunAgentInput,
-        model_settings: ModelSettings,
-        max_turns: int = 100,
-        system_prompt: str | list[str] | None = None,
-        reserved_tokens: int = 0,
-    ) -> Result[AsyncIterator[str], ModelNotFound]:
-        return await self._wrapProjectUUID(
-            project_uid,
-            self.route,
-            model=model,
-            run_input=run_input,
-            model_settings=model_settings,
-            system_prompt=system_prompt,
-            max_turns=max_turns,
-            reserved_tokens=reserved_tokens,
-        )
-
-    async def _wrapProjectUUID(
-        self, project_uid: uuid.UUID, async_func, **kwargs
-    ):
-        async with self.session_manager.get_session() as session:
-            project = await self.project_repo.getByUuid(
-                session, str(project_uid)
-            )
-            if not project:
-                raise InternalServiceError(
-                    message=f"Project with UUID {project_uid} not found."
-                )
-            project_id = project.id
-        return await async_func(project_id=project_id, **kwargs)
 
     def getModels(self) -> list[str]:
         return list(self.agent.keys())

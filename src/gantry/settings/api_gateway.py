@@ -42,6 +42,12 @@ class ApiGatewayRoute(BaseSettings):
             description="Maximum requests per minute for this route.",
         ),
     ] = None
+    proxy_redirect: Annotated[
+        dict[str, str],
+        Field(
+            description="Mapping of original URLs to redirect URLs for proxying.",
+        ),
+    ] = {}
 
 
 class ApiGatewaySettings(BaseSettings):

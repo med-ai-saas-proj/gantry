@@ -45,7 +45,7 @@ class UpdateFileMetadataRequest(BaseModel):
     extra_metadata: dict[str, str | int | float | None] | None
 
     @model_validator(mode="after")
-    def validate_extra_metadata(cls, v):
+    def validate_extra_metadata(v):
         if v is not None and v.extra_metadata is not None:
             if len(v.extra_metadata) > MAX_METADATA_KEY:
                 raise ValueError(

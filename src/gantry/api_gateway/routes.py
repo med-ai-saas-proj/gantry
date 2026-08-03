@@ -1,8 +1,10 @@
 from gantry.settings import AppStage, getAppSettings
+from gantry.shared.health import setup_health_routes
 from gantry.management.api_key import (
     ApiKeyInfo,
     ApiKeyService,
     ApiKeyHeaderNotFound,
+    getApiKeyInfo,
     api_key_header,
     getApiKeyService,
 )
@@ -134,6 +136,10 @@ def _inject_api_key_context_headers(
 
 
 @gateway_app.api_route(
+    "/{route_name}/{full_path:path}/",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
+@gateway_app.api_route(
     "/{route_name}/{full_path:path}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
 )
@@ -163,6 +169,10 @@ async def gateway_proxy_with_path(
     )
 
 
+@gateway_app.api_route(
+    "/{route_name}/",
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+)
 @gateway_app.api_route(
     "/{route_name}",
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
@@ -202,6 +212,7 @@ async def _gateway_proxy(
     api_key_service: Annotated[ApiKeyService, Depends(getApiKeyService)],
     background_tasks: BackgroundTasks,
 ):
+    # print(f"Incoming request for route: {route_name}, full_path: {full_path}")
     destination = gateway_service.getDestination(route_name=route_name).unwrap()
     if destination.require_key:
         if api_key is None:
@@ -232,6 +243,13 @@ async def _gateway_proxy(
     incoming_headers.update(_build_forwarded_headers(request))
     if apikey_info is not None:
         incoming_headers.update(_inject_api_key_context_headers(apikey_info))
+
+    original_host = request.headers.get("host", "")
+    incoming_headers["X-Forwarded-Host"] = original_host
+    incoming_headers["X-Forwarded-Proto"] = request.url.scheme
+    incoming_headers["X-Forwarded-For"] = (
+        request.client.host if request.client else ""
+    )
 
     request_timeout = getApiGatewaySettings().request_timeout.total_seconds()
 

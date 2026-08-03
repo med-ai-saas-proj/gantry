@@ -18,6 +18,7 @@ class TestRagInsert(unittest.IsolatedAsyncioTestCase):
                     "ef_construction": 200,
                 },
                 "ops_type": VectorOpsType.cosine,
+                "half_precision": False,
             }
         )
         EmbeddingModel = get_orm_class(table_name, 1536)

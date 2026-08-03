@@ -6,7 +6,6 @@ from gantry.service.file_storage.services import (
     FileStorageService,
     FileNotFoundInSystemError,
 )
-from gantry.management.project.repositories import ProjectRepository
 from gantry.service.file_storage.repositories import FileRepository
 from gantry.shared.custom_types.error_exception import (
     RecoverableError,
@@ -47,7 +46,7 @@ from typing import Any, Sequence, Awaitable, TypedDict, cast
 from datetime import datetime
 
 from openai import AsyncOpenAI
-from sqlalchemy import or_, cast as sqlalchemy_cast, func, delete, select
+from sqlalchemy import or_, func, delete, select
 from redis.asyncio import Redis
 from structlog.stdlib import BoundLogger
 from langchain_text_splitters import (
@@ -120,7 +119,6 @@ class RagService:
     def __init__(
         self,
         session_manager: AsyncSessionManager,
-        project_repo: ProjectRepository,
         file_repo: FileRepository,
         setting: RagSettings,
         file_storage_service: FileStorageService,
@@ -130,7 +128,6 @@ class RagService:
         reranker: Reranker,
     ):
         self.session_manager = session_manager
-        self.project_repo = project_repo
         self.file_repo = file_repo
         self.setting = setting
         self.file_storage_service = file_storage_service
@@ -1400,28 +1397,6 @@ class RagService:
 
         return Ok(task_id)
 
-    async def addFileByProjectUid(
-        self,
-        file_uid: uuid.UUID,
-        project_uid: uuid.UUID,
-        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
-        chunk_size: int = 1000,
-        chunk_overlap: int = 150,
-        lang: str = "simple",
-        chunk_splitter_options: ChunkSplitterOptions | None = None,
-    ) -> Result[str, FileNotFoundInSystemError | InternalServiceError]:
-        return await self._wrapProjectUUID(
-            project_uid,
-            self.addFile,
-            file_uid=file_uid,
-            project_uuid=project_uid,
-            chunk_splitter=chunk_splitter,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            lang=lang,
-            chunk_splitter_options=chunk_splitter_options,
-        )
-
     async def addText(
         self,
         text: str | list[str],
@@ -1470,30 +1445,6 @@ class RagService:
 
         return Ok(task_id)
 
-    async def addTextByProjectUid(
-        self,
-        text: str | list[str],
-        project_uid: uuid.UUID,
-        chunk_splitter: ChunkSplitterType = ChunkSplitterType.recursive,
-        chunk_size: int = 1000,
-        chunk_overlap: int = 150,
-        metadata: dict | None = None,
-        lang: str = "simple",
-        chunk_splitter_options: ChunkSplitterOptions | None = None,
-    ) -> Result[str, InternalServiceError]:
-        return await self._wrapProjectUUID(
-            project_uid,
-            self.addText,
-            text=text,
-            project_uuid=project_uid,
-            chunk_splitter=chunk_splitter,
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            metadata=metadata,
-            lang=lang,
-            chunk_splitter_options=chunk_splitter_options,
-        )
-
     async def getTaskStatus(
         self,
         task_id: str,
@@ -1533,17 +1484,6 @@ class RagService:
                 status=task_dict["status"],
                 failed_reason=task_dict.get("failed_reason"),
             )
-        )
-
-    async def getTaskStatusByProjectUid(
-        self,
-        task_id: str,
-        project_uid: uuid.UUID,
-    ) -> Result[EmbeddingTask, TaskNotFoundError]:
-        return await self._wrapProjectUUID(
-            project_uid,
-            self.getTaskStatus,
-            task_id=task_id,
         )
 
     async def addEmbedding(
@@ -1626,15 +1566,6 @@ class RagService:
                 }
                 for file_info in files_info
             ]
-
-    async def getFilesInRagByProjectUid(
-        self,
-        project_uid: uuid.UUID,
-    ) -> Sequence[FileRecord]:
-        return await self._wrapProjectUUID(
-            project_uid,
-            self.getFilesInRag,
-        )
 
     def getSupportedLanguages(self) -> Sequence[str]:
         return self.setting.supported_langs_list
@@ -1751,34 +1682,6 @@ class RagService:
             sorted_final_records, include_embedding
         )
         return Ok(results)
-
-    async def querySimilarByTextByProjectUid(
-        self,
-        project_uid: uuid.UUID,
-        query: str,
-        filters: QueryFilterByFileMetadata | QueryFilterByFileUid | None = None,
-        top_k: int = 5,
-        include_embedding: bool = False,
-        hybrid_search: bool = False,
-        hybrid_search_bm25_top_k: int = 100,
-        hybrid_search_semantic_top_k: int = 5,
-        hybrid_search_bm25_lang: str = "simple",
-    ) -> Result[
-        Sequence[RagQueryRecord],
-        FileNotFoundInSystemError | InvalidEmbeddingDimensionError,
-    ]:
-        return await self._wrapProjectUUID(
-            project_uid,
-            self.querySimilarByText,
-            query=query,
-            filters=filters,
-            top_k=top_k,
-            include_embedding=include_embedding,
-            hybrid_search=hybrid_search,
-            hybrid_search_bm25_top_k=hybrid_search_bm25_top_k,
-            hybrid_search_semantic_top_k=hybrid_search_semantic_top_k,
-            hybrid_search_bm25_lang=hybrid_search_bm25_lang,
-        )
 
     async def _resolveFilteredFileIds(
         self,
@@ -2059,17 +1962,3 @@ class RagService:
                     }
                 )
             return Ok(records)
-
-    async def _wrapProjectUUID(
-        self, project_uid: uuid.UUID, async_func, **kwargs
-    ):
-        async with self.session_manager.get_session() as session:
-            project = await self.project_repo.getByUuid(
-                session, str(project_uid)
-            )
-            if not project:
-                raise InternalServiceError(
-                    message=f"Project with UUID {project_uid} not found."
-                )
-            project_id = project.id
-        return await async_func(project_id=project_id, **kwargs)

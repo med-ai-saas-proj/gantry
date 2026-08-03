@@ -4,19 +4,17 @@ from gantry.api_gateway.routes import (
     filter_headers,
     _inject_api_key_context_headers,
 )
+from gantry.management.api_key.entities import ApiKeyInfo
 
 import json
 
-from pydantic import AnyUrl
 
-
-def _api_key_info_payload() -> dict:
+def _api_key_info_payload() -> ApiKeyInfo:
     return {
         "api_key_id": 10,
         "api_key_uuid": "api-key-1",
         "project_id": 20,
         "project_uuid": "11111111-1111-1111-1111-111111111111",
-        "org_id": "org-1",
         "organization_uuid": "org-1",
         "user_uuid": "user-1",
         "hashed_key": "hashed",
