@@ -51,7 +51,7 @@ async def simple_query_log(
             else:
                 filters_dict[key] = [value]
 
-    res = log_query_service.search_logs(
+    res = await log_query_service.search_logs(
         user_info["org_uuid"],
         common_const.APP_NAME,
         start,
@@ -74,7 +74,7 @@ async def query_log(
     user_info: Annotated[UserInfo, Depends(getUserInfo)],
     query_request: Annotated[QueryLogRequest, Body()],
 ) -> list[dict]:
-    res = log_query_service.search_logs(
+    res = await log_query_service.search_logs(
         user_info["org_uuid"],
         common_const.APP_NAME,
         query_request.start,

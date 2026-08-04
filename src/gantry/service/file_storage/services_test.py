@@ -10,6 +10,7 @@ from unittest.mock import ANY, Mock, AsyncMock, patch
 
 os.environ.setdefault("GANTRY_SERVER__CONFIG_FILE", "gantry.toml")
 
+from pyrusult import Ok, ResultStatus
 from gantry.db.session import AsyncSessionManager
 from gantry.service.file_storage.models import FileStatus
 from gantry.service.file_storage.services import (
@@ -17,8 +18,6 @@ from gantry.service.file_storage.services import (
     FileNotFoundInSystemError,
 )
 from gantry.service.file_storage.settings import ObjectStorageSettings
-
-from pyrusult import Ok, ResultStatus
 
 
 class _SessionContext:

@@ -6,6 +6,7 @@ import datetime
 from typing import Literal, TypedDict
 
 import httpx
+from structlog.stdlib import BoundLogger
 
 
 LOG_QUERY_ENDPOINT = "/loki/api/v1/query_range"
@@ -50,10 +51,11 @@ class LogQueryServiceError(RecoverableError):
 
 
 class LogQueryService:
-    def __init__(self, http_client: httpx.Client):
+    def __init__(self, http_client: httpx.AsyncClient, logger: BoundLogger):
         self.http_client = http_client
+        self.logger = logger
 
-    def search_logs(
+    async def search_logs(
         self,
         org_id: str,
         service_name: str,
@@ -102,11 +104,11 @@ class LogQueryService:
         query = f"{selector} {' '.join(pipeline)}".strip()
 
         # print(f"Querying logs with query: {query}, start: {start}, end: {end}, limit: {limit}, direction: {direction}")
-        return self.query_logs(
+        return await self.query_logs(
             query=query, start=start, end=end, limit=limit, direction=direction
         )
 
-    def query_logs(
+    async def query_logs(
         self,
         query: str,
         start: int | float | datetime.datetime,
@@ -126,7 +128,9 @@ class LogQueryService:
         }
 
         try:
-            response = self.http_client.get(LOG_QUERY_ENDPOINT, params=params)
+            response = await self.http_client.get(
+                LOG_QUERY_ENDPOINT, params=params
+            )
             response.raise_for_status()
             res = response.json()
             if "data" in res and "result" in res["data"]:
@@ -140,14 +144,25 @@ class LogQueryService:
                             logs.append(log_line)
                 return Ok(logs)
             else:
+                self.logger.error(
+                    "Invalid response structure from Loki", response=res
+                )
                 return Err(InvalidLogQueryError())
         except httpx.HTTPStatusError as exc:
             # print(f"HTTP error occurred: {exc.response.status_code} - {exc.response.text}")
+            self.logger.error(
+                "HTTP error occurred while querying logs",
+                status_code=exc.response.status_code,
+                text=exc.response.text,
+            )
             return Err(InvalidLogQueryError())
         except httpx.RequestError as exc:
+            self.logger.error(
+                "Request error occurred while querying logs", error=str(exc)
+            )
             return Err(LogQueryServiceError())
 
-    def get_log_labels(
+    async def get_log_labels(
         self,
         start: int | float | datetime.datetime,
         end: int | float | datetime.datetime,
@@ -159,19 +174,34 @@ class LogQueryService:
         }
 
         try:
-            response = self.http_client.get(LOG_LABEL_ENDPOINT, params=params)
+            response = await self.http_client.get(
+                LOG_LABEL_ENDPOINT, params=params
+            )
             response.raise_for_status()
             res = response.json()
             if "data" in res and isinstance(res["data"], list):
                 return Ok(res["data"])
             else:
+                self.logger.error(
+                    "Invalid response structure from Loki for labels",
+                    response=res,
+                )
                 return Err(InvalidLogQueryError())
         except httpx.HTTPStatusError as exc:
+            self.logger.error(
+                "HTTP error occurred while getting log labels",
+                status_code=exc.response.status_code,
+                text=exc.response.text,
+            )
             return Err(InvalidLogQueryError())
         except httpx.RequestError as exc:
+            self.logger.error(
+                "Request error occurred while getting log labels",
+                error=str(exc),
+            )
             return Err(LogQueryServiceError())
 
-    def get_log_label_values(
+    async def get_log_label_values(
         self,
         label_name: str,
         start: int | float | datetime.datetime,
@@ -185,16 +215,29 @@ class LogQueryService:
 
         endpoint = LOG_LABEL_VALUE_ENDPOINT.replace("<name>", label_name)
         try:
-            response = self.http_client.get(endpoint, params=params)
+            response = await self.http_client.get(endpoint, params=params)
             response.raise_for_status()
             res = response.json()
             if "data" in res and isinstance(res["data"], list):
                 return Ok(res["data"])
             else:
+                self.logger.error(
+                    "Invalid response structure from Loki for label values",
+                    response=res,
+                )
                 return Err(InvalidLogQueryError())
         except httpx.HTTPStatusError as exc:
+            self.logger.error(
+                "HTTP error occurred while getting log label values",
+                status_code=exc.response.status_code,
+                text=exc.response.text,
+            )
             return Err(InvalidLogQueryError())
         except httpx.RequestError as exc:
+            self.logger.error(
+                "Request error occurred while getting log label values",
+                error=str(exc),
+            )
             return Err(LogQueryServiceError())
 
 

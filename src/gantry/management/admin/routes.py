@@ -1,7 +1,6 @@
 """Admin-only management routes."""
 
-from gantry.settings import ApiGatewayRoute
-from gantry.settings import getAppSettings
+from gantry.settings import ApiGatewayRoute, getAppSettings
 from gantry.management.auth import AdminInfo, getAdminInfo
 from gantry.management.api_key.dtos import (
     ApiKeyResponse,
@@ -670,10 +669,11 @@ async def reset_user_permissions(
     del user_info
     return await admin_service.resetUserPermissions(user_id)
 
+
 @admin_router.get(
     "/registered-routes",
     summary="Get registered routes",
-    response_model=dict[str, ApiGatewayRoute]
+    response_model=dict[str, ApiGatewayRoute],
 )
 async def getRegisteredRoutes(
     user_info: Annotated[AdminInfo, Depends(getAdminInfo)],
