@@ -303,7 +303,11 @@ class ApiKeyService:
             description=str(api_key["description"]),
             hint=str(api_key["hint"]),
             created_at=api_key["created_at"],
-            permissions=list(api_key["permissions"]),
+            permissions=[
+                perm
+                for perm in api_key["permissions"]
+                if perm in self.permissions_ids_set
+            ],
             disabled=bool(api_key["disabled"]),
         )
 
