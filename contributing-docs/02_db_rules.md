@@ -1,1 +1,0 @@
-- Avoid sharing tables between class
