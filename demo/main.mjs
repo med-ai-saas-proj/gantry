@@ -2,11 +2,11 @@ import express from "express";
 import { HttpAgent } from "@ag-ui/client";
 
 const app = express();
-app.use(express.json());
 app.use((req, res, next) => {
   console.log(`${req.method} request received at ${req.url}`);
   next(); // Always call next to move to the next handler!
 });
+app.use(express.json());
 
 const structure_output_tool = {
   name: "output",
@@ -79,8 +79,12 @@ function calculatePrice(json) {
   return { value: Math.round(json.length / 100), scale: 1 };
 }
 
+app.get("/health", async (req, res) => {
+  res.status(200).send({ hello: "world" });
+});
+
 app.post("/ocr", async (req, res) => {
-  // Trả tiền theo số lượt sử dụngdụng, mỗi lượt dùng trả $1
+  // Trả tiền theo số lượt sử dụng, mỗi lượt dùng trả $1
   const text = await runOCR(req.body.image);
   res.status(200).send({ raw: text });
 });
@@ -101,6 +105,11 @@ app.post("/structured-ocr", async (req, res) => {
       amount: { value: 1 + 10, scale: 1 }, // $1 OCR + $10 LLM
     }),
   });
+  if (hold_response.status > 400) {
+    const error = await hold_response.text();
+    res.status(hold_response.status).send({ error });
+    return;
+  }
   const hold_id = await hold_response.text();
 
   const text = await runOCR(req.body.image);
@@ -137,10 +146,6 @@ app.post("/structured-ocr", async (req, res) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ real_amount: calculatePrice(json) }),
   });
-});
-
-app.get("/health", async (req, res) => {
-  res.status(200).send({ hello: "world" });
 });
 
 const port = 6969;
